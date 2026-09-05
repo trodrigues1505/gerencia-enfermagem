@@ -11,10 +11,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="GE Enfermagem">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<!-- React -->
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<!-- html2canvas para exportar PNG do kanban -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -28,6 +26,7 @@ input,select,textarea,button{font-family:inherit}
 .scroll-col{overflow-y:auto}
 .scroll-col::-webkit-scrollbar{width:3px}
 .scroll-col::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:99px}
+kbd{font-family:monospace}
 #install-banner{display:none;position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#0F172A;color:#fff;padding:10px 18px;border-radius:12px;font-size:13px;font-weight:600;z-index:9997;box-shadow:0 4px 20px rgba(0,0,0,.3);gap:10px;align-items:center;white-space:nowrap}
 #install-banner.show{display:flex}
 </style>
@@ -40,32 +39,26 @@ input,select,textarea,button{font-family:inherit}
   <button onclick="document.getElementById('install-banner').classList.remove('show')" style="background:none;border:none;color:#94A3B8;cursor:pointer;font-size:16px;margin-left:4px">✕</button>
 </div>
 <script>
-// PWA Service Worker — ignora chrome-extension
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
     navigator.serviceWorker.register('sw.js')
-      .then(reg => console.log('SW registrado:', reg.scope))
-      .catch(() => {});
+      .catch(()=>{});
   });
 }
-// Install prompt
 let deferredPrompt;
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  deferredPrompt = e;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();deferredPrompt=e;
   document.getElementById('install-banner').classList.add('show');
 });
-document.getElementById('btn-install').onclick = function() {
-  if (!deferredPrompt) return;
+document.getElementById('btn-install').onclick=function(){
+  if(!deferredPrompt)return;
   deferredPrompt.prompt();
-  deferredPrompt.userChoice.then(() => {
-    deferredPrompt = null;
+  deferredPrompt.userChoice.then(()=>{
+    deferredPrompt=null;
     document.getElementById('install-banner').classList.remove('show');
   });
 };
-window.addEventListener('appinstalled', () => {
-  document.getElementById('install-banner').classList.remove('show');
-});
+window.addEventListener('appinstalled',()=>document.getElementById('install-banner').classList.remove('show'));
 </script>
 <script>
 const {
@@ -1103,7 +1096,8 @@ function ShareModal({
   cards,
   cols,
   showT,
-  exportPNG
+  exportPNG,
+  generatePDF
 }) {
   const text = buildText(cards, cols, settings);
   function doShare() {
@@ -1155,7 +1149,8 @@ function ShareModal({
     }
   }, text)), /*#__PURE__*/React.createElement("div", {
     style: {
-      display: "flex",
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
       gap: 8,
       marginBottom: 10
     }
@@ -1163,14 +1158,37 @@ function ShareModal({
     variant: "ghost",
     onClick: () => {
       onClose();
-      setTimeout(() => exportPNG(), 100);
+      setTimeout(() => exportPNG(), 200);
     },
     style: {
-      flex: 1,
-      fontSize: 13,
-      padding: "10px"
+      fontSize: 12,
+      padding: "9px",
+      textAlign: "center"
     }
-  }, "📷 Baixar PNG do Kanban")), /*#__PURE__*/React.createElement(Btn, {
+  }, "🖼 PNG do Kanban"), /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: () => {
+      onClose();
+      setTimeout(() => generatePDF("text"), 200);
+    },
+    style: {
+      fontSize: 12,
+      padding: "9px",
+      textAlign: "center"
+    }
+  }, "📄 PDF Formatado"), /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: () => {
+      onClose();
+      setTimeout(() => generatePDF("visual"), 200);
+    },
+    style: {
+      fontSize: 12,
+      padding: "9px",
+      textAlign: "center",
+      gridColumn: "1/-1"
+    }
+  }, "🗂 PDF Visual do Kanban completo")), /*#__PURE__*/React.createElement(Btn, {
     variant: "wa",
     onClick: doShare,
     style: {
@@ -1813,7 +1831,20 @@ function KCard({
       fontSize: 10,
       color: "#94A3B8"
     }
-  }, "🔄 ", c.cross_info), hasAceite && /*#__PURE__*/React.createElement("div", {
+  }, "Cross: ", c.cross_info), (() => {
+    if (!c.created_at) return null;
+    const hrs = Math.floor((Date.now() - new Date(c.created_at).getTime()) / 3600000);
+    if (hrs < 1) return null;
+    const color = hrs >= 24 ? "#EF4444" : hrs >= 12 ? "#F59E0B" : "#94A3B8";
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 2,
+        fontSize: 9,
+        color,
+        fontWeight: hrs >= 12 ? 700 : 400
+      }
+    }, hrs >= 24 ? Math.floor(hrs / 24) + "d " : "", hrs % 24 > 0 ? hrs % 24 + "h " : "", "no sistema");
+  })(), hasAceite && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 3,
       fontSize: 10,
@@ -2126,6 +2157,114 @@ function Dashboard({
       fontWeight: 600
     }
   }, "⚠️ ", evadiu, " evasão", evadiu > 1 ? "ões" : ""))));
+}
+
+/* ─── HISTORY PANEL ─── */
+function HistoryPanel() {
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    sbGet("card_history", "order=created_at.desc&limit=100").then(rows => {
+      setHistory(rows);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+  const actionColor = {
+    "criou card": "#16A34A",
+    "editou card": "#3B82F6",
+    "excluiu card": "#EF4444",
+    "restaurou card": "#8B5CF6",
+    "moveu": "#F59E0B"
+  };
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 16,
+      color: "#0F172A",
+      marginBottom: 4
+    }
+  }, "Histórico de alterações"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#64748B",
+      marginBottom: 16
+    }
+  }, "Últimas 100 ações registradas"), loading && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: 32,
+      color: "#94A3B8"
+    }
+  }, "Carregando…"), !loading && history.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: 32,
+      color: "#CBD5E1",
+      fontSize: 13
+    }
+  }, "Nenhuma ação registrada ainda."), history.map(h => {
+    const actionKey = Object.keys(actionColor).find(k => h.action.startsWith(k));
+    const color = actionColor[actionKey] || "#64748B";
+    return /*#__PURE__*/React.createElement("div", {
+      key: h.id,
+      style: {
+        background: "#fff",
+        border: "1px solid #E2E8F0",
+        borderLeft: `3px solid ${color}`,
+        borderRadius: 8,
+        padding: "10px 14px",
+        marginBottom: 6,
+        display: "flex",
+        gap: 12,
+        alignItems: "flex-start"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        alignItems: "center",
+        marginBottom: 2
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 600,
+        fontSize: 12,
+        color: "#0F172A"
+      }
+    }, h.user_nome || "Sistema"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color,
+        fontWeight: 600
+      }
+    }, h.action)), h.new_value?.nome && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "#64748B"
+      }
+    }, h.new_value.nome), h.old_value?.nome && !h.new_value && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "#64748B"
+      }
+    }, h.old_value.nome)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "#94A3B8",
+        whiteSpace: "nowrap",
+        flexShrink: 0
+      }
+    }, new Date(h.created_at).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    })));
+  }));
 }
 
 /* ─── USERS PANEL ─── */
@@ -2583,6 +2722,7 @@ function App() {
   const [toast, setToast] = useState(null);
   const [undoQueue, setUndoQueue] = useState([]); // desfazer exclusão
   const [loading, setLoading] = useState(true);
+  const [showHistory, setShowHistory] = useState(false);
   const dragId = useRef(null);
   const dragOverCol = useRef(null);
   const newColRef = useRef(null);
@@ -2609,6 +2749,30 @@ function App() {
     }, 5000);
     return () => clearInterval(iv);
   }, [currentUser]);
+
+  // Atalhos de teclado
+  useEffect(() => {
+    function handleKey(e) {
+      if (!currentUser || !isAdmin) return;
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") return;
+      if (e.key === "n" || e.key === "N") {
+        e.preventDefault();
+        newCard();
+      }
+      if (e.key === "p" || e.key === "P") {
+        e.preventDefault();
+        setShowPub(true);
+      }
+      if (e.key === "Escape") {
+        setSelected(null);
+        setShowPub(false);
+        setShowShare(false);
+        setShowSettings(false);
+      }
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [currentUser, isAdmin]);
   async function loadAll() {
     setLoading(true);
     try {
@@ -2796,6 +2960,10 @@ function App() {
 
   /* ── Comments ── */
   async function onAddComment(cardId, texto) {
+    if (!userId) {
+      showT("Faça login para comentar.", "err");
+      return;
+    }
     try {
       const data = await fn("comments-write", {
         action: "create",
@@ -2807,7 +2975,7 @@ function App() {
         [cardId]: [...(p[cardId] || []), data]
       }));
     } catch (ex) {
-      showT(ex.message, "err");
+      showT("Erro ao comentar: " + ex.message, "err");
     }
   }
   async function onDelComment(commentId, cardId) {
@@ -2910,27 +3078,349 @@ function App() {
     }
   }
   async function exportPNG() {
-    const el = document.getElementById("kanban-board");
-    if (!el) {
-      showT("Abra o Kanban para exportar.", "err");
-      return;
-    }
-    showT("Gerando imagem...");
+    showT("Gerando imagem do Kanban completo...");
     try {
-      const canvas = await html2canvas(el, {
+      // Cria container temporário fora da viewport com TUDO expandido
+      const wrap = document.createElement("div");
+      wrap.style.cssText = "position:fixed;left:-9999px;top:0;background:#F1F5F9;padding:20px;display:flex;gap:10px;align-items:flex-start;font-family:Inter,system-ui,sans-serif;min-width:max-content;";
+      const colsToRender = isAdmin ? cols : pubCols || cols;
+      const cardsToRender = isAdmin ? cards : pubCards || [];
+      colsToRender.forEach(col => {
+        const colCards = cardsToRender.filter(c => c.col_id === col.id);
+        const colDiv = document.createElement("div");
+        colDiv.style.cssText = "background:#fff;border-radius:10px;border:1px solid #E2E8F0;width:240px;flex-shrink:0;overflow:visible;border-top:3px solid " + (col.accent || "#94A3B8") + ";";
+
+        // Header
+        const hdr = document.createElement("div");
+        hdr.style.cssText = "padding:10px 12px;border-bottom:1px solid #F1F5F9;";
+        hdr.innerHTML = "<div style='font-weight:700;font-size:12px;color:#0F172A;'>" + (col.emoji || "") + " " + col.label + "</div>" + "<div style='font-size:9px;color:#94A3B8;margin-top:1px;'>" + (col.sub || "") + "</div>" + "<span style='display:inline-block;background:#F1F5F9;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;color:#475569;margin-top:5px;'>" + colCards.length + "</span>";
+        colDiv.appendChild(hdr);
+
+        // Cards
+        const body = document.createElement("div");
+        body.style.cssText = "padding:8px;";
+        colCards.forEach(c => {
+          const gc = {
+            emergencia: "#EF4444",
+            urgencia: "#EAB308",
+            andamento_cor: "#F59E0B",
+            menor_gravidade: "#22C55E",
+            finalizado_cor: "#A855F7",
+            agendamento: "#94A3B8",
+            retorno: "#EC4899"
+          };
+          const dot = gc[c.grav] || "#EAB308";
+          const card = document.createElement("div");
+          card.style.cssText = "background:#fff;border:1px solid #E2E8F0;border-left:3px solid " + dot + ";border-radius:8px;padding:9px 10px;margin-bottom:6px;";
+          let html = "";
+          if (c.pr) html += "<div style='font-size:9px;font-weight:700;color:#94A3B8;margin-bottom:1px;'>#" + c.pr + "</div>";
+          html += "<div style='font-weight:600;font-size:12px;color:#0F172A;margin-bottom:4px;'>" + (c.is_rn ? "👶 " : "") + c.nome + "</div>";
+          if (c.hd) html += "<div style='font-size:11px;color:#374151;margin-bottom:3px;'><span style='color:#CBD5E1;'>HD: </span>" + c.hd + "</div>";
+          if (c.setor || c.rec) {
+            html += "<div style='display:flex;gap:4px;flex-wrap:wrap;margin-bottom:3px;'>";
+            if (c.setor) html += "<span style='font-size:10px;background:#F1F5F9;color:#475569;padding:1px 5px;border-radius:3px;'>" + c.setor + "</span>";
+            if (c.rec) html += "<span style='font-size:10px;background:#EFF6FF;color:#1E40AF;padding:1px 5px;border-radius:3px;'>" + c.rec + "</span>";
+            html += "</div>";
+          }
+          if (c.hosp) html += "<div style='font-size:10px;color:#64748B;'>→ <strong>" + c.hosp + "</strong></div>";
+          if (c.cross_info) html += "<div style='font-size:10px;color:#94A3B8;margin-top:2px;'>Cross: " + c.cross_info + "</div>";
+          if (c.receptor) html += "<div style='font-size:10px;color:#16A34A;margin-top:2px;'>Receptor: " + c.receptor + "</div>";
+          if (c.status) html += "<div style='font-size:9px;font-weight:700;color:#64748B;margin-top:3px;text-transform:uppercase;'>" + c.status + "</div>";
+          card.innerHTML = html;
+          body.appendChild(card);
+        });
+        colDiv.appendChild(body);
+        wrap.appendChild(colDiv);
+      });
+      document.body.appendChild(wrap);
+      await new Promise(r => setTimeout(r, 100)); // aguarda render
+
+      const canvas = await html2canvas(wrap, {
         scale: 2,
         backgroundColor: "#F1F5F9",
         useCORS: true,
         logging: false,
-        windowWidth: el.scrollWidth + 40
+        width: wrap.scrollWidth,
+        height: wrap.scrollHeight,
+        windowWidth: wrap.scrollWidth,
+        windowHeight: wrap.scrollHeight
       });
+      document.body.removeChild(wrap);
       const a = document.createElement("a");
       a.href = canvas.toDataURL("image/png");
       a.download = "kanban-" + new Date().toLocaleDateString("pt-BR").replace(/\//g, "-") + ".png";
       a.click();
-      showT("PNG exportado!");
+      showT("PNG exportado com sucesso!");
     } catch (e) {
       showT("Erro ao gerar PNG: " + e.message, "err");
+    }
+  }
+  async function generatePDF(mode) {
+    // mode: 'text' = PDF formatado com texto | 'visual' = PDF com imagem do kanban
+    showT("Gerando PDF...");
+    try {
+      // Carrega jsPDF dinamicamente
+      if (!window.jspdf) {
+        await new Promise((res, rej) => {
+          const s = document.createElement("script");
+          s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+          s.onload = res;
+          s.onerror = rej;
+          document.head.appendChild(s);
+        });
+      }
+      const {
+        jsPDF
+      } = window.jspdf;
+      const colsData = isAdmin ? cols : pubCols || cols;
+      const cardsData = isAdmin ? cards : pubCards || [];
+      const dateStr = new Date().toLocaleDateString("pt-BR");
+      const timeStr = new Date().toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+      if (mode === "text") {
+        const doc = new jsPDF({
+          unit: "mm",
+          format: "a4"
+        });
+        const PW = 190; // largura útil
+        let y = 15;
+        const LHEIGHT = 5;
+        function addLine(text, opts = {}) {
+          const {
+            size = 10,
+            bold = false,
+            color = [0, 0, 0],
+            indent = 0
+          } = opts;
+          doc.setFontSize(size);
+          doc.setFont("helvetica", bold ? "bold" : "normal");
+          doc.setTextColor(...color);
+          const lines = doc.splitTextToSize(text, PW - indent);
+          lines.forEach(l => {
+            if (y > 275) {
+              doc.addPage();
+              y = 15;
+            }
+            doc.text(l, 10 + indent, y);
+            y += LHEIGHT + (size > 10 ? 1 : 0);
+          });
+        }
+        function sep(color = [200, 200, 200]) {
+          if (y > 275) {
+            doc.addPage();
+            y = 15;
+          }
+          doc.setDrawColor(...color);
+          doc.line(10, y, 200, y);
+          y += 3;
+        }
+        const COL_COLORS = {
+          pendente: [245, 158, 11],
+          aceite: [59, 130, 246],
+          psiquiatria: [139, 92, 246],
+          andamento: [239, 68, 68],
+          finalizado: [107, 114, 128]
+        };
+        const GRAV_COLORS = {
+          emergencia: [239, 68, 68],
+          urgencia: [234, 179, 8],
+          andamento_cor: [245, 158, 11],
+          menor_gravidade: [34, 197, 94],
+          finalizado_cor: [168, 85, 247],
+          retorno: [236, 72, 153],
+          agendamento: [148, 163, 184]
+        };
+
+        // Cabeçalho
+        addLine("GERENCIA DE ENFERMAGEM", {
+          size: 16,
+          bold: true,
+          color: [15, 23, 42]
+        });
+        addLine("Data: " + dateStr + "  Hora: " + timeStr, {
+          size: 9,
+          color: [100, 116, 139]
+        });
+        y += 3;
+        sep([59, 130, 246]);
+        y += 2;
+        colsData.forEach(col => {
+          const cc = cardsData.filter(c => c.col_id === col.id);
+          if (!cc.length) return;
+          const colColor = COL_COLORS[col.id] || [100, 116, 139];
+
+          // Cabeçalho da coluna
+          y += 3;
+          doc.setFillColor(...colColor);
+          doc.roundedRect(10, y - 4, PW, 8, 2, 2, "F");
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(255, 255, 255);
+          doc.text(col.label.toUpperCase() + "  (" + cc.length + " paciente" + (cc.length !== 1 ? "s" : "") + ")", 14, y + 1);
+          y += 8;
+          cc.forEach((c, idx) => {
+            if (y > 268) {
+              doc.addPage();
+              y = 15;
+            }
+            const gravColor = GRAV_COLORS[c.grav] || [234, 179, 8];
+
+            // Linha colorida lateral
+            doc.setFillColor(...gravColor);
+            const cardStartY = y;
+            doc.rect(10, cardStartY, 2, 1, "F"); // será atualizado depois
+
+            // Número e nome
+            const prTxt = c.pr ? "[P" + c.pr + "] " : "";
+            const rnTxt = c.is_rn ? "[RN] " : "";
+            addLine(prTxt + rnTxt + c.nome, {
+              size: 10,
+              bold: true,
+              indent: 4
+            });
+            if (c.idade || c.adm) {
+              addLine((c.idade || "") + (c.idade && c.adm ? " | " : "") + (c.adm ? "Adm: " + c.adm : ""), {
+                size: 8,
+                color: [100, 116, 139],
+                indent: 4
+              });
+            }
+            if (c.hd) addLine("HD: " + c.hd, {
+              size: 9,
+              indent: 4
+            });
+            if (c.setor) addLine("Local: " + c.setor, {
+              size: 8,
+              color: [71, 85, 105],
+              indent: 4
+            });
+            const ambTxt = c.amb ? c.amb.includes("Av") ? "Amb. Avancada" : "Amb. Basica" : "";
+            if (c.rec && c.hosp) addLine("Enc: " + c.rec + " -> " + c.hosp + (ambTxt ? " | " + ambTxt : ""), {
+              size: 8,
+              indent: 4
+            });else if (c.rec) addLine("Rec: " + c.rec + (ambTxt ? " | " + ambTxt : ""), {
+              size: 8,
+              indent: 4
+            });
+            if (c.cross_info) addLine("Cross: " + c.cross_info, {
+              size: 8,
+              color: [100, 116, 139],
+              indent: 4
+            });
+            if (c.receptor) addLine("Receptor: " + c.receptor + (c.data_aceite ? " | " + c.data_aceite : "") + (c.hora_aceite ? " as " + c.hora_aceite : ""), {
+              size: 8,
+              color: [22, 163, 74],
+              indent: 4
+            });
+            if (c.status) addLine(c.status, {
+              size: 8,
+              bold: true,
+              color: [100, 116, 139],
+              indent: 4
+            });
+
+            // Barra lateral colorida
+            doc.setFillColor(...gravColor);
+            doc.rect(10, cardStartY, 2, y - cardStartY, "F");
+            y += 2;
+            if (idx < cc.length - 1) sep();
+          });
+          y += 4;
+        });
+
+        // Rodapé resumo
+        sep([59, 130, 246]);
+        y += 2;
+        addLine("RESUMO", {
+          size: 10,
+          bold: true,
+          color: [15, 23, 42]
+        });
+        addLine("Total: " + cardsData.length + " pacientes", {
+          size: 9
+        });
+        colsData.forEach(col => {
+          const n = cardsData.filter(c => c.col_id === col.id).length;
+          if (n > 0) addLine(col.label + ": " + n, {
+            size: 9,
+            indent: 4
+          });
+        });
+        doc.save("kanban-" + dateStr.replace(/\//g, "-") + ".pdf");
+        showT("PDF de texto gerado!");
+      } else {
+        // mode === 'visual' — PNG do kanban completo dentro do PDF
+        // reutiliza a mesma lógica de exportPNG mas coloca no PDF
+        const wrap = document.createElement("div");
+        wrap.style.cssText = "position:fixed;left:-9999px;top:0;background:#F1F5F9;padding:20px;display:flex;gap:10px;align-items:flex-start;font-family:Inter,system-ui,sans-serif;min-width:max-content;";
+        colsData.forEach(col => {
+          const colCards = cardsData.filter(c => c.col_id === col.id);
+          const colDiv = document.createElement("div");
+          colDiv.style.cssText = "background:#fff;border-radius:10px;border:1px solid #E2E8F0;width:220px;flex-shrink:0;border-top:3px solid " + (col.accent || "#94A3B8") + ";";
+          const hdr = document.createElement("div");
+          hdr.style.cssText = "padding:10px 12px;border-bottom:1px solid #F1F5F9;";
+          hdr.innerHTML = "<div style='font-weight:700;font-size:11px;color:#0F172A;'>" + (col.emoji || "") + " " + col.label + "</div><span style='display:inline-block;background:#F1F5F9;padding:2px 7px;border-radius:99px;font-size:9px;font-weight:700;color:#475569;margin-top:4px;'>" + colCards.length + "</span>";
+          colDiv.appendChild(hdr);
+          const body = document.createElement("div");
+          body.style.cssText = "padding:6px;";
+          const gc2 = {
+            emergencia: "#EF4444",
+            urgencia: "#EAB308",
+            andamento_cor: "#F59E0B",
+            menor_gravidade: "#22C55E",
+            finalizado_cor: "#A855F7",
+            agendamento: "#94A3B8",
+            retorno: "#EC4899"
+          };
+          colCards.forEach(c => {
+            const dot = gc2[c.grav] || "#EAB308";
+            const card = document.createElement("div");
+            card.style.cssText = "background:#fff;border:1px solid #E2E8F0;border-left:3px solid " + dot + ";border-radius:7px;padding:8px;margin-bottom:5px;";
+            let html = "";
+            if (c.pr) html += "<div style='font-size:8px;font-weight:700;color:#94A3B8;'>#" + c.pr + "</div>";
+            html += "<div style='font-weight:600;font-size:11px;color:#0F172A;margin-bottom:3px;'>" + (c.is_rn ? "RN: " : "") + c.nome + "</div>";
+            if (c.hd) html += "<div style='font-size:9px;color:#374151;margin-bottom:2px;'>" + c.hd + "</div>";
+            if (c.setor || c.rec) html += "<div style='font-size:8px;color:#64748B;'>" + [c.setor, c.rec].filter(Boolean).join(" | ") + "</div>";
+            if (c.hosp) html += "<div style='font-size:8px;color:#64748B;'>→ " + c.hosp + "</div>";
+            if (c.receptor) html += "<div style='font-size:8px;color:#16A34A;'>Receptor: " + c.receptor + "</div>";
+            if (c.status) html += "<div style='font-size:8px;font-weight:700;color:#475569;text-transform:uppercase;margin-top:2px;'>" + c.status + "</div>";
+            card.innerHTML = html;
+            body.appendChild(card);
+          });
+          colDiv.appendChild(body);
+          wrap.appendChild(colDiv);
+        });
+        document.body.appendChild(wrap);
+        await new Promise(r => setTimeout(r, 150));
+        const canvas = await html2canvas(wrap, {
+          scale: 2,
+          backgroundColor: "#F1F5F9",
+          useCORS: true,
+          logging: false,
+          width: wrap.scrollWidth,
+          height: wrap.scrollHeight,
+          windowWidth: wrap.scrollWidth,
+          windowHeight: wrap.scrollHeight
+        });
+        document.body.removeChild(wrap);
+        const imgData = canvas.toDataURL("image/png");
+        const imgW = canvas.width,
+          imgH = canvas.height;
+        // Landscape se kanban for mais largo que alto
+        const orient = imgW > imgH ? "l" : "p";
+        const doc2 = new jsPDF({
+          orientation: orient,
+          unit: "px",
+          format: [imgW / 2, imgH / 2]
+        });
+        doc2.addImage(imgData, "PNG", 0, 0, imgW / 2, imgH / 2);
+        doc2.save("kanban-visual-" + dateStr.replace(/\//g, "-") + ".pdf");
+        showT("PDF visual gerado!");
+      }
+    } catch (e) {
+      showT("Erro ao gerar PDF: " + e.message, "err");
     }
   }
   function newCard(col = "pendente") {
@@ -3145,7 +3635,39 @@ function App() {
       color: "#92400E",
       fontWeight: 500
     }
-  }, "✎ Modo de edição — alterações não ficam visíveis até publicar", lastPub ? ` · Última publicação: ${lastPub}` : "")), !isAdmin && /*#__PURE__*/React.createElement("div", {
+  }, "✎ Modo de edição — alterações não ficam visíveis até publicar", lastPub ? ` · Última publicação: ${lastPub}` : ""), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: "#92400E"
+    }
+  }, "Atalhos: ", /*#__PURE__*/React.createElement("kbd", {
+    style: {
+      background: "#FDE68A",
+      padding: "1px 4px",
+      borderRadius: 3,
+      fontFamily: "monospace"
+    }
+  }, "N"), " novo paciente\xA0", /*#__PURE__*/React.createElement("kbd", {
+    style: {
+      background: "#FDE68A",
+      padding: "1px 4px",
+      borderRadius: 3,
+      fontFamily: "monospace"
+    }
+  }, "P"), " publicar\xA0", /*#__PURE__*/React.createElement("kbd", {
+    style: {
+      background: "#FDE68A",
+      padding: "1px 4px",
+      borderRadius: 3,
+      fontFamily: "monospace"
+    }
+  }, "Esc"), " fechar"))), !isAdmin && /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#EFF6FF",
       borderBottom: "1px solid #BFDBFE",
@@ -3227,6 +3749,9 @@ function App() {
   }), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
     id: "usuarios",
     label: "👥 Profissionais"
+  }), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
+    id: "historico",
+    label: "📜 Histórico"
   })), /*#__PURE__*/React.createElement("input", {
     placeholder: "Buscar…",
     value: search,
@@ -3335,7 +3860,7 @@ function App() {
     currentUser: currentUser,
     userId: userId,
     showT: showT
-  }), !loading && view === "kanban" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  }), !loading && view === "historico" && isAdmin && /*#__PURE__*/React.createElement(HistoryPanel, null), !loading && view === "kanban" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 12,
@@ -3371,7 +3896,11 @@ function App() {
       paddingBottom: 8
     }
   }, (singleCol ? displayCols.filter(c => c.id === singleCol) : displayCols).map(col => {
-    const colCards = filtered.filter(c => c.col_id === col.id);
+    const colCards = filtered.filter(c => c.col_id === col.id).sort((a, b) => {
+      // coluna aceite: ordena por prioridade numérica
+      if (col.id === "aceite" && a.pr && b.pr) return parseInt(a.pr) - parseInt(b.pr);
+      return 0;
+    });
     const isMin = minimized.has(col.id);
     return /*#__PURE__*/React.createElement("div", {
       key: col.id,
@@ -3736,7 +4265,8 @@ function App() {
     cards: isAdmin ? cards : pubCards || [],
     cols: isAdmin ? cols : pubCols || cols,
     showT: showT,
-    exportPNG: exportPNG
+    exportPNG: exportPNG,
+    generatePDF: generatePDF
   }), showSettings && /*#__PURE__*/React.createElement(SettingsModal, {
     settings: settings,
     onClose: () => setShowSettings(false),
