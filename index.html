@@ -1708,6 +1708,106 @@ function PubModal({
   }, "Total: ", cards.length, " pacientes")));
 }
 
+/* ─── SUBCATEGORIAS: especialidades que agrupam visualmente dentro de cada coluna ─── */
+const SUBCOL_SPECS = [{
+  key: "psiquiatria",
+  label: "Psiquiatria",
+  emoji: "🧠",
+  color: "#8B5CF6",
+  keywords: ["psiquiatri", "psico"]
+}, {
+  key: "pediatria",
+  label: "Pediatria",
+  emoji: "👶",
+  color: "#EC4899",
+  keywords: ["pediatri", "pedi", "neonat", "rn de", "rn ", "recém"]
+}];
+function detectSubcat(card) {
+  const rec = (card.rec || "").toLowerCase();
+  const hd = (card.hd || "").toLowerCase();
+  const nom = (card.nome || "").toLowerCase();
+  for (const sc of SUBCOL_SPECS) {
+    if (sc.keywords.some(k => rec.includes(k) || hd.includes(k) || nom.includes(k) || card.is_rn && sc.key === "pediatria")) return sc;
+  }
+  return null;
+}
+
+/* Renderiza os cards de uma coluna agrupados por subcategoria */
+function GroupedCards({
+  cards,
+  onClick,
+  isAdmin,
+  onDragStart,
+  onDragEnd
+}) {
+  // Separa cards com subcategoria detectada dos normais
+  const subMap = {}; // key → [cards]
+  const normal = [];
+  cards.forEach(c => {
+    const sc = detectSubcat(c);
+    if (sc) {
+      if (!subMap[sc.key]) subMap[sc.key] = [];
+      subMap[sc.key].push(c);
+    } else normal.push(c);
+  });
+  const hasGroups = Object.keys(subMap).length > 0;
+  return /*#__PURE__*/React.createElement(React.Fragment, null, normal.map(card => /*#__PURE__*/React.createElement(KCard, {
+    key: card.id,
+    c: card,
+    onClick: onClick,
+    isAdmin: isAdmin,
+    onDragStart: e => onDragStart(e, card.id),
+    onDragEnd: onDragEnd
+  })), SUBCOL_SPECS.map(sc => {
+    const group = subMap[sc.key];
+    if (!group || !group.length) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: sc.key,
+      style: {
+        marginTop: normal.length > 0 ? 8 : 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 5,
+        marginBottom: 5,
+        paddingBottom: 4,
+        borderBottom: `1.5px solid ${sc.color}30`
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10
+      }
+    }, sc.emoji), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        fontWeight: 700,
+        color: sc.color,
+        textTransform: "uppercase",
+        letterSpacing: ".06em"
+      }
+    }, sc.label), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        fontWeight: 700,
+        color: sc.color,
+        background: sc.color + "18",
+        padding: "1px 5px",
+        borderRadius: 99,
+        marginLeft: "auto"
+      }
+    }, group.length)), group.map(card => /*#__PURE__*/React.createElement(KCard, {
+      key: card.id,
+      c: card,
+      onClick: onClick,
+      isAdmin: isAdmin,
+      onDragStart: e => onDragStart(e, card.id),
+      onDragEnd: onDragEnd
+    })));
+  }));
+}
+
 /* ─── KANBAN CARD ─── */
 function KCard({
   c,
@@ -2705,28 +2805,30 @@ function CalendarView({
 }) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth()); // 0-11
-  const [selected, setSelected] = useState(null); // {day, cards}
+  const [month, setMonth] = useState(today.getMonth());
+  const [selected, setSelected] = useState(null);
   const [filterCol, setFilterCol] = useState("all");
+  // 3 opções de data que o admin escolhe — múltipla seleção
+  const [dateSources, setDateSources] = useState({
+    adm: true,
+    aceite: true,
+    criado: false
+  });
   const colLabel = cols.reduce((acc, c) => ({
     ...acc,
     [c.id]: c.label
   }), {});
-
-  // Parse "DD/MM" ou "DD/MM/YYYY" → Date
-  function parseDate(str) {
+  function parseDate(str, refYear) {
     if (!str) return null;
-    const parts = str.replace(/[–-]/g, "/").split("/");
+    const parts = str.replace(/[–]/g, "/").split("/");
     if (parts.length < 2) return null;
     const d = parseInt(parts[0]),
       m = parseInt(parts[1]) - 1;
-    const y = parts.length >= 3 ? parseInt(parts[2]) : year;
+    const y = parts.length >= 3 ? parseInt(parts[2]) : refYear;
     const fullY = y < 100 ? 2000 + y : y;
     const dt = new Date(fullY, m, d);
     return isNaN(dt.getTime()) ? null : dt;
   }
-
-  // Mapeia cada card para as datas que ele aparece
   function getCardDates(c) {
     const dates = [];
     const push = (dt, label, col) => {
@@ -2736,13 +2838,11 @@ function CalendarView({
         col: col || c.col_id
       });
     };
-    push(parseDate(c.adm), "Admissão", c.col_id);
-    push(parseDate(c.data_aceite), "Aceite", "aceite");
-    if (c.created_at) push(new Date(c.created_at), "Criado", c.col_id);
+    if (dateSources.adm) push(parseDate(c.adm, year), "Admissão", c.col_id);
+    if (dateSources.aceite) push(parseDate(c.data_aceite, year), "Aceite", "aceite");
+    if (dateSources.criado && c.created_at) push(new Date(c.created_at), "Criado", c.col_id);
     return dates;
   }
-
-  // Monta mapa: "YYYY-MM-DD" → [{card, label, col}]
   const cardsByDay = {};
   const filteredCards = filterCol === "all" ? cards : cards.filter(c => c.col_id === filterCol);
   filteredCards.forEach(c => {
@@ -2761,7 +2861,7 @@ function CalendarView({
     });
   });
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstWeekday = new Date(year, month, 1).getDay(); // 0=dom
+  const firstWeekday = new Date(year, month, 1).getDay();
   const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
   const todayKey = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
@@ -2772,6 +2872,16 @@ function CalendarView({
     andamento: "#EF4444",
     finalizado: "#6B7280",
     pediatria: "#EC4899"
+  };
+  const SRC_COLORS = {
+    adm: "#F59E0B",
+    aceite: "#3B82F6",
+    criado: "#8B5CF6"
+  };
+  const SRC_LABELS = {
+    adm: "Admissão",
+    aceite: "Aceite",
+    criado: "Criado no sistema"
   };
   function prevMonth() {
     if (month === 0) {
@@ -2787,12 +2897,19 @@ function CalendarView({
     } else setMonth(m => m + 1);
     setSelected(null);
   }
+  function toggleSrc(key) {
+    setDateSources(p => ({
+      ...p,
+      [key]: !p[key]
+    }));
+    setSelected(null);
+  }
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: 16,
+      marginBottom: 12,
       flexWrap: "wrap",
       gap: 8
     }
@@ -2800,15 +2917,15 @@ function CalendarView({
     style: {
       display: "flex",
       alignItems: "center",
-      gap: 12
+      gap: 8
     }
   }, /*#__PURE__*/React.createElement("button", {
     onClick: prevMonth,
     style: {
       background: "#fff",
       border: "1px solid #E2E8F0",
-      borderRadius: 8,
-      padding: "6px 12px",
+      borderRadius: 7,
+      padding: "5px 11px",
       cursor: "pointer",
       fontSize: 14,
       fontWeight: 700
@@ -2816,9 +2933,9 @@ function CalendarView({
   }, "‹"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontWeight: 700,
-      fontSize: 15,
+      fontSize: 14,
       color: "#0F172A",
-      minWidth: 180,
+      minWidth: 160,
       textAlign: "center"
     }
   }, monthNames[month], " ", year), /*#__PURE__*/React.createElement("button", {
@@ -2826,8 +2943,8 @@ function CalendarView({
     style: {
       background: "#fff",
       border: "1px solid #E2E8F0",
-      borderRadius: 8,
-      padding: "6px 12px",
+      borderRadius: 7,
+      padding: "5px 11px",
       cursor: "pointer",
       fontSize: 14,
       fontWeight: 700
@@ -2840,21 +2957,42 @@ function CalendarView({
     style: {
       background: "#0F172A",
       border: "none",
-      borderRadius: 7,
-      padding: "6px 12px",
+      borderRadius: 6,
+      padding: "5px 10px",
       cursor: "pointer",
       fontSize: 11,
       fontWeight: 600,
       color: "#fff"
     }
-  }, "Hoje")), /*#__PURE__*/React.createElement("select", {
+  }, "Hoje")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center",
+      flexWrap: "wrap"
+    }
+  }, Object.entries(SRC_LABELS).map(([key, label]) => /*#__PURE__*/React.createElement("button", {
+    key: key,
+    onClick: () => toggleSrc(key),
+    style: {
+      padding: "4px 10px",
+      borderRadius: 6,
+      fontSize: 11,
+      fontWeight: 600,
+      cursor: "pointer",
+      background: dateSources[key] ? SRC_COLORS[key] : "#F1F5F9",
+      color: dateSources[key] ? "#fff" : "#64748B",
+      border: `1px solid ${dateSources[key] ? SRC_COLORS[key] : "#E2E8F0"}`,
+      transition: "all .15s"
+    }
+  }, label)), /*#__PURE__*/React.createElement("select", {
     value: filterCol,
     onChange: e => setFilterCol(e.target.value),
     style: {
-      padding: "6px 10px",
+      padding: "5px 8px",
       border: "1px solid #E2E8F0",
-      borderRadius: 8,
-      fontSize: 12,
+      borderRadius: 7,
+      fontSize: 11,
       background: "#fff",
       color: "#374151",
       fontFamily: "inherit"
@@ -2864,7 +3002,31 @@ function CalendarView({
   }, "Todas as colunas"), cols.map(c => /*#__PURE__*/React.createElement("option", {
     key: c.id,
     value: c.id
-  }, c.label)))), /*#__PURE__*/React.createElement("div", {
+  }, c.label))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 10,
+      flexWrap: "wrap"
+    }
+  }, Object.entries(SRC_LABELS).filter(([k]) => dateSources[k]).map(([key, label]) => /*#__PURE__*/React.createElement("div", {
+    key: key,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 4,
+      fontSize: 10,
+      color: "#64748B"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 8,
+      height: 8,
+      borderRadius: 2,
+      background: SRC_COLORS[key],
+      display: "inline-block"
+    }
+  }), label))), /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#fff",
       borderRadius: 12,
@@ -2881,7 +3043,7 @@ function CalendarView({
   }, weekDays.map(d => /*#__PURE__*/React.createElement("div", {
     key: d,
     style: {
-      padding: "8px 4px",
+      padding: "7px 4px",
       textAlign: "center",
       fontSize: 10,
       fontWeight: 700,
@@ -2899,7 +3061,7 @@ function CalendarView({
   }).map((_, i) => /*#__PURE__*/React.createElement("div", {
     key: "e" + i,
     style: {
-      minHeight: 80,
+      minHeight: 76,
       borderBottom: "1px solid #F1F5F9",
       borderRight: "1px solid #F1F5F9",
       background: "#FAFAFA"
@@ -2920,7 +3082,7 @@ function CalendarView({
         cards: dayCards
       } : null),
       style: {
-        minHeight: 80,
+        minHeight: 76,
         borderBottom: "1px solid #F1F5F9",
         borderRight: "1px solid #F1F5F9",
         padding: "4px",
@@ -2950,67 +3112,70 @@ function CalendarView({
         padding: "1px 4px",
         borderRadius: 3,
         marginBottom: 1,
-        background: (COL_DOT[item.col] || "#94A3B8") + "22",
-        color: COL_DOT[item.col] || "#94A3B8",
+        background: (SRC_COLORS[item.label === "Admissão" ? "adm" : item.label === "Aceite" ? "aceite" : "criado"] || "#94A3B8") + "25",
+        color: SRC_COLORS[item.label === "Admissão" ? "adm" : item.label === "Aceite" ? "aceite" : "criado"] || "#94A3B8",
         whiteSpace: "nowrap",
         overflow: "hidden",
         textOverflow: "ellipsis"
       }
-    }, item.label, ": ", item.card.nome.split(" ")[0])), dayCards.length > 3 && /*#__PURE__*/React.createElement("div", {
+    }, item.label[0], ": ", item.card.nome.split(" ")[0])), dayCards.length > 3 && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 9,
         color: "#94A3B8",
         fontWeight: 600
       }
-    }, "+", dayCards.length - 3, " mais"));
+    }, "+", dayCards.length - 3));
   }))), selected && /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 16,
+      marginTop: 12,
       background: "#fff",
       border: "1px solid #E2E8F0",
       borderRadius: 12,
-      padding: "16px 20px"
+      padding: "14px 18px"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: 12
+      marginBottom: 10
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontWeight: 700,
-      fontSize: 14,
+      fontSize: 13,
       color: "#0F172A"
     }
-  }, selected.day, " de ", monthNames[month], " de ", year, " — ", selected.cards.length, " evento", selected.cards.length !== 1 ? "s" : ""), /*#__PURE__*/React.createElement("button", {
+  }, selected.day, " de ", monthNames[month], " — ", selected.cards.length, " evento", selected.cards.length !== 1 ? "s" : ""), /*#__PURE__*/React.createElement("button", {
     onClick: () => setSelected(null),
     style: {
       background: "none",
       border: "none",
       cursor: "pointer",
       color: "#94A3B8",
-      fontSize: 18
+      fontSize: 17
     }
   }, "✕")), selected.cards.map((item, i) => {
+    const srcKey = item.label === "Admissão" ? "adm" : item.label === "Aceite" ? "aceite" : "criado";
+    const srcColor = SRC_COLORS[srcKey] || "#94A3B8";
     const gc = {
-      "emergencia": "#EF4444",
-      "urgencia": "#EAB308",
-      "andamento_cor": "#F59E0B",
-      "menor_gravidade": "#22C55E",
-      "finalizado_cor": "#A855F7",
-      "agendamento": "#94A3B8",
-      "retorno": "#EC4899"
+      emergencia: "#EF4444",
+      urgencia: "#EAB308",
+      andamento_cor: "#F59E0B",
+      menor_gravidade: "#22C55E",
+      finalizado_cor: "#A855F7",
+      agendamento: "#94A3B8",
+      retorno: "#EC4899"
     };
     const dot = gc[item.card.grav] || "#EAB308";
     return /*#__PURE__*/React.createElement("div", {
       key: i,
       style: {
         display: "flex",
-        gap: 12,
-        padding: "10px 0",
-        borderBottom: i < selected.cards.length - 1 ? "1px solid #F1F5F9" : "none"
+        gap: 10,
+        padding: "8px 0",
+        borderBottom: i < selected.cards.length - 1 ? "1px solid #F1F5F9" : "none",
+        alignItems: "flex-start"
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -3018,7 +3183,8 @@ function CalendarView({
         borderRadius: 99,
         background: dot,
         flexShrink: 0,
-        alignSelf: "stretch"
+        alignSelf: "stretch",
+        minHeight: 32
       }
     }), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -3027,9 +3193,9 @@ function CalendarView({
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
-        gap: 8,
+        gap: 6,
         alignItems: "center",
-        marginBottom: 2
+        marginBottom: 1
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
@@ -3040,23 +3206,23 @@ function CalendarView({
     }, item.card.nome), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 9,
-        fontWeight: 600,
-        padding: "1px 6px",
+        fontWeight: 700,
+        padding: "1px 5px",
         borderRadius: 3,
-        background: (COL_DOT[item.col] || "#94A3B8") + "22",
-        color: COL_DOT[item.col] || "#94A3B8"
+        background: srcColor + "20",
+        color: srcColor
       }
     }, item.label)), item.card.hd && /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: 11,
+        fontSize: 10,
         color: "#64748B"
       }
     }, item.card.hd), /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: 10,
+        fontSize: 9,
         color: "#94A3B8"
       }
-    }, colLabel[item.card.col_id] || item.card.col_id)));
+    }, colLabel[item.card.col_id])));
   })));
 }
 
@@ -3066,6 +3232,7 @@ function TimelineView({
   cols
 }) {
   const [filterCol, setFilterCol] = useState("all");
+  const [tlMode, setTlMode] = useState("paciente"); // 'paciente' | 'cronologico'
   const colLabel = cols.reduce((acc, c) => ({
     ...acc,
     [c.id]: c.label
@@ -3088,41 +3255,172 @@ function TimelineView({
     retorno: "#EC4899"
   };
   const filtered = filterCol === "all" ? cards : cards.filter(c => c.col_id === filterCol);
-
-  // Agrupa por coluna na ordem das colunas
   const colsOrdered = cols.filter(col => filtered.some(c => c.col_id === col.id));
 
-  // Eventos: cada card com todas as suas datas
-  const events = [];
-  filtered.forEach(c => {
-    const push = (label, dateStr, color, detail) => {
-      events.push({
-        card: c,
-        label,
-        dateStr,
-        color,
-        detail
-      });
-    };
-    if (c.created_at) push("Criado no sistema", new Date(c.created_at).toLocaleString("pt-BR", {
+  // Modo cronológico: todos os eventos de todos os cards ordenados por data/hora
+  function buildCronEvents() {
+    const events = [];
+    filtered.forEach(c => {
+      const push = (dt, label, color) => {
+        if (dt) events.push({
+          card: c,
+          label,
+          color,
+          ts: dt.getTime(),
+          dtStr: dt.toLocaleString("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit"
+          })
+        });
+      };
+      if (c.created_at) push(new Date(c.created_at), "Criado no sistema", COL_DOT[c.col_id] || "#94A3B8");
+      if (c.adm) push(parseAdm(c.adm), "Admissão", "#F59E0B");
+      if (c.data_aceite) push(parseAdm(c.data_aceite), "Aceite confirmado", "#3B82F6");
+      if (c.saida) push(parseAdm(c.saida), "Saída", "#16A34A");
+    });
+    return events.sort((a, b) => b.ts - a.ts); // mais recente primeiro
+  }
+  function parseAdm(str) {
+    if (!str) return null;
+    const parts = str.split("/");
+    if (parts.length < 2) return null;
+    const d = parseInt(parts[0]),
+      m = parseInt(parts[1]) - 1,
+      y = parts.length >= 3 ? parseInt(parts[2]) : new Date().getFullYear();
+    const dt = new Date(y < 100 ? 2000 + y : y, m, d);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  const CardChip = ({
+    c
+  }) => {
+    const dot = GRAV_DOT[c.grav] || "#EAB308";
+    const accent = COL_DOT[c.col_id] || "#94A3B8";
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#fff",
+        border: "1px solid #E2E8F0",
+        borderRadius: 10,
+        padding: "10px 14px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        gap: 8,
+        marginBottom: 4
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 600,
+        fontSize: 12,
+        color: "#0F172A"
+      }
+    }, c.is_rn ? "👶 " : "", c.nome, c.idade ? " · " + c.idade : ""), c.pr && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        fontWeight: 700,
+        background: "#F1F5F9",
+        color: "#475569",
+        padding: "2px 6px",
+        borderRadius: 4,
+        flexShrink: 0
+      }
+    }, "P", c.pr)), c.hd && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "#374151",
+        marginBottom: 4
+      }
+    }, c.hd), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 5,
+        flexWrap: "wrap"
+      }
+    }, c.adm && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        background: "#FEF3C7",
+        color: "#92400E",
+        padding: "1px 5px",
+        borderRadius: 3
+      }
+    }, "Adm: ", c.adm), c.setor && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        background: "#F1F5F9",
+        color: "#475569",
+        padding: "1px 5px",
+        borderRadius: 3
+      }
+    }, c.setor), c.rec && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        background: "#EFF6FF",
+        color: "#1E40AF",
+        padding: "1px 5px",
+        borderRadius: 3
+      }
+    }, c.rec), c.hosp && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        background: "#F0FDF4",
+        color: "#166534",
+        padding: "1px 5px",
+        borderRadius: 3
+      }
+    }, "→ ", c.hosp), c.amb && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        background: c.amb.includes("Av") ? "#FEF2F2" : "#EFF6FF",
+        color: c.amb.includes("Av") ? "#991B1B" : "#1E40AF",
+        padding: "1px 5px",
+        borderRadius: 3
+      }
+    }, c.amb.includes("Av") ? "Avançada" : "Básica")), (c.data_aceite || c.receptor) && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 4,
+        fontSize: 10,
+        color: "#16A34A"
+      }
+    }, c.data_aceite && "Aceite: " + c.data_aceite, c.hora_aceite ? " às " + c.hora_aceite : "", c.receptor ? " · " + c.receptor : ""), c.cross_info && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 2,
+        fontSize: 10,
+        color: "#94A3B8"
+      }
+    }, "Cross: ", c.cross_info), c.status && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 4,
+        fontSize: 9,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        color: "#64748B"
+      }
+    }, c.status), c.created_at && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 3,
+        fontSize: 9,
+        color: "#CBD5E1"
+      }
+    }, new Date(c.created_at).toLocaleString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
       hour: "2-digit",
       minute: "2-digit"
-    }), COL_DOT[c.col_id] || "#94A3B8", c.setor);
-    if (c.adm) push("Admissão", c.adm, "#F59E0B", c.hd);
-    if (c.data_aceite) push("Aceite confirmado", c.data_aceite + (c.hora_aceite ? " às " + c.hora_aceite : ""), "#3B82F6", c.receptor ? "Receptor: " + c.receptor : "");
-    if (c.saida) push("Saída", c.saida, "#16A34A", c.hosp ? "→ " + c.hosp : "");
-    if (c.retorno) push("Retorno", c.retorno, "#EC4899", "");
-    if (c.status) push(c.status, "", COL_DOT[c.col_id] || "#64748B", "");
-  });
+    })));
+  };
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      gap: 8,
-      marginBottom: 16,
+      justifyContent: "space-between",
       alignItems: "center",
-      flexWrap: "wrap"
+      marginBottom: 16,
+      flexWrap: "wrap",
+      gap: 8
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3130,25 +3428,53 @@ function TimelineView({
       fontSize: 15,
       color: "#0F172A"
     }
-  }, "Linha do Tempo"), /*#__PURE__*/React.createElement("select", {
+  }, "Linha do Tempo"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "center",
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#F1F5F9",
+      borderRadius: 8,
+      padding: 2,
+      display: "flex",
+      gap: 1
+    }
+  }, [["paciente", "👤 Por paciente"], ["cronologico", "📅 Cronológico"]].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
+    key: id,
+    onClick: () => setTlMode(id),
+    style: {
+      padding: "5px 12px",
+      borderRadius: 6,
+      border: "none",
+      fontSize: 11,
+      fontWeight: tlMode === id ? 700 : 400,
+      background: tlMode === id ? "#0F172A" : "transparent",
+      color: tlMode === id ? "#fff" : "#64748B",
+      cursor: "pointer",
+      transition: "all .15s"
+    }
+  }, label))), /*#__PURE__*/React.createElement("select", {
     value: filterCol,
     onChange: e => setFilterCol(e.target.value),
     style: {
-      padding: "6px 10px",
+      padding: "5px 8px",
       border: "1px solid #E2E8F0",
-      borderRadius: 8,
-      fontSize: 12,
+      borderRadius: 7,
+      fontSize: 11,
       background: "#fff",
       color: "#374151",
-      fontFamily: "inherit",
-      marginLeft: "auto"
+      fontFamily: "inherit"
     }
   }, /*#__PURE__*/React.createElement("option", {
     value: "all"
   }, "Todas as colunas"), cols.map(c => /*#__PURE__*/React.createElement("option", {
     key: c.id,
     value: c.id
-  }, c.label)))), colsOrdered.map(col => {
+  }, c.label))))), tlMode === "paciente" && /*#__PURE__*/React.createElement(React.Fragment, null, colsOrdered.map(col => {
     const colCards = filtered.filter(c => c.col_id === col.id);
     const accent = col.accent || "#94A3B8";
     return /*#__PURE__*/React.createElement("div", {
@@ -3191,7 +3517,7 @@ function TimelineView({
         paddingLeft: 20,
         borderLeft: `2px solid ${accent}30`
       }
-    }, colCards.map((c, i) => {
+    }, colCards.map(c => {
       const dot = GRAV_DOT[c.grav] || "#EAB308";
       return /*#__PURE__*/React.createElement("div", {
         key: c.id,
@@ -3211,121 +3537,9 @@ function TimelineView({
           border: "2px solid #fff",
           boxShadow: "0 0 0 1px " + dot
         }
-      }), /*#__PURE__*/React.createElement("div", {
-        style: {
-          background: "#fff",
-          border: "1px solid #E2E8F0",
-          borderRadius: 10,
-          padding: "10px 14px"
-        }
-      }, /*#__PURE__*/React.createElement("div", {
-        style: {
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          gap: 8,
-          marginBottom: 4
-        }
-      }, /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontWeight: 600,
-          fontSize: 12,
-          color: "#0F172A"
-        }
-      }, c.is_rn ? "👶 " : "", c.nome, c.idade ? " · " + c.idade : ""), c.pr && /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: 9,
-          fontWeight: 700,
-          background: "#F1F5F9",
-          color: "#475569",
-          padding: "2px 6px",
-          borderRadius: 4,
-          flexShrink: 0
-        }
-      }, "P", c.pr)), c.hd && /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: 11,
-          color: "#374151",
-          marginBottom: 4
-        }
-      }, c.hd), /*#__PURE__*/React.createElement("div", {
-        style: {
-          display: "flex",
-          gap: 6,
-          flexWrap: "wrap"
-        }
-      }, c.adm && /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: 10,
-          background: "#FEF3C7",
-          color: "#92400E",
-          padding: "1px 6px",
-          borderRadius: 3
-        }
-      }, "Adm: ", c.adm), c.setor && /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: 10,
-          background: "#F1F5F9",
-          color: "#475569",
-          padding: "1px 6px",
-          borderRadius: 3
-        }
-      }, c.setor), c.rec && /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: 10,
-          background: "#EFF6FF",
-          color: "#1E40AF",
-          padding: "1px 6px",
-          borderRadius: 3
-        }
-      }, c.rec), c.hosp && /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: 10,
-          background: "#F0FDF4",
-          color: "#166534",
-          padding: "1px 6px",
-          borderRadius: 3
-        }
-      }, "→ ", c.hosp), c.amb && /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: 10,
-          background: c.amb.includes("Av") ? "#FEF2F2" : "#EFF6FF",
-          color: c.amb.includes("Av") ? "#991B1B" : "#1E40AF",
-          padding: "1px 6px",
-          borderRadius: 3
-        }
-      }, c.amb.includes("Av") ? "Avançada" : "Básica")), (c.data_aceite || c.receptor) && /*#__PURE__*/React.createElement("div", {
-        style: {
-          marginTop: 4,
-          fontSize: 10,
-          color: "#16A34A"
-        }
-      }, c.data_aceite && "Aceite: " + c.data_aceite, c.hora_aceite ? " às " + c.hora_aceite : "", c.receptor ? " · Receptor: " + c.receptor : ""), c.cross_info && /*#__PURE__*/React.createElement("div", {
-        style: {
-          marginTop: 2,
-          fontSize: 10,
-          color: "#94A3B8"
-        }
-      }, "Cross: ", c.cross_info), c.status && /*#__PURE__*/React.createElement("div", {
-        style: {
-          marginTop: 4,
-          fontSize: 9,
-          fontWeight: 700,
-          textTransform: "uppercase",
-          color: "#64748B"
-        }
-      }, c.status), c.created_at && /*#__PURE__*/React.createElement("div", {
-        style: {
-          marginTop: 3,
-          fontSize: 9,
-          color: "#CBD5E1"
-        }
-      }, new Date(c.created_at).toLocaleString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit"
-      }))));
+      }), /*#__PURE__*/React.createElement(CardChip, {
+        c: c
+      }));
     })));
   }), filtered.length === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3334,7 +3548,94 @@ function TimelineView({
       color: "#CBD5E1",
       fontSize: 13
     }
-  }, "Nenhum card encontrado."));
+  }, "Nenhum card encontrado.")), tlMode === "cronologico" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      paddingLeft: 20,
+      borderLeft: "2px solid #E2E8F0"
+    }
+  }, buildCronEvents().map((ev, i) => {
+    const dot = GRAV_DOT[ev.card.grav] || "#EAB308";
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        position: "relative",
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "absolute",
+        left: -25,
+        top: 10,
+        width: 9,
+        height: 9,
+        borderRadius: "50%",
+        background: ev.color,
+        border: "2px solid #fff",
+        boxShadow: "0 0 0 1px " + ev.color
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#fff",
+        border: "1px solid #E2E8F0",
+        borderRadius: 10,
+        padding: "10px 14px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        gap: 8,
+        marginBottom: 4
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        fontWeight: 700,
+        padding: "1px 6px",
+        borderRadius: 3,
+        background: ev.color + "20",
+        color: ev.color,
+        marginRight: 6
+      }
+    }, ev.label), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 600,
+        fontSize: 12,
+        color: "#0F172A"
+      }
+    }, ev.card.nome), ev.card.idade && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#94A3B8"
+      }
+    }, " · ", ev.card.idade)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#94A3B8",
+        flexShrink: 0,
+        whiteSpace: "nowrap"
+      }
+    }, ev.dtStr)), ev.card.hd && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "#64748B"
+      }
+    }, ev.card.hd), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: "#94A3B8",
+        marginTop: 2
+      }
+    }, colLabel[ev.card.col_id])));
+  }), buildCronEvents().length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "48px",
+      color: "#CBD5E1",
+      fontSize: 13
+    }
+  }, "Nenhum evento encontrado."))));
 }
 
 /* ════════════════════════════════════════════
@@ -3365,6 +3666,8 @@ function App() {
   const [sortCol, setSortCol] = useState(null);
   const [toast, setToast] = useState(null);
   const [undoQueue, setUndoQueue] = useState([]); // desfazer exclusão
+  const [newComAlerts, setNewComAlerts] = useState([]); // {id, card_id, card_nome, comment}
+  const [showComPanel, setShowComPanel] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const dragId = useRef(null);
@@ -3418,9 +3721,21 @@ function App() {
             });
             return next;
           });
-          // Notifica
-          const cardName = cards.find(c => c.id === genuinelyNew[0].card_id)?.nome || "card";
-          showT("💬 Novo comentário em: " + cardName);
+          // Acumula alertas no painel
+          setNewComAlerts(prev => [...prev, ...genuinelyNew.map(c => ({
+            id: c.id,
+            card_id: c.card_id,
+            card_nome: cards.find(k => k.id === c.card_id)?.nome || "card",
+            autor: c.autor_nome,
+            texto: c.texto,
+            hora: new Date(c.created_at).toLocaleString("pt-BR", {
+              day: "2-digit",
+              month: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit"
+            })
+          }))]);
+          setShowComPanel(true);
         }
         // Também adiciona IDs conhecidos dos já carregados
         newComs.forEach(c => knownIds.add(c.id));
@@ -4358,7 +4673,34 @@ function App() {
       fontSize: 12,
       fontWeight: 700
     }
-  }, "↑ Publicar"), /*#__PURE__*/React.createElement("button", {
+  }, "↑ Publicar"), newComAlerts.length > 0 && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowComPanel(true),
+    style: {
+      padding: "5px 10px",
+      border: "none",
+      borderRadius: 7,
+      background: "#3B82F6",
+      color: "#fff",
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700,
+      position: "relative",
+      display: "flex",
+      alignItems: "center",
+      gap: 5
+    }
+  }, "💬", /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: "#EF4444",
+      color: "#fff",
+      borderRadius: 99,
+      fontSize: 9,
+      fontWeight: 800,
+      padding: "1px 5px",
+      minWidth: 16,
+      textAlign: "center"
+    }
+  }, newComAlerts.length)), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowSettings(true),
     style: {
       padding: "6px 10px",
@@ -4864,14 +5206,13 @@ function App() {
         borderRadius: 8,
         margin: "4px 0"
       }
-    }, isAdmin ? "Arraste ou adicione" : "Sem pacientes") : colCards.map(card => /*#__PURE__*/React.createElement(KCard, {
-      key: card.id,
-      c: card,
+    }, isAdmin ? "Arraste ou adicione" : "Sem pacientes") : /*#__PURE__*/React.createElement(GroupedCards, {
+      cards: colCards,
       onClick: setSelected,
       isAdmin: isAdmin,
-      onDragStart: e => handleDragStart(e, card.id),
+      onDragStart: handleDragStart,
       onDragEnd: handleDragEnd
-    })))));
+    }))));
   }))), !loading && view === "lista" && /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#fff",
@@ -5071,7 +5412,137 @@ function App() {
       setPendingMove(null);
     },
     onCancel: () => setPendingMove(null)
-  }), /*#__PURE__*/React.createElement(Toast, {
+  }), showComPanel && newComAlerts.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      top: 60,
+      right: 16,
+      width: 320,
+      background: "#fff",
+      borderRadius: 12,
+      boxShadow: "0 8px 32px rgba(0,0,0,.18)",
+      border: "1px solid #E2E8F0",
+      zIndex: 9000,
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "10px 14px",
+      borderBottom: "1px solid #F1F5F9",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      background: "#EFF6FF"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#1E40AF"
+    }
+  }, "💬 Novos comentários (", newComAlerts.length, ")"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowComPanel(false),
+    style: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      color: "#94A3B8",
+      fontSize: 16
+    }
+  }, "✕")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      maxHeight: 340,
+      overflowY: "auto"
+    }
+  }, newComAlerts.map((alert, i) => /*#__PURE__*/React.createElement("div", {
+    key: alert.id,
+    style: {
+      padding: "10px 14px",
+      borderBottom: "1px solid #F1F5F9",
+      display: "flex",
+      flexDirection: "column",
+      gap: 4
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#0F172A"
+    }
+  }, alert.card_nome), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "#64748B"
+    }
+  }, alert.autor, " · ", alert.hora)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setNewComAlerts(p => p.filter(x => x.id !== alert.id)),
+    style: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      color: "#CBD5E1",
+      fontSize: 13,
+      padding: 0,
+      flexShrink: 0
+    }
+  }, "✕")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#374151",
+      background: "#F8FAFC",
+      borderRadius: 6,
+      padding: "5px 8px"
+    }
+  }, alert.texto), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const card = cards.find(c => c.id === alert.card_id);
+      if (card) {
+        setSelected(card);
+        setShowComPanel(false);
+      }
+      setNewComAlerts(p => p.filter(x => x.id !== alert.id));
+    },
+    style: {
+      alignSelf: "flex-start",
+      padding: "3px 10px",
+      border: "1px solid #BFDBFE",
+      borderRadius: 6,
+      background: "none",
+      color: "#1E40AF",
+      cursor: "pointer",
+      fontSize: 11,
+      fontWeight: 600
+    }
+  }, "Abrir card e responder →")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 14px",
+      borderTop: "1px solid #F1F5F9",
+      display: "flex",
+      gap: 6,
+      justifyContent: "flex-end"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setNewComAlerts([]);
+      setShowComPanel(false);
+    },
+    style: {
+      padding: "4px 12px",
+      border: "1px solid #E2E8F0",
+      borderRadius: 6,
+      background: "none",
+      color: "#64748B",
+      cursor: "pointer",
+      fontSize: 11
+    }
+  }, "Ignorar todos"))), /*#__PURE__*/React.createElement(Toast, {
     toast: toast
   }));
 }
