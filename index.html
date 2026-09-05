@@ -4,21 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gerência de Enfermagem</title>
-
-<!-- PWA -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0F172A">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="GE Enfermagem">
-<link rel="apple-touch-icon" href="icon-192.png">
-
-<!-- React -->
+<link rel="apple-touch-icon" href="icon-192.svg">
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<!-- html2canvas -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;-webkit-tap-highlight-color:transparent}
@@ -31,128 +24,66 @@ input,select,textarea,button{font-family:inherit}
 .scroll-col{overflow-y:auto}
 .scroll-col::-webkit-scrollbar{width:3px}
 .scroll-col::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:99px}
-
-/* PWA install banner */
-#install-banner{display:none;position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
-  background:#0F172A;color:#fff;padding:10px 18px;border-radius:12px;
-  font-size:13px;font-weight:600;cursor:pointer;z-index:9998;
-  box-shadow:0 4px 20px rgba(0,0,0,.3);gap:10px;align-items:center;white-space:nowrap}
+#install-banner{display:none;position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#0F172A;color:#fff;padding:10px 18px;border-radius:12px;font-size:13px;font-weight:600;z-index:9997;box-shadow:0 4px 20px rgba(0,0,0,.3);gap:10px;align-items:center;white-space:nowrap}
 #install-banner.show{display:flex}
 </style>
 </head>
 <body>
 <div id="root"></div>
-
-<!-- PWA install prompt -->
 <div id="install-banner">
-  📲 Instalar app — Gerência de Enfermagem
-  <button onclick="doInstall()" style="background:#1E40AF;border:none;color:#fff;padding:5px 12px;borderRadius:6px;cursor:pointer;font-size:12px;fontWeight:600">Instalar</button>
-  <button onclick="document.getElementById('install-banner').classList.remove('show')" style="background:none;border:none;color:#64748B;cursor:pointer;font-size:16px">✕</button>
+  📲 Instalar — Gerência de Enfermagem
+  <button id="btn-install" style="background:#1E40AF;border:none;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">Instalar</button>
+  <button onclick="document.getElementById('install-banner').classList.remove('show')" style="background:none;border:none;color:#64748B;cursor:pointer;font-size:16px;margin-left:4px">✕</button>
 </div>
-
 <script>
-// PWA Service Worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  });
-}
-
-// PWA Install prompt
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});}
 let deferredPrompt;
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  deferredPrompt = e;
-  document.getElementById('install-banner').classList.add('show');
-});
-function doInstall() {
-  if (!deferredPrompt) return;
-  deferredPrompt.prompt();
-  deferredPrompt.userChoice.then(() => {
-    deferredPrompt = null;
-    document.getElementById('install-banner').classList.remove('show');
-  });
-}
-window.addEventListener('appinstalled', () => {
-  document.getElementById('install-banner').classList.remove('show');
-});
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('install-banner').classList.add('show');});
+document.getElementById('btn-install').onclick=function(){if(!deferredPrompt)return;deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;document.getElementById('install-banner').classList.remove('show');});};
+window.addEventListener('appinstalled',()=>document.getElementById('install-banner').classList.remove('show'));
 </script>
-
 <script>
-/* ============================================================
-   GERÊNCIA DE ENFERMAGEM v7
-   Supabase + PWA + buildText completo (regras 41-65)
-   ============================================================ */
-
 const {
   useState,
   useEffect,
   useRef,
   useCallback
 } = React;
+
+/* ─── CONFIG ─── */
 const SB_URL = "https://ahcrscstdtfawoogsugi.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjk1MDgsImV4cCI6MjEwNDIwNTUwOH0.8ivWRA99AXXyBVFT3TQd5NuSod2eiowiI490Blt2zHM";
+const FN_URL = `${SB_URL}/functions/v1`;
 const ADMIN_COREN = "299283";
-const ADMIN_SENHA = "@thi1505";
 
-/* ── Supabase client ── */
-const SB = {
-  headers: {
-    "apikey": SB_KEY,
-    "Authorization": `Bearer ${SB_KEY}`,
-    "Content-Type": "application/json",
-    "Prefer": "return=representation"
-  },
-  async get(table, params = "") {
-    const r = await fetch(`${SB_URL}/rest/v1/${table}?${params}`, {
-      headers: this.headers
-    });
-    if (!r.ok) throw new Error(await r.text());
-    return r.json();
-  },
-  async post(table, body) {
-    const r = await fetch(`${SB_URL}/rest/v1/${table}`, {
-      method: "POST",
-      headers: this.headers,
-      body: JSON.stringify(body)
-    });
-    if (!r.ok) throw new Error(await r.text());
-    return r.json();
-  },
-  async patch(table, id, body, idCol = "id") {
-    const r = await fetch(`${SB_URL}/rest/v1/${table}?${idCol}=eq.${id}`, {
-      method: "PATCH",
-      headers: this.headers,
-      body: JSON.stringify(body)
-    });
-    if (!r.ok) throw new Error(await r.text());
-    return r.json();
-  },
-  async delete(table, id, idCol = "id") {
-    const r = await fetch(`${SB_URL}/rest/v1/${table}?${idCol}=eq.${id}`, {
-      method: "DELETE",
-      headers: this.headers
-    });
-    if (!r.ok) throw new Error(await r.text());
-  },
-  realtime(table, cb) {
-    // Supabase Realtime via polling leve (sem lib extra)
-    let last = Date.now();
-    const iv = setInterval(async () => {
-      try {
-        const rows = await this.get(table, `created_at=gt.${new Date(last).toISOString()}&order=created_at.asc`);
-        if (rows.length) {
-          last = Date.now();
-          cb(rows);
-        }
-      } catch {}
-    }, 4000);
-    return () => clearInterval(iv);
-  }
-};
+/* ─── API helpers ─── */
+const H = userId => ({
+  "Content-Type": "application/json",
+  "apikey": SB_KEY,
+  "Authorization": `Bearer ${SB_KEY}`,
+  ...(userId ? {
+    "x-user-id": userId
+  } : {})
+});
+async function sbGet(table, params = "") {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?${params}`, {
+    headers: H()
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function fn(name, body, userId) {
+  const r = await fetch(`${FN_URL}/${name}`, {
+    method: "POST",
+    headers: H(userId),
+    body: JSON.stringify(body)
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || "Erro desconhecido");
+  return data;
+}
 
-/* ── CONSTANTS ── */
-const ADMIN_ID = "00000000-0000-0000-0000-000000000001";
+/* ─── CONSTANTS ─── */
 const GC = {
   emergencia: {
     bg: "#FEE2E2",
@@ -211,6 +142,7 @@ const GC = {
     emoji: "🔵"
   }
 };
+const STATUS_OPTIONS = ["", "REINSERIR", "EVADIU", "EVASÃO", "ALTA", "ALTA MÉDICA", "RESOLVIDO COM RECURSOS LOCAIS", "FINALIZADO VIA CROSS", "ENCAMINHAR AMANHÃ"];
 const STATUS_EMOJI = {
   "EVADIU": "⚠️",
   "EVASÃO": "⚠️",
@@ -227,9 +159,8 @@ const PR_EMOJI = {
   "03": "🟡",
   "04": "⚪"
 };
-const STATUS_OPTIONS = ["", "REINSERIR", "EVADIU", "EVASÃO", "ALTA", "ALTA MÉDICA", "RESOLVIDO COM RECURSOS LOCAIS", "FINALIZADO VIA CROSS", "ENCAMINHAR AMANHÃ"];
 
-/* ── UTILS ── */
+/* ─── UTILS ─── */
 const todayStr = () => new Date().toLocaleDateString("pt-BR", {
   day: "2-digit",
   month: "2-digit",
@@ -253,67 +184,32 @@ const saveLS = (k, v) => {
   } catch {}
 };
 
-/* ════════════════════════════════════════════
-   buildText — Regras 41–65
-   ════════════════════════════════════════════ */
+/* ─── buildText (regras 41-65) ─── */
 function buildText(cards, cols, settings) {
   const appLink = settings?.app_url ? `\n\n━━━━━━━━━━━━━━━━━━━━\n🌐 *Acesse o sistema:*\n${settings.app_url}` : "";
   const lines = [`🏥 *GERÊNCIA DE ENFERMAGEM*`, `📅 Atualização: *${todayStr()} às ${nowStr()}*`, `━━━━━━━━━━━━━━━━━━━━`];
   cols.forEach(col => {
-    const colCards = cards.filter(c => c.col_id === col.id);
-    if (!colCards.length) return;
-    lines.push("");
-    lines.push(`${col.emoji || "📌"} *${col.label.toUpperCase()}*`);
-    lines.push(`👥 ${colCards.length} paciente${colCards.length !== 1 ? "s" : ""}`);
-    lines.push(`━━━━━━━━━━━━━━━━━━━━`);
-    colCards.forEach((c, i) => {
+    const cc = cards.filter(c => c.col_id === col.id);
+    if (!cc.length) return;
+    lines.push("", `${col.emoji || "📌"} *${col.label.toUpperCase()}*`, `👥 ${cc.length} paciente${cc.length !== 1 ? "s" : ""}`, `━━━━━━━━━━━━━━━━━━━━`);
+    cc.forEach((c, i) => {
       lines.push("");
-
-      // Prioridade (nível 3 — antes do paciente)
-      if (c.pr) {
-        const prEmoji = PR_EMOJI[c.pr] || "⚪";
-        lines.push(`${prEmoji} *PRIORIDADE ${String(c.pr).padStart(2, "0")}*`);
-      }
-
-      // Paciente
-      const pacEmoji = c.is_rn ? "👶" : "👤";
-      lines.push(`${pacEmoji} *${c.nome}*${c.idade ? ` — ${c.idade}` : ""}`);
-
-      // Diagnóstico
+      if (c.pr) lines.push(`${PR_EMOJI[c.pr] || "⚪"} *PRIORIDADE ${String(c.pr).padStart(2, "0")}*`);
+      lines.push(`${c.is_rn ? "👶" : "👤"} *${c.nome}*${c.idade ? ` — ${c.idade}` : ""}`);
       if (c.hd) lines.push(`🩺 HD: ${c.hd}`);
-
-      // Localização
       if (c.setor) lines.push(`📍 ${c.setor}`);
-
-      // Especialidade + Destino + Ambulância
-      const hasHosp = !!c.hosp;
-      const hasRec = !!c.rec;
       const ambTxt = c.amb ? c.amb.includes("Av") ? "Amb. Avançada" : "Amb. Básica" : "";
-      if (hasRec && hasHosp) {
+      if (c.rec && c.hosp) {
         lines.push(`➡️ ${c.rec} → ${c.hosp}`);
         if (ambTxt) lines.push(`🏥 ${ambTxt}`);
-      } else if (hasRec) {
-        lines.push(`🏥 ${c.rec}${ambTxt ? " | " + ambTxt : ""}`);
-      } else if (ambTxt) {
-        lines.push(`🏥 ${ambTxt}`);
-      }
-
-      // CROSS
+      } else if (c.rec) lines.push(`🏥 ${c.rec}${ambTxt ? " | " + ambTxt : ""}`);else if (ambTxt) lines.push(`🏥 ${ambTxt}`);
       if (c.cross_info) lines.push(`🔄 Cross: ${c.cross_info}`);
-
-      // Status final
-      if (c.status) {
-        const stEmoji = STATUS_EMOJI[c.status] || "▸";
-        lines.push(`${stEmoji} *${c.status}*`);
-      }
+      if (c.receptor) lines.push(`📥 Receptor: ${c.receptor}${c.data_aceite ? " — " + c.data_aceite : ""}${c.hora_aceite ? " às " + c.hora_aceite : ""}`);
+      if (c.status) lines.push(`${STATUS_EMOJI[c.status] || "▸"} *${c.status}*`);
     });
     lines.push("");
   });
-
-  // Resumo geral (Regra 58)
-  lines.push("━━━━━━━━━━━━━━━━━━━━");
-  lines.push(`📊 *RESUMO GERAL*`);
-  lines.push("");
+  lines.push("━━━━━━━━━━━━━━━━━━━━", `📊 *RESUMO GERAL*`, "");
   lines.push(`👥 Total: *${cards.length} pacientes*`);
   cols.forEach(col => {
     const n = cards.filter(c => c.col_id === col.id).length;
@@ -323,7 +219,77 @@ function buildText(cards, cols, settings) {
   return lines.join("\n");
 }
 
-/* ── SMALL COMPONENTS ── */
+/* ─── SMALL UI ─── */
+const inp_s = {
+  width: "100%",
+  padding: "8px 10px",
+  border: "1px solid #E2E8F0",
+  borderRadius: 7,
+  fontSize: 13,
+  color: "#0F172A",
+  background: "#fff",
+  fontFamily: "inherit"
+};
+const lbl_s = {
+  fontSize: 10,
+  fontWeight: 600,
+  color: "#94A3B8",
+  textTransform: "uppercase",
+  letterSpacing: ".05em",
+  display: "block",
+  marginBottom: 3
+};
+function Btn({
+  children,
+  onClick,
+  variant = "primary",
+  style: ex = {},
+  disabled = false,
+  type = "button"
+}) {
+  const v = {
+    primary: {
+      background: "#0F172A",
+      color: "#fff",
+      border: "none"
+    },
+    ghost: {
+      background: "none",
+      color: "#64748B",
+      border: "1px solid #E2E8F0"
+    },
+    danger: {
+      background: "none",
+      color: "#DC2626",
+      border: "1px solid #FCA5A5"
+    },
+    green: {
+      background: "#16A34A",
+      color: "#fff",
+      border: "none"
+    },
+    wa: {
+      background: "#25D366",
+      color: "#fff",
+      border: "none"
+    }
+  };
+  return /*#__PURE__*/React.createElement("button", {
+    type: type,
+    onClick: onClick,
+    disabled: disabled,
+    style: {
+      padding: "7px 16px",
+      borderRadius: 8,
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: disabled ? "not-allowed" : "pointer",
+      opacity: disabled ? .6 : 1,
+      ...(v[variant] || v.primary),
+      ...ex
+    }
+  }, children);
+}
 function Badge({
   grav
 }) {
@@ -356,7 +322,7 @@ function StatusPill({
   status
 }) {
   if (!status) return null;
-  const map = {
+  const m = {
     "EVADIU": "#FEE2E2|#991B1B",
     "EVASÃO": "#FEE2E2|#991B1B",
     "ALTA": "#DCFCE7|#14532D",
@@ -366,7 +332,7 @@ function StatusPill({
     "REINSERIR": "#FEF3C7|#92400E",
     "ENCAMINHAR AMANHÃ": "#EFF6FF|#1E40AF"
   };
-  const [bg, color] = (map[status] || "#F1F5F9|#475569").split("|");
+  const [bg, color] = (m[status] || "#F1F5F9|#475569").split("|");
   return /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 9,
@@ -422,58 +388,6 @@ function Toast({
       color: toast.type === "err" ? "#991B1B" : "#166534"
     }
   }, toast.msg);
-}
-function Btn({
-  children,
-  onClick,
-  variant = "primary",
-  style: extra = {},
-  disabled = false,
-  type = "button"
-}) {
-  const v = {
-    primary: {
-      background: "#0F172A",
-      color: "#fff",
-      border: "none"
-    },
-    ghost: {
-      background: "none",
-      color: "#64748B",
-      border: "1px solid #E2E8F0"
-    },
-    danger: {
-      background: "none",
-      color: "#DC2626",
-      border: "1px solid #FCA5A5"
-    },
-    green: {
-      background: "#16A34A",
-      color: "#fff",
-      border: "none"
-    },
-    wa: {
-      background: "#25D366",
-      color: "#fff",
-      border: "none"
-    }
-  };
-  return /*#__PURE__*/React.createElement("button", {
-    type: type,
-    onClick: onClick,
-    disabled: disabled,
-    style: {
-      padding: "7px 16px",
-      borderRadius: 8,
-      fontSize: 13,
-      fontWeight: 600,
-      cursor: disabled ? "not-allowed" : "pointer",
-      transition: "opacity .13s",
-      opacity: disabled ? .6 : 1,
-      ...(v[variant] || v.primary),
-      ...extra
-    }
-  }, children);
 }
 function ModalShell({
   onClose,
@@ -562,26 +476,7 @@ function ModalShell({
   }, footer)));
 }
 
-/* ── FIELD — definido FORA dos modais (fix do perde foco) ── */
-const inp_s = {
-  width: "100%",
-  padding: "8px 10px",
-  border: "1px solid #E2E8F0",
-  borderRadius: 7,
-  fontSize: 13,
-  color: "#0F172A",
-  background: "#fff",
-  fontFamily: "inherit"
-};
-const lbl_s = {
-  fontSize: 10,
-  fontWeight: 600,
-  color: "#94A3B8",
-  textTransform: "uppercase",
-  letterSpacing: ".05em",
-  display: "block",
-  marginBottom: 3
-};
+/* Field fora dos modais — fix do perde foco */
 function Field({
   label,
   fieldKey,
@@ -627,7 +522,613 @@ function Field({
   }));
 }
 
-/* ── LOGIN ── */
+/* ─── MODAL ACEITE OBRIGATÓRIO ─── */
+function AceiteModal({
+  card,
+  onConfirm,
+  onCancel
+}) {
+  const [form, setForm] = useState({
+    receptor: "",
+    data_aceite: new Date().toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    }),
+    hora_aceite: nowStr()
+  });
+  const [err, setErr] = useState("");
+  const upd = (k, v) => setForm(p => ({
+    ...p,
+    [k]: v
+  }));
+  function confirm() {
+    if (!form.receptor.trim()) {
+      setErr("Receptor é obrigatório.");
+      return;
+    }
+    if (!form.data_aceite.trim()) {
+      setErr("Data é obrigatória.");
+      return;
+    }
+    if (!form.hora_aceite.trim()) {
+      setErr("Hora é obrigatória.");
+      return;
+    }
+    onConfirm(form);
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      background: "rgba(15,23,42,.6)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 2000,
+      padding: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      borderRadius: 16,
+      width: "100%",
+      maxWidth: 420,
+      boxShadow: "0 20px 60px rgba(0,0,0,.25)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "16px 20px",
+      borderBottom: "1px solid #F1F5F9",
+      background: "#F0FDF4",
+      borderRadius: "16px 16px 0 0"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#16A34A",
+      textTransform: "uppercase",
+      letterSpacing: ".05em"
+    }
+  }, "Aceite Confirmado"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 15,
+      color: "#0F172A",
+      marginTop: 2
+    }
+  }, "Registrar dados do aceite"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#64748B",
+      marginTop: 2
+    }
+  }, card.nome)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "16px 20px"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12,
+      color: "#64748B",
+      marginBottom: 14
+    }
+  }, "Preencha os dados do aceite antes de mover o paciente para esta coluna."), /*#__PURE__*/React.createElement(Field, {
+    label: "Receptor *",
+    fieldKey: "receptor",
+    value: form.receptor,
+    onChange: upd,
+    placeholder: "Nome do médico, setor ou hospital"
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Data do aceite *",
+    fieldKey: "data_aceite",
+    value: form.data_aceite,
+    onChange: upd,
+    placeholder: "05/09/2026"
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Hora do aceite *",
+    fieldKey: "hora_aceite",
+    value: form.hora_aceite,
+    onChange: upd,
+    placeholder: "14:35"
+  }), err && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#FEE2E2",
+      color: "#991B1B",
+      padding: "8px 12px",
+      borderRadius: 8,
+      fontSize: 12,
+      marginTop: 8
+    }
+  }, err)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "10px 20px",
+      borderTop: "1px solid #F1F5F9",
+      display: "flex",
+      gap: 8,
+      justifyContent: "flex-end"
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: onCancel
+  }, "Cancelar movimentação"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: confirm
+  }, "✅ Confirmar aceite"))));
+}
+
+/* ─── CARD MODAL ─── */
+function CardModal({
+  card,
+  cols,
+  onClose,
+  onSave,
+  onDel,
+  isAdmin,
+  currentUser,
+  comments,
+  onAddComment,
+  onDelComment
+}) {
+  const [form, setForm] = useState({
+    ...card
+  });
+  const [tab, setTab] = useState("info");
+  const [commentText, setCommentText] = useState("");
+  const upd = useCallback((k, v) => setForm(p => ({
+    ...p,
+    [k]: v
+  })), []);
+  function addComment() {
+    if (!commentText.trim()) return;
+    onAddComment(card.id, commentText.trim());
+    setCommentText("");
+  }
+  const selOpts = opts => opts.map(o => typeof o === "string" ? {
+    v: o,
+    t: o || "(sem status)"
+  } : o);
+  const isAceite = form.col_id === "aceite";
+  return /*#__PURE__*/React.createElement(ModalShell, {
+    title: form.nome || "Paciente",
+    subtitle: card.id === "new" ? "Novo Paciente" : "Card",
+    onClose: onClose,
+    footer: isAdmin && /*#__PURE__*/React.createElement(React.Fragment, null, card.id !== "new" && /*#__PURE__*/React.createElement(Btn, {
+      variant: "danger",
+      onClick: () => onDel(card.id)
+    }, "Excluir"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginLeft: "auto"
+      }
+    }, /*#__PURE__*/React.createElement(Btn, {
+      variant: "ghost",
+      onClick: onClose
+    }, "Cancelar"), /*#__PURE__*/React.createElement(Btn, {
+      onClick: () => onSave(form)
+    }, "Salvar")))
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 2,
+      marginBottom: 16,
+      background: "#F8FAFC",
+      borderRadius: 8,
+      padding: 2
+    }
+  }, [["info", "📋 Informações"], ["aceite_info", "🟢 Aceite"], ["comments", "💬 Comentários" + (comments.length ? ` (${comments.length})` : "")]].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
+    key: id,
+    type: "button",
+    onClick: () => setTab(id),
+    style: {
+      flex: 1,
+      padding: "6px 10px",
+      borderRadius: 6,
+      border: "none",
+      fontSize: 12,
+      fontWeight: tab === id ? 600 : 400,
+      background: tab === id ? "#fff" : "transparent",
+      color: tab === id ? "#0F172A" : "#64748B",
+      cursor: "pointer",
+      boxShadow: tab === id ? "0 1px 3px rgba(0,0,0,.08)" : undefined
+    }
+  }, label))), tab === "info" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: "0 12px"
+    }
+  }, /*#__PURE__*/React.createElement(Field, {
+    label: "Nome completo",
+    fieldKey: "nome",
+    value: form.nome,
+    onChange: upd,
+    disabled: !isAdmin,
+    full: true
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Recém-nascido?",
+    fieldKey: "is_rn",
+    value: form.is_rn ? "Sim" : "Não",
+    onChange: (k, v) => upd(k, v === "Sim"),
+    disabled: !isAdmin,
+    opts: [{
+      v: "Não",
+      t: "Não"
+    }, {
+      v: "Sim",
+      t: "Sim (RN)"
+    }]
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Idade",
+    fieldKey: "idade",
+    value: form.idade,
+    onChange: upd,
+    disabled: !isAdmin,
+    placeholder: "44 anos"
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Admissão",
+    fieldKey: "adm",
+    value: form.adm,
+    onChange: upd,
+    disabled: !isAdmin,
+    placeholder: "05/09"
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Hipótese diagnóstica (HD)",
+    fieldKey: "hd",
+    value: form.hd,
+    onChange: upd,
+    disabled: !isAdmin,
+    full: true
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Setor / Leito",
+    fieldKey: "setor",
+    value: form.setor,
+    onChange: upd,
+    disabled: !isAdmin,
+    placeholder: "CM/L.14"
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Recurso / Especialidade",
+    fieldKey: "rec",
+    value: form.rec,
+    onChange: upd,
+    disabled: !isAdmin,
+    placeholder: "Ortopedia"
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Hospital receptor",
+    fieldKey: "hosp",
+    value: form.hosp,
+    onChange: upd,
+    disabled: !isAdmin,
+    placeholder: "Lacaz"
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Ambulância",
+    fieldKey: "amb",
+    value: form.amb,
+    onChange: upd,
+    disabled: !isAdmin,
+    opts: selOpts([{
+      v: "",
+      t: "—"
+    }, {
+      v: "Básica",
+      t: "🚐 Básica (SBV)"
+    }, {
+      v: "Avançada",
+      t: "🚨 Avançada (SAV)"
+    }])
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Prioridade (nº)",
+    fieldKey: "pr",
+    value: form.pr,
+    onChange: upd,
+    disabled: !isAdmin,
+    placeholder: "01"
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Status",
+    fieldKey: "status",
+    value: form.status,
+    onChange: upd,
+    disabled: !isAdmin,
+    opts: selOpts(STATUS_OPTIONS)
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Gravidade",
+    fieldKey: "grav",
+    value: form.grav,
+    onChange: upd,
+    disabled: !isAdmin,
+    opts: Object.entries(GC).map(([k, v]) => ({
+      v: k,
+      t: v.label
+    }))
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Coluna",
+    fieldKey: "col_id",
+    value: form.col_id,
+    onChange: upd,
+    disabled: !isAdmin,
+    opts: cols.map(c => ({
+      v: c.id,
+      t: c.label
+    }))
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Finalizado Cross",
+    fieldKey: "cross_info",
+    value: form.cross_info,
+    onChange: upd,
+    disabled: !isAdmin,
+    full: true,
+    placeholder: "04/09 às 13:56"
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Horário de saída",
+    fieldKey: "saida",
+    value: form.saida,
+    onChange: upd,
+    disabled: !isAdmin
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Horário de retorno",
+    fieldKey: "retorno",
+    value: form.retorno,
+    onChange: upd,
+    disabled: !isAdmin
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Observações",
+    fieldKey: "obs",
+    value: form.obs,
+    onChange: upd,
+    disabled: !isAdmin,
+    as: "textarea",
+    full: true
+  })), tab === "aceite_info" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: isAceite ? "#F0FDF4" : "#F8FAFC",
+      border: `1px solid ${isAceite ? "#86EFAC" : "#E2E8F0"}`,
+      borderRadius: 10,
+      padding: "12px 14px",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: isAceite ? "#16A34A" : "#94A3B8",
+      fontWeight: 600
+    }
+  }, isAceite ? "✅ Paciente na coluna Aceite Confirmado" : "ℹ️ Preencher quando o aceite for confirmado")), /*#__PURE__*/React.createElement(Field, {
+    label: "Receptor *",
+    fieldKey: "receptor",
+    value: form.receptor,
+    onChange: upd,
+    disabled: !isAdmin,
+    placeholder: "Dr. João Silva / Hospital SCSP"
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Data do aceite",
+    fieldKey: "data_aceite",
+    value: form.data_aceite,
+    onChange: upd,
+    disabled: !isAdmin,
+    placeholder: "05/09/2026"
+  }), /*#__PURE__*/React.createElement(Field, {
+    label: "Hora do aceite",
+    fieldKey: "hora_aceite",
+    value: form.hora_aceite,
+    onChange: upd,
+    disabled: !isAdmin,
+    placeholder: "14:35"
+  })), tab === "comments" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      maxHeight: 300,
+      overflowY: "auto",
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, comments.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "24px",
+      color: "#CBD5E1",
+      fontSize: 12
+    }
+  }, "Nenhum comentário ainda."), comments.map(c => /*#__PURE__*/React.createElement("div", {
+    key: c.id,
+    style: {
+      background: c.is_admin ? "#EFF6FF" : "#F8FAFC",
+      borderRadius: 8,
+      padding: "10px 12px",
+      border: `1px solid ${c.is_admin ? "#BFDBFE" : "#E2E8F0"}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 30,
+      height: 30,
+      borderRadius: "50%",
+      flexShrink: 0,
+      overflow: "hidden",
+      background: c.is_admin ? "#1E40AF" : "#F1F5F9",
+      border: "1px solid #E2E8F0",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, c.autor_foto ? /*#__PURE__*/React.createElement("img", {
+    src: c.autor_foto,
+    style: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover"
+    }
+  }) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: c.is_admin ? "#fff" : "#94A3B8"
+    }
+  }, (c.autor_nome || "?")[0].toUpperCase())), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 5,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: c.is_admin ? "#1E40AF" : "#374151"
+    }
+  }, c.autor_nome), c.is_admin && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 9,
+      fontWeight: 700,
+      padding: "1px 5px",
+      borderRadius: 3,
+      background: "#1E40AF",
+      color: "#fff"
+    }
+  }, "ADMIN")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: "#94A3B8"
+    }
+  }, new Date(c.created_at).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  })), (currentUser?.role === "admin" || c.autor_id === currentUser?.id) && /*#__PURE__*/React.createElement("button", {
+    onClick: () => onDelComment(c.id),
+    style: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      color: "#CBD5E1",
+      fontSize: 12,
+      padding: 0
+    }
+  }, "✕"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#374151",
+      lineHeight: 1.5,
+      marginTop: 2
+    }
+  }, c.texto)))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    value: commentText,
+    onChange: e => setCommentText(e.target.value),
+    onKeyDown: e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), addComment()),
+    placeholder: "Comentário… (Enter para enviar)",
+    style: {
+      ...inp_s,
+      flex: 1
+    }
+  }), /*#__PURE__*/React.createElement(Btn, {
+    onClick: addComment
+  }, "Enviar"))));
+}
+
+/* ─── SHARE MODAL ─── */
+function ShareModal({
+  onClose,
+  settings,
+  cards,
+  cols,
+  showT
+}) {
+  const text = buildText(cards, cols, settings);
+  function doShare() {
+    window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank");
+    navigator.clipboard.writeText(text).catch(() => {});
+    showT("✅ WhatsApp aberto!");
+    onClose();
+  }
+  return /*#__PURE__*/React.createElement(ModalShell, {
+    title: "Compartilhar no WhatsApp",
+    onClose: onClose,
+    maxWidth: 520
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#F0FDF4",
+      border: "1px solid #86EFAC",
+      borderRadius: 10,
+      padding: "12px 14px",
+      marginBottom: 14,
+      fontSize: 12,
+      color: "#166534",
+      lineHeight: 1.8
+    }
+  }, /*#__PURE__*/React.createElement("strong", null, "Como funciona:"), /*#__PURE__*/React.createElement("br", null), "① WhatsApp Web abre com o texto já preenchido", /*#__PURE__*/React.createElement("br", null), "② Escolha o grupo na lista", /*#__PURE__*/React.createElement("br", null), "③ Clique em Enviar", settings?.app_url && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("br", null), "④ Link do app incluído automaticamente")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#F8FAFC",
+      borderRadius: 8,
+      padding: "10px 12px",
+      marginBottom: 14,
+      maxHeight: 280,
+      overflowY: "auto"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#94A3B8",
+      marginBottom: 6,
+      textTransform: "uppercase",
+      letterSpacing: ".05em"
+    }
+  }, "Pré-visualização"), /*#__PURE__*/React.createElement("pre", {
+    style: {
+      fontSize: 11,
+      color: "#374151",
+      whiteSpace: "pre-wrap",
+      fontFamily: "inherit",
+      lineHeight: 1.7
+    }
+  }, text)), /*#__PURE__*/React.createElement(Btn, {
+    variant: "wa",
+    onClick: doShare,
+    style: {
+      width: "100%",
+      justifyContent: "center",
+      padding: "12px",
+      fontSize: 14
+    }
+  }, "📤 Abrir WhatsApp com o texto"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#94A3B8",
+      textAlign: "center",
+      marginTop: 8
+    }
+  }, "Funciona no computador e no celular"));
+}
+
+/* ─── LOGIN ─── */
 function LoginScreen({
   onLogin,
   showT
@@ -650,41 +1151,13 @@ function LoginScreen({
     setErr("");
     setLoading(true);
     try {
-      if (coren.trim() === ADMIN_COREN) {
-        if (senha !== ADMIN_SENHA) {
-          setErr("Senha incorreta.");
-          setLoading(false);
-          return;
-        }
-        const rows = await SB.get("users", `coren=eq.299283&limit=1`);
-        onLogin(rows[0] || {
-          id: ADMIN_ID,
-          nome: "Fabiana Faria de Figueiredo",
-          role: "admin",
-          status: "aprovado"
-        });
-      } else {
-        const rows = await SB.get("users", `or=(coren.eq.${coren.trim()},crm.eq.${coren.trim()})&limit=1`);
-        if (!rows.length) {
-          setErr("Registro não encontrado. Solicite à administradora.");
-          setLoading(false);
-          return;
-        }
-        const u = rows[0];
-        if (u.status === "pendente") {
-          setErr("Cadastro aguardando aprovação.");
-          setLoading(false);
-          return;
-        }
-        if (u.status === "bloqueado") {
-          setErr("Acesso bloqueado. Contate a administradora.");
-          setLoading(false);
-          return;
-        }
-        onLogin(u);
-      }
+      const data = await fn("auth-login", {
+        coren: coren.trim(),
+        senha
+      });
+      onLogin(data);
     } catch (ex) {
-      setErr("Erro de conexão. Verifique sua internet.");
+      setErr(ex.message);
     }
     setLoading(false);
   }
@@ -696,25 +1169,17 @@ function LoginScreen({
       return;
     }
     try {
-      const existing = await SB.get("users", `or=(coren.eq.${reg.registro.trim()},crm.eq.${reg.registro.trim()})&limit=1`);
-      if (existing.length) {
-        setErr("Registro já cadastrado.");
-        return;
-      }
-      await SB.post("users", {
+      await fn("users-register", {
         tipo: reg.tipo,
-        coren: reg.tipo === "COREN" ? reg.registro : null,
-        crm: reg.tipo === "CRM" ? reg.registro : null,
-        nome: reg.nome,
+        registro: reg.registro.trim(),
+        nome: reg.nome.trim(),
         zap: reg.zap,
-        foto: reg.foto,
-        role: "viewer",
-        status: "pendente"
+        foto: reg.foto
       });
       setMode("login");
       showT("Cadastro enviado! Aguarde aprovação da administradora.");
     } catch (ex) {
-      setErr("Erro ao cadastrar. Tente novamente.");
+      setErr(ex.message);
     }
   }
   function handleFoto(e, setter) {
@@ -1016,7 +1481,7 @@ function LoginScreen({
   }, "Sou novo aqui — solicitar acesso"))));
 }
 
-/* ── SETTINGS MODAL ── */
+/* ─── SETTINGS MODAL ─── */
 function SettingsModal({
   settings,
   onClose,
@@ -1097,83 +1562,7 @@ function SettingsModal({
   }));
 }
 
-/* ── SHARE MODAL ── */
-function ShareModal({
-  onClose,
-  settings,
-  cards,
-  cols,
-  showT
-}) {
-  const text = buildText(cards, cols, settings);
-  function doShare() {
-    const encoded = encodeURIComponent(text);
-    window.open("https://wa.me/?text=" + encoded, "_blank");
-    navigator.clipboard.writeText(text).catch(() => {});
-    showT("✅ WhatsApp aberto!");
-    onClose();
-  }
-  return /*#__PURE__*/React.createElement(ModalShell, {
-    title: "Compartilhar no WhatsApp",
-    onClose: onClose,
-    maxWidth: 520
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#F0FDF4",
-      border: "1px solid #86EFAC",
-      borderRadius: 10,
-      padding: "12px 14px",
-      marginBottom: 14,
-      fontSize: 12,
-      color: "#166534",
-      lineHeight: 1.8
-    }
-  }, /*#__PURE__*/React.createElement("strong", null, "Como funciona:"), /*#__PURE__*/React.createElement("br", null), "① WhatsApp Web abre com o texto já preenchido", /*#__PURE__*/React.createElement("br", null), "② Escolha o grupo na lista de conversas", /*#__PURE__*/React.createElement("br", null), "③ Clique em Enviar", settings?.app_url && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("br", null), "④ O link do app já vem no texto — clicável no WhatsApp!")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#F8FAFC",
-      borderRadius: 8,
-      padding: "10px 12px",
-      marginBottom: 14,
-      maxHeight: 300,
-      overflowY: "auto"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      fontWeight: 600,
-      color: "#94A3B8",
-      marginBottom: 6,
-      textTransform: "uppercase",
-      letterSpacing: ".05em"
-    }
-  }, "Pré-visualização"), /*#__PURE__*/React.createElement("pre", {
-    style: {
-      fontSize: 11,
-      color: "#374151",
-      whiteSpace: "pre-wrap",
-      fontFamily: "inherit",
-      lineHeight: 1.7
-    }
-  }, text)), /*#__PURE__*/React.createElement(Btn, {
-    variant: "wa",
-    onClick: doShare,
-    style: {
-      width: "100%",
-      justifyContent: "center",
-      padding: "12px",
-      fontSize: 14
-    }
-  }, "📤 Abrir WhatsApp com o texto"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "#94A3B8",
-      textAlign: "center",
-      marginTop: 8
-    }
-  }, "Funciona no computador e no celular"));
-}
-
-/* ── PUBLISH MODAL ── */
+/* ─── PUBLISH MODAL ─── */
 function PubModal({
   onClose,
   onPub,
@@ -1196,7 +1585,7 @@ function PubModal({
       color: "#64748B",
       marginBottom: 14
     }
-  }, "Esta versão ficará registrada como publicação oficial."), cols.map(c => {
+  }, "Esta versão ficará visível para todos os profissionais."), cols.map(c => {
     const n = cards.filter(k => k.col_id === c.id).length;
     return /*#__PURE__*/React.createElement("div", {
       key: c.id,
@@ -1235,822 +1624,7 @@ function PubModal({
   }, "Total: ", cards.length, " pacientes")));
 }
 
-/* ── CARD MODAL ── */
-function CardModal({
-  card,
-  cols,
-  onClose,
-  onSave,
-  onDel,
-  isAdmin,
-  currentUser,
-  comments,
-  onAddComment,
-  onDelComment
-}) {
-  const [form, setForm] = useState({
-    ...card
-  });
-  const [tab, setTab] = useState("info");
-  const [commentText, setCommentText] = useState("");
-  const upd = useCallback((k, v) => setForm(p => ({
-    ...p,
-    [k]: v
-  })), []);
-  function addComment() {
-    if (!commentText.trim()) return;
-    onAddComment(card.id, commentText.trim());
-    setCommentText("");
-  }
-  const selOpts = opts => opts.map(o => typeof o === "string" ? {
-    v: o,
-    t: o || "(sem status)"
-  } : o);
-  return /*#__PURE__*/React.createElement(ModalShell, {
-    title: form.nome || "Paciente",
-    subtitle: card.id === "new" ? "Novo Paciente" : "Card",
-    onClose: onClose,
-    footer: isAdmin && /*#__PURE__*/React.createElement(React.Fragment, null, card.id !== "new" && /*#__PURE__*/React.createElement(Btn, {
-      variant: "danger",
-      onClick: () => onDel(card.id)
-    }, "Excluir"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 8,
-        marginLeft: "auto"
-      }
-    }, /*#__PURE__*/React.createElement(Btn, {
-      variant: "ghost",
-      onClick: onClose
-    }, "Cancelar"), /*#__PURE__*/React.createElement(Btn, {
-      onClick: () => onSave(form)
-    }, "Salvar")))
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 2,
-      marginBottom: 16,
-      background: "#F8FAFC",
-      borderRadius: 8,
-      padding: 2
-    }
-  }, [["info", "📋 Informações"], ["comments", "💬 Comentários" + (comments.length ? ` (${comments.length})` : "")]].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
-    key: id,
-    type: "button",
-    onClick: () => setTab(id),
-    style: {
-      flex: 1,
-      padding: "6px 10px",
-      borderRadius: 6,
-      border: "none",
-      fontSize: 12,
-      fontWeight: tab === id ? 600 : 400,
-      background: tab === id ? "#fff" : "transparent",
-      color: tab === id ? "#0F172A" : "#64748B",
-      cursor: "pointer",
-      boxShadow: tab === id ? "0 1px 3px rgba(0,0,0,.08)" : undefined
-    }
-  }, label))), tab === "info" && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: "0 12px"
-    }
-  }, /*#__PURE__*/React.createElement(Field, {
-    label: "Nome completo",
-    fieldKey: "nome",
-    value: form.nome,
-    onChange: upd,
-    isAdmin: isAdmin,
-    disabled: !isAdmin,
-    full: true
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Recém-nascido?",
-    fieldKey: "is_rn",
-    value: form.is_rn ? "Sim" : "Não",
-    onChange: (k, v) => upd(k, v === "Sim"),
-    disabled: !isAdmin,
-    opts: [{
-      v: "Não",
-      t: "Não"
-    }, {
-      v: "Sim",
-      t: "Sim (RN)"
-    }]
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Idade",
-    fieldKey: "idade",
-    value: form.idade,
-    onChange: upd,
-    disabled: !isAdmin,
-    placeholder: "44 anos"
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Admissão",
-    fieldKey: "adm",
-    value: form.adm,
-    onChange: upd,
-    disabled: !isAdmin,
-    placeholder: "05/09"
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Hipótese diagnóstica (HD)",
-    fieldKey: "hd",
-    value: form.hd,
-    onChange: upd,
-    disabled: !isAdmin,
-    full: true
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Setor / Leito",
-    fieldKey: "setor",
-    value: form.setor,
-    onChange: upd,
-    disabled: !isAdmin,
-    placeholder: "CM/L.14"
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Recurso / Especialidade",
-    fieldKey: "rec",
-    value: form.rec,
-    onChange: upd,
-    disabled: !isAdmin,
-    placeholder: "Ortopedia"
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Hospital receptor",
-    fieldKey: "hosp",
-    value: form.hosp,
-    onChange: upd,
-    disabled: !isAdmin,
-    placeholder: "Lacaz"
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Ambulância",
-    fieldKey: "amb",
-    value: form.amb,
-    onChange: upd,
-    disabled: !isAdmin,
-    opts: selOpts([{
-      v: "",
-      t: "—"
-    }, {
-      v: "Básica",
-      t: "🚐 Básica (SBV)"
-    }, {
-      v: "Avançada",
-      t: "🚨 Avançada (SAV)"
-    }])
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Prioridade (nº)",
-    fieldKey: "pr",
-    value: form.pr,
-    onChange: upd,
-    disabled: !isAdmin,
-    placeholder: "01"
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Status",
-    fieldKey: "status",
-    value: form.status,
-    onChange: upd,
-    disabled: !isAdmin,
-    opts: selOpts(STATUS_OPTIONS)
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Gravidade",
-    fieldKey: "grav",
-    value: form.grav,
-    onChange: upd,
-    disabled: !isAdmin,
-    opts: Object.entries(GC).map(([k, v]) => ({
-      v: k,
-      t: v.label
-    }))
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Coluna",
-    fieldKey: "col_id",
-    value: form.col_id,
-    onChange: upd,
-    disabled: !isAdmin,
-    opts: cols.map(c => ({
-      v: c.id,
-      t: c.label
-    }))
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Finalizado Cross",
-    fieldKey: "cross_info",
-    value: form.cross_info,
-    onChange: upd,
-    disabled: !isAdmin,
-    full: true,
-    placeholder: "04/09 às 13:56"
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Horário de saída",
-    fieldKey: "saida",
-    value: form.saida,
-    onChange: upd,
-    disabled: !isAdmin
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Horário de retorno",
-    fieldKey: "retorno",
-    value: form.retorno,
-    onChange: upd,
-    disabled: !isAdmin
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Observações",
-    fieldKey: "obs",
-    value: form.obs,
-    onChange: upd,
-    disabled: !isAdmin,
-    as: "textarea",
-    full: true
-  })), tab === "comments" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      maxHeight: 300,
-      overflowY: "auto",
-      display: "flex",
-      flexDirection: "column",
-      gap: 8,
-      marginBottom: 12
-    }
-  }, comments.length === 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: "center",
-      padding: "24px",
-      color: "#CBD5E1",
-      fontSize: 12
-    }
-  }, "Nenhum comentário ainda."), comments.map(c => /*#__PURE__*/React.createElement("div", {
-    key: c.id,
-    style: {
-      background: c.is_admin ? "#EFF6FF" : "#F8FAFC",
-      borderRadius: 8,
-      padding: "10px 12px",
-      border: `1px solid ${c.is_admin ? "#BFDBFE" : "#E2E8F0"}`
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 30,
-      height: 30,
-      borderRadius: "50%",
-      flexShrink: 0,
-      overflow: "hidden",
-      background: c.is_admin ? "#1E40AF" : "#F1F5F9",
-      border: "1px solid #E2E8F0",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
-    }
-  }, c.autor_foto ? /*#__PURE__*/React.createElement("img", {
-    src: c.autor_foto,
-    style: {
-      width: "100%",
-      height: "100%",
-      objectFit: "cover"
-    }
-  }) : /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      fontWeight: 700,
-      color: c.is_admin ? "#fff" : "#94A3B8"
-    }
-  }, (c.autor_nome || "?")[0].toUpperCase())), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 5,
-      alignItems: "center"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      fontWeight: 700,
-      color: c.is_admin ? "#1E40AF" : "#374151"
-    }
-  }, c.autor_nome), c.is_admin && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 9,
-      fontWeight: 700,
-      padding: "1px 5px",
-      borderRadius: 3,
-      background: "#1E40AF",
-      color: "#fff"
-    }
-  }, "ADMIN")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 6,
-      alignItems: "center"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 10,
-      color: "#94A3B8"
-    }
-  }, new Date(c.created_at).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  })), (isAdmin || c.autor_id === currentUser?.id) && /*#__PURE__*/React.createElement("button", {
-    onClick: () => onDelComment(c.id),
-    style: {
-      background: "none",
-      border: "none",
-      cursor: "pointer",
-      color: "#CBD5E1",
-      fontSize: 12,
-      padding: 0
-    }
-  }, "✕"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      color: "#374151",
-      lineHeight: 1.5,
-      marginTop: 2
-    }
-  }, c.texto)))))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement("input", {
-    value: commentText,
-    onChange: e => setCommentText(e.target.value),
-    onKeyDown: e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), addComment()),
-    placeholder: "Comentário… (Enter para enviar)",
-    style: {
-      ...inp_s,
-      flex: 1
-    }
-  }), /*#__PURE__*/React.createElement(Btn, {
-    onClick: addComment
-  }, "Enviar")), !isAdmin && /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 10,
-      color: "#94A3B8",
-      marginTop: 6
-    }
-  }, "Comentários ficam visíveis para todos os usuários.")));
-}
-
-/* ── USERS PANEL ── */
-function UsersPanel({
-  currentUser,
-  showT
-}) {
-  const [users, setUsers] = useState([]);
-  const [showAdd, setShowAdd] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({
-    tipo: "COREN",
-    registro: "",
-    nome: "",
-    zap: "",
-    foto: null
-  });
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    loadUsers();
-  }, []);
-  async function loadUsers() {
-    setLoading(true);
-    try {
-      setUsers(await SB.get("users", "order=created_at.asc"));
-    } catch {}
-    setLoading(false);
-  }
-  async function approve(id) {
-    await SB.patch("users", id, {
-      status: "aprovado"
-    });
-    loadUsers();
-    showT("Aprovado.");
-  }
-  async function block(id) {
-    await SB.patch("users", id, {
-      status: "bloqueado"
-    });
-    loadUsers();
-    showT("Bloqueado.");
-  }
-  async function remove(id) {
-    if (!window.confirm("Remover este profissional?")) return;
-    await SB.delete("users", id);
-    loadUsers();
-    showT("Removido.", "err");
-  }
-  function startEdit(u) {
-    setEditing(u.id);
-    setForm({
-      tipo: u.tipo || "COREN",
-      registro: u.coren || u.crm || "",
-      nome: u.nome,
-      zap: u.zap || "",
-      foto: u.foto || null
-    });
-    setShowAdd(true);
-  }
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!form.registro.trim() || !form.nome.trim()) return;
-    const body = {
-      tipo: form.tipo,
-      coren: form.tipo === "COREN" ? form.registro : null,
-      crm: form.tipo === "CRM" ? form.registro : null,
-      nome: form.nome,
-      zap: form.zap,
-      foto: form.foto
-    };
-    if (editing) {
-      await SB.patch("users", editing, body);
-      showT("Profissional atualizado.");
-    } else {
-      const dup = await SB.get("users", `or=(coren.eq.${form.registro},crm.eq.${form.registro})&limit=1`);
-      if (dup.length) {
-        showT("Registro já cadastrado.", "err");
-        return;
-      }
-      await SB.post("users", {
-        ...body,
-        role: "viewer",
-        status: "aprovado"
-      });
-      showT("Profissional cadastrado.");
-    }
-    setShowAdd(false);
-    setEditing(null);
-    setForm({
-      tipo: "COREN",
-      registro: "",
-      nome: "",
-      zap: "",
-      foto: null
-    });
-    loadUsers();
-  }
-  function handleFoto(e) {
-    const f = e.target.files[0];
-    if (!f) return;
-    const r = new FileReader();
-    r.onload = ev => setForm(p => ({
-      ...p,
-      foto: ev.target.result
-    }));
-    r.readAsDataURL(f);
-  }
-  const statusColor = {
-    aprovado: "#16A34A",
-    pendente: "#F59E0B",
-    bloqueado: "#EF4444"
-  };
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 16
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 700,
-      fontSize: 16,
-      color: "#0F172A"
-    }
-  }, "Profissionais"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#64748B",
-      marginTop: 2
-    }
-  }, "Gerencie o acesso ao sistema — dados sincronizados em tempo real")), /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => {
-      setShowAdd(p => !p);
-      setEditing(null);
-      setForm({
-        tipo: "COREN",
-        registro: "",
-        nome: "",
-        zap: "",
-        foto: null
-      });
-    }
-  }, showAdd ? "✕ Fechar" : "+ Cadastrar")), showAdd && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#fff",
-      border: "1px solid #E2E8F0",
-      borderRadius: 12,
-      padding: "16px 20px",
-      marginBottom: 16
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 600,
-      fontSize: 13,
-      color: "#0F172A",
-      marginBottom: 12
-    }
-  }, editing ? "Editar profissional" : "Novo profissional"), /*#__PURE__*/React.createElement("form", {
-    onSubmit: handleSubmit
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: "0 12px"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      gridColumn: "1/-1",
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8
-    }
-  }, ["COREN", "CRM"].map(t => /*#__PURE__*/React.createElement("button", {
-    key: t,
-    type: "button",
-    onClick: () => setForm(p => ({
-      ...p,
-      tipo: t
-    })),
-    style: {
-      flex: 1,
-      padding: "7px",
-      borderRadius: 7,
-      border: `2px solid ${form.tipo === t ? "#0F172A" : "#E2E8F0"}`,
-      background: form.tipo === t ? "#0F172A" : "#fff",
-      color: form.tipo === t ? "#fff" : "#64748B",
-      cursor: "pointer",
-      fontWeight: 600,
-      fontSize: 12
-    }
-  }, t)))), [["Número do registro", form.tipo, "registro"], ["Nome completo", "Nome completo", "nome"], ["WhatsApp", "(19) 99999-9999", "zap"]].map(([label, ph, key]) => /*#__PURE__*/React.createElement("div", {
-    key: key,
-    style: {
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: lbl_s
-  }, label), /*#__PURE__*/React.createElement("input", {
-    value: form[key] || "",
-    onChange: e => setForm(p => ({
-      ...p,
-      [key]: e.target.value
-    })),
-    placeholder: ph,
-    style: inp_s,
-    required: key !== "zap"
-  }))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      gridColumn: "1/-1",
-      marginBottom: 12
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: lbl_s
-  }, "Foto"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8
-    }
-  }, form.foto && /*#__PURE__*/React.createElement("img", {
-    src: form.foto,
-    style: {
-      width: 36,
-      height: 36,
-      borderRadius: "50%",
-      objectFit: "cover"
-    }
-  }), /*#__PURE__*/React.createElement("label", {
-    style: {
-      padding: "5px 12px",
-      border: "1px solid #E2E8F0",
-      borderRadius: 6,
-      cursor: "pointer",
-      fontSize: 11,
-      color: "#64748B"
-    }
-  }, "Escolher", /*#__PURE__*/React.createElement("input", {
-    type: "file",
-    accept: "image/*",
-    onChange: handleFoto,
-    style: {
-      display: "none"
-    }
-  }))))), /*#__PURE__*/React.createElement(Btn, {
-    type: "submit",
-    style: {
-      padding: "8px 20px"
-    }
-  }, editing ? "Salvar" : "Cadastrar e aprovar"))), loading && /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: "center",
-      padding: 32,
-      color: "#94A3B8",
-      fontSize: 13
-    }
-  }, "Carregando…"), !loading && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#fff",
-      border: "2px solid #E2E8F0",
-      borderRadius: 10,
-      padding: "12px 16px",
-      marginBottom: 8,
-      display: "flex",
-      alignItems: "center",
-      gap: 12
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 40,
-      height: 40,
-      borderRadius: "50%",
-      background: "#1E40AF",
-      overflow: "hidden",
-      flexShrink: 0,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
-    }
-  }, currentUser?.foto ? /*#__PURE__*/React.createElement("img", {
-    src: currentUser.foto,
-    style: {
-      width: "100%",
-      height: "100%",
-      objectFit: "cover"
-    }
-  }) : /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: "#fff",
-      fontWeight: 700,
-      fontSize: 14
-    }
-  }, "F")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 600,
-      fontSize: 13,
-      color: "#0F172A"
-    }
-  }, "Fabiana Faria de Figueiredo"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "#64748B"
-    }
-  }, "COREN 299283 · Administradora")), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 10,
-      fontWeight: 700,
-      padding: "2px 8px",
-      borderRadius: 99,
-      background: "#EFF6FF",
-      color: "#1E40AF"
-    }
-  }, "Admin")), !loading && users.filter(u => u.coren !== "299283").map(u => /*#__PURE__*/React.createElement("div", {
-    key: u.id,
-    style: {
-      background: "#fff",
-      border: "1px solid #E2E8F0",
-      borderRadius: 10,
-      padding: "12px 16px",
-      marginBottom: 8,
-      display: "flex",
-      alignItems: "center",
-      gap: 12
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 40,
-      height: 40,
-      borderRadius: "50%",
-      background: "#F1F5F9",
-      overflow: "hidden",
-      flexShrink: 0,
-      border: "1px solid #E2E8F0",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
-    }
-  }, u.foto ? /*#__PURE__*/React.createElement("img", {
-    src: u.foto,
-    style: {
-      width: "100%",
-      height: "100%",
-      objectFit: "cover"
-    }
-  }) : /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 16,
-      color: "#CBD5E1"
-    }
-  }, "👤")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1,
-      minWidth: 0
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 600,
-      fontSize: 13,
-      color: "#0F172A",
-      whiteSpace: "nowrap",
-      overflow: "hidden",
-      textOverflow: "ellipsis"
-    }
-  }, u.nome), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "#64748B"
-    }
-  }, u.tipo, " ", u.coren || u.crm, u.zap ? " · " + u.zap : "")), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 10,
-      fontWeight: 700,
-      padding: "2px 8px",
-      borderRadius: 99,
-      whiteSpace: "nowrap",
-      background: u.status === "aprovado" ? "#F0FDF4" : u.status === "pendente" ? "#FFFBEB" : "#FEF2F2",
-      color: statusColor[u.status] || "#64748B"
-    }
-  }, u.status), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 6,
-      flexShrink: 0
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => startEdit(u),
-    style: {
-      padding: "5px 10px",
-      border: "1px solid #E2E8F0",
-      borderRadius: 6,
-      background: "none",
-      color: "#374151",
-      cursor: "pointer",
-      fontSize: 11
-    }
-  }, "✏️"), u.status === "pendente" && /*#__PURE__*/React.createElement("button", {
-    onClick: () => approve(u.id),
-    style: {
-      padding: "5px 10px",
-      border: "none",
-      borderRadius: 6,
-      background: "#16A34A",
-      color: "#fff",
-      cursor: "pointer",
-      fontSize: 11,
-      fontWeight: 600
-    }
-  }, "Aprovar"), u.status === "aprovado" && /*#__PURE__*/React.createElement("button", {
-    onClick: () => block(u.id),
-    style: {
-      padding: "5px 10px",
-      border: "1px solid #FCA5A5",
-      borderRadius: 6,
-      background: "none",
-      color: "#DC2626",
-      cursor: "pointer",
-      fontSize: 11
-    }
-  }, "Bloquear"), u.status === "bloqueado" && /*#__PURE__*/React.createElement("button", {
-    onClick: () => approve(u.id),
-    style: {
-      padding: "5px 10px",
-      border: "1px solid #86EFAC",
-      borderRadius: 6,
-      background: "none",
-      color: "#16A34A",
-      cursor: "pointer",
-      fontSize: 11
-    }
-  }, "Desbloquear"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => remove(u.id),
-    style: {
-      padding: "5px 8px",
-      border: "1px solid #E2E8F0",
-      borderRadius: 6,
-      background: "none",
-      color: "#94A3B8",
-      cursor: "pointer",
-      fontSize: 11
-    }
-  }, "✕")))));
-}
-
-/* ── KANBAN CARD ── */
+/* ─── KANBAN CARD ─── */
 function KCard({
   c,
   onClick,
@@ -2059,6 +1633,7 @@ function KCard({
   onDragEnd
 }) {
   const gc = GC[c.grav] || GC.urgencia;
+  const hasAceite = c.receptor || c.data_aceite;
   return /*#__PURE__*/React.createElement("div", {
     className: "k-card",
     "data-id": c.id,
@@ -2177,37 +1752,42 @@ function KCard({
       fontSize: 10,
       color: "#94A3B8"
     }
-  }, "🔄 ", c.cross_info), c.obs && /*#__PURE__*/React.createElement("div", {
+  }, "🔄 ", c.cross_info), hasAceite && /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 2,
+      marginTop: 3,
       fontSize: 10,
-      color: "#9333EA",
-      fontStyle: "italic"
+      color: "#16A34A"
     }
-  }, c.obs));
+  }, "📥 ", c.receptor, c.hora_aceite ? " às " + c.hora_aceite : ""));
 }
 
-/* ── DASHBOARD ── */
+/* ─── DASHBOARD ─── */
 function Dashboard({
   cards,
-  cols
+  cols,
+  dashMode,
+  setDashMode
 }) {
-  const total = cards.length;
-  const emergencias = cards.filter(c => c.grav === "emergencia").length;
-  const avancadas = cards.filter(c => c.amb === "Avançada").length;
-  const semHosp = cards.filter(c => !c.hosp && c.col_id !== "finalizado").length;
-  const evadiu = cards.filter(c => c.status === "EVADIU" || c.status === "EVASÃO").length;
+  const today = new Date().toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit"
+  });
+  const data = dashMode === "hoje" ? cards.filter(c => (c.adm || "").startsWith(today)) : cards;
+  const total = data.length,
+    emergencias = data.filter(c => c.grav === "emergencia").length,
+    avancadas = data.filter(c => c.amb === "Avançada").length,
+    semHosp = data.filter(c => !c.hosp && c.col_id !== "finalizado").length,
+    evadiu = data.filter(c => c.status === "EVADIU" || c.status === "EVASÃO").length;
   const hospC = {};
-  cards.filter(c => c.hosp).forEach(c => {
+  data.filter(c => c.hosp).forEach(c => {
     hospC[c.hosp] = (hospC[c.hosp] || 0) + 1;
   });
   const topHosp = Object.entries(hospC).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const recC = {};
-  cards.filter(c => c.rec).forEach(c => {
+  data.filter(c => c.rec).forEach(c => {
     recC[c.rec] = (recC[c.rec] || 0) + 1;
   });
   const topRec = Object.entries(recC).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const accentOf = id => cols.find(c => c.id === id)?.accent || "#94A3B8";
   const Stat = ({
     label,
     value,
@@ -2290,11 +1870,44 @@ function Dashboard({
       width: `${max ? value / max * 100 : 0}%`,
       background: color || "#3B82F6",
       height: "100%",
-      borderRadius: 99,
-      transition: "width .4s"
+      borderRadius: 99
     }
   })));
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 16,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      border: "1px solid #E2E8F0",
+      borderRadius: 8,
+      padding: "2px",
+      display: "flex",
+      gap: 1
+    }
+  }, [["acumulado", "📊 Acumulado"], ["hoje", "📅 Hoje"]].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
+    key: id,
+    onClick: () => setDashMode(id),
+    style: {
+      padding: "5px 14px",
+      borderRadius: 6,
+      border: "none",
+      fontSize: 12,
+      fontWeight: dashMode === id ? 600 : 400,
+      background: dashMode === id ? "#0F172A" : "transparent",
+      color: dashMode === id ? "#fff" : "#64748B",
+      cursor: "pointer"
+    }
+  }, label))), dashMode === "hoje" && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#94A3B8"
+    }
+  }, "Admissões de hoje (", today, ") — ", data.length, " paciente", data.length !== 1 ? "s" : "")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "repeat(4,1fr)",
@@ -2327,12 +1940,12 @@ function Dashboard({
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
-      gridTemplateColumns: `repeat(${cols.length},1fr)`,
+      gridTemplateColumns: `repeat(${Math.min(cols.length, 5)},1fr)`,
       gap: 10,
       marginBottom: 16
     }
   }, cols.map(c => {
-    const n = cards.filter(k => k.col_id === c.id).length;
+    const n = data.filter(k => k.col_id === c.id).length;
     return /*#__PURE__*/React.createElement("div", {
       key: c.id,
       style: {
@@ -2432,7 +2045,7 @@ function Dashboard({
       marginBottom: 12
     }
   }, "📊 Gravidades"), Object.entries(GC).map(([k, v]) => {
-    const n = cards.filter(c => c.grav === k).length;
+    const n = data.filter(c => c.grav === k).length;
     if (!n) return null;
     return /*#__PURE__*/React.createElement(Bar, {
       key: k,
@@ -2451,7 +2064,433 @@ function Dashboard({
       color: "#991B1B",
       fontWeight: 600
     }
-  }, "⚠️ ", evadiu, " evasão", evadiu > 1 ? "ões" : "", " registrada", evadiu > 1 ? "s" : ""))));
+  }, "⚠️ ", evadiu, " evasão", evadiu > 1 ? "ões" : ""))));
+}
+
+/* ─── USERS PANEL ─── */
+function UsersPanel({
+  currentUser,
+  userId,
+  showT
+}) {
+  const [users, setUsers] = useState([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({
+    tipo: "COREN",
+    registro: "",
+    nome: "",
+    zap: "",
+    foto: null
+  });
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    load();
+  }, []);
+  async function load() {
+    setLoading(true);
+    try {
+      setUsers(await sbGet("users", "order=created_at.asc"));
+    } catch {}
+    setLoading(false);
+  }
+  async function action(act, id) {
+    await fn("users-write", {
+      action: act,
+      id
+    }, userId);
+    load();
+    showT(act === "approve" ? "Aprovado." : act === "delete" ? "Removido." : "Bloqueado/desbloqueado.", act === "delete" ? "err" : "ok");
+  }
+  function startEdit(u) {
+    setEditing(u.id);
+    setForm({
+      tipo: u.tipo || "COREN",
+      registro: u.coren || u.crm || "",
+      nome: u.nome,
+      zap: u.zap || "",
+      foto: u.foto || null
+    });
+    setShowAdd(true);
+  }
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!form.registro.trim() || !form.nome.trim()) return;
+    const act = editing ? "update" : "create";
+    await fn("users-write", {
+      action: act,
+      id: editing,
+      body: {
+        tipo: form.tipo,
+        registro: form.registro,
+        nome: form.nome,
+        zap: form.zap,
+        foto: form.foto
+      }
+    }, userId);
+    setShowAdd(false);
+    setEditing(null);
+    setForm({
+      tipo: "COREN",
+      registro: "",
+      nome: "",
+      zap: "",
+      foto: null
+    });
+    load();
+    showT(editing ? "Atualizado." : "Cadastrado.");
+  }
+  function handleFoto(e) {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => setForm(p => ({
+      ...p,
+      foto: ev.target.result
+    }));
+    r.readAsDataURL(f);
+  }
+  const sC = {
+    aprovado: "#16A34A",
+    pendente: "#F59E0B",
+    bloqueado: "#EF4444"
+  };
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 16,
+      color: "#0F172A"
+    }
+  }, "Profissionais"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#64748B",
+      marginTop: 2
+    }
+  }, "Sincronizado com Supabase em tempo real")), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => {
+      setShowAdd(p => !p);
+      setEditing(null);
+      setForm({
+        tipo: "COREN",
+        registro: "",
+        nome: "",
+        zap: "",
+        foto: null
+      });
+    }
+  }, showAdd ? "✕ Fechar" : "+ Cadastrar")), showAdd && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      border: "1px solid #E2E8F0",
+      borderRadius: 12,
+      padding: "16px 20px",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#0F172A",
+      marginBottom: 12
+    }
+  }, editing ? "Editar profissional" : "Novo profissional"), /*#__PURE__*/React.createElement("form", {
+    onSubmit: handleSubmit
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: "0 12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      gridColumn: "1/-1",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, ["COREN", "CRM"].map(t => /*#__PURE__*/React.createElement("button", {
+    key: t,
+    type: "button",
+    onClick: () => setForm(p => ({
+      ...p,
+      tipo: t
+    })),
+    style: {
+      flex: 1,
+      padding: "7px",
+      borderRadius: 7,
+      border: `2px solid ${form.tipo === t ? "#0F172A" : "#E2E8F0"}`,
+      background: form.tipo === t ? "#0F172A" : "#fff",
+      color: form.tipo === t ? "#fff" : "#64748B",
+      cursor: "pointer",
+      fontWeight: 600,
+      fontSize: 12
+    }
+  }, t)))), [["Registro", form.tipo, "registro"], ["Nome completo", "Nome", "nome"], ["WhatsApp", "(19) 99999-9999", "zap"]].map(([label, ph, key]) => /*#__PURE__*/React.createElement("div", {
+    key: key,
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: lbl_s
+  }, label), /*#__PURE__*/React.createElement("input", {
+    value: form[key] || "",
+    onChange: e => setForm(p => ({
+      ...p,
+      [key]: e.target.value
+    })),
+    placeholder: ph,
+    style: inp_s,
+    required: key !== "zap"
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      gridColumn: "1/-1",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: lbl_s
+  }, "Foto"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, form.foto && /*#__PURE__*/React.createElement("img", {
+    src: form.foto,
+    style: {
+      width: 36,
+      height: 36,
+      borderRadius: "50%",
+      objectFit: "cover"
+    }
+  }), /*#__PURE__*/React.createElement("label", {
+    style: {
+      padding: "5px 12px",
+      border: "1px solid #E2E8F0",
+      borderRadius: 6,
+      cursor: "pointer",
+      fontSize: 11,
+      color: "#64748B"
+    }
+  }, "Escolher", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: "image/*",
+    onChange: handleFoto,
+    style: {
+      display: "none"
+    }
+  }))))), /*#__PURE__*/React.createElement(Btn, {
+    type: "submit",
+    style: {
+      padding: "8px 20px"
+    }
+  }, editing ? "Salvar" : "Cadastrar e aprovar"))), loading && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: 32,
+      color: "#94A3B8",
+      fontSize: 13
+    }
+  }, "Carregando…"), !loading && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      border: "2px solid #E2E8F0",
+      borderRadius: 10,
+      padding: "12px 16px",
+      marginBottom: 8,
+      display: "flex",
+      alignItems: "center",
+      gap: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 40,
+      height: 40,
+      borderRadius: "50%",
+      background: "#1E40AF",
+      flexShrink: 0,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, currentUser?.foto ? /*#__PURE__*/React.createElement("img", {
+    src: currentUser.foto,
+    style: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      borderRadius: "50%"
+    }
+  }) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#fff",
+      fontWeight: 700,
+      fontSize: 14
+    }
+  }, "F")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#0F172A"
+    }
+  }, "Fabiana Faria de Figueiredo"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#64748B"
+    }
+  }, "COREN 299283 · Administradora")), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      fontWeight: 700,
+      padding: "2px 8px",
+      borderRadius: 99,
+      background: "#EFF6FF",
+      color: "#1E40AF"
+    }
+  }, "Admin")), !loading && users.filter(u => u.coren !== "299283").map(u => /*#__PURE__*/React.createElement("div", {
+    key: u.id,
+    style: {
+      background: "#fff",
+      border: "1px solid #E2E8F0",
+      borderRadius: 10,
+      padding: "12px 16px",
+      marginBottom: 8,
+      display: "flex",
+      alignItems: "center",
+      gap: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 40,
+      height: 40,
+      borderRadius: "50%",
+      background: "#F1F5F9",
+      overflow: "hidden",
+      flexShrink: 0,
+      border: "1px solid #E2E8F0",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, u.foto ? /*#__PURE__*/React.createElement("img", {
+    src: u.foto,
+    style: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover"
+    }
+  }) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 16,
+      color: "#CBD5E1"
+    }
+  }, "👤")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#0F172A",
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis"
+    }
+  }, u.nome), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#64748B"
+    }
+  }, u.tipo, " ", u.coren || u.crm, u.zap ? " · " + u.zap : "")), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      fontWeight: 700,
+      padding: "2px 8px",
+      borderRadius: 99,
+      whiteSpace: "nowrap",
+      background: u.status === "aprovado" ? "#F0FDF4" : u.status === "pendente" ? "#FFFBEB" : "#FEF2F2",
+      color: sC[u.status] || "#64748B"
+    }
+  }, u.status), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => startEdit(u),
+    style: {
+      padding: "5px 10px",
+      border: "1px solid #E2E8F0",
+      borderRadius: 6,
+      background: "none",
+      color: "#374151",
+      cursor: "pointer",
+      fontSize: 11
+    }
+  }, "✏️"), u.status === "pendente" && /*#__PURE__*/React.createElement("button", {
+    onClick: () => action("approve", u.id),
+    style: {
+      padding: "5px 10px",
+      border: "none",
+      borderRadius: 6,
+      background: "#16A34A",
+      color: "#fff",
+      cursor: "pointer",
+      fontSize: 11,
+      fontWeight: 600
+    }
+  }, "Aprovar"), u.status === "aprovado" && /*#__PURE__*/React.createElement("button", {
+    onClick: () => action("block", u.id),
+    style: {
+      padding: "5px 10px",
+      border: "1px solid #FCA5A5",
+      borderRadius: 6,
+      background: "none",
+      color: "#DC2626",
+      cursor: "pointer",
+      fontSize: 11
+    }
+  }, "Bloquear"), u.status === "bloqueado" && /*#__PURE__*/React.createElement("button", {
+    onClick: () => action("unblock", u.id),
+    style: {
+      padding: "5px 10px",
+      border: "1px solid #86EFAC",
+      borderRadius: 6,
+      background: "none",
+      color: "#16A34A",
+      cursor: "pointer",
+      fontSize: 11
+    }
+  }, "Desbloquear"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => action("delete", u.id),
+    style: {
+      padding: "5px 8px",
+      border: "1px solid #E2E8F0",
+      borderRadius: 6,
+      background: "none",
+      color: "#94A3B8",
+      cursor: "pointer",
+      fontSize: 11
+    }
+  }, "✕")))));
 }
 
 /* ════════════════════════════════════════════
@@ -2461,55 +2500,83 @@ function App() {
   const [currentUser, setCurrentUser] = useState(() => loadLS("ge_session", null));
   const [cards, setCards] = useState([]);
   const [cols, setCols] = useState([]);
-  const [comments, setComments] = useState({}); // { cardId: [...] }
+  const [comments, setComments] = useState({});
   const [settings, setSettings] = useState({});
   const [lastPub, setLastPub] = useState(null);
+  const [pubCards, setPubCards] = useState(null); // versão publicada para viewers
+  const [pubCols, setPubCols] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [pendingMove, setPendingMove] = useState(null); // {card, newColId}
   const [showPub, setShowPub] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [search, setSearch] = useState("");
   const [fGrav, setFGrav] = useState("all");
   const [view, setView] = useState("kanban");
+  const [dashMode, setDashMode] = useState("acumulado");
   const [showNewCol, setShowNewCol] = useState(false);
   const [newColName, setNewColName] = useState("");
-  const [minimized, setMinimized] = useState(() => new Set());
+  const [minimized, setMinimized] = useState(new Set());
   const [singleCol, setSingleCol] = useState(null);
-  const [sortCol, setSortCol] = useState(null); // { key, dir }
+  const [sortCol, setSortCol] = useState(null);
   const [toast, setToast] = useState(null);
+  const [undoQueue, setUndoQueue] = useState([]); // desfazer exclusão
   const [loading, setLoading] = useState(true);
   const dragId = useRef(null);
   const dragOverCol = useRef(null);
   const newColRef = useRef(null);
   const isAdmin = currentUser?.role === "admin";
+  const userId = currentUser?.id || "";
 
-  /* ── Load initial data ── */
+  /* ── dados exibidos para viewer = versão publicada ── */
+  const displayCards = isAdmin ? cards : pubCards || [];
+  const displayCols = isAdmin ? cols : pubCols || cols;
   useEffect(() => {
     if (!currentUser) return;
     loadAll();
-    // polling realtime para novos users (notificações de cadastro)
-    const stop = SB.realtime("users", rows => {
-      const pending = rows.filter(r => r.status === "pendente");
-      if (pending.length && isAdmin) showT(`📋 ${pending.length} novo(s) cadastro(s) aguardando aprovação!`);
-    });
-    return stop;
+    // polling: novos usuários pendentes (notifica admin)
+    let last = Date.now();
+    const iv = setInterval(async () => {
+      if (!isAdmin) return;
+      try {
+        const rows = await sbGet("users", `status=eq.pendente&created_at=gt.${new Date(last).toISOString()}`);
+        if (rows.length) {
+          last = Date.now();
+          showT(`📋 ${rows.length} novo(s) cadastro(s) aguardando aprovação!`);
+        }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(iv);
   }, [currentUser]);
   async function loadAll() {
     setLoading(true);
     try {
-      const [c, cl, s] = await Promise.all([SB.get("cards", "order=card_order.asc,created_at.asc"), SB.get("columns", "order=col_order.asc"), SB.get("settings", "id=eq.1&limit=1")]);
+      const [c, cl, s, pub] = await Promise.all([sbGet("cards", "order=card_order.asc,created_at.asc"), sbGet("columns", "order=col_order.asc"), sbGet("settings", "id=eq.1&limit=1"), sbGet("publications", "order=created_at.desc&limit=1")]);
       setCards(c);
       setCols(cl);
       if (s.length) setSettings(s[0]);
-      // carrega comentários de todos os cards
+      // versão publicada
+      if (pub.length) {
+        const snap = pub[0].snapshot;
+        setPubCards(snap.cards || []);
+        setPubCols(snap.cols || cl);
+        setLastPub(new Date(pub[0].created_at).toLocaleString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit"
+        }));
+      }
+      // comentários
       if (c.length) {
         const ids = c.map(x => x.id).join(",");
-        const coms = await SB.get("comments", `card_id=in.(${ids})&order=created_at.asc`);
-        const grouped = {};
+        const coms = await sbGet("comments", `card_id=in.(${ids})&order=created_at.asc`);
+        const g = {};
         coms.forEach(cm => {
-          grouped[cm.card_id] = [...(grouped[cm.card_id] || []), cm];
+          g[cm.card_id] = [...(g[cm.card_id] || []), cm];
         });
-        setComments(grouped);
+        setComments(g);
       }
     } catch (e) {
       showT("Erro ao carregar dados.", "err");
@@ -2521,7 +2588,7 @@ function App() {
       msg,
       type
     });
-    setTimeout(() => setToast(null), 4000);
+    setTimeout(() => setToast(null), 5000);
   }
   function handleLogin(user) {
     setCurrentUser(user);
@@ -2534,135 +2601,88 @@ function App() {
 
   /* ── Cards ── */
   async function onSave(form) {
-    const body = {
-      col_id: form.col_id,
-      pr: form.pr,
-      status: form.status,
-      nome: form.nome,
-      idade: form.idade,
-      adm: form.adm,
-      hd: form.hd,
-      setor: form.setor,
-      rec: form.rec,
-      hosp: form.hosp,
-      cross_info: form.cross_info,
-      amb: form.amb,
-      saida: form.saida,
-      retorno: form.retorno,
-      grav: form.grav,
-      obs: form.obs,
-      is_rn: form.is_rn || false
-    };
-    if (form.id === "new") {
-      const rows = await SB.post("cards", body);
-      setCards(p => [...p, rows[0]]);
-      showT("Paciente adicionado.");
-    } else {
-      await SB.patch("cards", form.id, body);
-      setCards(p => p.map(c => c.id === form.id ? {
-        ...c,
-        ...body
-      } : c));
-      showT("Card atualizado.");
+    try {
+      const action = form.id === "new" ? "create" : "update";
+      const data = await fn("cards-write", {
+        action,
+        id: form.id,
+        body: form
+      }, userId);
+      if (action === "create") setCards(p => [...p, data]);else setCards(p => p.map(c => c.id === form.id ? data : c));
+      showT("Salvo.");
+    } catch (ex) {
+      showT(ex.message, "err");
     }
     setSelected(null);
   }
   async function onDel(id) {
     if (!window.confirm("Remover este card?")) return;
-    await SB.delete("cards", id);
-    setCards(p => p.filter(c => c.id !== id));
-    setSelected(null);
-    showT("Removido.", "err");
-  }
-
-  /* ── Comments ── */
-  async function onAddComment(cardId, texto) {
-    const body = {
-      card_id: cardId,
-      autor_id: currentUser.id,
-      autor_nome: currentUser.nome,
-      autor_foto: currentUser.foto || null,
-      is_admin: isAdmin,
-      texto
-    };
-    const rows = await SB.post("comments", body);
-    setComments(p => ({
-      ...p,
-      [cardId]: [...(p[cardId] || []), rows[0]]
-    }));
-  }
-  async function onDelComment(commentId, cardId) {
-    await SB.delete("comments", commentId);
-    setComments(p => ({
-      ...p,
-      [cardId]: (p[cardId] || []).filter(c => c.id !== commentId)
-    }));
-  }
-
-  /* ── Publish ── */
-  async function onPub() {
-    const snapshot = {
-      cards,
-      cols,
-      date: todayStr(),
-      time: nowStr()
-    };
-    await SB.post("publications", {
-      label: `Publicação ${todayStr()} ${nowStr()}`,
-      published_by: currentUser.id,
-      published_by_nome: currentUser.nome,
-      snapshot
-    });
-    setLastPub(`${todayStr()} ${nowStr()}`);
-    setShowPub(false);
-    showT("✅ Publicado com sucesso!");
-  }
-
-  /* ── Columns ── */
-  async function addColumn() {
-    const name = newColName.trim();
-    if (!name) return;
-    const id = "col_" + Date.now();
-    const rows = await SB.post("columns", {
-      id,
-      label: name,
-      sub: "",
-      emoji: "📌",
-      col_order: cols.length + 1,
-      fixed: false,
-      accent: "#94A3B8"
-    });
-    setCols(p => [...p, rows[0]]);
-    setNewColName("");
-    setShowNewCol(false);
-    showT(`Coluna "${name}" criada.`);
-  }
-  async function removeColumn(id) {
-    if (cols.find(c => c.id === id)?.fixed) {
-      showT("Coluna fixa.", "err");
-      return;
+    try {
+      const data = await fn("cards-write", {
+        action: "delete",
+        id
+      }, userId);
+      const deleted = data.deleted;
+      setCards(p => p.filter(c => c.id !== id));
+      setSelected(null);
+      // desfazer
+      const timer = setTimeout(async () => {
+        setUndoQueue(q => q.filter(x => x.id !== id));
+      }, 6000);
+      setUndoQueue(q => [...q, {
+        id,
+        card: deleted,
+        timer
+      }]);
+      showT("Card removido.");
+    } catch (ex) {
+      showT(ex.message, "err");
     }
-    await SB.delete("columns", id, "id");
-    setCols(p => p.filter(c => c.id !== id));
-    setCards(p => p.map(c => c.col_id === id ? {
-      ...c,
-      col_id: "pendente"
-    } : c));
-    showT("Coluna removida.");
+  }
+  async function undoDelete(id) {
+    const item = undoQueue.find(x => x.id === id);
+    if (!item) return;
+    clearTimeout(item.timer);
+    setUndoQueue(q => q.filter(x => x.id !== id));
+    try {
+      const data = await fn("cards-write", {
+        action: "restore",
+        body: item.card
+      }, userId);
+      setCards(p => [...p, data]);
+      showT("Card restaurado!");
+    } catch (ex) {
+      showT(ex.message, "err");
+    }
   }
 
-  /* ── Settings ── */
-  async function saveSettings(form) {
-    await SB.patch("settings", 1, form, "id");
-    setSettings(s => ({
-      ...s,
-      ...form
-    }));
-    setShowSettings(false);
-    showT("Configurações salvas.");
+  /* ── Mover card (drag ou select coluna) ── */
+  async function moveCard(cardId, newColId, aceiteData) {
+    try {
+      const data = await fn("cards-move", {
+        card_id: cardId,
+        new_col_id: newColId,
+        aceite: aceiteData || null
+      }, userId);
+      setCards(p => p.map(c => c.id === cardId ? data : c));
+      showT("Card movido.");
+    } catch (ex) {
+      showT(ex.message, "err");
+    }
+  }
+  function handleMoveAttempt(cardId, newColId) {
+    if (newColId === "aceite") {
+      const card = cards.find(c => c.id === cardId);
+      setPendingMove({
+        card,
+        newColId
+      });
+    } else {
+      moveCard(cardId, newColId);
+    }
   }
 
-  /* ── Drag (via DOM refs, zero re-render) ── */
+  /* ── Drag ── */
   function handleDragStart(e, cardId) {
     dragId.current = cardId;
     e.dataTransfer.effectAllowed = "move";
@@ -2680,27 +2700,20 @@ function App() {
     });
     dragOverCol.current = null;
   }
-  async function handleDrop(e, colId) {
+  function handleDrop(e, colId) {
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain") || dragId.current;
     if (!id) return;
-    setCards(p => p.map(c => c.id === id ? {
-      ...c,
-      col_id: colId
-    } : c));
-    await SB.patch("cards", id, {
-      col_id: colId
-    });
-    showT("Card movido.");
+    handleMoveAttempt(id, colId);
   }
   function handleDragOver(e, colId) {
     e.preventDefault();
     if (dragOverCol.current === colId) return;
     if (dragOverCol.current) {
-      const prev = document.querySelector(`[data-dropzone="${dragOverCol.current}"]`);
-      if (prev) {
-        prev.style.borderColor = "#E2E8F0";
-        prev.style.boxShadow = "none";
+      const p = document.querySelector(`[data-dropzone="${dragOverCol.current}"]`);
+      if (p) {
+        p.style.borderColor = "#E2E8F0";
+        p.style.boxShadow = "none";
       }
     }
     dragOverCol.current = colId;
@@ -2720,7 +2733,121 @@ function App() {
     if (dragOverCol.current === colId) dragOverCol.current = null;
   }
 
-  /* ── New card ── */
+  /* ── Comments ── */
+  async function onAddComment(cardId, texto) {
+    try {
+      const data = await fn("comments-write", {
+        action: "create",
+        card_id: cardId,
+        texto
+      }, userId);
+      setComments(p => ({
+        ...p,
+        [cardId]: [...(p[cardId] || []), data]
+      }));
+    } catch (ex) {
+      showT(ex.message, "err");
+    }
+  }
+  async function onDelComment(commentId, cardId) {
+    try {
+      await fn("comments-write", {
+        action: "delete",
+        id: commentId
+      }, userId);
+      setComments(p => ({
+        ...p,
+        [cardId]: (p[cardId] || []).filter(c => c.id !== commentId)
+      }));
+    } catch (ex) {
+      showT(ex.message, "err");
+    }
+  }
+
+  /* ── Publish ── */
+  async function onPub() {
+    try {
+      await fn("publish", {}, userId);
+      const pub = await sbGet("publications", "order=created_at.desc&limit=1");
+      if (pub.length) {
+        const snap = pub[0].snapshot;
+        setPubCards(snap.cards || []);
+        setPubCols(snap.cols || cols);
+        setLastPub(new Date(pub[0].created_at).toLocaleString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit"
+        }));
+      }
+      setShowPub(false);
+      showT("✅ Publicado!");
+    } catch (ex) {
+      showT(ex.message, "err");
+    }
+  }
+
+  /* ── Columns ── */
+  async function addColumn() {
+    const name = newColName.trim();
+    if (!name) return;
+    const id = "col_" + Date.now();
+    try {
+      const data = await fn("columns-write", {
+        action: "create",
+        body: {
+          id,
+          label: name,
+          sub: "",
+          emoji: "📌",
+          col_order: cols.length + 1,
+          accent: "#94A3B8"
+        }
+      }, userId);
+      setCols(p => [...p, data]);
+      setNewColName("");
+      setShowNewCol(false);
+      showT(`Coluna "${name}" criada.`);
+    } catch (ex) {
+      showT(ex.message, "err");
+    }
+  }
+  async function removeColumn(id) {
+    if (cols.find(c => c.id === id)?.fixed) {
+      showT("Coluna fixa.", "err");
+      return;
+    }
+    try {
+      await fn("columns-write", {
+        action: "delete",
+        id
+      }, userId);
+      setCols(p => p.filter(c => c.id !== id));
+      setCards(p => p.map(c => c.col_id === id ? {
+        ...c,
+        col_id: "pendente"
+      } : c));
+      showT("Coluna removida.");
+    } catch (ex) {
+      showT(ex.message, "err");
+    }
+  }
+
+  /* ── Settings ── */
+  async function saveSettings(form) {
+    try {
+      await fn("settings-write", form, userId);
+      setSettings(s => ({
+        ...s,
+        ...form
+      }));
+      setShowSettings(false);
+      showT("Configurações salvas.");
+    } catch (ex) {
+      showT(ex.message, "err");
+    }
+  }
   function newCard(col = "pendente") {
     setSelected({
       id: "new",
@@ -2743,16 +2870,16 @@ function App() {
       retorno: "",
       grav: "urgencia",
       obs: "",
-      is_rn: false
+      is_rn: false,
+      receptor: "",
+      data_aceite: "",
+      hora_aceite: ""
     });
   }
-
-  /* ── Filter/sort ── */
-  const filtered = cards.filter(c => {
+  const filtered = displayCards.filter(c => {
     const q = search.toLowerCase();
     const ms = !q || [c.nome, c.hd, c.setor, c.rec, c.hosp].some(s => (s || "").toLowerCase().includes(q));
-    const mg = fGrav === "all" || c.grav === fGrav;
-    return ms && mg;
+    return ms && (fGrav === "all" || c.grav === fGrav);
   });
   function toggleSort(key) {
     setSortCol(p => p?.key === key ? p.dir === "asc" ? {
@@ -2764,8 +2891,8 @@ function App() {
     });
   }
   const sortedFiltered = sortCol ? [...filtered].sort((a, b) => {
-    const av = (a[sortCol.key] || "").toString().toLowerCase();
-    const bv = (b[sortCol.key] || "").toString().toLowerCase();
+    const av = (a[sortCol.key] || "").toString().toLowerCase(),
+      bv = (b[sortCol.key] || "").toString().toLowerCase();
     return sortCol.dir === "asc" ? av.localeCompare(bv, "pt") : bv.localeCompare(av, "pt");
   }) : filtered;
   const NavBtn = ({
@@ -2933,7 +3060,54 @@ function App() {
       color: "#92400E",
       fontWeight: 500
     }
-  }, "✎ Modo de edição", lastPub ? ` · Última publicação: ${lastPub}` : "")), /*#__PURE__*/React.createElement("div", {
+  }, "✎ Modo de edição — alterações não ficam visíveis até publicar", lastPub ? ` · Última publicação: ${lastPub}` : "")), !isAdmin && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#EFF6FF",
+      borderBottom: "1px solid #BFDBFE",
+      padding: "5px 20px",
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#1E40AF",
+      fontWeight: 500
+    }
+  }, "👁 Visualização somente leitura", lastPub ? ` · Publicado em: ${lastPub}` : "")), undoQueue.map(item => /*#__PURE__*/React.createElement("div", {
+    key: item.id,
+    style: {
+      position: "fixed",
+      bottom: 72,
+      left: "50%",
+      transform: "translateX(-50%)",
+      background: "#0F172A",
+      color: "#fff",
+      padding: "10px 16px",
+      borderRadius: 10,
+      fontSize: 13,
+      fontWeight: 500,
+      boxShadow: "0 4px 20px rgba(0,0,0,.3)",
+      zIndex: 9998,
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      whiteSpace: "nowrap"
+    }
+  }, "Card removido", /*#__PURE__*/React.createElement("button", {
+    onClick: () => undoDelete(item.id),
+    style: {
+      background: "#3B82F6",
+      border: "none",
+      color: "#fff",
+      padding: "4px 12px",
+      borderRadius: 6,
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "↩ Desfazer"))), /*#__PURE__*/React.createElement("div", {
     style: {
       maxWidth: 1600,
       margin: "0 auto",
@@ -2969,7 +3143,7 @@ function App() {
     id: "usuarios",
     label: "👥 Profissionais"
   })), /*#__PURE__*/React.createElement("input", {
-    placeholder: "Buscar paciente, HD, setor…",
+    placeholder: "Buscar…",
     value: search,
     onChange: e => setSearch(e.target.value),
     style: {
@@ -2978,7 +3152,7 @@ function App() {
       borderRadius: 8,
       fontSize: 12,
       color: "#0F172A",
-      width: 240,
+      width: 220,
       background: "#fff",
       fontFamily: "inherit"
     }
@@ -3053,7 +3227,7 @@ function App() {
       fontSize: 12,
       padding: "6px 12px"
     }
-  }, "+ Coluna")), view !== "usuarios" && /*#__PURE__*/React.createElement(Btn, {
+  }, "+ Coluna")), isAdmin && view !== "usuarios" && /*#__PURE__*/React.createElement(Btn, {
     onClick: () => newCard(),
     style: {
       marginLeft: "auto",
@@ -3069,9 +3243,12 @@ function App() {
     }
   }, "Carregando dados…"), !loading && view === "dashboard" && /*#__PURE__*/React.createElement(Dashboard, {
     cards: filtered,
-    cols: cols
+    cols: displayCols,
+    dashMode: dashMode,
+    setDashMode: setDashMode
   }), !loading && view === "usuarios" && isAdmin && /*#__PURE__*/React.createElement(UsersPanel, {
     currentUser: currentUser,
+    userId: userId,
     showT: showT
   }), !loading && view === "kanban" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3089,7 +3266,17 @@ function App() {
       fontSize: 10,
       color: "#64748B"
     }
-  }, /*#__PURE__*/React.createElement("span", null, v.emoji), v.label))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", null, v.emoji), v.label))), !isAdmin && !pubCards && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#FEF3C7",
+      border: "1px solid #FDE68A",
+      borderRadius: 10,
+      padding: "14px 16px",
+      marginBottom: 16,
+      fontSize: 13,
+      color: "#92400E"
+    }
+  }, "⚠️ Nenhuma versão publicada ainda. Aguarde a administradora publicar o Kanban."), /*#__PURE__*/React.createElement("div", {
     id: "kanban-board",
     style: {
       display: "flex",
@@ -3098,15 +3285,15 @@ function App() {
       overflowX: "auto",
       paddingBottom: 8
     }
-  }, (singleCol ? cols.filter(c => c.id === singleCol) : cols).map(col => {
+  }, (singleCol ? displayCols.filter(c => c.id === singleCol) : displayCols).map(col => {
     const colCards = filtered.filter(c => c.col_id === col.id);
     const isMin = minimized.has(col.id);
     return /*#__PURE__*/React.createElement("div", {
       key: col.id,
       "data-dropzone": col.id,
-      onDragOver: e => handleDragOver(e, col.id),
-      onDragLeave: e => handleDragLeave(e, col.id),
-      onDrop: e => handleDrop(e, col.id),
+      onDragOver: e => isAdmin && handleDragOver(e, col.id),
+      onDragLeave: e => isAdmin && handleDragLeave(e, col.id),
+      onDrop: e => isAdmin && handleDrop(e, col.id),
       style: {
         background: "#fff",
         borderRadius: 12,
@@ -3186,7 +3373,6 @@ function App() {
       }
     }, /*#__PURE__*/React.createElement("button", {
       onClick: () => setSingleCol(p => p === col.id ? null : col.id),
-      title: singleCol === col.id ? "Ver todas" : "Expandir",
       style: {
         background: "none",
         border: "none",
@@ -3201,7 +3387,6 @@ function App() {
         n.add(col.id);
         return n;
       }),
-      title: "Minimizar",
       style: {
         background: "none",
         border: "none",
@@ -3302,7 +3487,7 @@ function App() {
     style: {
       background: "#F8FAFC"
     }
-  }, [["pr", "#"], ["nome", "Paciente"], ["status", "Status"], ["adm", "Adm."], ["hd", "HD"], ["setor", "Setor"], ["rec", "Recurso"], ["hosp", "Hospital"], ["col_id", "Coluna"], ["grav", "Gravidade"], ["amb", "Amb."]].map(([key, h]) => /*#__PURE__*/React.createElement("th", {
+  }, [["pr", "#"], ["nome", "Paciente"], ["status", "Status"], ["adm", "Adm."], ["hd", "HD"], ["setor", "Setor"], ["rec", "Recurso"], ["hosp", "Hospital"], ["col_id", "Coluna"], ["grav", "Gravidade"], ["amb", "Amb."], ["receptor", "Receptor"]].map(([key, h]) => /*#__PURE__*/React.createElement("th", {
     key: key,
     onClick: () => toggleSort(key),
     style: {
@@ -3319,7 +3504,7 @@ function App() {
       userSelect: "none"
     }
   }, h, sortCol?.key === key ? sortCol.dir === "asc" ? " ↑" : " ↓" : "")))), /*#__PURE__*/React.createElement("tbody", null, sortedFiltered.map((card, i) => {
-    const c = cols.find(c => c.id === card.col_id);
+    const c = displayCols.find(c => c.id === card.col_id);
     return /*#__PURE__*/React.createElement("tr", {
       key: card.id,
       onClick: () => setSelected(card),
@@ -3428,9 +3613,17 @@ function App() {
       }
     }, /*#__PURE__*/React.createElement(AmbBadge, {
       amb: card.amb
-    })));
+    })), /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: "8px 11px",
+        borderBottom: "1px solid #F1F5F9",
+        color: "#64748B",
+        whiteSpace: "nowrap",
+        fontSize: 11
+      }
+    }, card.receptor || ""));
   }), sortedFiltered.length === 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    colSpan: 11,
+    colSpan: 12,
     style: {
       padding: 32,
       textAlign: "center",
@@ -3438,7 +3631,7 @@ function App() {
     }
   }, "Nenhum resultado."))))))), selected && /*#__PURE__*/React.createElement(CardModal, {
     card: selected,
-    cols: cols,
+    cols: isAdmin ? cols : displayCols,
     onClose: () => setSelected(null),
     onSave: onSave,
     onDel: onDel,
@@ -3455,13 +3648,20 @@ function App() {
   }), showShare && /*#__PURE__*/React.createElement(ShareModal, {
     onClose: () => setShowShare(false),
     settings: settings,
-    cards: filtered,
-    cols: cols,
+    cards: isAdmin ? cards : pubCards || [],
+    cols: isAdmin ? cols : pubCols || cols,
     showT: showT
   }), showSettings && /*#__PURE__*/React.createElement(SettingsModal, {
     settings: settings,
     onClose: () => setShowSettings(false),
     onSave: saveSettings
+  }), pendingMove && /*#__PURE__*/React.createElement(AceiteModal, {
+    card: pendingMove.card,
+    onConfirm: aceite => {
+      moveCard(pendingMove.card.id, pendingMove.newColId, aceite);
+      setPendingMove(null);
+    },
+    onCancel: () => setPendingMove(null)
   }), /*#__PURE__*/React.createElement(Toast, {
     toast: toast
   }));
