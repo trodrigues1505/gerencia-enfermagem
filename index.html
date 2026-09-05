@@ -1,0 +1,3880 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gerência de Enfermagem</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:#F1F5F9;color:#0F172A}
+input,select,textarea,button{font-family:inherit}
+.k-card{transition:box-shadow .14s,transform .12s}
+.k-card:hover{box-shadow:0 3px 12px rgba(0,0,0,.1);transform:translateY(-1px)}
+.k-card[draggable=true]{cursor:grab}
+.k-card[draggable=true]:active{cursor:grabbing}
+.scroll-col{overflow-y:auto}
+.scroll-col::-webkit-scrollbar{width:3px}
+.scroll-col::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:99px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const {
+  useState,
+  useEffect,
+  useRef,
+  useCallback
+} = React;
+
+/* ─── CONSTANTS ─── */
+const ADMIN_COREN = "299283";
+const ADMIN_SENHA = "@thi1505";
+const ADMIN_USER = {
+  id: "admin",
+  coren: "299283",
+  nome: "Fabiana Faria de Figueiredo",
+  tipo: "COREN",
+  zap: "",
+  foto: null,
+  role: "admin",
+  status: "aprovado"
+};
+const GC = {
+  emergencia: {
+    bg: "#FEE2E2",
+    border: "#FCA5A5",
+    text: "#991B1B",
+    dot: "#EF4444",
+    label: "Emergência",
+    emoji: "🔴"
+  },
+  urgencia: {
+    bg: "#FEF9C3",
+    border: "#FDE047",
+    text: "#713F12",
+    dot: "#EAB308",
+    label: "Urgência",
+    emoji: "🟡"
+  },
+  andamento_cor: {
+    bg: "#FEF3C7",
+    border: "#FCD34D",
+    text: "#92400E",
+    dot: "#F59E0B",
+    label: "Em andamento",
+    emoji: "🟠"
+  },
+  menor_gravidade: {
+    bg: "#DCFCE7",
+    border: "#86EFAC",
+    text: "#14532D",
+    dot: "#22C55E",
+    label: "Menor gravidade",
+    emoji: "🟢"
+  },
+  finalizado_cor: {
+    bg: "#F3E8FF",
+    border: "#D8B4FE",
+    text: "#581C87",
+    dot: "#A855F7",
+    label: "Finalizado",
+    emoji: "🟣"
+  },
+  agendamento: {
+    bg: "#F1F5F9",
+    border: "#CBD5E1",
+    text: "#334155",
+    dot: "#94A3B8",
+    label: "Agendamento",
+    emoji: "⚪"
+  },
+  retorno: {
+    bg: "#FDF2F8",
+    border: "#F9A8D4",
+    text: "#831843",
+    dot: "#EC4899",
+    label: "Retorno",
+    emoji: "🔵"
+  }
+};
+const STATUS_OPTIONS = ["", "REINSERIR", "EVADIU", "EVASÃO", "ALTA", "ALTA MÉDICA", "RESOLVIDO COM RECURSOS LOCAIS", "FINALIZADO VIA CROSS", "ENCAMINHAR AMANHÃ"];
+const STATUS_EMOJI = {
+  "EVADIU": "⚠️",
+  "EVASÃO": "⚠️",
+  "ALTA": "✅",
+  "ALTA MÉDICA": "✅",
+  "FINALIZADO VIA CROSS": "✔️",
+  "RESOLVIDO COM RECURSOS LOCAIS": "✔️",
+  "REINSERIR": "🔄",
+  "ENCAMINHAR AMANHÃ": "📅"
+};
+const COL_EMOJI = {
+  pendente: "⏳",
+  aceite: "✅",
+  psiquiatria: "🧠",
+  andamento: "🚑",
+  finalizado: "📋"
+};
+const ACCENT = {
+  pendente: "#F59E0B",
+  aceite: "#3B82F6",
+  psiquiatria: "#8B5CF6",
+  andamento: "#EF4444",
+  finalizado: "#6B7280"
+};
+const DEFAULT_COLUMNS = [{
+  id: "pendente",
+  label: "Pendente de Aceite",
+  sub: "CROSS / Aguardando",
+  fixed: true
+}, {
+  id: "aceite",
+  label: "Aceite Confirmado",
+  sub: "Classificação de Prioridades",
+  fixed: true
+}, {
+  id: "psiquiatria",
+  label: "Psiquiatria",
+  sub: "CROSS / Pendente Psiquiatria",
+  fixed: true
+}, {
+  id: "andamento",
+  label: "Remoção em Andamento",
+  sub: "Ambulância Acionada",
+  fixed: true
+}, {
+  id: "finalizado",
+  label: "Finalizadas",
+  sub: "Remoções Concluídas",
+  fixed: true
+}];
+const INIT_CARDS = [{
+  id: 1,
+  col: "pendente",
+  pr: "",
+  status: "",
+  nome: "Marcos Jose de Oliveira",
+  idade: "44a",
+  adm: "30/08",
+  hd: "Frat. Diáfise Úmero",
+  setor: "CM/L.14",
+  rec: "Ortopedia",
+  hosp: "",
+  cross: "",
+  amb: "Básica",
+  grav: "urgencia",
+  obs: "",
+  comments: []
+}, {
+  id: 2,
+  col: "pendente",
+  pr: "",
+  status: "",
+  nome: "Luan Alves de Carvalho",
+  idade: "30a",
+  adm: "30/08",
+  hd: "Frat. Diáfise Tíbia",
+  setor: "C.Médica L.25",
+  rec: "Ortopedia",
+  hosp: "",
+  cross: "",
+  amb: "Básica",
+  grav: "urgencia",
+  obs: "",
+  comments: []
+}, {
+  id: 3,
+  col: "pendente",
+  pr: "",
+  status: "",
+  nome: "Cícera de Lima Silva",
+  idade: "61a",
+  adm: "30/08",
+  hd: "Cálculo biliar",
+  setor: "CM L32",
+  rec: "Cirurgia Geral",
+  hosp: "",
+  cross: "",
+  amb: "Básica",
+  grav: "urgencia",
+  obs: "",
+  comments: []
+}, {
+  id: 4,
+  col: "pendente",
+  pr: "",
+  status: "",
+  nome: "Viviane Rodrigues de Souza",
+  idade: "42a",
+  adm: "30/08",
+  hd: "Frat. Úmero",
+  setor: "CM/L08",
+  rec: "Ortopedia",
+  hosp: "",
+  cross: "",
+  amb: "Básica",
+  grav: "urgencia",
+  obs: "",
+  comments: []
+}, {
+  id: 5,
+  col: "pendente",
+  pr: "",
+  status: "",
+  nome: "José Pedro Olindo Guerra",
+  idade: "53a",
+  adm: "30/08",
+  hd: "Frat. Fêmur",
+  setor: "CM/L.08",
+  rec: "Ortopedia",
+  hosp: "",
+  cross: "",
+  amb: "Básica",
+  grav: "urgencia",
+  obs: "",
+  comments: []
+}, {
+  id: 6,
+  col: "pendente",
+  pr: "",
+  status: "",
+  nome: "Jorge Benedito Colpano",
+  idade: "72a",
+  adm: "31/08",
+  hd: "Mastoidite",
+  setor: "CM-L02",
+  rec: "RNM",
+  hosp: "Albano",
+  cross: "01/09-12h51",
+  amb: "Básica",
+  grav: "urgencia",
+  obs: "",
+  comments: []
+}, {
+  id: 7,
+  col: "pendente",
+  pr: "",
+  status: "",
+  nome: "Hilda de Jesus",
+  idade: "85a",
+  adm: "31/08",
+  hd: "Úlcera MMII",
+  setor: "CM/L.33",
+  rec: "C. Geral",
+  hosp: "",
+  cross: "",
+  amb: "Básica",
+  grav: "urgencia",
+  obs: "",
+  comments: []
+}, {
+  id: 8,
+  col: "pendente",
+  pr: "",
+  status: "",
+  nome: "João Rozendo da Silva",
+  idade: "75a",
+  adm: "01/09",
+  hd: "IAM",
+  setor: "UTI L04",
+  rec: "Cardiologista",
+  hosp: "",
+  cross: "",
+  amb: "Avançada",
+  grav: "urgencia",
+  obs: "",
+  comments: []
+}, {
+  id: 9,
+  col: "pendente",
+  pr: "",
+  status: "",
+  nome: "Simone Apda da Silva Reis",
+  idade: "37a",
+  adm: "04/09",
+  hd: "Hidronefrose",
+  setor: "OBS",
+  rec: "Urologia",
+  hosp: "",
+  cross: "",
+  amb: "Básica",
+  grav: "urgencia",
+  obs: "",
+  comments: []
+}, {
+  id: 10,
+  col: "pendente",
+  pr: "",
+  status: "",
+  nome: "João Pedro Silva de Lima",
+  idade: "11a",
+  adm: "03/09",
+  hd: "Luxação de Cotovelo",
+  setor: "OBS",
+  rec: "Ortopedia",
+  hosp: "Albano",
+  cross: "",
+  amb: "Básica",
+  grav: "urgencia",
+  obs: "UPA FM",
+  comments: []
+}, {
+  id: 11,
+  col: "psiquiatria",
+  pr: "",
+  status: "",
+  nome: "Edilainea Oliveira Marculino",
+  idade: "41a",
+  adm: "02/09",
+  hd: "Auto-intoxicação",
+  setor: "OBS",
+  rec: "Psiquiatria",
+  hosp: "",
+  cross: "",
+  amb: "Básica",
+  grav: "urgencia",
+  obs: "",
+  comments: []
+}, {
+  id: 12,
+  col: "psiquiatria",
+  pr: "",
+  status: "",
+  nome: "Lidio João da Silva",
+  idade: "38a",
+  adm: "",
+  hd: "Alucinação",
+  setor: "OBS",
+  rec: "Psiquiatria",
+  hosp: "",
+  cross: "",
+  amb: "Básica",
+  grav: "urgencia",
+  obs: "",
+  comments: []
+}, {
+  id: 13,
+  col: "aceite",
+  pr: "02",
+  status: "",
+  nome: "Gesseli Apda Dias",
+  idade: "38a",
+  adm: "31/08",
+  hd: "Transtorno Psicótico",
+  setor: "CM L16",
+  rec: "Psiquiatria",
+  hosp: "CAISM",
+  cross: "03/09-18:57",
+  amb: "Básica",
+  grav: "urgencia",
+  obs: "",
+  comments: []
+}, {
+  id: 14,
+  col: "aceite",
+  pr: "04",
+  status: "",
+  nome: "Ana Victória Lopes",
+  idade: "08a",
+  adm: "03/09",
+  hd: "Abscesso Cutâneo",
+  setor: "Pediatria/L14",
+  rec: "C. Pediátrica",
+  hosp: "Lacaz",
+  cross: "04/09-12:01",
+  amb: "Básica",
+  grav: "urgencia",
+  obs: "",
+  comments: []
+}, {
+  id: 15,
+  col: "aceite",
+  pr: "04",
+  status: "",
+  nome: "Carla Josina",
+  idade: "57a",
+  adm: "03/09",
+  hd: "AVC",
+  setor: "CM-L35",
+  rec: "Tomografia",
+  hosp: "Lacaz",
+  cross: "04/09-12:03",
+  amb: "Básica",
+  grav: "urgencia",
+  obs: "",
+  comments: []
+}, {
+  id: 16,
+  col: "aceite",
+  pr: "01",
+  status: "",
+  nome: "Andres Henrique Sobral da Silva",
+  idade: "19a",
+  adm: "03/09",
+  hd: "Dor Abdominal",
+  setor: "OBS",
+  rec: "Tomografia",
+  hosp: "Lacaz",
+  cross: "03/09-21:10",
+  amb: "Básica",
+  grav: "urgencia",
+  obs: "",
+  comments: []
+}, {
+  id: 17,
+  col: "aceite",
+  pr: "03",
+  status: "",
+  nome: "Miguel Lorenzo Martins de Sa",
+  idade: "05a",
+  adm: "04/09",
+  hd: "Dor Abdominal",
+  setor: "OBS",
+  rec: "C. Pediátrica",
+  hosp: "Lacaz",
+  cross: "04/09-13:23",
+  amb: "Básica",
+  grav: "urgencia",
+  obs: "",
+  comments: []
+}, {
+  id: 18,
+  col: "andamento",
+  pr: "01",
+  status: "",
+  nome: "Denilson Barbosa C. dos Santos",
+  idade: "33a",
+  adm: "24/08",
+  hd: "Fístula Bronco Pleural",
+  setor: "CM-L11",
+  rec: "C. Torácica",
+  hosp: "SCSP",
+  cross: "Retorno 04/09 7h",
+  amb: "Básica",
+  grav: "retorno",
+  obs: "",
+  comments: []
+}, {
+  id: 19,
+  col: "andamento",
+  pr: "01",
+  status: "",
+  nome: "João Rozendo da Silva",
+  idade: "75a",
+  adm: "01/09",
+  hd: "IAM",
+  setor: "UTI L04",
+  rec: "Cardiologista",
+  hosp: "SCSP",
+  cross: "04/09 às 7h",
+  amb: "Avançada",
+  grav: "andamento_cor",
+  obs: "",
+  comments: []
+}, {
+  id: 20,
+  col: "andamento",
+  pr: "01",
+  status: "",
+  nome: "RN de Célia Beatriz Nogueira",
+  idade: "1d",
+  adm: "04/09",
+  hd: "Desc. Respiratório",
+  setor: "Sala Estab.",
+  rec: "UTI Neo",
+  hosp: "Lacaz",
+  cross: "04/09-13:56",
+  amb: "Avançada",
+  grav: "emergencia",
+  obs: "",
+  comments: []
+}, {
+  id: 21,
+  col: "finalizado",
+  pr: "01",
+  status: "FINALIZADO VIA CROSS",
+  nome: "Rute Maria da Silva",
+  idade: "58a",
+  adm: "01/09",
+  hd: "Hidronefrose",
+  setor: "CM/L28",
+  rec: "Urologista",
+  hosp: "SCSP",
+  cross: "04/09 às 7h",
+  amb: "Básica",
+  grav: "finalizado_cor",
+  obs: "",
+  comments: []
+}, {
+  id: 22,
+  col: "finalizado",
+  pr: "01",
+  status: "FINALIZADO VIA CROSS",
+  nome: "Lindovaldo Felisbino",
+  idade: "70a",
+  adm: "03/09",
+  hd: "AVC?",
+  setor: "OBS",
+  rec: "Tomografia",
+  hosp: "Lacaz",
+  cross: "",
+  amb: "Avançada",
+  grav: "finalizado_cor",
+  obs: "",
+  comments: []
+}, {
+  id: 23,
+  col: "finalizado",
+  pr: "02",
+  status: "FINALIZADO VIA CROSS",
+  nome: "Rony Junio Santos Silva",
+  idade: "11a",
+  adm: "01/09",
+  hd: "Apendicite",
+  setor: "Obs.Pediátrica",
+  rec: "C. Geral",
+  hosp: "Lacaz",
+  cross: "01/09-03h57",
+  amb: "Básica",
+  grav: "finalizado_cor",
+  obs: "",
+  comments: []
+}, {
+  id: 24,
+  col: "finalizado",
+  pr: "04",
+  status: "FINALIZADO VIA CROSS",
+  nome: "Francisco Deivid Alves da Silva",
+  idade: "41a",
+  adm: "01/09",
+  hd: "TCE",
+  setor: "CM-L02",
+  rec: "TC Crânio",
+  hosp: "Albano",
+  cross: "01/09-09h39",
+  amb: "Básica",
+  grav: "finalizado_cor",
+  obs: "",
+  comments: []
+}, {
+  id: 25,
+  col: "finalizado",
+  pr: "",
+  status: "REINSERIR",
+  nome: "Roseli Serafim de Oliveira",
+  idade: "63a",
+  adm: "Ret.",
+  hd: "DAOP MIE",
+  setor: "CM/L.22",
+  rec: "Vascular",
+  hosp: "SCSP",
+  cross: "09/09 às 7h",
+  amb: "Básica",
+  grav: "retorno",
+  obs: "",
+  comments: []
+}];
+
+/* ─── UTILS ─── */
+const todayStr = () => new Date().toLocaleDateString("pt-BR", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric"
+});
+const dateKey = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const nowStr = () => new Date().toLocaleTimeString("pt-BR", {
+  hour: "2-digit",
+  minute: "2-digit"
+});
+const loadLS = (k, fb) => {
+  try {
+    const v = localStorage.getItem(k);
+    return v ? JSON.parse(v) : fb;
+  } catch {
+    return fb;
+  }
+};
+const saveLS = (k, v) => {
+  try {
+    localStorage.setItem(k, JSON.stringify(v));
+  } catch {}
+};
+
+/* ─── TINY UI ─── */
+const s = {
+  inp: {
+    width: "100%",
+    padding: "8px 10px",
+    border: "1px solid #E2E8F0",
+    borderRadius: 7,
+    fontSize: 13,
+    color: "#0F172A",
+    background: "#fff",
+    fontFamily: "inherit"
+  },
+  lbl: {
+    fontSize: 10,
+    fontWeight: 600,
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    letterSpacing: ".05em",
+    display: "block",
+    marginBottom: 3
+  }
+};
+function Btn({
+  children,
+  onClick,
+  variant = "primary",
+  style: extra = {},
+  disabled = false,
+  type = "button"
+}) {
+  const variants = {
+    primary: {
+      background: "#0F172A",
+      color: "#fff",
+      border: "none"
+    },
+    ghost: {
+      background: "none",
+      color: "#64748B",
+      border: "1px solid #E2E8F0"
+    },
+    danger: {
+      background: "none",
+      color: "#DC2626",
+      border: "1px solid #FCA5A5"
+    },
+    green: {
+      background: "#16A34A",
+      color: "#fff",
+      border: "none"
+    },
+    wa: {
+      background: "#25D366",
+      color: "#fff",
+      border: "none"
+    }
+  };
+  return /*#__PURE__*/React.createElement("button", {
+    type: type,
+    onClick: onClick,
+    disabled: disabled,
+    style: {
+      padding: "7px 16px",
+      borderRadius: 8,
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: disabled ? "not-allowed" : "pointer",
+      transition: "opacity .13s",
+      opacity: disabled ? .6 : 1,
+      ...variants[variant],
+      ...extra
+    }
+  }, children);
+}
+function Badge({
+  grav
+}) {
+  const c = GC[grav] || GC.urgencia;
+  return /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 4,
+      fontSize: 10,
+      fontWeight: 600,
+      padding: "2px 8px",
+      borderRadius: 99,
+      background: c.bg,
+      color: c.text,
+      border: `1px solid ${c.border}`,
+      whiteSpace: "nowrap"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 5,
+      height: 5,
+      borderRadius: "50%",
+      background: c.dot,
+      flexShrink: 0
+    }
+  }), c.label);
+}
+function StatusPill({
+  status
+}) {
+  if (!status) return null;
+  const map = {
+    "EVADIU": "#FEE2E2|#991B1B",
+    "EVASÃO": "#FEE2E2|#991B1B",
+    "ALTA": "#DCFCE7|#14532D",
+    "ALTA MÉDICA": "#DCFCE7|#14532D",
+    "FINALIZADO VIA CROSS": "#F3E8FF|#581C87",
+    "RESOLVIDO COM RECURSOS LOCAIS": "#DCFCE7|#14532D",
+    "REINSERIR": "#FEF3C7|#92400E",
+    "ENCAMINHAR AMANHÃ": "#EFF6FF|#1E40AF"
+  };
+  const [bg, color] = (map[status] || "#F1F5F9|#475569").split("|");
+  return /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 9,
+      fontWeight: 700,
+      padding: "1px 6px",
+      borderRadius: 3,
+      background: bg,
+      color,
+      whiteSpace: "nowrap",
+      textTransform: "uppercase",
+      letterSpacing: ".04em"
+    }
+  }, status);
+}
+function AmbBadge({
+  amb
+}) {
+  if (!amb) return null;
+  const av = amb.includes("Av");
+  return /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      padding: "2px 7px",
+      borderRadius: 4,
+      whiteSpace: "nowrap",
+      background: av ? "#FEE2E2" : "#EFF6FF",
+      color: av ? "#991B1B" : "#1E40AF",
+      border: `1px solid ${av ? "#FCA5A5" : "#BFDBFE"}`
+    }
+  }, av ? "🚨 Avançada" : "🚐 Básica");
+}
+function Toast({
+  toast
+}) {
+  if (!toast) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      bottom: 24,
+      left: "50%",
+      transform: "translateX(-50%)",
+      padding: "10px 20px",
+      borderRadius: 10,
+      fontSize: 13,
+      fontWeight: 500,
+      boxShadow: "0 4px 20px rgba(0,0,0,.14)",
+      zIndex: 9999,
+      whiteSpace: "nowrap",
+      pointerEvents: "none",
+      background: toast.type === "err" ? "#FEE2E2" : "#F0FDF4",
+      border: `1px solid ${toast.type === "err" ? "#FCA5A5" : "#86EFAC"}`,
+      color: toast.type === "err" ? "#991B1B" : "#166534"
+    }
+  }, toast.msg);
+}
+function ModalShell({
+  onClose,
+  title,
+  subtitle,
+  children,
+  footer,
+  maxWidth = 560
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      background: "rgba(15,23,42,.5)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 1000,
+      padding: 16
+    },
+    onClick: e => e.target === e.currentTarget && onClose()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      borderRadius: 16,
+      width: "100%",
+      maxWidth,
+      maxHeight: "92vh",
+      overflowY: "auto",
+      boxShadow: "0 20px 60px rgba(0,0,0,.22)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "14px 20px",
+      borderBottom: "1px solid #F1F5F9",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      position: "sticky",
+      top: 0,
+      background: "#fff",
+      borderRadius: "16px 16px 0 0",
+      zIndex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", null, subtitle && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#94A3B8",
+      textTransform: "uppercase",
+      letterSpacing: ".05em"
+    }
+  }, subtitle), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 15,
+      color: "#0F172A",
+      marginTop: subtitle ? 2 : 0
+    }
+  }, title)), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      color: "#94A3B8",
+      fontSize: 20,
+      padding: 4
+    }
+  }, "✕")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "16px 20px"
+    }
+  }, children), footer && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "10px 20px",
+      borderTop: "1px solid #F1F5F9",
+      display: "flex",
+      gap: 8,
+      justifyContent: "flex-end",
+      position: "sticky",
+      bottom: 0,
+      background: "#fff",
+      borderRadius: "0 0 16px 16px"
+    }
+  }, footer)));
+}
+
+/* ─── LOGIN ─── */
+function LoginScreen({
+  onLogin,
+  showT
+}) {
+  const [mode, setMode] = useState("login");
+  const [coren, setCoren] = useState("");
+  const [senha, setSenha] = useState("");
+  const [showP, setShowP] = useState(false);
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [reg, setReg] = useState({
+    tipo: "COREN",
+    registro: "",
+    nome: "",
+    zap: "",
+    senha: "",
+    foto: null
+  });
+  function doLogin(e) {
+    e.preventDefault();
+    setErr("");
+    setLoading(true);
+    setTimeout(() => {
+      if (coren.trim() === ADMIN_COREN && senha === ADMIN_SENHA) {
+        onLogin(loadLS("ge_admin_user", null) || ADMIN_USER);
+      } else {
+        const users = loadLS("ge_users", []);
+        const u = users.find(u => (u.coren || u.crm || "").trim() === coren.trim());
+        if (!u) {
+          setErr("Registro não encontrado.");
+          setLoading(false);
+          return;
+        }
+        if (u.status === "pendente") {
+          setErr("Cadastro aguardando aprovação.");
+          setLoading(false);
+          return;
+        }
+        if (u.status === "bloqueado") {
+          setErr("Acesso bloqueado. Contate a administradora.");
+          setLoading(false);
+          return;
+        }
+        if (u.senha !== senha) {
+          setErr("Senha incorreta.");
+          setLoading(false);
+          return;
+        }
+        onLogin(u);
+      }
+      setLoading(false);
+    }, 500);
+  }
+  function doRegister(e) {
+    e.preventDefault();
+    setErr("");
+    if (!reg.registro.trim() || !reg.nome.trim() || !reg.senha) {
+      setErr("Preencha todos os campos obrigatórios.");
+      return;
+    }
+    const users = loadLS("ge_users", []);
+    if (users.find(u => (u.coren || u.crm || "") === reg.registro.trim())) {
+      setErr("Registro já cadastrado.");
+      return;
+    }
+    const novo = {
+      id: "u_" + Date.now(),
+      tipo: reg.tipo,
+      coren: reg.tipo === "COREN" ? reg.registro : "",
+      crm: reg.tipo === "CRM" ? reg.registro : "",
+      nome: reg.nome,
+      zap: reg.zap,
+      foto: reg.foto,
+      senha: reg.senha,
+      role: "viewer",
+      status: "pendente"
+    };
+    saveLS("ge_users", [...users, novo]);
+    setMode("login");
+    showT("Cadastro enviado! Aguarde aprovação.");
+  }
+  function handleFoto(e, setter) {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => setter(p => ({
+      ...p,
+      foto: ev.target.result
+    }));
+    r.readAsDataURL(f);
+  }
+  const inp2 = {
+    ...s.inp,
+    padding: "10px 12px",
+    fontSize: 14
+  };
+  const lbl2 = {
+    ...s.lbl,
+    marginBottom: 4
+  };
+  if (mode === "register") return /*#__PURE__*/React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: "#F1F5F9",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      borderRadius: 16,
+      width: "100%",
+      maxWidth: 420,
+      boxShadow: "0 8px 40px rgba(0,0,0,.1)",
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0F172A",
+      padding: "20px 24px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 16,
+      color: "#fff"
+    }
+  }, "+ Gerência de Enfermagem"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#475569",
+      marginTop: 2
+    }
+  }, "Solicitar acesso")), /*#__PURE__*/React.createElement("form", {
+    onSubmit: doRegister,
+    style: {
+      padding: "20px 24px",
+      display: "flex",
+      flexDirection: "column",
+      gap: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, ["COREN", "CRM"].map(t => /*#__PURE__*/React.createElement("button", {
+    key: t,
+    type: "button",
+    onClick: () => setReg(p => ({
+      ...p,
+      tipo: t
+    })),
+    style: {
+      flex: 1,
+      padding: "8px",
+      borderRadius: 8,
+      border: `2px solid ${reg.tipo === t ? "#0F172A" : "#E2E8F0"}`,
+      background: reg.tipo === t ? "#0F172A" : "#fff",
+      color: reg.tipo === t ? "#fff" : "#64748B",
+      cursor: "pointer",
+      fontWeight: 600,
+      fontSize: 13
+    }
+  }, t))), [["Número do registro *", "registro", `Digite seu ${reg.tipo}`], ["Nome completo *", "nome", "Nome completo"], ["WhatsApp", "zap", "(19) 99999-9999"], ["Senha *", "senha", "Crie uma senha"]].map(([label, key, ph]) => /*#__PURE__*/React.createElement("div", {
+    key: key
+  }, /*#__PURE__*/React.createElement("label", {
+    style: lbl2
+  }, label), /*#__PURE__*/React.createElement("input", {
+    type: key === "senha" ? "password" : "text",
+    value: reg[key] || "",
+    onChange: e => setReg(p => ({
+      ...p,
+      [key]: e.target.value
+    })),
+    placeholder: ph,
+    style: inp2,
+    required: label.includes("*")
+  }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: lbl2
+  }, "Foto (opcional)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, reg.foto && /*#__PURE__*/React.createElement("img", {
+    src: reg.foto,
+    style: {
+      width: 44,
+      height: 44,
+      borderRadius: "50%",
+      objectFit: "cover",
+      border: "2px solid #E2E8F0"
+    }
+  }), /*#__PURE__*/React.createElement("label", {
+    style: {
+      padding: "7px 14px",
+      border: "1px solid #E2E8F0",
+      borderRadius: 8,
+      cursor: "pointer",
+      fontSize: 12,
+      color: "#64748B",
+      background: "#F8FAFC"
+    }
+  }, "Escolher foto", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: "image/*",
+    onChange: e => handleFoto(e, setReg),
+    style: {
+      display: "none"
+    }
+  })))), err && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#FEE2E2",
+      color: "#991B1B",
+      padding: "8px 12px",
+      borderRadius: 8,
+      fontSize: 12
+    }
+  }, err), /*#__PURE__*/React.createElement(Btn, {
+    type: "submit",
+    style: {
+      padding: "11px",
+      fontSize: 14
+    }
+  }, "Enviar cadastro"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setMode("login");
+      setErr("");
+    },
+    style: {
+      padding: "8px",
+      border: "none",
+      background: "none",
+      color: "#64748B",
+      cursor: "pointer",
+      fontSize: 13
+    }
+  }, "← Voltar ao login"))));
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: "#F1F5F9",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      borderRadius: 16,
+      width: "100%",
+      maxWidth: 380,
+      boxShadow: "0 8px 40px rgba(0,0,0,.1)",
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0F172A",
+      padding: "28px 24px",
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 48,
+      height: 48,
+      borderRadius: 12,
+      background: "#1E40AF",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#fff",
+      fontSize: 22,
+      fontWeight: 700
+    }
+  }, "+")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 17,
+      color: "#fff"
+    }
+  }, "Gerência de Enfermagem"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#475569",
+      marginTop: 4
+    }
+  }, "Acesso restrito a profissionais autorizados")), /*#__PURE__*/React.createElement("form", {
+    onSubmit: doLogin,
+    style: {
+      padding: "24px",
+      display: "flex",
+      flexDirection: "column",
+      gap: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: lbl2
+  }, "COREN / CRM"), /*#__PURE__*/React.createElement("input", {
+    value: coren,
+    onChange: e => setCoren(e.target.value),
+    style: inp2,
+    placeholder: "Número do seu registro",
+    autoComplete: "username"
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: lbl2
+  }, "Senha"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: showP ? "text" : "password",
+    value: senha,
+    onChange: e => setSenha(e.target.value),
+    style: {
+      ...inp2,
+      paddingRight: 44
+    },
+    placeholder: "••••••••",
+    autoComplete: "current-password"
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setShowP(p => !p),
+    style: {
+      position: "absolute",
+      right: 12,
+      top: "50%",
+      transform: "translateY(-50%)",
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      color: "#94A3B8",
+      fontSize: 16
+    }
+  }, showP ? "🙈" : "👁"))), err && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#FEE2E2",
+      color: "#991B1B",
+      padding: "8px 12px",
+      borderRadius: 8,
+      fontSize: 12
+    }
+  }, err), /*#__PURE__*/React.createElement(Btn, {
+    type: "submit",
+    disabled: loading,
+    style: {
+      padding: "11px",
+      fontSize: 14
+    }
+  }, loading ? "Entrando…" : "Entrar"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setMode("register");
+      setErr("");
+    },
+    style: {
+      padding: "8px",
+      border: "none",
+      background: "none",
+      color: "#64748B",
+      cursor: "pointer",
+      fontSize: 13
+    }
+  }, "Sou novo aqui — solicitar acesso"))));
+}
+
+/* ─── PROFILE MODAL ─── */
+function ProfileModal({
+  user,
+  onSave,
+  onClose
+}) {
+  const [zap, setZap] = useState(user.zap || "");
+  const [foto, setFoto] = useState(user.foto || null);
+  function handleFoto(e) {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => setFoto(ev.target.result);
+    r.readAsDataURL(f);
+  }
+  return /*#__PURE__*/React.createElement(ModalShell, {
+    title: "Complete seu perfil",
+    subtitle: "Bem-vinda, Fabiana",
+    onClose: onClose,
+    maxWidth: 400,
+    footer: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Btn, {
+      variant: "ghost",
+      onClick: onClose
+    }, "Agora não"), /*#__PURE__*/React.createElement(Btn, {
+      onClick: () => onSave({
+        ...user,
+        zap,
+        foto
+      })
+    }, "Salvar"))
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 56,
+      height: 56,
+      borderRadius: "50%",
+      background: "#F1F5F9",
+      overflow: "hidden",
+      flexShrink: 0,
+      border: "2px solid #E2E8F0",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, foto ? /*#__PURE__*/React.createElement("img", {
+    src: foto,
+    style: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover"
+    }
+  }) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 22,
+      color: "#CBD5E1"
+    }
+  }, "👤")), /*#__PURE__*/React.createElement("label", {
+    style: {
+      padding: "7px 14px",
+      border: "1px solid #E2E8F0",
+      borderRadius: 8,
+      cursor: "pointer",
+      fontSize: 12,
+      color: "#64748B",
+      background: "#F8FAFC"
+    }
+  }, foto ? "Alterar foto" : "Adicionar foto", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: "image/*",
+    onChange: handleFoto,
+    style: {
+      display: "none"
+    }
+  }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: s.lbl
+  }, "WhatsApp"), /*#__PURE__*/React.createElement("input", {
+    value: zap,
+    onChange: e => setZap(e.target.value),
+    placeholder: "(19) 99999-9999",
+    style: s.inp
+  })));
+}
+
+/* ─── SETTINGS MODAL ─── */
+function SettingsModal({
+  settings,
+  onClose,
+  onSave
+}) {
+  const [form, setForm] = useState({
+    ...settings
+  });
+  const upd = (k, v) => setForm(p => ({
+    ...p,
+    [k]: v
+  }));
+  const Row = ({
+    label,
+    k,
+    ph = ""
+  }) => /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: s.lbl
+  }, label), /*#__PURE__*/React.createElement("input", {
+    value: form[k] || "",
+    onChange: e => upd(k, e.target.value),
+    placeholder: ph,
+    style: s.inp
+  }));
+  return /*#__PURE__*/React.createElement(ModalShell, {
+    title: "Configurações",
+    onClose: onClose,
+    maxWidth: 420,
+    footer: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Btn, {
+      variant: "ghost",
+      onClick: onClose
+    }, "Cancelar"), /*#__PURE__*/React.createElement(Btn, {
+      onClick: () => onSave(form)
+    }, "Salvar"))
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#0F172A",
+      marginBottom: 10,
+      textTransform: "uppercase",
+      letterSpacing: ".05em"
+    }
+  }, "Administradora"), /*#__PURE__*/React.createElement(Row, {
+    label: "Nome completo",
+    k: "adminNome",
+    ph: "Enf.ª Fabiana Faria de Figueiredo"
+  }), /*#__PURE__*/React.createElement(Row, {
+    label: "COREN",
+    k: "adminCoren",
+    ph: "COREN-SP 299283"
+  }), /*#__PURE__*/React.createElement(Row, {
+    label: "WhatsApp",
+    k: "adminZap",
+    ph: "(19) 99999-9999"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#0F172A",
+      margin: "16px 0 6px",
+      textTransform: "uppercase",
+      letterSpacing: ".05em"
+    }
+  }, "Link do aplicativo"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      color: "#94A3B8",
+      marginBottom: 8
+    }
+  }, "Cole o link do app após hospedar (ex: GitHub Pages). Ele será incluído automaticamente na mensagem do WhatsApp."), /*#__PURE__*/React.createElement(Row, {
+    label: "URL do app",
+    k: "appUrl",
+    ph: "https://seuusuario.github.io/gerencia-enfermagem"
+  }));
+}
+
+/* ─── SHARE MODAL ─── */
+function ShareModal({
+  onClose,
+  settings,
+  cards,
+  cols,
+  showT
+}) {
+  const [sharing, setSharing] = useState(false);
+  function buildText() {
+    const appLink = settings.appUrl ? `\n\n🔗 Acesse o sistema: ${settings.appUrl}` : "";
+    const lines = [`🏥 *GERÊNCIA DE ENFERMAGEM*\n📅 ${todayStr()}\n`];
+    cols.forEach(col => {
+      const cc = cards.filter(c => c.col === col.id);
+      if (!cc.length) return;
+      const emoji = COL_EMOJI[col.id] || "📌";
+      lines.push(`\n${emoji} *${col.label.toUpperCase()}* — ${cc.length} paciente${cc.length !== 1 ? "s" : ""}`);
+      lines.push("─────────────────────");
+      cc.forEach(c => {
+        const g = GC[c.grav] || GC.urgencia;
+        const pr = c.pr ? ` [P${c.pr}]` : "";
+        const st = c.status ? (STATUS_EMOJI[c.status] || "") + " " + c.status + " " : "";
+        lines.push(`${g.emoji}${pr} *${c.nome}*, ${c.idade}`);
+        lines.push(`   └ ${c.hd}`);
+        if (c.setor || c.rec) lines.push(`   └ ${[c.setor, c.rec].filter(Boolean).join(" · ")}`);
+        if (c.hosp) lines.push(`   └ 🏨 ${c.hosp}`);
+        if (c.amb) lines.push(`   └ ${c.amb.includes("Av") ? "🚨" : "🚐"} ${c.amb}`);
+        if (c.cross) lines.push(`   └ 📋 Cross: ${c.cross}`);
+        if (st) lines.push(`   └ ${st}`);
+      });
+    });
+    lines.push(`\n━━━━━━━━━━━━━━━━━━━━`);
+    lines.push(`📊 Total: *${cards.length} pacientes*`);
+    lines.push(`⏰ Atualizado: ${todayStr()} às ${nowStr()}${appLink}`);
+    return lines.join("\n");
+  }
+  async function doShare() {
+    setSharing(true);
+    const text = buildText();
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {}
+    const encoded = encodeURIComponent(text);
+    window.open(`https://wa.me/?text=${encoded}`, "_blank");
+    showT("✅ WhatsApp aberto com o texto do Kanban!");
+    setSharing(false);
+    onClose();
+  }
+  return /*#__PURE__*/React.createElement(ModalShell, {
+    title: "Compartilhar no WhatsApp",
+    onClose: onClose,
+    maxWidth: 480
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#F0FDF4",
+      border: "1px solid #86EFAC",
+      borderRadius: 10,
+      padding: "12px 14px",
+      marginBottom: 14,
+      fontSize: 12,
+      color: "#166534",
+      lineHeight: 1.9
+    }
+  }, /*#__PURE__*/React.createElement("strong", null, "Como funciona:"), /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("strong", null, "①"), " WhatsApp Web abre com o texto já preenchido", /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("strong", null, "②"), " Escolha o grupo na lista", /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("strong", null, "③"), " Clique em Enviar", settings.appUrl && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("strong", null, "④"), " O link do app já vem no texto — clicável no WhatsApp!")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#F8FAFC",
+      borderRadius: 8,
+      padding: "10px 12px",
+      marginBottom: 14,
+      maxHeight: 220,
+      overflowY: "auto"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#94A3B8",
+      marginBottom: 6,
+      textTransform: "uppercase",
+      letterSpacing: ".05em"
+    }
+  }, "Pré-visualização"), /*#__PURE__*/React.createElement("pre", {
+    style: {
+      fontSize: 11,
+      color: "#374151",
+      whiteSpace: "pre-wrap",
+      fontFamily: "inherit",
+      lineHeight: 1.6
+    }
+  }, buildText())), /*#__PURE__*/React.createElement(Btn, {
+    variant: "wa",
+    onClick: doShare,
+    disabled: sharing,
+    style: {
+      width: "100%",
+      justifyContent: "center",
+      padding: "12px",
+      fontSize: 14
+    }
+  }, sharing ? "Abrindo…" : "📤  Abrir WhatsApp com o texto"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#94A3B8",
+      textAlign: "center",
+      marginTop: 8
+    }
+  }, "Funciona no computador e no celular"));
+}
+function CardModal({
+  card,
+  cols,
+  onClose,
+  onSave,
+  onDel,
+  isAdmin,
+  currentUser
+}) {
+  const [form, setForm] = useState({
+    ...card,
+    comments: card.comments || []
+  });
+  const [comment, setComment] = useState("");
+  const [tab, setTab] = useState("info");
+  const upd = (k, v) => setForm(p => ({
+    ...p,
+    [k]: v
+  }));
+  function addComment() {
+    if (!comment.trim()) return;
+    const c = {
+      id: Date.now(),
+      autor: currentUser.nome,
+      autorId: currentUser.id,
+      texto: comment.trim(),
+      hora: `${todayStr()} ${nowStr()}`,
+      isAdmin: currentUser.role === "admin"
+    };
+    setForm(p => ({
+      ...p,
+      comments: [...(p.comments || []), c]
+    }));
+    setComment("");
+  }
+  function delComment(cid) {
+    setForm(p => ({
+      ...p,
+      comments: (p.comments || []).filter(c => c.id !== cid)
+    }));
+  }
+  const F = ({
+    label,
+    k,
+    as,
+    opts,
+    full
+  }) => /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10,
+      gridColumn: full ? "1/-1" : undefined
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: s.lbl
+  }, label), opts ? /*#__PURE__*/React.createElement("select", {
+    value: form[k] || "",
+    onChange: e => upd(k, e.target.value),
+    disabled: !isAdmin,
+    style: s.inp
+  }, opts.map(o => /*#__PURE__*/React.createElement("option", {
+    key: o.v ?? o,
+    value: o.v ?? o
+  }, o.t ?? o))) : as === "textarea" ? /*#__PURE__*/React.createElement("textarea", {
+    rows: 2,
+    value: form[k] || "",
+    onChange: e => upd(k, e.target.value),
+    disabled: !isAdmin,
+    style: {
+      ...s.inp,
+      resize: "vertical"
+    }
+  }) : /*#__PURE__*/React.createElement("input", {
+    value: form[k] || "",
+    onChange: e => upd(k, e.target.value),
+    disabled: !isAdmin,
+    style: s.inp
+  }));
+  return /*#__PURE__*/React.createElement(ModalShell, {
+    title: form.nome || "Paciente",
+    subtitle: card.id === "new" ? "Novo Paciente" : "Card",
+    onClose: onClose,
+    footer: isAdmin && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Btn, {
+      variant: "danger",
+      onClick: () => onDel(card.id)
+    }, "Excluir"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginLeft: "auto"
+      }
+    }, /*#__PURE__*/React.createElement(Btn, {
+      variant: "ghost",
+      onClick: onClose
+    }, "Cancelar"), /*#__PURE__*/React.createElement(Btn, {
+      onClick: () => onSave(form)
+    }, "Salvar")))
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 2,
+      marginBottom: 16,
+      background: "#F8FAFC",
+      borderRadius: 8,
+      padding: 2
+    }
+  }, [["info", "📋 Informações"], ["comments", "💬 Comentários" + (form.comments?.length ? ` (${form.comments.length})` : "")]].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
+    key: id,
+    type: "button",
+    onClick: () => setTab(id),
+    style: {
+      flex: 1,
+      padding: "6px 10px",
+      borderRadius: 6,
+      border: "none",
+      fontSize: 12,
+      fontWeight: tab === id ? 600 : 400,
+      background: tab === id ? "#fff" : "transparent",
+      color: tab === id ? "#0F172A" : "#64748B",
+      cursor: "pointer",
+      boxShadow: tab === id ? "0 1px 3px rgba(0,0,0,.08)" : undefined
+    }
+  }, label))), tab === "info" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: "0 12px"
+    }
+  }, /*#__PURE__*/React.createElement(F, {
+    label: "Nome completo",
+    k: "nome",
+    full: true
+  }), /*#__PURE__*/React.createElement(F, {
+    label: "Idade",
+    k: "idade"
+  }), /*#__PURE__*/React.createElement(F, {
+    label: "Admissão",
+    k: "adm"
+  }), /*#__PURE__*/React.createElement(F, {
+    label: "Hipótese diagnóstica",
+    k: "hd",
+    full: true
+  }), /*#__PURE__*/React.createElement(F, {
+    label: "Setor / Leito",
+    k: "setor"
+  }), /*#__PURE__*/React.createElement(F, {
+    label: "Recurso / Especialidade",
+    k: "rec"
+  }), /*#__PURE__*/React.createElement(F, {
+    label: "Hospital receptor",
+    k: "hosp"
+  }), /*#__PURE__*/React.createElement(F, {
+    label: "Ambulância",
+    k: "amb",
+    opts: [{
+      v: "",
+      t: "—"
+    }, {
+      v: "Básica",
+      t: "🚐 Básica (SBV)"
+    }, {
+      v: "Avançada",
+      t: "🚨 Avançada (SAV)"
+    }]
+  }), /*#__PURE__*/React.createElement(F, {
+    label: "Prioridade (nº)",
+    k: "pr"
+  }), /*#__PURE__*/React.createElement(F, {
+    label: "Status",
+    k: "status",
+    opts: STATUS_OPTIONS.map(o => ({
+      v: o,
+      t: o || "(sem status)"
+    }))
+  }), /*#__PURE__*/React.createElement(F, {
+    label: "Gravidade",
+    k: "grav",
+    opts: Object.entries(GC).map(([k, v]) => ({
+      v: k,
+      t: v.label
+    }))
+  }), /*#__PURE__*/React.createElement(F, {
+    label: "Coluna",
+    k: "col",
+    opts: cols.map(c => ({
+      v: c.id,
+      t: c.label
+    }))
+  }), /*#__PURE__*/React.createElement(F, {
+    label: "Finalizado Cross",
+    k: "cross",
+    full: true
+  }), /*#__PURE__*/React.createElement(F, {
+    label: "Horário de saída",
+    k: "saida"
+  }), /*#__PURE__*/React.createElement(F, {
+    label: "Horário de retorno",
+    k: "ret"
+  }), /*#__PURE__*/React.createElement(F, {
+    label: "Observações",
+    k: "obs",
+    as: "textarea",
+    full: true
+  })), tab === "comments" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12,
+      maxHeight: 280,
+      overflowY: "auto",
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, (!form.comments || form.comments.length === 0) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "24px",
+      color: "#CBD5E1",
+      fontSize: 12
+    }
+  }, "Nenhum comentário ainda."), (form.comments || []).map(c => /*#__PURE__*/React.createElement("div", {
+    key: c.id,
+    style: {
+      background: c.isAdmin ? "#EFF6FF" : "#F8FAFC",
+      borderRadius: 8,
+      padding: "10px 12px",
+      border: `1px solid ${c.isAdmin ? "#BFDBFE" : "#E2E8F0"}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 8,
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: c.isAdmin ? "#1E40AF" : "#374151"
+    }
+  }, c.autor), c.isAdmin && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 9,
+      fontWeight: 700,
+      padding: "1px 5px",
+      borderRadius: 3,
+      background: "#1E40AF",
+      color: "#fff"
+    }
+  }, "ADMIN")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: "#94A3B8"
+    }
+  }, c.hora), (isAdmin || c.autorId === currentUser.id) && /*#__PURE__*/React.createElement("button", {
+    onClick: () => delComment(c.id),
+    style: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      color: "#CBD5E1",
+      fontSize: 12,
+      padding: 0
+    }
+  }, "✕"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#374151",
+      lineHeight: 1.5
+    }
+  }, c.texto)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    value: comment,
+    onChange: e => setComment(e.target.value),
+    onKeyDown: e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), addComment()),
+    placeholder: "Escreva um comentário… (Enter para enviar)",
+    style: {
+      ...s.inp,
+      flex: 1
+    }
+  }), /*#__PURE__*/React.createElement(Btn, {
+    onClick: addComment
+  }, "Enviar")), !isAdmin && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 10,
+      color: "#94A3B8",
+      marginTop: 6
+    }
+  }, "Comentários ficam visíveis para todos após salvar o card.")));
+}
+
+/* ─── USERS PANEL ─── */
+function UsersPanel({
+  currentUser,
+  showT
+}) {
+  const [users, setUsers] = useState(() => loadLS("ge_users", []));
+  const [showAdd, setShowAdd] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({
+    tipo: "COREN",
+    registro: "",
+    nome: "",
+    zap: "",
+    senha: "",
+    foto: null
+  });
+  useEffect(() => saveLS("ge_users", users), [users]);
+  const approve = id => {
+    setUsers(p => p.map(u => u.id === id ? {
+      ...u,
+      status: "aprovado"
+    } : u));
+    showT("Usuário aprovado.");
+  };
+  const block = id => {
+    setUsers(p => p.map(u => u.id === id ? {
+      ...u,
+      status: "bloqueado"
+    } : u));
+    showT("Usuário bloqueado.");
+  };
+  const remove = id => {
+    if (!window.confirm("Remover este profissional?")) return;
+    setUsers(p => p.filter(u => u.id !== id));
+    showT("Removido.", "err");
+  };
+  function startEdit(u) {
+    setEditing(u.id);
+    setForm({
+      tipo: u.tipo || "COREN",
+      registro: u.coren || u.crm || "",
+      nome: u.nome,
+      zap: u.zap || "",
+      senha: u.senha || "",
+      foto: u.foto || null
+    });
+    setShowAdd(true);
+  }
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (!form.registro.trim() || !form.nome.trim()) return;
+    if (editing) {
+      setUsers(p => p.map(u => u.id === editing ? {
+        ...u,
+        tipo: form.tipo,
+        coren: form.tipo === "COREN" ? form.registro : "",
+        crm: form.tipo === "CRM" ? form.registro : "",
+        nome: form.nome,
+        zap: form.zap,
+        senha: form.senha || u.senha,
+        foto: form.foto
+      } : u));
+      showT("Profissional atualizado.");
+    } else {
+      if (!form.senha) {
+        showT("Informe uma senha.", "err");
+        return;
+      }
+      const dup = users.find(u => (u.coren || u.crm || "") === form.registro.trim());
+      if (dup) {
+        showT("Registro já cadastrado.", "err");
+        return;
+      }
+      setUsers(p => [...p, {
+        id: "u_" + Date.now(),
+        tipo: form.tipo,
+        coren: form.tipo === "COREN" ? form.registro : "",
+        crm: form.tipo === "CRM" ? form.registro : "",
+        nome: form.nome,
+        zap: form.zap,
+        foto: form.foto,
+        senha: form.senha,
+        role: "viewer",
+        status: "aprovado"
+      }]);
+      showT("Profissional cadastrado.");
+    }
+    setShowAdd(false);
+    setEditing(null);
+    setForm({
+      tipo: "COREN",
+      registro: "",
+      nome: "",
+      zap: "",
+      senha: "",
+      foto: null
+    });
+  }
+  function handleFoto(e) {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => setForm(p => ({
+      ...p,
+      foto: ev.target.result
+    }));
+    r.readAsDataURL(f);
+  }
+  const statusColor = {
+    aprovado: "#16A34A",
+    pendente: "#F59E0B",
+    bloqueado: "#EF4444"
+  };
+  const inp2 = {
+    ...s.inp
+  };
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 16,
+      color: "#0F172A"
+    }
+  }, "Profissionais"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#64748B",
+      marginTop: 2
+    }
+  }, "Gerencie o acesso ao sistema")), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => {
+      setShowAdd(p => !p);
+      setEditing(null);
+      setForm({
+        tipo: "COREN",
+        registro: "",
+        nome: "",
+        zap: "",
+        senha: "",
+        foto: null
+      });
+    }
+  }, showAdd ? "✕ Fechar" : "+ Cadastrar")), showAdd && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      border: "1px solid #E2E8F0",
+      borderRadius: 12,
+      padding: "16px 20px",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#0F172A",
+      marginBottom: 12
+    }
+  }, editing ? "Editar profissional" : "Novo profissional"), /*#__PURE__*/React.createElement("form", {
+    onSubmit: handleSubmit
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: "0 12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      gridColumn: "1/-1",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, ["COREN", "CRM"].map(t => /*#__PURE__*/React.createElement("button", {
+    key: t,
+    type: "button",
+    onClick: () => setForm(p => ({
+      ...p,
+      tipo: t
+    })),
+    style: {
+      flex: 1,
+      padding: "7px",
+      borderRadius: 7,
+      border: `2px solid ${form.tipo === t ? "#0F172A" : "#E2E8F0"}`,
+      background: form.tipo === t ? "#0F172A" : "#fff",
+      color: form.tipo === t ? "#fff" : "#64748B",
+      cursor: "pointer",
+      fontWeight: 600,
+      fontSize: 12
+    }
+  }, t)))), [["Número do registro", form.tipo, "registro"], ["Nome completo", "Nome completo", "nome"], ["WhatsApp", "(19) 99999-9999", "zap"], ["Senha", "••••••••", "senha"]].map(([label, ph, key]) => /*#__PURE__*/React.createElement("div", {
+    key: key,
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: s.lbl
+  }, label, key === "senha" && editing ? " (deixe em branco para manter)" : ""), /*#__PURE__*/React.createElement("input", {
+    type: key === "senha" ? "password" : "text",
+    value: form[key] || "",
+    onChange: e => setForm(p => ({
+      ...p,
+      [key]: e.target.value
+    })),
+    placeholder: ph,
+    style: inp2,
+    required: !editing && (key === "registro" || key === "nome" || key === "senha")
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      gridColumn: "1/-1",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: s.lbl
+  }, "Foto"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, form.foto && /*#__PURE__*/React.createElement("img", {
+    src: form.foto,
+    style: {
+      width: 36,
+      height: 36,
+      borderRadius: "50%",
+      objectFit: "cover"
+    }
+  }), /*#__PURE__*/React.createElement("label", {
+    style: {
+      padding: "5px 12px",
+      border: "1px solid #E2E8F0",
+      borderRadius: 6,
+      cursor: "pointer",
+      fontSize: 11,
+      color: "#64748B"
+    }
+  }, "Escolher", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: "image/*",
+    onChange: handleFoto,
+    style: {
+      display: "none"
+    }
+  }))))), /*#__PURE__*/React.createElement(Btn, {
+    type: "submit",
+    style: {
+      padding: "8px 20px"
+    }
+  }, editing ? "Salvar alterações" : "Cadastrar e aprovar"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      border: "2px solid #E2E8F0",
+      borderRadius: 10,
+      padding: "12px 16px",
+      marginBottom: 8,
+      display: "flex",
+      alignItems: "center",
+      gap: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 40,
+      height: 40,
+      borderRadius: "50%",
+      background: "#1E40AF",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#fff",
+      fontWeight: 700
+    }
+  }, "F")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#0F172A"
+    }
+  }, ADMIN_USER.nome), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#64748B"
+    }
+  }, "COREN ", ADMIN_COREN, " · Administradora")), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      fontWeight: 700,
+      padding: "2px 8px",
+      borderRadius: 99,
+      background: "#EFF6FF",
+      color: "#1E40AF"
+    }
+  }, "Admin")), users.length === 0 && !showAdd && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "32px",
+      color: "#CBD5E1",
+      fontSize: 13,
+      background: "#fff",
+      borderRadius: 10,
+      border: "1px solid #E2E8F0"
+    }
+  }, "Nenhum profissional cadastrado."), users.map(u => /*#__PURE__*/React.createElement("div", {
+    key: u.id,
+    style: {
+      background: "#fff",
+      border: "1px solid #E2E8F0",
+      borderRadius: 10,
+      padding: "12px 16px",
+      marginBottom: 8,
+      display: "flex",
+      alignItems: "center",
+      gap: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 40,
+      height: 40,
+      borderRadius: "50%",
+      background: "#F1F5F9",
+      overflow: "hidden",
+      flexShrink: 0,
+      border: "1px solid #E2E8F0",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, u.foto ? /*#__PURE__*/React.createElement("img", {
+    src: u.foto,
+    style: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover"
+    }
+  }) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 16,
+      color: "#CBD5E1"
+    }
+  }, "👤")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#0F172A",
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis"
+    }
+  }, u.nome), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#64748B"
+    }
+  }, u.tipo, " ", u.coren || u.crm, u.zap ? " · " + u.zap : "")), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      fontWeight: 700,
+      padding: "2px 8px",
+      borderRadius: 99,
+      whiteSpace: "nowrap",
+      background: u.status === "aprovado" ? "#F0FDF4" : u.status === "pendente" ? "#FFFBEB" : "#FEF2F2",
+      color: statusColor[u.status] || "#64748B"
+    }
+  }, u.status), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => startEdit(u),
+    style: {
+      padding: "5px 10px",
+      border: "1px solid #E2E8F0",
+      borderRadius: 6,
+      background: "none",
+      color: "#374151",
+      cursor: "pointer",
+      fontSize: 11
+    }
+  }, "✏️"), u.status === "pendente" && /*#__PURE__*/React.createElement("button", {
+    onClick: () => approve(u.id),
+    style: {
+      padding: "5px 10px",
+      border: "none",
+      borderRadius: 6,
+      background: "#16A34A",
+      color: "#fff",
+      cursor: "pointer",
+      fontSize: 11,
+      fontWeight: 600
+    }
+  }, "Aprovar"), u.status === "aprovado" && /*#__PURE__*/React.createElement("button", {
+    onClick: () => block(u.id),
+    style: {
+      padding: "5px 10px",
+      border: "1px solid #FCA5A5",
+      borderRadius: 6,
+      background: "none",
+      color: "#DC2626",
+      cursor: "pointer",
+      fontSize: 11
+    }
+  }, "Bloquear"), u.status === "bloqueado" && /*#__PURE__*/React.createElement("button", {
+    onClick: () => approve(u.id),
+    style: {
+      padding: "5px 10px",
+      border: "1px solid #86EFAC",
+      borderRadius: 6,
+      background: "none",
+      color: "#16A34A",
+      cursor: "pointer",
+      fontSize: 11
+    }
+  }, "Desbloquear"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => remove(u.id),
+    style: {
+      padding: "5px 8px",
+      border: "1px solid #E2E8F0",
+      borderRadius: 6,
+      background: "none",
+      color: "#94A3B8",
+      cursor: "pointer",
+      fontSize: 11
+    }
+  }, "✕")))));
+}
+
+/* ─── KANBAN CARD ─── */
+function KCard({
+  c,
+  onClick,
+  isAdmin,
+  dragHandlers
+}) {
+  const gc = GC[c.grav] || GC.urgencia;
+  const hasComments = c.comments && c.comments.length > 0;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "k-card",
+    "data-id": c.id,
+    draggable: isAdmin,
+    onDragStart: dragHandlers?.onDragStart,
+    onDragEnd: dragHandlers?.onDragEnd,
+    onClick: () => onClick(c),
+    style: {
+      background: "#fff",
+      border: "1px solid #E2E8F0",
+      borderLeft: `3px solid ${gc.dot}`,
+      borderRadius: 8,
+      padding: "10px 11px",
+      marginBottom: 6,
+      userSelect: "none",
+      cursor: isAdmin ? "grab" : "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 6,
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 4,
+      alignItems: "center",
+      marginBottom: 2,
+      flexWrap: "wrap"
+    }
+  }, c.pr && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 9,
+      fontWeight: 700,
+      color: "#94A3B8"
+    }
+  }, "#", c.pr), /*#__PURE__*/React.createElement(StatusPill, {
+    status: c.status
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 12,
+      color: "#0F172A",
+      lineHeight: 1.3,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis"
+    }
+  }, c.nome)), /*#__PURE__*/React.createElement(Badge, {
+    grav: c.grav
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#374151",
+      marginBottom: 5,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#CBD5E1"
+    }
+  }, "HD: "), c.hd), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 4,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 4,
+      flexWrap: "wrap"
+    }
+  }, c.setor && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      background: "#F1F5F9",
+      color: "#475569",
+      padding: "1px 5px",
+      borderRadius: 3
+    }
+  }, c.setor), c.rec && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      background: "#EFF6FF",
+      color: "#1E40AF",
+      padding: "1px 5px",
+      borderRadius: 3
+    }
+  }, c.rec)), /*#__PURE__*/React.createElement(AmbBadge, {
+    amb: c.amb
+  })), c.hosp && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 4,
+      fontSize: 10,
+      color: "#64748B"
+    }
+  }, "→ ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: "#0F172A"
+    }
+  }, c.hosp)), c.cross && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 2,
+      fontSize: 10,
+      color: "#94A3B8"
+    }
+  }, "📋 ", c.cross), c.obs && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 2,
+      fontSize: 10,
+      color: "#9333EA",
+      fontStyle: "italic"
+    }
+  }, c.obs), hasComments && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 4,
+      fontSize: 10,
+      color: "#64748B"
+    }
+  }, "💬 ", c.comments.length, " comentário", c.comments.length !== 1 ? "s" : ""));
+}
+
+/* ─── DASHBOARD ─── */
+function Dashboard({
+  cards,
+  cols
+}) {
+  const total = cards.length;
+  const emergencias = cards.filter(c => c.grav === "emergencia").length;
+  const avancadas = cards.filter(c => c.amb === "Avançada").length;
+  const semHosp = cards.filter(c => !c.hosp && c.col !== "finalizado").length;
+  const evadiu = cards.filter(c => c.status === "EVADIU" || c.status === "EVASÃO").length;
+  const totalComments = cards.reduce((acc, c) => acc + (c.comments?.length || 0), 0);
+  const hospC = {};
+  cards.filter(c => c.hosp).forEach(c => {
+    hospC[c.hosp] = (hospC[c.hosp] || 0) + 1;
+  });
+  const topHosp = Object.entries(hospC).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const recC = {};
+  cards.filter(c => c.rec).forEach(c => {
+    recC[c.rec] = (recC[c.rec] || 0) + 1;
+  });
+  const topRec = Object.entries(recC).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const accentOf = id => ACCENT[id] || "#94A3B8";
+  const Stat = ({
+    label,
+    value,
+    color = "#0F172A",
+    bg = "#fff",
+    sub,
+    icon
+  }) => /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: bg,
+      border: "1px solid #E2E8F0",
+      borderRadius: 10,
+      padding: "14px 16px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#94A3B8",
+      textTransform: "uppercase",
+      letterSpacing: ".04em"
+    }
+  }, label), icon && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18
+    }
+  }, icon)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 28,
+      fontWeight: 700,
+      color,
+      marginTop: 4
+    }
+  }, value), sub && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#94A3B8",
+      marginTop: 2
+    }
+  }, sub));
+  const Bar = ({
+    label,
+    value,
+    max,
+    color
+  }) => /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: 11,
+      marginBottom: 3
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#374151"
+    }
+  }, label), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 600,
+      color: "#0F172A"
+    }
+  }, value)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#F1F5F9",
+      borderRadius: 99,
+      height: 6,
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: `${max ? value / max * 100 : 0}%`,
+      background: color || "#3B82F6",
+      height: "100%",
+      borderRadius: 99,
+      transition: "width .4s"
+    }
+  })));
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(4,1fr)",
+      gap: 12,
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement(Stat, {
+    label: "Total de Pacientes",
+    value: total,
+    icon: "🧑‍⚕️"
+  }), /*#__PURE__*/React.createElement(Stat, {
+    label: "Emergências",
+    value: emergencias,
+    color: "#EF4444",
+    bg: "#FEF2F2",
+    icon: "🔴"
+  }), /*#__PURE__*/React.createElement(Stat, {
+    label: "Amb. Avançadas",
+    value: avancadas,
+    color: "#F59E0B",
+    bg: "#FFFBEB",
+    icon: "🚨"
+  }), /*#__PURE__*/React.createElement(Stat, {
+    label: "Sem Hospital Definido",
+    value: semHosp,
+    color: "#64748B",
+    bg: "#F8FAFC",
+    sub: "excl. finalizados",
+    icon: "❓"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(5,1fr)",
+      gap: 10,
+      marginBottom: 16
+    }
+  }, cols.map(c => {
+    const n = cards.filter(k => k.col === c.id).length;
+    return /*#__PURE__*/React.createElement("div", {
+      key: c.id,
+      style: {
+        background: "#fff",
+        border: "1px solid #E2E8F0",
+        borderTop: `3px solid ${accentOf(c.id)}`,
+        borderRadius: 10,
+        padding: "12px 14px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        fontWeight: 600,
+        color: "#94A3B8",
+        textTransform: "uppercase",
+        letterSpacing: ".04em",
+        marginBottom: 3,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, COL_EMOJI[c.id] || "📌", " ", c.label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 24,
+        fontWeight: 700,
+        color: accentOf(c.id)
+      }
+    }, n));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr 1fr",
+      gap: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      border: "1px solid #E2E8F0",
+      borderRadius: 10,
+      padding: "14px 16px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#0F172A",
+      marginBottom: 12
+    }
+  }, "🏨 Hospitais receptores"), topHosp.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#CBD5E1"
+    }
+  }, "Nenhum definido") : topHosp.map(([h, n]) => /*#__PURE__*/React.createElement(Bar, {
+    key: h,
+    label: h,
+    value: n,
+    max: topHosp[0][1],
+    color: "#3B82F6"
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      border: "1px solid #E2E8F0",
+      borderRadius: 10,
+      padding: "14px 16px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#0F172A",
+      marginBottom: 12
+    }
+  }, "🔬 Especialidades"), topRec.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#CBD5E1"
+    }
+  }, "—") : topRec.map(([r, n]) => /*#__PURE__*/React.createElement(Bar, {
+    key: r,
+    label: r,
+    value: n,
+    max: topRec[0][1],
+    color: "#8B5CF6"
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      border: "1px solid #E2E8F0",
+      borderRadius: 10,
+      padding: "14px 16px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#0F172A",
+      marginBottom: 12
+    }
+  }, "📊 Gravidades"), Object.entries(GC).map(([k, v]) => {
+    const n = cards.filter(c => c.grav === k).length;
+    if (!n) return null;
+    return /*#__PURE__*/React.createElement(Bar, {
+      key: k,
+      label: v.emoji + " " + v.label,
+      value: n,
+      max: total,
+      color: v.dot
+    });
+  }).filter(Boolean), evadiu > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      padding: "7px 10px",
+      background: "#FEE2E2",
+      borderRadius: 7,
+      fontSize: 11,
+      color: "#991B1B",
+      fontWeight: 600
+    }
+  }, "⚠️ ", evadiu, " evasão", evadiu > 1 ? "ões" : "", " registrada", evadiu > 1 ? "s" : ""), totalComments > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 6,
+      padding: "7px 10px",
+      background: "#EFF6FF",
+      borderRadius: 7,
+      fontSize: 11,
+      color: "#1E40AF"
+    }
+  }, "💬 ", totalComments, " comentário", totalComments !== 1 ? "s" : "", " nos cards"))));
+}
+
+/* ─── SNAPSHOT MODAL ─── */
+function SnapshotModal({
+  onClose,
+  onLoad,
+  showT
+}) {
+  const [snaps, setSnaps] = useState(() => {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("snap_")) keys.push(k);
+    }
+    return keys.sort().reverse().map(k => {
+      try {
+        const d = JSON.parse(localStorage.getItem(k));
+        return {
+          key: k,
+          date: d.date,
+          count: d.cards?.length || 0
+        };
+      } catch {
+        return null;
+      }
+    }).filter(Boolean);
+  });
+  function handleImport() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.onchange = e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = ev => {
+        try {
+          const d = JSON.parse(ev.target.result);
+          onLoad(d);
+          onClose();
+          showT("Arquivo carregado: " + d.date);
+        } catch {
+          showT("Arquivo inválido.", "err");
+        }
+      };
+      r.readAsText(f);
+    };
+    input.click();
+  }
+  return /*#__PURE__*/React.createElement(ModalShell, {
+    title: "Snapshots salvos",
+    onClose: onClose,
+    maxWidth: 460
+  }, /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: handleImport,
+    style: {
+      width: "100%",
+      marginBottom: 12,
+      fontSize: 12
+    }
+  }, "📂 Carregar arquivo .json do computador"), snaps.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "24px",
+      color: "#CBD5E1",
+      fontSize: 12
+    }
+  }, "Nenhum snapshot salvo no navegador."), snaps.map(s => /*#__PURE__*/React.createElement("div", {
+    key: s.key,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "10px 0",
+      borderBottom: "1px solid #F8FAFC"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#0F172A"
+    }
+  }, s.date), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#94A3B8"
+    }
+  }, s.count, " pacientes")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: () => {
+      try {
+        const d = JSON.parse(localStorage.getItem(s.key));
+        onLoad(d);
+        onClose();
+        showT("Snapshot de " + s.date + " carregado.");
+      } catch {
+        showT("Erro.", "err");
+      }
+    },
+    style: {
+      fontSize: 12,
+      padding: "5px 12px"
+    }
+  }, "Carregar"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      localStorage.removeItem(s.key);
+      setSnaps(p => p.filter(x => x.key !== s.key));
+    },
+    style: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      color: "#CBD5E1",
+      fontSize: 16,
+      padding: "4px 6px"
+    }
+  }, "✕")))));
+}
+
+/* ─── PUBLISH MODAL ─── */
+function PubModal({
+  onClose,
+  onPub,
+  cards,
+  cols
+}) {
+  return /*#__PURE__*/React.createElement(ModalShell, {
+    title: "Publicar atualização",
+    onClose: onClose,
+    maxWidth: 420,
+    footer: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Btn, {
+      variant: "ghost",
+      onClick: onClose
+    }, "Cancelar"), /*#__PURE__*/React.createElement(Btn, {
+      onClick: onPub
+    }, "Publicar versão"))
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 13,
+      color: "#64748B",
+      marginBottom: 14
+    }
+  }, "Esta versão ficará visível para todos os profissionais."), cols.map(c => {
+    const n = cards.filter(k => k.col === c.id).length;
+    return /*#__PURE__*/React.createElement("div", {
+      key: c.id,
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        padding: "7px 0",
+        borderBottom: "1px solid #F8FAFC"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        color: "#374151"
+      }
+    }, COL_EMOJI[c.id] || "📌", " ", c.label), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        fontWeight: 700,
+        color: "#0F172A"
+      }
+    }, n));
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12,
+      padding: "10px 14px",
+      background: "#F0FDF4",
+      borderRadius: 8,
+      border: "1px solid #86EFAC"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#166534",
+      fontWeight: 600
+    }
+  }, "Total: ", cards.length, " pacientes")));
+}
+
+/* ─── MAIN APP ─── */
+function App() {
+  const [currentUser, setCurrentUser] = useState(() => loadLS("ge_session", null));
+  const [showProfileSetup, setShowProfileSetup] = useState(false);
+  const [cards, setCards] = useState(() => loadLS("ge_cards", INIT_CARDS));
+  const [cols, setCols] = useState(() => loadLS("ge_cols", DEFAULT_COLUMNS));
+  const [settings, setSettings] = useState(() => loadLS("ge_settings", {
+    adminNome: "Fabiana Faria de Figueiredo",
+    adminCoren: "COREN-SP 299283",
+    adminZap: "",
+    appUrl: ""
+  }));
+  const [lastPub, setLastPub] = useState(() => loadLS("ge_lastpub", null));
+  const [selected, setSelected] = useState(null);
+  const [showPub, setShowPub] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const [showSnap, setShowSnap] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [search, setSearch] = useState("");
+  const [fGrav, setFGrav] = useState("all");
+  const [view, setView] = useState("kanban");
+  const [showNewCol, setShowNewCol] = useState(false);
+  const [newColName, setNewColName] = useState("");
+  const [kanbanDate, setKanbanDate] = useState(dateKey());
+  const [toast, setToast] = useState(null);
+  const [dragId, setDragId] = useState(null);
+  const [dragOver, setDragOver] = useState(null);
+  const nid = useRef(300);
+  const newColRef = useRef(null);
+  const isAdmin = currentUser?.role === "admin";
+  useEffect(() => {
+    saveLS("ge_cards", cards);
+  }, [cards]);
+  useEffect(() => {
+    saveLS("ge_cols", cols);
+  }, [cols]);
+  useEffect(() => {
+    saveLS("ge_settings", settings);
+  }, [settings]);
+  useEffect(() => {
+    saveLS("ge_lastpub", lastPub);
+  }, [lastPub]);
+  useEffect(() => {
+    if (currentUser) saveLS("ge_session", currentUser);
+  }, [currentUser]);
+  useEffect(() => {
+    if (!currentUser) return;
+    const k = "snap_" + dateKey();
+    if (!localStorage.getItem(k)) saveLS(k, {
+      date: todayStr(),
+      cards,
+      cols
+    });
+  }, [currentUser]);
+  useEffect(() => {
+    if (currentUser?.role === "admin" && !currentUser.zap) {
+      const shown = sessionStorage.getItem("profile_shown");
+      if (!shown) {
+        sessionStorage.setItem("profile_shown", "1");
+        setShowProfileSetup(true);
+      }
+    }
+  }, [currentUser]);
+  useEffect(() => {
+    if (showNewCol && newColRef.current) newColRef.current.focus();
+  }, [showNewCol]);
+  function showT(msg, type = "ok") {
+    setToast({
+      msg,
+      type
+    });
+    setTimeout(() => setToast(null), 3500);
+  }
+  function handleLogin(user) {
+    setCurrentUser(user);
+    saveLS("ge_session", user);
+    if (user.role === "admin") saveLS("ge_admin_user", user);
+  }
+  function handleLogout() {
+    setCurrentUser(null);
+    localStorage.removeItem("ge_session");
+    sessionStorage.removeItem("profile_shown");
+  }
+  function saveProfile(u) {
+    setCurrentUser(u);
+    saveLS("ge_admin_user", u);
+    setShowProfileSetup(false);
+    showT("Perfil salvo.");
+  }
+  const filtered = cards.filter(c => {
+    const q = search.toLowerCase();
+    const ms = !q || [c.nome, c.hd, c.setor, c.rec, c.hosp].some(s => (s || "").toLowerCase().includes(q));
+    const mg = fGrav === "all" || c.grav === fGrav;
+    return ms && mg;
+  });
+  function onSave(form) {
+    if (form.id === "new") {
+      setCards(p => [...p, {
+        ...form,
+        id: nid.current++,
+        comments: form.comments || []
+      }]);
+    } else {
+      setCards(p => p.map(c => c.id === form.id ? form : c));
+    }
+    setSelected(null);
+    showT("Salvo.");
+  }
+  function onDel(id) {
+    setCards(p => p.filter(c => c.id !== id));
+    setSelected(null);
+    showT("Removido.", "err");
+  }
+  function onPub() {
+    const now = new Date().toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+    setLastPub(now);
+    setShowPub(false);
+    saveLS("snap_" + dateKey(), {
+      date: todayStr(),
+      cards,
+      cols
+    });
+    showT("Publicado!");
+  }
+  function newCard(col = "pendente") {
+    setSelected({
+      id: "new",
+      col,
+      pr: "",
+      status: "",
+      nome: "",
+      idade: "",
+      adm: new Date().toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit"
+      }),
+      hd: "",
+      setor: "",
+      rec: "",
+      hosp: "",
+      cross: "",
+      amb: "Básica",
+      saida: "",
+      ret: "",
+      grav: "urgencia",
+      obs: "",
+      comments: []
+    });
+  }
+  function addColumn() {
+    const name = newColName.trim();
+    if (!name) return;
+    const id = "col_" + Date.now();
+    setCols(p => [...p, {
+      id,
+      label: name,
+      sub: "",
+      fixed: false
+    }]);
+    setNewColName("");
+    setShowNewCol(false);
+    showT(`Coluna "${name}" criada.`);
+  }
+  function removeColumn(id) {
+    if (cols.find(c => c.id === id)?.fixed) {
+      showT("Coluna fixa.", "err");
+      return;
+    }
+    setCols(p => p.filter(c => c.id !== id));
+    setCards(p => p.map(c => c.col === id ? {
+      ...c,
+      col: "pendente"
+    } : c));
+    showT("Coluna removida.");
+  }
+  function clearKanban() {
+    if (!window.confirm("Remover todos os cards?")) return;
+    saveLS("snap_clear_" + Date.now(), {
+      date: todayStr(),
+      cards,
+      cols
+    });
+    setCards([]);
+    showT("Limpo.");
+  }
+  function exportJSON() {
+    const data = {
+      date: todayStr(),
+      cards,
+      cols
+    };
+    const b = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json"
+    });
+    const url = URL.createObjectURL(b);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `kanban-${dateKey()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showT("JSON exportado.");
+  }
+  function exportPNG() {
+    const el = document.getElementById("kanban-board");
+    if (!el) {
+      showT("Abra o Kanban.", "err");
+      return;
+    }
+    html2canvas(el, {
+      scale: 2.5,
+      backgroundColor: "#F1F5F9",
+      useCORS: true,
+      logging: false
+    }).then(canvas => {
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = `kanban-${dateKey()}.png`;
+      a.click();
+      showT("PNG exportado.");
+    });
+  }
+  function loadSnapshot(data) {
+    if (data.cards) setCards(data.cards);
+    if (data.cols) setCols(data.cols);
+  }
+
+  /* ── drag-and-drop nativo HTML5 ── */
+  function handleDragStart(e, cardId) {
+    setDragId(cardId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(cardId));
+    // delay para o ghost aparecer antes da animação
+    requestAnimationFrame(() => {
+      const el = e.currentTarget;
+      if (el) el.style.opacity = ".4";
+    });
+  }
+  function handleDragEnd(e) {
+    setDragId(null);
+    setDragOver(null);
+    const el = e.currentTarget;
+    if (el) el.style.opacity = "1";
+  }
+  function handleDrop(e, colId) {
+    e.preventDefault();
+    const id = parseInt(e.dataTransfer.getData("text/plain") || dragId);
+    if (!id) return;
+    setCards(p => p.map(c => c.id === id ? {
+      ...c,
+      col: colId
+    } : c));
+    setDragId(null);
+    setDragOver(null);
+    showT("Card movido.");
+  }
+  function handleDragOver(e, colId) {
+    e.preventDefault();
+    setDragOver(colId);
+  }
+  function handleDragLeave() {
+    setDragOver(null);
+  }
+  const accentOf = id => ACCENT[id] || "#94A3B8";
+  const NavBtn = ({
+    id,
+    label
+  }) => /*#__PURE__*/React.createElement("button", {
+    onClick: () => setView(id),
+    style: {
+      padding: "5px 14px",
+      borderRadius: 6,
+      border: "none",
+      fontSize: 12,
+      fontWeight: view === id ? 600 : 400,
+      background: view === id ? "#0F172A" : "transparent",
+      color: view === id ? "#fff" : "#64748B",
+      cursor: "pointer",
+      transition: "all .15s"
+    }
+  }, label);
+  if (!currentUser) return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(LoginScreen, {
+    onLogin: handleLogin,
+    showT: showT
+  }), /*#__PURE__*/React.createElement(Toast, {
+    toast: toast
+  }));
+  const pendingComments = cards.reduce((acc, c) => acc + (c.comments?.length || 0), 0);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: "#F1F5F9",
+      fontFamily: "'Inter',system-ui,sans-serif"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0F172A",
+      padding: "0 20px",
+      position: "sticky",
+      top: 0,
+      zIndex: 100,
+      boxShadow: "0 2px 12px rgba(0,0,0,.2)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      maxWidth: 1600,
+      margin: "0 auto",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      height: 52
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 30,
+      height: 30,
+      borderRadius: 8,
+      background: "#1E40AF",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#fff",
+      fontSize: 14,
+      fontWeight: 700
+    }
+  }, "+")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14,
+      color: "#fff",
+      letterSpacing: "-.01em"
+    }
+  }, "Gerência de Enfermagem"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: "#475569",
+      textTransform: "uppercase",
+      letterSpacing: ".08em"
+    }
+  }, isAdmin ? "modo de edição · " + currentUser.nome : "visualização · " + currentUser.nome))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, isAdmin && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowShare(true),
+    style: {
+      padding: "6px 12px",
+      border: "none",
+      borderRadius: 7,
+      background: "#25D366",
+      color: "#fff",
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "📤 WhatsApp"), isAdmin && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowPub(true),
+    style: {
+      padding: "6px 14px",
+      border: "none",
+      borderRadius: 7,
+      background: "#16A34A",
+      color: "#fff",
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "↑ Publicar"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowSettings(true),
+    style: {
+      padding: "6px 10px",
+      border: "1px solid #334155",
+      borderRadius: 7,
+      background: "none",
+      color: "#64748B",
+      cursor: "pointer",
+      fontSize: 12
+    }
+  }, "⚙"), currentUser.foto ? /*#__PURE__*/React.createElement("img", {
+    src: currentUser.foto,
+    style: {
+      width: 28,
+      height: 28,
+      borderRadius: "50%",
+      objectFit: "cover",
+      border: "2px solid #334155",
+      cursor: "pointer"
+    },
+    onClick: handleLogout,
+    title: "Sair"
+  }) : /*#__PURE__*/React.createElement("button", {
+    onClick: handleLogout,
+    style: {
+      padding: "5px 11px",
+      border: "1px solid #334155",
+      borderRadius: 7,
+      background: "none",
+      color: "#64748B",
+      cursor: "pointer",
+      fontSize: 11
+    }
+  }, "Sair")))), isAdmin && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#FFFBEB",
+      borderBottom: "1px solid #FDE68A",
+      padding: "5px 20px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#92400E",
+      fontWeight: 500
+    }
+  }, "✎ Modo de edição", lastPub ? " · Última publicação: " + lastPub : ""), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: kanbanDate,
+    onChange: e => setKanbanDate(e.target.value),
+    style: {
+      padding: "2px 8px",
+      border: "1px solid #FDE68A",
+      borderRadius: 5,
+      fontSize: 11,
+      background: "#FFFBEB",
+      color: "#92400E",
+      fontFamily: "inherit"
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: exportJSON,
+    style: {
+      padding: "3px 10px",
+      border: "1px solid #FDE68A",
+      borderRadius: 5,
+      background: "none",
+      color: "#92400E",
+      cursor: "pointer",
+      fontSize: 11
+    }
+  }, "↓ JSON"), /*#__PURE__*/React.createElement("button", {
+    onClick: exportPNG,
+    style: {
+      padding: "3px 10px",
+      border: "1px solid #FDE68A",
+      borderRadius: 5,
+      background: "none",
+      color: "#92400E",
+      cursor: "pointer",
+      fontSize: 11
+    }
+  }, "↓ PNG"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowSnap(true),
+    style: {
+      padding: "3px 10px",
+      border: "1px solid #FDE68A",
+      borderRadius: 5,
+      background: "none",
+      color: "#92400E",
+      cursor: "pointer",
+      fontSize: 11
+    }
+  }, "📂 Carregar"), /*#__PURE__*/React.createElement("button", {
+    onClick: clearKanban,
+    style: {
+      padding: "3px 10px",
+      border: "1px solid #FCA5A5",
+      borderRadius: 5,
+      background: "none",
+      color: "#DC2626",
+      cursor: "pointer",
+      fontSize: 11
+    }
+  }, "🗑 Limpar"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      maxWidth: 1600,
+      margin: "0 auto",
+      padding: "16px 20px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 14,
+      alignItems: "center",
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      border: "1px solid #E2E8F0",
+      borderRadius: 8,
+      padding: "2px",
+      display: "flex",
+      gap: 1
+    }
+  }, /*#__PURE__*/React.createElement(NavBtn, {
+    id: "dashboard",
+    label: "📊 Dashboard"
+  }), /*#__PURE__*/React.createElement(NavBtn, {
+    id: "kanban",
+    label: "📋 Kanban"
+  }), /*#__PURE__*/React.createElement(NavBtn, {
+    id: "lista",
+    label: "📄 Lista"
+  }), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
+    id: "usuarios",
+    label: "👥 Profissionais"
+  })), /*#__PURE__*/React.createElement("input", {
+    placeholder: "Buscar paciente, HD, setor…",
+    value: search,
+    onChange: e => setSearch(e.target.value),
+    style: {
+      padding: "6px 12px",
+      border: "1px solid #E2E8F0",
+      borderRadius: 8,
+      fontSize: 12,
+      color: "#0F172A",
+      width: 240,
+      background: "#fff",
+      fontFamily: "inherit"
+    }
+  }), /*#__PURE__*/React.createElement("select", {
+    value: fGrav,
+    onChange: e => setFGrav(e.target.value),
+    style: {
+      padding: "6px 10px",
+      border: "1px solid #E2E8F0",
+      borderRadius: 8,
+      fontSize: 12,
+      color: "#374151",
+      background: "#fff",
+      fontFamily: "inherit"
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Todas as gravidades"), Object.entries(GC).map(([k, v]) => /*#__PURE__*/React.createElement("option", {
+    key: k,
+    value: k
+  }, v.emoji, " ", v.label))), isAdmin && view === "kanban" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center"
+    }
+  }, showNewCol ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
+    ref: newColRef,
+    value: newColName,
+    onChange: e => setNewColName(e.target.value),
+    onKeyDown: e => {
+      if (e.key === "Enter") addColumn();
+      if (e.key === "Escape") {
+        setShowNewCol(false);
+        setNewColName("");
+      }
+    },
+    placeholder: "Nome da coluna…",
+    style: {
+      padding: "6px 10px",
+      border: "1px solid #3B82F6",
+      borderRadius: 8,
+      fontSize: 12,
+      width: 180,
+      fontFamily: "inherit",
+      background: "#fff",
+      outline: "none"
+    }
+  }), /*#__PURE__*/React.createElement(Btn, {
+    onClick: addColumn,
+    style: {
+      padding: "6px 12px",
+      fontSize: 12
+    }
+  }, "✓"), /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: () => {
+      setShowNewCol(false);
+      setNewColName("");
+    },
+    style: {
+      padding: "6px 10px",
+      fontSize: 12
+    }
+  }, "✕")) : /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: () => setShowNewCol(true),
+    style: {
+      fontSize: 12,
+      padding: "6px 12px"
+    }
+  }, "+ Coluna")), view !== "usuarios" && /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => newCard(),
+    style: {
+      marginLeft: "auto",
+      fontSize: 12,
+      padding: "6px 16px"
+    }
+  }, "+ Paciente")), view === "dashboard" && /*#__PURE__*/React.createElement(Dashboard, {
+    cards: filtered,
+    cols: cols
+  }), view === "usuarios" && isAdmin && /*#__PURE__*/React.createElement(UsersPanel, {
+    currentUser: currentUser,
+    showT: showT
+  }), view === "kanban" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 12,
+      marginBottom: 12,
+      flexWrap: "wrap"
+    }
+  }, Object.entries(GC).map(([k, v]) => /*#__PURE__*/React.createElement("div", {
+    key: k,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 4,
+      fontSize: 10,
+      color: "#64748B"
+    }
+  }, /*#__PURE__*/React.createElement("span", null, v.emoji), v.label))), /*#__PURE__*/React.createElement("div", {
+    id: "kanban-board",
+    style: {
+      display: "flex",
+      gap: 10,
+      alignItems: "start",
+      overflowX: "auto",
+      paddingBottom: 8
+    }
+  }, cols.map(col => {
+    const colCards = filtered.filter(c => c.col === col.id);
+    const isDragTarget = dragOver === col.id;
+    return /*#__PURE__*/React.createElement("div", {
+      key: col.id,
+      onDragOver: e => handleDragOver(e, col.id),
+      onDragLeave: handleDragLeave,
+      onDrop: e => handleDrop(e, col.id),
+      style: {
+        background: "#fff",
+        borderRadius: 12,
+        border: `1.5px solid ${isDragTarget ? "#3B82F6" : "#E2E8F0"}`,
+        overflow: "hidden",
+        minWidth: 230,
+        flex: "0 0 230px",
+        transition: "border-color .15s",
+        boxShadow: isDragTarget ? "0 0 0 3px rgba(59,130,246,.15)" : undefined
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "10px 12px",
+        borderBottom: "1px solid #F1F5F9",
+        borderTop: `3px solid ${accentOf(col.id)}`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: 12,
+        color: "#0F172A",
+        lineHeight: 1.2
+      }
+    }, COL_EMOJI[col.id] || "📌", " ", col.label), col.sub && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: "#94A3B8",
+        marginTop: 1
+      }
+    }, col.sub)), !col.fixed && isAdmin && /*#__PURE__*/React.createElement("button", {
+      onClick: () => removeColumn(col.id),
+      style: {
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        color: "#CBD5E1",
+        fontSize: 13,
+        padding: "0 0 0 4px",
+        lineHeight: 1
+      }
+    }, "✕")), /*#__PURE__*/React.createElement("span", {
+      style: {
+        marginTop: 5,
+        display: "inline-flex",
+        background: "#F1F5F9",
+        padding: "2px 8px",
+        borderRadius: 99,
+        fontSize: 10,
+        fontWeight: 700,
+        color: "#475569"
+      }
+    }, colCards.length)), isAdmin && /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "6px 8px 0"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => newCard(col.id),
+      style: {
+        width: "100%",
+        padding: "5px",
+        border: "1.5px dashed #E2E8F0",
+        borderRadius: 6,
+        background: "none",
+        color: "#94A3B8",
+        cursor: "pointer",
+        fontSize: 11,
+        transition: "border-color .15s,color .15s"
+      },
+      onMouseEnter: e => {
+        e.currentTarget.style.borderColor = "#3B82F6";
+        e.currentTarget.style.color = "#3B82F6";
+      },
+      onMouseLeave: e => {
+        e.currentTarget.style.borderColor = "#E2E8F0";
+        e.currentTarget.style.color = "#94A3B8";
+      }
+    }, "+ Adicionar paciente")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "6px 8px 8px",
+        minHeight: 80,
+        maxHeight: "58vh",
+        overflowY: "auto"
+      }
+    }, colCards.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        padding: "18px 8px",
+        color: "#CBD5E1",
+        fontSize: 11,
+        border: "1.5px dashed #F1F5F9",
+        borderRadius: 8,
+        margin: "4px 0"
+      }
+    }, isDragTarget ? "Solte aqui ↓" : isAdmin ? "Arraste ou adicione" : "Sem pacientes") : colCards.map(card => /*#__PURE__*/React.createElement(KCard, {
+      key: card.id,
+      c: card,
+      onClick: setSelected,
+      isAdmin: isAdmin,
+      dragHandlers: {
+        onDragStart: e => handleDragStart(e, card.id),
+        onDragEnd: handleDragEnd
+      }
+    }))));
+  }))), view === "lista" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 12,
+      marginBottom: 12,
+      flexWrap: "wrap"
+    }
+  }, Object.entries(GC).map(([k, v]) => /*#__PURE__*/React.createElement("div", {
+    key: k,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 4,
+      fontSize: 10,
+      color: "#64748B"
+    }
+  }, /*#__PURE__*/React.createElement("span", null, v.emoji), v.label))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      border: "1px solid #E2E8F0",
+      borderRadius: 12,
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowX: "auto"
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      width: "100%",
+      borderCollapse: "collapse",
+      fontSize: 12
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
+    style: {
+      background: "#F8FAFC"
+    }
+  }, ["#", "Paciente", "Status", "Adm.", "HD", "Setor", "Recurso", "Hospital", "Coluna", "Gravidade", "Amb.", "💬"].map(h => /*#__PURE__*/React.createElement("th", {
+    key: h,
+    style: {
+      padding: "9px 11px",
+      textAlign: "left",
+      fontWeight: 600,
+      color: "#64748B",
+      fontSize: 10,
+      textTransform: "uppercase",
+      letterSpacing: ".04em",
+      borderBottom: "1px solid #E2E8F0",
+      whiteSpace: "nowrap"
+    }
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, filtered.map((card, i) => {
+    const c = cols.find(c => c.id === card.col);
+    return /*#__PURE__*/React.createElement("tr", {
+      key: card.id,
+      onClick: () => setSelected(card),
+      style: {
+        cursor: "pointer",
+        background: i % 2 === 0 ? "#fff" : "#FAFAFA"
+      },
+      onMouseEnter: e => e.currentTarget.style.background = "#EFF6FF",
+      onMouseLeave: e => e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#FAFAFA"
+    }, /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: "8px 11px",
+        borderBottom: "1px solid #F1F5F9",
+        color: "#94A3B8",
+        fontWeight: 700,
+        fontSize: 11
+      }
+    }, card.pr || "—"), /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: "8px 11px",
+        borderBottom: "1px solid #F1F5F9",
+        fontWeight: 600,
+        color: "#0F172A",
+        whiteSpace: "nowrap"
+      }
+    }, card.nome), /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: "8px 11px",
+        borderBottom: "1px solid #F1F5F9",
+        whiteSpace: "nowrap"
+      }
+    }, /*#__PURE__*/React.createElement(StatusPill, {
+      status: card.status
+    })), /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: "8px 11px",
+        borderBottom: "1px solid #F1F5F9",
+        color: "#64748B",
+        whiteSpace: "nowrap"
+      }
+    }, card.adm), /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: "8px 11px",
+        borderBottom: "1px solid #F1F5F9",
+        color: "#374151",
+        maxWidth: 180,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, card.hd), /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: "8px 11px",
+        borderBottom: "1px solid #F1F5F9",
+        color: "#64748B",
+        whiteSpace: "nowrap"
+      }
+    }, card.setor), /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: "8px 11px",
+        borderBottom: "1px solid #F1F5F9",
+        whiteSpace: "nowrap"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        background: "#EFF6FF",
+        color: "#1E40AF",
+        padding: "1px 5px",
+        borderRadius: 3,
+        fontSize: 10
+      }
+    }, card.rec)), /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: "8px 11px",
+        borderBottom: "1px solid #F1F5F9",
+        color: "#374151",
+        whiteSpace: "nowrap"
+      }
+    }, card.hosp), /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: "8px 11px",
+        borderBottom: "1px solid #F1F5F9",
+        whiteSpace: "nowrap"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        background: "#F1F5F9",
+        color: "#475569",
+        padding: "1px 5px",
+        borderRadius: 3,
+        fontSize: 10
+      }
+    }, COL_EMOJI[c?.id] || "", " ", c?.label)), /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: "8px 11px",
+        borderBottom: "1px solid #F1F5F9",
+        whiteSpace: "nowrap"
+      }
+    }, /*#__PURE__*/React.createElement(Badge, {
+      grav: card.grav
+    })), /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: "8px 11px",
+        borderBottom: "1px solid #F1F5F9",
+        whiteSpace: "nowrap"
+      }
+    }, /*#__PURE__*/React.createElement(AmbBadge, {
+      amb: card.amb
+    })), /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: "8px 11px",
+        borderBottom: "1px solid #F1F5F9",
+        whiteSpace: "nowrap",
+        color: "#64748B",
+        fontSize: 11
+      }
+    }, card.comments?.length ? `💬 ${card.comments.length}` : ""));
+  }), filtered.length === 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
+    colSpan: 12,
+    style: {
+      padding: 32,
+      textAlign: "center",
+      color: "#CBD5E1"
+    }
+  }, "Nenhum resultado.")))))))), selected && /*#__PURE__*/React.createElement(CardModal, {
+    card: selected,
+    cols: cols,
+    onClose: () => setSelected(null),
+    onSave: onSave,
+    onDel: onDel,
+    isAdmin: isAdmin,
+    currentUser: currentUser
+  }), showPub && /*#__PURE__*/React.createElement(PubModal, {
+    onClose: () => setShowPub(false),
+    onPub: onPub,
+    cards: cards,
+    cols: cols
+  }), showShare && /*#__PURE__*/React.createElement(ShareModal, {
+    onClose: () => setShowShare(false),
+    settings: settings,
+    cards: cards,
+    cols: cols,
+    showT: showT
+  }), showSnap && /*#__PURE__*/React.createElement(SnapshotModal, {
+    onClose: () => setShowSnap(false),
+    onLoad: loadSnapshot,
+    showT: showT
+  }), showSettings && /*#__PURE__*/React.createElement(SettingsModal, {
+    settings: settings,
+    onClose: () => setShowSettings(false),
+    onSave: s => {
+      setSettings(s);
+      setShowSettings(false);
+      showT("Configurações salvas.");
+    }
+  }), showProfileSetup && /*#__PURE__*/React.createElement(ProfileModal, {
+    user: currentUser,
+    onSave: saveProfile,
+    onClose: () => setShowProfileSetup(false)
+  }), /*#__PURE__*/React.createElement(Toast, {
+    toast: toast
+  }));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(App, null));</script>
+</body>
+</html>
