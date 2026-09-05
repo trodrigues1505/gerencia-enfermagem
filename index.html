@@ -6,12 +6,16 @@
 <title>Gerência de Enfermagem</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0F172A">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="GE Enfermagem">
 <link rel="apple-touch-icon" href="icon-192.svg">
+<!-- React -->
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<!-- html2canvas para exportar PNG do kanban -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;-webkit-tap-highlight-color:transparent}
@@ -31,16 +35,37 @@ input,select,textarea,button{font-family:inherit}
 <body>
 <div id="root"></div>
 <div id="install-banner">
-  📲 Instalar — Gerência de Enfermagem
+  Instalar — Gerência de Enfermagem
   <button id="btn-install" style="background:#1E40AF;border:none;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">Instalar</button>
-  <button onclick="document.getElementById('install-banner').classList.remove('show')" style="background:none;border:none;color:#64748B;cursor:pointer;font-size:16px;margin-left:4px">✕</button>
+  <button onclick="document.getElementById('install-banner').classList.remove('show')" style="background:none;border:none;color:#94A3B8;cursor:pointer;font-size:16px;margin-left:4px">✕</button>
 </div>
 <script>
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});}
+// PWA Service Worker — ignora chrome-extension
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('SW registrado:', reg.scope))
+      .catch(() => {});
+  });
+}
+// Install prompt
 let deferredPrompt;
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('install-banner').classList.add('show');});
-document.getElementById('btn-install').onclick=function(){if(!deferredPrompt)return;deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;document.getElementById('install-banner').classList.remove('show');});};
-window.addEventListener('appinstalled',()=>document.getElementById('install-banner').classList.remove('show'));
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('install-banner').classList.add('show');
+});
+document.getElementById('btn-install').onclick = function() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(() => {
+    deferredPrompt = null;
+    document.getElementById('install-banner').classList.remove('show');
+  });
+};
+window.addEventListener('appinstalled', () => {
+  document.getElementById('install-banner').classList.remove('show');
+});
 </script>
 <script>
 const {
@@ -144,20 +169,20 @@ const GC = {
 };
 const STATUS_OPTIONS = ["", "REINSERIR", "EVADIU", "EVASÃO", "ALTA", "ALTA MÉDICA", "RESOLVIDO COM RECURSOS LOCAIS", "FINALIZADO VIA CROSS", "ENCAMINHAR AMANHÃ"];
 const STATUS_EMOJI = {
-  "EVADIU": "⚠️",
-  "EVASÃO": "⚠️",
-  "ALTA": "✅",
-  "ALTA MÉDICA": "✅",
-  "FINALIZADO VIA CROSS": "✅",
-  "RESOLVIDO COM RECURSOS LOCAIS": "✅",
-  "REINSERIR": "🔁",
-  "ENCAMINHAR AMANHÃ": "📅"
+  "EVADIU": "[!]",
+  "EVASÃO": "[!]",
+  "ALTA": "[ALTA]",
+  "ALTA MÉDICA": "[ALTA]",
+  "FINALIZADO VIA CROSS": "[OK]",
+  "RESOLVIDO COM RECURSOS LOCAIS": "[OK]",
+  "REINSERIR": "[>>]",
+  "ENCAMINHAR AMANHÃ": "[>>]"
 };
 const PR_EMOJI = {
-  "01": "🔴",
-  "02": "🟠",
-  "03": "🟡",
-  "04": "⚪"
+  "01": "[P1]",
+  "02": "[P2]",
+  "03": "[P3]",
+  "04": "[P4]"
 };
 
 /* ─── UTILS ─── */
@@ -184,36 +209,54 @@ const saveLS = (k, v) => {
   } catch {}
 };
 
-/* ─── buildText (regras 41-65) ─── */
+/* ─── buildText (regras 41-65) — emojis compatíveis WhatsApp ─── */
 function buildText(cards, cols, settings) {
-  const appLink = settings?.app_url ? `\n\n━━━━━━━━━━━━━━━━━━━━\n🌐 *Acesse o sistema:*\n${settings.app_url}` : "";
-  const lines = [`🏥 *GERÊNCIA DE ENFERMAGEM*`, `📅 Atualização: *${todayStr()} às ${nowStr()}*`, `━━━━━━━━━━━━━━━━━━━━`];
+  const SEP = "--------------------";
+  const appLink = settings?.app_url ? "\n\n" + SEP + "\nAcesse o sistema:\n" + settings.app_url : "";
+  const lines = ["*GERENCIA DE ENFERMAGEM*", "Data: *" + todayStr() + " as " + nowStr() + "*", SEP];
+  const COL_LABEL = {
+    pendente: "PENDENTE DE ACEITE",
+    aceite: "ACEITE CONFIRMADO",
+    psiquiatria: "PSIQUIATRIA",
+    andamento: "REMOCAO EM ANDAMENTO",
+    finalizado: "FINALIZADAS"
+  };
   cols.forEach(col => {
     const cc = cards.filter(c => c.col_id === col.id);
     if (!cc.length) return;
-    lines.push("", `${col.emoji || "📌"} *${col.label.toUpperCase()}*`, `👥 ${cc.length} paciente${cc.length !== 1 ? "s" : ""}`, `━━━━━━━━━━━━━━━━━━━━`);
-    cc.forEach((c, i) => {
+    const colLabel = COL_LABEL[col.id] || col.label.toUpperCase();
+    lines.push("");
+    lines.push("*" + colLabel + "*");
+    lines.push(cc.length + " paciente" + (cc.length !== 1 ? "s" : ""));
+    lines.push(SEP);
+    cc.forEach(c => {
       lines.push("");
-      if (c.pr) lines.push(`${PR_EMOJI[c.pr] || "⚪"} *PRIORIDADE ${String(c.pr).padStart(2, "0")}*`);
-      lines.push(`${c.is_rn ? "👶" : "👤"} *${c.nome}*${c.idade ? ` — ${c.idade}` : ""}`);
-      if (c.hd) lines.push(`🩺 HD: ${c.hd}`);
-      if (c.setor) lines.push(`📍 ${c.setor}`);
-      const ambTxt = c.amb ? c.amb.includes("Av") ? "Amb. Avançada" : "Amb. Básica" : "";
+      if (c.pr) lines.push(PR_EMOJI[c.pr] + " *PRIORIDADE " + String(c.pr).padStart(2, "0") + "*");
+      const pacLabel = c.is_rn ? "[RN]" : "[PAC]";
+      lines.push(pacLabel + " *" + c.nome + "*" + (c.idade ? " - " + c.idade : ""));
+      if (c.hd) lines.push("HD: " + c.hd);
+      if (c.setor) lines.push("Local: " + c.setor);
+      const ambTxt = c.amb ? c.amb.includes("Av") ? "Amb. Avancada" : "Amb. Basica" : "";
       if (c.rec && c.hosp) {
-        lines.push(`➡️ ${c.rec} → ${c.hosp}`);
-        if (ambTxt) lines.push(`🏥 ${ambTxt}`);
-      } else if (c.rec) lines.push(`🏥 ${c.rec}${ambTxt ? " | " + ambTxt : ""}`);else if (ambTxt) lines.push(`🏥 ${ambTxt}`);
-      if (c.cross_info) lines.push(`🔄 Cross: ${c.cross_info}`);
-      if (c.receptor) lines.push(`📥 Receptor: ${c.receptor}${c.data_aceite ? " — " + c.data_aceite : ""}${c.hora_aceite ? " às " + c.hora_aceite : ""}`);
-      if (c.status) lines.push(`${STATUS_EMOJI[c.status] || "▸"} *${c.status}*`);
+        lines.push("Enc: " + c.rec + " -> " + c.hosp);
+        if (ambTxt) lines.push(ambTxt);
+      } else if (c.rec) {
+        lines.push("Rec: " + c.rec + (ambTxt ? " | " + ambTxt : ""));
+      } else if (ambTxt) {
+        lines.push(ambTxt);
+      }
+      if (c.cross_info) lines.push("Cross: " + c.cross_info);
+      if (c.receptor) lines.push("Receptor: " + c.receptor + (c.data_aceite ? " | " + c.data_aceite : "") + (c.hora_aceite ? " as " + c.hora_aceite : ""));
+      if (c.status) lines.push(STATUS_EMOJI[c.status] + " *" + c.status + "*");
     });
     lines.push("");
   });
-  lines.push("━━━━━━━━━━━━━━━━━━━━", `📊 *RESUMO GERAL*`, "");
-  lines.push(`👥 Total: *${cards.length} pacientes*`);
+  lines.push(SEP);
+  lines.push("*RESUMO*");
+  lines.push("Total: *" + cards.length + " pacientes*");
   cols.forEach(col => {
     const n = cards.filter(c => c.col_id === col.id).length;
-    if (n > 0) lines.push(`${col.emoji || "📌"} ${col.label}: ${n}`);
+    if (n > 0) lines.push((COL_LABEL[col.id] || col.label) + ": " + n);
   });
   lines.push(appLink);
   return lines.join("\n");
@@ -1059,7 +1102,8 @@ function ShareModal({
   settings,
   cards,
   cols,
-  showT
+  showT,
+  exportPNG
 }) {
   const text = buildText(cards, cols, settings);
   function doShare() {
@@ -1109,7 +1153,24 @@ function ShareModal({
       fontFamily: "inherit",
       lineHeight: 1.7
     }
-  }, text)), /*#__PURE__*/React.createElement(Btn, {
+  }, text)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: () => {
+      onClose();
+      setTimeout(() => exportPNG(), 100);
+    },
+    style: {
+      flex: 1,
+      fontSize: 13,
+      padding: "10px"
+    }
+  }, "📷 Baixar PNG do Kanban")), /*#__PURE__*/React.createElement(Btn, {
     variant: "wa",
     onClick: doShare,
     style: {
@@ -2848,6 +2909,30 @@ function App() {
       showT(ex.message, "err");
     }
   }
+  async function exportPNG() {
+    const el = document.getElementById("kanban-board");
+    if (!el) {
+      showT("Abra o Kanban para exportar.", "err");
+      return;
+    }
+    showT("Gerando imagem...");
+    try {
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        backgroundColor: "#F1F5F9",
+        useCORS: true,
+        logging: false,
+        windowWidth: el.scrollWidth + 40
+      });
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = "kanban-" + new Date().toLocaleDateString("pt-BR").replace(/\//g, "-") + ".png";
+      a.click();
+      showT("PNG exportado!");
+    } catch (e) {
+      showT("Erro ao gerar PNG: " + e.message, "err");
+    }
+  }
   function newCard(col = "pendente") {
     setSelected({
       id: "new",
@@ -3650,7 +3735,8 @@ function App() {
     settings: settings,
     cards: isAdmin ? cards : pubCards || [],
     cols: isAdmin ? cols : pubCols || cols,
-    showT: showT
+    showT: showT,
+    exportPNG: exportPNG
   }), showSettings && /*#__PURE__*/React.createElement(SettingsModal, {
     settings: settings,
     onClose: () => setShowSettings(false),
