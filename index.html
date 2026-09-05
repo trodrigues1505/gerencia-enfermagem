@@ -892,18 +892,23 @@ function LoginScreen({
     setErr("");
     setLoading(true);
     setTimeout(() => {
-      if (coren.trim() === ADMIN_COREN && senha === ADMIN_SENHA) {
+      if (coren.trim() === ADMIN_COREN) {
+        if (senha !== ADMIN_SENHA) {
+          setErr("Senha incorreta.");
+          setLoading(false);
+          return;
+        }
         onLogin(loadLS("ge_admin_user", null) || ADMIN_USER);
       } else {
         const users = loadLS("ge_users", []);
         const u = users.find(u => (u.coren || u.crm || "").trim() === coren.trim());
         if (!u) {
-          setErr("Registro não encontrado.");
+          setErr("Registro não encontrado. Solicite à administradora.");
           setLoading(false);
           return;
         }
         if (u.status === "pendente") {
-          setErr("Cadastro aguardando aprovação.");
+          setErr("Cadastro aguardando aprovação da administradora.");
           setLoading(false);
           return;
         }
@@ -912,12 +917,7 @@ function LoginScreen({
           setLoading(false);
           return;
         }
-        if (u.senha !== senha) {
-          setErr("Senha incorreta.");
-          setLoading(false);
-          return;
-        }
-        onLogin(u);
+        onLogin(u); // sem senha para profissionais
       }
       setLoading(false);
     }, 500);
@@ -1181,7 +1181,7 @@ function LoginScreen({
     style: inp2,
     placeholder: "Número do seu registro",
     autoComplete: "username"
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  })), coren.trim() === ADMIN_COREN && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: lbl2
   }, "Senha"), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1422,44 +1422,46 @@ function ShareModal({
   cols,
   showT
 }) {
-  const [sharing, setSharing] = useState(false);
   function buildText() {
-    const appLink = settings.appUrl ? `\n\n🔗 Acesse o sistema: ${settings.appUrl}` : "";
-    const lines = [`🏥 *GERÊNCIA DE ENFERMAGEM*\n📅 ${todayStr()}\n`];
+    const appLink = settings.appUrl ? `\n\n🔗 *Acesse o sistema completo:*\n${settings.appUrl}` : "";
+    const sep = "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄";
+    const lines = ["╔══════════════════════╗", "║ 🏥 GERÊNCIA DE ENFERMAGEM", `║ 📅 ${todayStr()} · ${nowStr()}`, "╚══════════════════════╝"];
+    let total = 0;
     cols.forEach(col => {
       const cc = cards.filter(c => c.col === col.id);
       if (!cc.length) return;
-      const emoji = COL_EMOJI[col.id] || "📌";
-      lines.push(`\n${emoji} *${col.label.toUpperCase()}* — ${cc.length} paciente${cc.length !== 1 ? "s" : ""}`);
-      lines.push("─────────────────────");
-      cc.forEach(c => {
+      total += cc.length;
+      const colEmoji = COL_EMOJI[col.id] || "📌";
+      lines.push("");
+      lines.push(`${colEmoji} *${col.label.toUpperCase()}*`);
+      lines.push(`${cc.length} paciente${cc.length !== 1 ? "s" : ""}`);
+      lines.push(sep);
+      cc.forEach((c, i) => {
         const g = GC[c.grav] || GC.urgencia;
-        const pr = c.pr ? ` [P${c.pr}]` : "";
-        const st = c.status ? (STATUS_EMOJI[c.status] || "") + " " + c.status + " " : "";
-        lines.push(`${g.emoji}${pr} *${c.nome}*, ${c.idade}`);
-        lines.push(`   └ ${c.hd}`);
-        if (c.setor || c.rec) lines.push(`   └ ${[c.setor, c.rec].filter(Boolean).join(" · ")}`);
-        if (c.hosp) lines.push(`   └ 🏨 ${c.hosp}`);
-        if (c.amb) lines.push(`   └ ${c.amb.includes("Av") ? "🚨" : "🚐"} ${c.amb}`);
-        if (c.cross) lines.push(`   └ 📋 Cross: ${c.cross}`);
-        if (st) lines.push(`   └ ${st}`);
+        const pr = c.pr ? ` · Prioridade ${c.pr}` : "";
+        const amb = c.amb ? c.amb.includes("Av") ? " · 🚨 Avançada" : " · 🚐 Básica" : "";
+        lines.push(`${g.emoji} *${c.nome}*${pr}`);
+        lines.push(`  ${c.idade ? c.idade + " · " : ""}${c.hd}`);
+        const infos = [c.setor, c.rec, c.hosp ? "→ " + c.hosp : ""].filter(Boolean).join(" · ");
+        if (infos) lines.push("  " + infos + amb);
+        if (c.cross) lines.push("  📋 " + c.cross);
+        if (c.status) lines.push("  " + (STATUS_EMOJI[c.status] || "▸") + " " + c.status);
+        if (i < cc.length - 1) lines.push("");
       });
     });
-    lines.push(`\n━━━━━━━━━━━━━━━━━━━━`);
-    lines.push(`📊 Total: *${cards.length} pacientes*`);
-    lines.push(`⏰ Atualizado: ${todayStr()} às ${nowStr()}${appLink}`);
+    lines.push("");
+    lines.push("━━━━━━━━━━━━━━━━━━━━━━");
+    lines.push(`📊 *Total: ${total} pacientes*${appLink}`);
     return lines.join("\n");
   }
-  async function doShare() {
-    setSharing(true);
+  function doShare() {
     const text = buildText();
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {}
+    // abre ANTES de qualquer async para não ser bloqueado como popup
     const encoded = encodeURIComponent(text);
-    window.open(`https://wa.me/?text=${encoded}`, "_blank");
-    showT("✅ WhatsApp aberto com o texto do Kanban!");
-    setSharing(false);
+    window.open("https://wa.me/?text=" + encoded, "_blank");
+    // copia em background
+    navigator.clipboard.writeText(text).catch(() => {});
+    showT("✅ WhatsApp aberto! Texto também copiado.");
     onClose();
   }
   return /*#__PURE__*/React.createElement(ModalShell, {
@@ -1506,14 +1508,13 @@ function ShareModal({
   }, buildText())), /*#__PURE__*/React.createElement(Btn, {
     variant: "wa",
     onClick: doShare,
-    disabled: sharing,
     style: {
       width: "100%",
       justifyContent: "center",
       padding: "12px",
       fontSize: 14
     }
-  }, sharing ? "Abrindo…" : "📤  Abrir WhatsApp com o texto"), /*#__PURE__*/React.createElement("div", {
+  }, "\"📤  Abrir WhatsApp com o texto\""), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: "#94A3B8",
@@ -2104,15 +2105,25 @@ function UsersPanel({
       height: 40,
       borderRadius: "50%",
       background: "#1E40AF",
+      overflow: "hidden",
+      flexShrink: 0,
+      border: "2px solid #E2E8F0",
       display: "flex",
       alignItems: "center",
-      justifyContent: "center",
-      flexShrink: 0
+      justifyContent: "center"
     }
-  }, /*#__PURE__*/React.createElement("span", {
+  }, loadLS("ge_admin_user", null)?.foto ? /*#__PURE__*/React.createElement("img", {
+    src: loadLS("ge_admin_user", null).foto,
+    style: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover"
+    }
+  }) : /*#__PURE__*/React.createElement("span", {
     style: {
       color: "#fff",
-      fontWeight: 700
+      fontWeight: 700,
+      fontSize: 14
     }
   }, "F")), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2911,8 +2922,11 @@ function App() {
   const [newColName, setNewColName] = useState("");
   const [kanbanDate, setKanbanDate] = useState(dateKey());
   const [toast, setToast] = useState(null);
-  const [dragId, setDragId] = useState(null);
-  const [dragOver, setDragOver] = useState(null);
+  const [minimized, setMinimized] = useState(() => new Set());
+  const [singleCol, setSingleCol] = useState(null); // id da coluna expandida ou null
+  const [dashMode, setDashMode] = useState("acumulado"); // acumulado | hoje
+  const dragId = useRef(null);
+  const dragOverCol = useRef(null);
   const nid = useRef(300);
   const newColRef = useRef(null);
   const isAdmin = currentUser?.role === "admin";
@@ -2940,15 +2954,7 @@ function App() {
       cols
     });
   }, [currentUser]);
-  useEffect(() => {
-    if (currentUser?.role === "admin" && !currentUser.zap) {
-      const shown = sessionStorage.getItem("profile_shown");
-      if (!shown) {
-        sessionStorage.setItem("profile_shown", "1");
-        setShowProfileSetup(true);
-      }
-    }
-  }, [currentUser]);
+  // profile setup removido — admin gerencia perfis pelo painel
   useEffect(() => {
     if (showNewCol && newColRef.current) newColRef.current.focus();
   }, [showNewCol]);
@@ -3077,9 +3083,20 @@ function App() {
     setCards([]);
     showT("Limpo.");
   }
-  function exportJSON() {
+  function toggleMinimize(id) {
+    setMinimized(p => {
+      const n = new Set(p);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  }
+  function toggleSingle(id) {
+    setSingleCol(p => p === id ? null : id);
+  }
+  function exportJSON(label) {
     const data = {
       date: todayStr(),
+      label: label || "Kanban " + todayStr(),
       cards,
       cols
     };
@@ -3092,7 +3109,14 @@ function App() {
     a.download = `kanban-${dateKey()}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    showT("JSON exportado.");
+    // salva também no localStorage
+    saveLS("snap_" + dateKey(), {
+      date: todayStr(),
+      label: "Kanban " + todayStr(),
+      cards,
+      cols
+    });
+    showT("💾 Dia salvo!");
   }
   function exportPNG() {
     const el = document.getElementById("kanban-board");
@@ -3118,41 +3142,64 @@ function App() {
     if (data.cols) setCols(data.cols);
   }
 
-  /* ── drag-and-drop nativo HTML5 ── */
+  /* ── drag-and-drop via refs (sem re-render) ── */
   function handleDragStart(e, cardId) {
-    setDragId(cardId);
+    dragId.current = cardId;
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", String(cardId));
-    // delay para o ghost aparecer antes da animação
+    const el = e.currentTarget;
     requestAnimationFrame(() => {
-      const el = e.currentTarget;
-      if (el) el.style.opacity = ".4";
+      if (el) el.style.opacity = ".35";
     });
   }
   function handleDragEnd(e) {
-    setDragId(null);
-    setDragOver(null);
+    dragId.current = null;
     const el = e.currentTarget;
     if (el) el.style.opacity = "1";
+    // limpa highlight de todas as colunas
+    document.querySelectorAll("[data-dropzone]").forEach(z => {
+      z.style.borderColor = "#E2E8F0";
+      z.style.boxShadow = "none";
+    });
+    dragOverCol.current = null;
   }
   function handleDrop(e, colId) {
     e.preventDefault();
-    const id = parseInt(e.dataTransfer.getData("text/plain") || dragId);
+    const id = parseInt(e.dataTransfer.getData("text/plain") || dragId.current || 0);
     if (!id) return;
     setCards(p => p.map(c => c.id === id ? {
       ...c,
       col: colId
     } : c));
-    setDragId(null);
-    setDragOver(null);
     showT("Card movido.");
   }
   function handleDragOver(e, colId) {
     e.preventDefault();
-    setDragOver(colId);
+    if (dragOverCol.current === colId) return;
+    // remove highlight anterior
+    if (dragOverCol.current) {
+      const prev = document.querySelector(`[data-dropzone="${dragOverCol.current}"]`);
+      if (prev) {
+        prev.style.borderColor = "#E2E8F0";
+        prev.style.boxShadow = "none";
+      }
+    }
+    dragOverCol.current = colId;
+    const el = document.querySelector(`[data-dropzone="${colId}"]`);
+    if (el) {
+      el.style.borderColor = "#3B82F6";
+      el.style.boxShadow = "0 0 0 3px rgba(59,130,246,.15)";
+    }
   }
-  function handleDragLeave() {
-    setDragOver(null);
+  function handleDragLeave(e, colId) {
+    // só remove se saiu de fato da coluna (não de um filho)
+    if (e.currentTarget.contains(e.relatedTarget)) return;
+    const el = document.querySelector(`[data-dropzone="${colId}"]`);
+    if (el) {
+      el.style.borderColor = "#E2E8F0";
+      el.style.boxShadow = "none";
+    }
+    if (dragOverCol.current === colId) dragOverCol.current = null;
   }
   const accentOf = id => ACCENT[id] || "#94A3B8";
   const NavBtn = ({
@@ -3341,7 +3388,7 @@ function App() {
       fontFamily: "inherit"
     }
   }), /*#__PURE__*/React.createElement("button", {
-    onClick: exportJSON,
+    onClick: () => exportJSON(),
     style: {
       padding: "3px 10px",
       border: "1px solid #FDE68A",
@@ -3351,7 +3398,7 @@ function App() {
       cursor: "pointer",
       fontSize: 11
     }
-  }, "↓ JSON"), /*#__PURE__*/React.createElement("button", {
+  }, "💾 Salvar dia"), /*#__PURE__*/React.createElement("button", {
     onClick: exportPNG,
     style: {
       padding: "3px 10px",
@@ -3508,10 +3555,51 @@ function App() {
       fontSize: 12,
       padding: "6px 16px"
     }
-  }, "+ Paciente")), view === "dashboard" && /*#__PURE__*/React.createElement(Dashboard, {
-    cards: filtered,
+  }, "+ Paciente")), view === "dashboard" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 14,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      border: "1px solid #E2E8F0",
+      borderRadius: 8,
+      padding: "2px",
+      display: "flex",
+      gap: 1
+    }
+  }, [["acumulado", "📊 Acumulado"], ["hoje", "📅 Hoje (" + todayStr() + ")"]].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
+    key: id,
+    onClick: () => setDashMode(id),
+    style: {
+      padding: "5px 14px",
+      borderRadius: 6,
+      border: "none",
+      fontSize: 12,
+      fontWeight: dashMode === id ? 600 : 400,
+      background: dashMode === id ? "#0F172A" : "transparent",
+      color: dashMode === id ? "#fff" : "#64748B",
+      cursor: "pointer"
+    }
+  }, label))), dashMode === "hoje" && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#94A3B8"
+    }
+  }, "Mostrando apenas cards com ADM igual a hoje")), /*#__PURE__*/React.createElement(Dashboard, {
+    cards: dashMode === "hoje" ? filtered.filter(c => {
+      const d = new Date();
+      const t = d.toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit"
+      });
+      return (c.adm || "").includes(t);
+    }) : filtered,
     cols: cols
-  }), view === "usuarios" && isAdmin && /*#__PURE__*/React.createElement(UsersPanel, {
+  })), view === "usuarios" && isAdmin && /*#__PURE__*/React.createElement(UsersPanel, {
     currentUser: currentUser,
     showT: showT
   }), view === "kanban" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
@@ -3534,28 +3622,29 @@ function App() {
     id: "kanban-board",
     style: {
       display: "flex",
-      gap: 10,
+      gap: 8,
       alignItems: "start",
       overflowX: "auto",
-      paddingBottom: 8
+      paddingBottom: 8,
+      flexWrap: "nowrap"
     }
-  }, cols.map(col => {
+  }, (singleCol ? cols.filter(c => c.id === singleCol) : cols).map(col => {
     const colCards = filtered.filter(c => c.col === col.id);
-    const isDragTarget = dragOver === col.id;
     return /*#__PURE__*/React.createElement("div", {
       key: col.id,
+      "data-dropzone": col.id,
       onDragOver: e => handleDragOver(e, col.id),
-      onDragLeave: handleDragLeave,
+      onDragLeave: e => handleDragLeave(e, col.id),
       onDrop: e => handleDrop(e, col.id),
       style: {
         background: "#fff",
         borderRadius: 12,
-        border: `1.5px solid ${isDragTarget ? "#3B82F6" : "#E2E8F0"}`,
-        overflow: "hidden",
-        minWidth: 230,
-        flex: "0 0 230px",
-        transition: "border-color .15s",
-        boxShadow: isDragTarget ? "0 0 0 3px rgba(59,130,246,.15)" : undefined
+        border: "1.5px solid #E2E8F0",
+        overflow: minimized.has(col.id) ? "hidden" : "hidden",
+        minWidth: minimized.has(col.id) ? 48 : 220,
+        flex: minimized.has(col.id) ? "0 0 48px" : singleCol === col.id ? "1 1 100%" : "1 1 200px",
+        maxWidth: minimized.has(col.id) ? 48 : singleCol === col.id ? "100%" : 340,
+        transition: "all .2s"
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -3563,7 +3652,36 @@ function App() {
         borderBottom: "1px solid #F1F5F9",
         borderTop: `3px solid ${accentOf(col.id)}`
       }
-    }, /*#__PURE__*/React.createElement("div", {
+    }, minimized.has(col.id) ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        writingMode: "vertical-rl",
+        textOrientation: "mixed",
+        fontWeight: 700,
+        fontSize: 11,
+        color: "#64748B",
+        padding: "8px 0",
+        cursor: "pointer",
+        userSelect: "none",
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      },
+      onClick: () => toggleMinimize(col.id)
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10
+      }
+    }, COL_EMOJI[col.id] || "📌"), /*#__PURE__*/React.createElement("span", null, col.label), /*#__PURE__*/React.createElement("span", {
+      style: {
+        background: "#F1F5F9",
+        borderRadius: 99,
+        padding: "2px 5px",
+        fontSize: 9,
+        fontWeight: 700,
+        color: "#475569",
+        writingMode: "horizontal-tb"
+      }
+    }, colCards.length)) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         justifyContent: "space-between",
@@ -3571,14 +3689,18 @@ function App() {
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        flex: 1
+        flex: 1,
+        minWidth: 0
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         fontWeight: 700,
         fontSize: 12,
         color: "#0F172A",
-        lineHeight: 1.2
+        lineHeight: 1.2,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis"
       }
     }, COL_EMOJI[col.id] || "📌", " ", col.label), col.sub && /*#__PURE__*/React.createElement("div", {
       style: {
@@ -3586,18 +3708,50 @@ function App() {
         color: "#94A3B8",
         marginTop: 1
       }
-    }, col.sub)), !col.fixed && isAdmin && /*#__PURE__*/React.createElement("button", {
-      onClick: () => removeColumn(col.id),
+    }, col.sub)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 3,
+        flexShrink: 0,
+        marginLeft: 4
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => toggleSingle(col.id),
+      title: singleCol === col.id ? "Ver todas" : "Expandir coluna",
+      style: {
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        color: singleCol === col.id ? "#3B82F6" : "#CBD5E1",
+        fontSize: 12,
+        padding: "2px 3px",
+        lineHeight: 1
+      }
+    }, singleCol === col.id ? "⊠" : "⊡"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => toggleMinimize(col.id),
+      title: "Minimizar",
       style: {
         background: "none",
         border: "none",
         cursor: "pointer",
         color: "#CBD5E1",
-        fontSize: 13,
-        padding: "0 0 0 4px",
+        fontSize: 12,
+        padding: "2px 3px",
         lineHeight: 1
       }
-    }, "✕")), /*#__PURE__*/React.createElement("span", {
+    }, "−"), !col.fixed && isAdmin && /*#__PURE__*/React.createElement("button", {
+      onClick: () => removeColumn(col.id),
+      title: "Remover coluna",
+      style: {
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        color: "#CBD5E1",
+        fontSize: 12,
+        padding: "2px 3px",
+        lineHeight: 1
+      }
+    }, "✕"))), /*#__PURE__*/React.createElement("span", {
       style: {
         marginTop: 5,
         display: "inline-flex",
@@ -3608,7 +3762,7 @@ function App() {
         fontWeight: 700,
         color: "#475569"
       }
-    }, colCards.length)), isAdmin && /*#__PURE__*/React.createElement("div", {
+    }, colCards.length))), !minimized.has(col.id) && isAdmin && /*#__PURE__*/React.createElement("div", {
       style: {
         padding: "6px 8px 0"
       }
@@ -3633,11 +3787,11 @@ function App() {
         e.currentTarget.style.borderColor = "#E2E8F0";
         e.currentTarget.style.color = "#94A3B8";
       }
-    }, "+ Adicionar paciente")), /*#__PURE__*/React.createElement("div", {
+    }, "+ Adicionar paciente")), !minimized.has(col.id) && /*#__PURE__*/React.createElement("div", {
       style: {
         padding: "6px 8px 8px",
         minHeight: 80,
-        maxHeight: "58vh",
+        maxHeight: singleCol ? "75vh" : "58vh",
         overflowY: "auto"
       }
     }, colCards.length === 0 ? /*#__PURE__*/React.createElement("div", {
@@ -3650,7 +3804,7 @@ function App() {
         borderRadius: 8,
         margin: "4px 0"
       }
-    }, isDragTarget ? "Solte aqui ↓" : isAdmin ? "Arraste ou adicione" : "Sem pacientes") : colCards.map(card => /*#__PURE__*/React.createElement(KCard, {
+    }, isAdmin ? "Arraste ou adicione" : "Sem pacientes") : colCards.map(card => /*#__PURE__*/React.createElement(KCard, {
       key: card.id,
       c: card,
       onClick: setSelected,
@@ -3867,10 +4021,6 @@ function App() {
       setShowSettings(false);
       showT("Configurações salvas.");
     }
-  }), showProfileSetup && /*#__PURE__*/React.createElement(ProfileModal, {
-    user: currentUser,
-    onSave: saveProfile,
-    onClose: () => setShowProfileSetup(false)
   }), /*#__PURE__*/React.createElement(Toast, {
     toast: toast
   }));
