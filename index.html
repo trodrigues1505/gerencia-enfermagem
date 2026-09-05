@@ -925,7 +925,7 @@ function LoginScreen({
   function doRegister(e) {
     e.preventDefault();
     setErr("");
-    if (!reg.registro.trim() || !reg.nome.trim() || !reg.senha) {
+    if (!reg.registro.trim() || !reg.nome.trim()) {
       setErr("Preencha todos os campos obrigatórios.");
       return;
     }
@@ -942,7 +942,6 @@ function LoginScreen({
       nome: reg.nome,
       zap: reg.zap,
       foto: reg.foto,
-      senha: reg.senha,
       role: "viewer",
       status: "pendente"
     };
@@ -1035,12 +1034,11 @@ function LoginScreen({
       fontWeight: 600,
       fontSize: 13
     }
-  }, t))), [["Número do registro *", "registro", `Digite seu ${reg.tipo}`], ["Nome completo *", "nome", "Nome completo"], ["WhatsApp", "zap", "(19) 99999-9999"], ["Senha *", "senha", "Crie uma senha"]].map(([label, key, ph]) => /*#__PURE__*/React.createElement("div", {
+  }, t))), [["Número do registro *", "registro", `Digite seu ${reg.tipo}`], ["Nome completo *", "nome", "Nome completo"], ["WhatsApp", "zap", "(19) 99999-9999"]].map(([label, key, ph]) => /*#__PURE__*/React.createElement("div", {
     key: key
   }, /*#__PURE__*/React.createElement("label", {
     style: lbl2
   }, label), /*#__PURE__*/React.createElement("input", {
-    type: key === "senha" ? "password" : "text",
     value: reg[key] || "",
     onChange: e => setReg(p => ({
       ...p,
@@ -1339,7 +1337,10 @@ function SettingsModal({
   onSave
 }) {
   const [form, setForm] = useState({
-    ...settings
+    adminNome: settings.adminNome || "",
+    adminCoren: settings.adminCoren || "",
+    adminZap: settings.adminZap || "",
+    appUrl: settings.appUrl || ""
   });
   const upd = (k, v) => setForm(p => ({
     ...p,
@@ -1351,39 +1352,42 @@ function SettingsModal({
     ph = ""
   }) => /*#__PURE__*/React.createElement("div", {
     style: {
-      marginBottom: 10
+      marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement("label", {
     style: s.lbl
   }, label), /*#__PURE__*/React.createElement("input", {
-    value: form[k] || "",
+    value: form[k],
     onChange: e => upd(k, e.target.value),
     placeholder: ph,
     style: s.inp
   }));
   return /*#__PURE__*/React.createElement(ModalShell, {
-    title: "Configurações",
+    title: "Configuracoes",
     onClose: onClose,
-    maxWidth: 420,
+    maxWidth: 440,
     footer: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Btn, {
       variant: "ghost",
       onClick: onClose
     }, "Cancelar"), /*#__PURE__*/React.createElement(Btn, {
-      onClick: () => onSave(form)
+      onClick: () => onSave({
+        ...settings,
+        ...form
+      })
     }, "Salvar"))
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       fontWeight: 700,
       color: "#0F172A",
-      marginBottom: 10,
+      marginBottom: 12,
       textTransform: "uppercase",
       letterSpacing: ".05em"
     }
   }, "Administradora"), /*#__PURE__*/React.createElement(Row, {
     label: "Nome completo",
     k: "adminNome",
-    ph: "Enf.ª Fabiana Faria de Figueiredo"
+    ph: "Enf. Fabiana Faria de Figueiredo"
   }), /*#__PURE__*/React.createElement(Row, {
     label: "COREN",
     k: "adminCoren",
@@ -1394,10 +1398,16 @@ function SettingsModal({
     ph: "(19) 99999-9999"
   }), /*#__PURE__*/React.createElement("div", {
     style: {
+      height: 1,
+      background: "#F1F5F9",
+      margin: "16px 0"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
       fontSize: 11,
       fontWeight: 700,
       color: "#0F172A",
-      margin: "16px 0 6px",
+      marginBottom: 6,
       textTransform: "uppercase",
       letterSpacing: ".05em"
     }
@@ -1405,9 +1415,9 @@ function SettingsModal({
     style: {
       fontSize: 11,
       color: "#94A3B8",
-      marginBottom: 8
+      marginBottom: 10
     }
-  }, "Cole o link do app após hospedar (ex: GitHub Pages). Ele será incluído automaticamente na mensagem do WhatsApp."), /*#__PURE__*/React.createElement(Row, {
+  }, "Cole o link do app hospedado. Sera incluido automaticamente na mensagem do WhatsApp."), /*#__PURE__*/React.createElement(Row, {
     label: "URL do app",
     k: "appUrl",
     ph: "https://seuusuario.github.io/gerencia-enfermagem"
@@ -1423,35 +1433,50 @@ function ShareModal({
   showT
 }) {
   function buildText() {
-    const appLink = settings.appUrl ? `\n\n🔗 *Acesse o sistema completo:*\n${settings.appUrl}` : "";
-    const sep = "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄";
-    const lines = ["╔══════════════════════╗", "║ 🏥 GERÊNCIA DE ENFERMAGEM", `║ 📅 ${todayStr()} · ${nowStr()}`, "╚══════════════════════╝"];
+    const appLink = settings.appUrl ? "\n\nAcesse o sistema: " + settings.appUrl : "";
+    const lines = ["------------------------------", "GERENCIA DE ENFERMAGEM", "Data: " + todayStr() + " - " + nowStr(), "------------------------------"];
     let total = 0;
+    const gravLabel = {
+      emergencia: "EMERGENCIA",
+      urgencia: "URGENCIA",
+      andamento_cor: "EM ANDAMENTO",
+      menor_gravidade: "MENOR GRAVIDADE",
+      finalizado_cor: "FINALIZADO",
+      agendamento: "AGENDAMENTO",
+      retorno: "RETORNO"
+    };
+    const gravIcon = {
+      emergencia: "[!]",
+      urgencia: "[U]",
+      andamento_cor: "[->]",
+      menor_gravidade: "[ok]",
+      finalizado_cor: "[v]",
+      agendamento: "[ ]",
+      retorno: "[<]"
+    };
     cols.forEach(col => {
       const cc = cards.filter(c => c.col === col.id);
       if (!cc.length) return;
       total += cc.length;
-      const colEmoji = COL_EMOJI[col.id] || "📌";
       lines.push("");
-      lines.push(`${colEmoji} *${col.label.toUpperCase()}*`);
-      lines.push(`${cc.length} paciente${cc.length !== 1 ? "s" : ""}`);
-      lines.push(sep);
+      lines.push(">> " + col.label.toUpperCase() + " (" + cc.length + " paciente" + (cc.length !== 1 ? "s" : "") + ")");
+      lines.push("- - - - - - - - - - - - - -");
       cc.forEach((c, i) => {
-        const g = GC[c.grav] || GC.urgencia;
-        const pr = c.pr ? ` · Prioridade ${c.pr}` : "";
-        const amb = c.amb ? c.amb.includes("Av") ? " · 🚨 Avançada" : " · 🚐 Básica" : "";
-        lines.push(`${g.emoji} *${c.nome}*${pr}`);
-        lines.push(`  ${c.idade ? c.idade + " · " : ""}${c.hd}`);
-        const infos = [c.setor, c.rec, c.hosp ? "→ " + c.hosp : ""].filter(Boolean).join(" · ");
-        if (infos) lines.push("  " + infos + amb);
-        if (c.cross) lines.push("  📋 " + c.cross);
-        if (c.status) lines.push("  " + (STATUS_EMOJI[c.status] || "▸") + " " + c.status);
+        const icon = gravIcon[c.grav] || "[?]";
+        const pr = c.pr ? " | Prioridade " + c.pr : "";
+        const amb = c.amb ? c.amb.includes("Av") ? " | Amb. Avancada" : " | Amb. Basica" : "";
+        lines.push(icon + " " + c.nome + (c.idade ? ", " + c.idade : "") + pr);
+        lines.push("   HD: " + c.hd);
+        const local = [c.setor, c.rec].filter(Boolean).join(" | ");
+        if (local) lines.push("   " + local + (c.hosp ? " -> " + c.hosp : "") + amb);
+        if (c.cross) lines.push("   Cross: " + c.cross);
+        if (c.status) lines.push("   Status: " + c.status);
         if (i < cc.length - 1) lines.push("");
       });
     });
     lines.push("");
-    lines.push("━━━━━━━━━━━━━━━━━━━━━━");
-    lines.push(`📊 *Total: ${total} pacientes*${appLink}`);
+    lines.push("------------------------------");
+    lines.push("Total: " + total + " pacientes" + appLink);
     return lines.join("\n");
   }
   function doShare() {
@@ -1548,6 +1573,7 @@ function CardModal({
       id: Date.now(),
       autor: currentUser.nome,
       autorId: currentUser.id,
+      autorFoto: currentUser.foto || null,
       texto: comment.trim(),
       hora: `${todayStr()} ${nowStr()}`,
       isAdmin: currentUser.role === "admin"
@@ -1752,15 +1778,51 @@ function CardModal({
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      justifyContent: "space-between",
-      alignItems: "flex-start",
       gap: 8,
-      marginBottom: 4
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 30,
+      height: 30,
+      borderRadius: "50%",
+      flexShrink: 0,
+      overflow: "hidden",
+      background: c.isAdmin ? "#1E40AF" : "#F1F5F9",
+      border: "1px solid #E2E8F0",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, c.autorFoto ? /*#__PURE__*/React.createElement("img", {
+    src: c.autorFoto,
+    style: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover"
+    }
+  }) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: c.isAdmin ? "#fff" : "#94A3B8"
+    }
+  }, (c.autor || "?")[0].toUpperCase())), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      gap: 6,
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 5,
       alignItems: "center"
     }
   }, /*#__PURE__*/React.createElement("span", {
@@ -1803,9 +1865,10 @@ function CardModal({
     style: {
       fontSize: 13,
       color: "#374151",
-      lineHeight: 1.5
+      lineHeight: 1.5,
+      marginTop: 2
     }
-  }, c.texto)))), /*#__PURE__*/React.createElement("div", {
+  }, c.texto)))))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8
@@ -1889,15 +1952,10 @@ function UsersPanel({
         crm: form.tipo === "CRM" ? form.registro : "",
         nome: form.nome,
         zap: form.zap,
-        senha: form.senha || u.senha,
         foto: form.foto
       } : u));
       showT("Profissional atualizado.");
     } else {
-      if (!form.senha) {
-        showT("Informe uma senha.", "err");
-        return;
-      }
       const dup = users.find(u => (u.coren || u.crm || "") === form.registro.trim());
       if (dup) {
         showT("Registro já cadastrado.", "err");
@@ -1911,7 +1969,6 @@ function UsersPanel({
         nome: form.nome,
         zap: form.zap,
         foto: form.foto,
-        senha: form.senha,
         role: "viewer",
         status: "aprovado"
       }]);
@@ -2029,15 +2086,14 @@ function UsersPanel({
       fontWeight: 600,
       fontSize: 12
     }
-  }, t)))), [["Número do registro", form.tipo, "registro"], ["Nome completo", "Nome completo", "nome"], ["WhatsApp", "(19) 99999-9999", "zap"], ["Senha", "••••••••", "senha"]].map(([label, ph, key]) => /*#__PURE__*/React.createElement("div", {
+  }, t)))), [["Número do registro", form.tipo, "registro"], ["Nome completo", "Nome completo", "nome"], ["WhatsApp", "(19) 99999-9999", "zap"]].map(([label, ph, key]) => /*#__PURE__*/React.createElement("div", {
     key: key,
     style: {
       marginBottom: 10
     }
   }, /*#__PURE__*/React.createElement("label", {
     style: s.lbl
-  }, label, key === "senha" && editing ? " (deixe em branco para manter)" : ""), /*#__PURE__*/React.createElement("input", {
-    type: key === "senha" ? "password" : "text",
+  }, label), /*#__PURE__*/React.createElement("input", {
     value: form[key] || "",
     onChange: e => setForm(p => ({
       ...p,
@@ -2045,7 +2101,7 @@ function UsersPanel({
     })),
     placeholder: ph,
     style: inp2,
-    required: !editing && (key === "registro" || key === "nome" || key === "senha")
+    required: key === "registro" || key === "nome"
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
       gridColumn: "1/-1",
@@ -3140,6 +3196,7 @@ function App() {
   function loadSnapshot(data) {
     if (data.cards) setCards(data.cards);
     if (data.cols) setCols(data.cols);
+    showT('Snapshot carregado. Usuarios preservados.');
   }
 
   /* ── drag-and-drop via refs (sem re-render) ── */
