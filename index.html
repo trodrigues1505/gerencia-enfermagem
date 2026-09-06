@@ -690,33 +690,14 @@ function AceiteModal({
 }
 
 /* ─── CARD MODAL ─── */
-/* ── Extração IA via Edge Function proxy (evita CORS da Anthropic) ── */
 async function extractCROSS(texto) {
-  const prompt = `Você vai receber o texto de uma ficha CROSS (regulação hospitalar brasileira).
-Extraia os campos abaixo e retorne APENAS um JSON válido, sem markdown, sem explicações.
-
-Campos:
-- nome: nome completo do paciente
-- idade: idade (ex: "59 anos")
-- hd: diagnóstico/hipótese — use o CID 1 + descrição, ou resumo clínico principal
-- setor: unidade solicitante (campo "Unidade Solicitante")  
-- rec: recurso/especialidade solicitada (campo "1º Recurso" — ex: "Tomografia Computadorizada")
-- hosp: deixar vazio
-- adm: data no formato DD/MM (campo "Data Admissão" ou "Data" da ficha)
-- grav: baseado em "Prioridade": "1" → "emergencia", "2" → "urgencia", "3" → "menor_gravidade", vazio → "urgencia"
-- obs: primeiros 250 caracteres do Resumo Clínico
-- amb: deixar vazio
-
-Texto:
-${texto}`;
-
   const r = await fetch("https://ahcrscstdtfawoogsugi.supabase.co/functions/v1/extract-cross", {
-    method: "POST",
-    headers: {"Content-Type":"application/json","apikey":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjk1MDgsImV4cCI6MjEwNDIwNTUwOH0.8ivWRA99AXXyBVFT3TQd5NuSod2eiowiI490Blt2zHM","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjk1MDgsImV4cCI6MjEwNDIwNTUwOH0.8ivWRA99AXXyBVFT3TQd5NuSod2eiowiI490Blt2zHM"},
-    body: JSON.stringify({texto, prompt})
+    method:"POST",
+    headers:{"Content-Type":"application/json","apikey":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjk1MDgsImV4cCI6MjEwNDIwNTUwOH0.8ivWRA99AXXyBVFT3TQd5NuSod2eiowiI490Blt2zHM","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjk1MDgsImV4cCI6MjEwNDIwNTUwOH0.8ivWRA99AXXyBVFT3TQd5NuSod2eiowiI490Blt2zHM"},
+    body:JSON.stringify({texto})
   });
   const d = await r.json();
-  if (!r.ok) throw new Error(d.error || "Erro na extração");
+  if(!r.ok) throw new Error(d.error||"Erro na extração");
   return d;
 }
 
@@ -748,10 +729,19 @@ function CardModal({
     setAiStatus("Extraindo com IA…");
     try {
       const campos = await extractCROSS(aiText);
-      setForm(f => ({ ...f, ...campos }));
+      setForm(f => ({ ...f,
+        nome: campos.nome || f.nome,
+        idade: campos.idade || f.idade,
+        hd: campos.hd || f.hd,
+        setor: campos.setor || f.setor,
+        rec: campos.rec || f.rec,
+        adm: campos.adm || f.adm,
+        grav: campos.grav || f.grav,
+        obs: campos.obs || f.obs,
+      }));
       setShowAiBox(false);
       setAiText("");
-      setAiStatus("");
+      setAiStatus("✓ Campos preenchidos!");
     } catch(e) {
       setAiStatus("Erro: " + e.message);
     } finally {
@@ -791,51 +781,24 @@ function CardModal({
     }, "Cancelar"), /*#__PURE__*/React.createElement(Btn, {
       onClick: () => onSave(form)
     }, "Salvar")))
-  }, isAdmin && /*#__PURE__*/React.createElement("div", {
-    style: {marginBottom: 10}
-  },
-    !showAiBox ? /*#__PURE__*/React.createElement("button", {
-      onClick: function() { setShowAiBox(true); },
-      style: {padding:"6px 14px",border:"1px dashed #7C3AED",borderRadius:8,background:"#F5F3FF",
-        color:"#6D28D9",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit",width:"100%"}
-    }, "✨ Preencher com IA — colar ficha CROSS") :
-    /*#__PURE__*/React.createElement("div", {
-      style: {background:"#F5F3FF",border:"1px solid #DDD6FE",borderRadius:10,padding:12}
-    },
-      /*#__PURE__*/React.createElement("div", {
-        style: {fontSize:11,fontWeight:600,color:"#6D28D9",marginBottom:6}
-      }, "Cole o texto da ficha CROSS abaixo:"),
-      /*#__PURE__*/React.createElement("textarea", {
-        value: aiText,
-        onChange: function(e) { setAiText(e.target.value); },
-        placeholder: "Cole aqui o conteúdo copiado da ficha CROSS...",
-        rows: 6,
-        style: {width:"100%",padding:"8px 10px",border:"1px solid #C4B5FD",borderRadius:7,
-          fontSize:12,fontFamily:"inherit",resize:"vertical",outline:"none",
-          background:"#fff",color:"#0F172A",lineHeight:1.6}
-      }),
-      aiStatus && /*#__PURE__*/React.createElement("div", {
-        style: {fontSize:11,color:"#6D28D9",marginTop:4}
-      }, aiStatus),
-      /*#__PURE__*/React.createElement("div", {
-        style: {display:"flex",gap:8,marginTop:8,justifyContent:"flex-end"}
-      },
-        /*#__PURE__*/React.createElement("button", {
-          onClick: function() { setShowAiBox(false); setAiText(""); setAiStatus(""); },
-          style: {padding:"5px 12px",border:"1px solid #E2E8F0",borderRadius:7,background:"none",
-            color:"#64748B",cursor:"pointer",fontSize:12,fontFamily:"inherit"}
-        }, "Cancelar"),
-        /*#__PURE__*/React.createElement("button", {
-          onClick: runExtract,
-          disabled: aiLoading || !aiText.trim(),
-          style: {padding:"5px 14px",border:"none",borderRadius:7,background:"#6D28D9",
-            color:"#fff",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit",
-            opacity: (aiLoading || !aiText.trim()) ? 0.6 : 1}
-        }, aiLoading ? "Extraindo…" : "✨ Extrair com IA")
-      )
-    )
-  ),
-  /*#__PURE__*/React.createElement("div", {
+  ), isAdmin && /*#__PURE__*/React.createElement("div", { style:{marginBottom:10} },
+    !showAiBox
+      ? /*#__PURE__*/React.createElement("button", {
+          onClick: function(){setShowAiBox(true);},
+          style:{width:"100%",padding:"7px 14px",border:"1px dashed #7C3AED",borderRadius:8,
+            background:"#F5F3FF",color:"#6D28D9",cursor:"pointer",fontSize:12,
+            fontWeight:600,fontFamily:"inherit"}
+        }, "✨ Preencher com IA — colar ficha CROSS")
+      : /*#__PURE__*/React.createElement("div", {style:{background:"#F5F3FF",border:"1px solid #DDD6FE",borderRadius:10,padding:12}},
+          /*#__PURE__*/React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#6D28D9",marginBottom:6}},"Cole o texto da ficha CROSS:"),
+          /*#__PURE__*/React.createElement("textarea",{value:aiText,onChange:function(e){setAiText(e.target.value);},placeholder:"Cole aqui o texto copiado da ficha CROSS...",rows:6,style:{width:"100%",padding:"8px 10px",border:"1px solid #C4B5FD",borderRadius:7,fontSize:12,fontFamily:"inherit",resize:"vertical",outline:"none",background:"#fff",color:"#0F172A",lineHeight:1.6}}),
+          aiStatus&&/*#__PURE__*/React.createElement("div",{style:{fontSize:11,color:"#6D28D9",marginTop:4}},aiStatus),
+          /*#__PURE__*/React.createElement("div",{style:{display:"flex",gap:8,marginTop:8,justifyContent:"flex-end"}},
+            /*#__PURE__*/React.createElement("button",{onClick:function(){setShowAiBox(false);setAiText("");setAiStatus("");},style:{padding:"5px 12px",border:"1px solid #E2E8F0",borderRadius:7,background:"none",color:"#64748B",cursor:"pointer",fontSize:12,fontFamily:"inherit"}},"Cancelar"),
+            /*#__PURE__*/React.createElement("button",{onClick:runExtract,disabled:aiLoading||!aiText.trim(),style:{padding:"5px 14px",border:"none",borderRadius:7,background:"#6D28D9",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit",opacity:(aiLoading||!aiText.trim())?0.6:1}},aiLoading?"Extraindo…":"✨ Extrair com IA")
+          )
+        )
+  ), }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 2,
@@ -4989,9 +4952,7 @@ function App() {
   async function moveCard(cardId, newColId, aceiteData) {
     try {
       const data = await fn("cards-move", {
-        card_id: cardId,
-        new_col_id: newColId,
-        aceite: aceiteData || null
+        card_id: cardId, new_col_id: newColId, aceite: aceiteData || null
       }, userId);
       setCards(p => p.map(c => c.id === cardId ? data : c));
       showT("Card movido.");
@@ -4999,18 +4960,16 @@ function App() {
         try {
           const hoje = new Date().toISOString().split("T")[0];
           const agora = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
-          const gravMap = {emergencia:"VERMELHO",urgencia:"AMARELO",andamento_cor:"AMARELO",menor_gravidade:"VERDE",finalizado_cor:"CINZA",agendamento:"CINZA",retorno:"CINZA"};
-          const ambMap = {Básica:"BÁSICA",Avançada:"AVANÇADA"};
+          const gm = {emergencia:"VERMELHO",urgencia:"AMARELO",andamento_cor:"AMARELO",menor_gravidade:"VERDE",finalizado_cor:"CINZA",agendamento:"CINZA",retorno:"CINZA"};
+          const am = {Básica:"BÁSICA",Avançada:"AVANÇADA"};
           await fetch("https://ahcrscstdtfawoogsugi.supabase.co/functions/v1/remocoes-write", {
             method:"POST",
             headers:{"Content-Type":"application/json","apikey":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjk1MDgsImV4cCI6MjEwNDIwNTUwOH0.8ivWRA99AXXyBVFT3TQd5NuSod2eiowiI490Blt2zHM","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjk1MDgsImV4cCI6MjEwNDIwNTUwOH0.8ivWRA99AXXyBVFT3TQd5NuSod2eiowiI490Blt2zHM"},
-            body:JSON.stringify({action:"create",nome_paciente:data.nome||"",setor:data.setor||"",especialidade:data.rec||"",diagnostico:data.hd||"",instituicao_destino:data.hosp||"",tipo_ambulancia:ambMap[data.amb]||"",gravidade:gravMap[data.grav]||"AMARELO",data_solicitacao:hoje,horario_solicitacao:agora,status:newColId==="aceite"?"PACIENTE AGUARDANDO AMBULÂNCIA":"PACIENTE EM REMOÇÃO"})
+            body:JSON.stringify({action:"create",nome_paciente:data.nome||"",setor:data.setor||"",especialidade:data.rec||"",diagnostico:data.hd||"",instituicao_destino:data.hosp||"",tipo_ambulancia:am[data.amb]||"",gravidade:gm[data.grav]||"AMARELO",data_solicitacao:hoje,horario_solicitacao:agora,status:newColId==="aceite"?"PACIENTE AGUARDANDO AMBULÂNCIA":"PACIENTE EM REMOÇÃO"})
           });
         } catch(e2) { /* silencioso */ }
       }
-    } catch (ex) {
-      showT(ex.message, "err");
-    }
+    } catch (ex) { showT(ex.message, "err"); }
   }
   function handleMoveAttempt(cardId, newColId) {
     if (newColId === "aceite") {
@@ -5759,7 +5718,75 @@ function App() {
       bv = (b[sortCol.key] || "").toString().toLowerCase();
     return sortCol.dir === "asc" ? av.localeCompare(bv, "pt") : bv.localeCompare(av, "pt");
   }) : filtered;
-  const NavBtn = ({
+  function KanbanDropdown({ view, setView }) {
+  const [open, setOpen] = React.useState(false);
+  const subViews = [["lista","📄 Lista"],["calendario","📅 Calendário"],["timeline","⏱ Linha do Tempo"]];
+  const isSubView = subViews.some(s => s[0] === view);
+  const activeLabel = isSubView ? subViews.find(s => s[0] === view)[1] : "📋 Kanban";
+  return /*#__PURE__*/React.createElement("div", {
+    style: { position:"relative", display:"inline-block" },
+    onMouseEnter: function() { setOpen(true); },
+    onMouseLeave: function() { setOpen(false); }
+  },
+    /* Botão principal */
+    /*#__PURE__*/React.createElement("button", {
+      onClick: function() { if (!isSubView) setView("kanban"); },
+      style: {
+        padding: "5px 14px", borderRadius: 6, border: "none", fontSize: 12,
+        fontWeight: view === "kanban" || isSubView ? 600 : 400,
+        background: view === "kanban" || isSubView ? "#0F172A" : "transparent",
+        color: view === "kanban" || isSubView ? "#fff" : "#64748B",
+        cursor: "pointer", display:"inline-flex", alignItems:"center", gap:4,
+        fontFamily: "inherit"
+      }
+    }, activeLabel, " ", /*#__PURE__*/React.createElement("span", { style:{fontSize:8,opacity:.7} }, "▾")),
+    /* Dropdown */
+    open && /*#__PURE__*/React.createElement("div", {
+      style: {
+        position:"absolute", top:"100%", left:0, zIndex:200,
+        background:"#fff", border:"1px solid #E2E8F0", borderRadius:10,
+        boxShadow:"0 8px 24px rgba(0,0,0,.12)", padding:"4px 0",
+        minWidth:160, marginTop:2
+      }
+    },
+      /*#__PURE__*/React.createElement("div", {
+        style:{padding:"4px 12px 6px",fontSize:9,fontWeight:700,color:"#CBD5E1",textTransform:"uppercase",letterSpacing:".06em"}
+      }, "Outras visualizações"),
+      subViews.map(function(it) {
+        return /*#__PURE__*/React.createElement("button", {
+          key: it[0],
+          onClick: function() { setView(it[0]); setOpen(false); },
+          style: {
+            display:"flex", alignItems:"center", gap:8, width:"100%",
+            padding:"8px 14px", border:"none", background: view===it[0] ? "#F1F5F9" : "transparent",
+            fontSize:13, fontWeight: view===it[0] ? 600 : 400,
+            color: view===it[0] ? "#0F172A" : "#374151",
+            cursor:"pointer", textAlign:"left", fontFamily:"inherit",
+            transition:"background .1s"
+          },
+          onMouseEnter: function(e){ e.currentTarget.style.background="#F8FAFC"; },
+          onMouseLeave: function(e){ e.currentTarget.style.background = view===it[0]?"#F1F5F9":"transparent"; }
+        }, it[1]);
+      }),
+      /*#__PURE__*/React.createElement("div", { style:{height:1,background:"#F1F5F9",margin:"4px 0"} }),
+      /*#__PURE__*/React.createElement("button", {
+        onClick: function() { setView("kanban"); setOpen(false); },
+        style: {
+          display:"flex", alignItems:"center", gap:8, width:"100%",
+          padding:"8px 14px", border:"none",
+          background: view==="kanban" ? "#F1F5F9" : "transparent",
+          fontSize:13, fontWeight: view==="kanban" ? 600 : 400,
+          color: view==="kanban" ? "#0F172A" : "#374151",
+          cursor:"pointer", textAlign:"left", fontFamily:"inherit"
+        },
+        onMouseEnter: function(e){ e.currentTarget.style.background="#F8FAFC"; },
+        onMouseLeave: function(e){ e.currentTarget.style.background = view==="kanban"?"#F1F5F9":"transparent"; }
+      }, "📋 Kanban")
+    )
+  );
+}
+
+const NavBtn = ({
     id,
     label
   }) => /*#__PURE__*/React.createElement("button", {
@@ -6096,9 +6123,9 @@ function App() {
   }, /*#__PURE__*/React.createElement(NavBtn, {
     id: "dashboard",
     label: "📊 Dashboard"
-  }), /*#__PURE__*/React.createElement(NavBtn, {
-    id: "kanban",
-    label: "📋 Kanban"
+  }), /*#__PURE__*/React.createElement(KanbanDropdown, {
+    view: view,
+    setView: setView
   }), /*#__PURE__*/React.createElement("a", {
     href: "remocao.html",
     style: {padding:"5px 14px",borderRadius:6,border:"none",fontSize:12,fontWeight:400,background:"transparent",color:"#64748B",cursor:"pointer",textDecoration:"none",display:"inline-flex",alignItems:"center"}
@@ -6257,22 +6284,7 @@ function App() {
   }, /*#__PURE__*/React.createElement(TimelineView, {
     cards: filtered,
     cols: displayCols
-  })), !loading && view === "kanban" && /*#__PURE__*/React.createElement("div", null,
-  /*#__PURE__*/React.createElement("div", {
-    style: {background:"#fff",border:"1px solid #E2E8F0",borderRadius:10,marginBottom:10,display:"flex",alignItems:"center",gap:1,padding:2}
-  },
-    [["lista","📄 Lista"],["calendario","📅 Calendário"],["timeline","⏱ Linha do Tempo"]].map(function(it){
-      return /*#__PURE__*/React.createElement("button",{
-        key:it[0],
-        onClick:function(){setView(it[0]);},
-        style:{flex:1,padding:"6px 12px",border:"none",borderRadius:8,fontSize:12,fontWeight:400,
-          background:"transparent",color:"#64748B",cursor:"pointer",transition:"all .15s",fontFamily:"inherit"},
-        onMouseEnter:function(e){e.currentTarget.style.background="#F1F5F9";e.currentTarget.style.color="#0F172A";},
-        onMouseLeave:function(e){e.currentTarget.style.background="transparent";e.currentTarget.style.color="#64748B";}
-      }, it[1]);
-    })
-  ),
-  /*#__PURE__*/React.createElement("div", {
+  })), !loading && view === "kanban" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 12,
