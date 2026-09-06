@@ -619,10 +619,8 @@ function App(){
     const data=[hdrs,...filtered.map(r=>fields.map(f=>r[f]||""))];
     const ws=window.XLSX.utils.aoa_to_sheet(data);
     // Larguras
-    ws["!cols"]=COLS.map(([,,cls])=>{
-      const w={col-data:10,col-hora:8,col-ficha:16,col-nome:24,col-setor:16,col-proc:14,col-esp:18,col-diag:22,col-status:24,col-grav:12,col-drdata:10,col-drhora:8,col-dest:16,col-amb:12,col-bdata:10,col-saida:8,col-esp2:10,col-obs:24,col-enf:16,col-tec:16,col-med:16,col-ret:8}[cls]||14;
-      return {wch:w};
-    });
+    const colWidths={"col-data":10,"col-hora":8,"col-ficha":16,"col-nome":24,"col-setor":16,"col-proc":14,"col-esp":18,"col-diag":22,"col-status":24,"col-grav":12,"col-drdata":10,"col-drhora":8,"col-dest":16,"col-amb":12,"col-bdata":10,"col-saida":8,"col-esp2":10,"col-obs":24,"col-enf":16,"col-tec":16,"col-med":16,"col-ret":8};
+    ws["!cols"]=COLS.map(([,,cls])=>({wch:colWidths[cls]||14}));
     const wb=window.XLSX.utils.book_new();
     window.XLSX.utils.book_append_sheet(wb,"Remoções",ws);
     window.XLSX.writeFile(wb,`remocoes_${new Date().toISOString().slice(0,10)}.xlsx`);
