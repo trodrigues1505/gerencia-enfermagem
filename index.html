@@ -26,23 +26,13 @@ input,select,textarea,button{font-family:inherit}
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:99px}
 kbd{font-family:monospace;background:#F1F5F9;padding:1px 5px;border-radius:3px;border:1px solid #E2E8F0;font-size:10px}
-#install-banner{display:none;position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#0F172A;color:#fff;padding:10px 18px;border-radius:12px;font-size:13px;font-weight:600;z-index:9997;box-shadow:0 4px 20px rgba(0,0,0,.3);gap:10px;align-items:center;white-space:nowrap}
-#install-banner.show{display:flex}
+#install-banner{display:none}
 </style>
 </head>
 <body>
 <div id="root"></div>
-<div id="install-banner">
-  Instalar — Gerência de Enfermagem
-  <button id="btn-install" style="background:#1E40AF;border:none;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">Instalar</button>
-  <button onclick="document.getElementById('install-banner').classList.remove('show')" style="background:none;border:none;color:#94A3B8;cursor:pointer;font-size:16px;margin-left:4px">✕</button>
-</div>
 <script>
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});}
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('install-banner').classList.add('show');});
-document.getElementById('btn-install').onclick=function(){if(!deferredPrompt)return;deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;document.getElementById('install-banner').classList.remove('show');});};
-window.addEventListener('appinstalled',()=>document.getElementById('install-banner').classList.remove('show'));
 </script>
 <script>
 const {
@@ -209,9 +199,12 @@ function buildText(cards, cols, settings) {
     cc.forEach(c => {
       lines.push("");
       if (c.pr) lines.push(PR_EMOJI[c.pr] + " *PRIORIDADE " + String(c.pr).padStart(2, "0") + "*");
-      const pacLabel = c.is_rn ? "[RN]" : "[PAC]";
-      lines.push(pacLabel + " *" + c.nome + "*" + (c.idade ? " - " + c.idade : ""));
-      if (c.hd) lines.push("HD: " + c.hd);
+      const catL = {
+        pediatria: "[Ped]",
+        psiquiatria: "[Psi]"
+      };
+      const catT = c.categoria && c.categoria !== "normal" ? catL[c.categoria] : c.is_rn ? "[RN]" : "";
+      lines.push(`[PAC]${catT ? " " + catT : ""} *${c.nome}*${c.idade ? ` - ${c.idade}` : ""}`);
       if (c.setor) lines.push("Local: " + c.setor);
       const ambTxt = c.amb ? c.amb.includes("Av") ? "Amb. Avancada" : "Amb. Basica" : "";
       if (c.rec && c.hosp) {
@@ -767,6 +760,22 @@ function CardModal({
     disabled: !isAdmin,
     full: true
   }), /*#__PURE__*/React.createElement(Field, {
+    label: "Categoria",
+    fieldKey: "categoria",
+    value: form.categoria || "normal",
+    onChange: upd,
+    disabled: !isAdmin,
+    opts: [{
+      v: "normal",
+      t: "Normal"
+    }, {
+      v: "pediatria",
+      t: "👶 Pediatria"
+    }, {
+      v: "psiquiatria",
+      t: "🧠 Psiquiatria"
+    }]
+  }), /*#__PURE__*/React.createElement(Field, {
     label: "Recém-nascido?",
     fieldKey: "is_rn",
     value: form.is_rn ? "Sim" : "Não",
@@ -1092,7 +1101,8 @@ function ShareModal({
   showT,
   exportPNG,
   generatePDF,
-  exportExcel
+  exportExcel,
+  currentView
 }) {
   const text = buildText(cards, cols, settings);
   function doShare() {
@@ -1153,14 +1163,14 @@ function ShareModal({
     variant: "ghost",
     onClick: () => {
       onClose();
-      setTimeout(() => exportPNG(), 200);
+      setTimeout(() => exportPNG(currentView), 200);
     },
     style: {
       fontSize: 12,
       padding: "9px",
       textAlign: "center"
     }
-  }, "🖼 PNG do Kanban"), /*#__PURE__*/React.createElement(Btn, {
+  }, "🖼 PNG da tela atual"), /*#__PURE__*/React.createElement(Btn, {
     variant: "ghost",
     onClick: () => {
       onClose();
@@ -1723,12 +1733,10 @@ const SUBCOL_SPECS = [{
   keywords: ["pediatri", "pedi", "neonat", "rn de", "rn ", "recém"]
 }];
 function detectSubcat(card) {
-  const rec = (card.rec || "").toLowerCase();
-  const hd = (card.hd || "").toLowerCase();
-  const nom = (card.nome || "").toLowerCase();
-  for (const sc of SUBCOL_SPECS) {
-    if (sc.keywords.some(k => rec.includes(k) || hd.includes(k) || nom.includes(k) || card.is_rn && sc.key === "pediatria")) return sc;
-  }
+  // Usa campo explícito categoria; fallback para is_rn = pediatria
+  const cat = card.categoria;
+  if (cat && cat !== "normal") return SUBCOL_SPECS.find(s => s.key === cat) || null;
+  if (card.is_rn) return SUBCOL_SPECS.find(s => s.key === "pediatria") || null;
   return null;
 }
 
@@ -1869,11 +1877,41 @@ function KCard({
       fontSize: 12,
       color: "#0F172A",
       lineHeight: 1.3,
-      whiteSpace: "nowrap",
-      overflow: "hidden",
-      textOverflow: "ellipsis"
+      display: "flex",
+      alignItems: "center",
+      gap: 3,
+      minWidth: 0
     }
-  }, c.is_rn ? "👶 " : "", c.nome)), /*#__PURE__*/React.createElement(Badge, {
+  }, (() => {
+    const B = {
+      pediatria: {
+        e: "👶",
+        c: "#EC4899"
+      },
+      psiquiatria: {
+        e: "🧠",
+        c: "#8B5CF6"
+      }
+    };
+    const b = c.categoria && c.categoria !== "normal" ? B[c.categoria] : c.is_rn ? B.pediatria : null;
+    return b ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        fontWeight: 800,
+        padding: "1px 4px",
+        borderRadius: 3,
+        background: b.c + "20",
+        color: b.c,
+        flexShrink: 0
+      }
+    }, b.e) : null;
+  })(), /*#__PURE__*/React.createElement("span", {
+    style: {
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, c.nome))), /*#__PURE__*/React.createElement(Badge, {
     grav: c.grav
   })), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1965,11 +2003,32 @@ function Dashboard({
   dashMode,
   setDashMode
 }) {
-  const today = new Date().toLocaleDateString("pt-BR", {
+  const today = new Date();
+  const todayStr2 = today.toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "2-digit"
   });
-  const data = dashMode === "hoje" ? cards.filter(c => (c.adm || "").startsWith(today)) : cards;
+  const [dashStart, setDashStart] = useState("");
+  const [dashEnd, setDashEnd] = useState("");
+  function parseAdmDate(str) {
+    if (!str) return null;
+    const p = str.split("/");
+    if (p.length < 2) return null;
+    const d = parseInt(p[0]),
+      m = parseInt(p[1]) - 1,
+      y = p.length >= 3 ? parseInt(p[2]) : today.getFullYear();
+    const dt = new Date(y < 100 ? 2000 + y : y, m, d);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  let data = cards;
+  if (dashMode === "hoje") data = cards.filter(c => (c.adm || "").startsWith(todayStr2));else if (dashMode === "periodo" && dashStart && dashEnd) {
+    const s = new Date(dashStart + "T00:00:00"),
+      e = new Date(dashEnd + "T23:59:59");
+    data = cards.filter(c => {
+      const dt = parseAdmDate(c.adm);
+      return dt && dt >= s && dt <= e;
+    });
+  }
   const total = data.length,
     emergencias = data.filter(c => c.grav === "emergencia").length,
     avancadas = data.filter(c => c.amb === "Avançada").length,
@@ -2804,15 +2863,24 @@ function CalendarView({
   cols
 }) {
   const today = new Date();
+  const [viewMode, setViewMode] = useState("month"); // month | range
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [selected, setSelected] = useState(null);
   const [filterCol, setFilterCol] = useState("all");
-  // 3 opções de data que o admin escolhe — múltipla seleção
   const [dateSources, setDateSources] = useState({
     adm: true,
     aceite: true,
-    criado: false
+    criado: false,
+    saida: false,
+    retorno: false
+  });
+  // Range customizado
+  const [rangeStart, setRangeStart] = useState(() => today.toISOString().split("T")[0]);
+  const [rangeEnd, setRangeEnd] = useState(() => {
+    const d = new Date(today);
+    d.setDate(d.getDate() + 6);
+    return d.toISOString().split("T")[0];
   });
   const colLabel = cols.reduce((acc, c) => ({
     ...acc,
@@ -2820,7 +2888,9 @@ function CalendarView({
   }), {});
   function parseDate(str, refYear) {
     if (!str) return null;
-    const parts = str.replace(/[–]/g, "/").split("/");
+    // Tenta ISO primeiro
+    if (str.includes("T")) return new Date(str);
+    const parts = str.split("/");
     if (parts.length < 2) return null;
     const d = parseInt(parts[0]),
       m = parseInt(parts[1]) - 1;
@@ -2831,58 +2901,78 @@ function CalendarView({
   }
   function getCardDates(c) {
     const dates = [];
-    const push = (dt, label, col) => {
+    const push = (dt, label) => {
       if (dt) dates.push({
         date: dt,
         label,
-        col: col || c.col_id
+        col: c.col_id,
+        card: c
       });
     };
-    if (dateSources.adm) push(parseDate(c.adm, year), "Admissão", c.col_id);
-    if (dateSources.aceite) push(parseDate(c.data_aceite, year), "Aceite", "aceite");
-    if (dateSources.criado && c.created_at) push(new Date(c.created_at), "Criado", c.col_id);
+    if (dateSources.adm) push(parseDate(c.adm, year), "Admissão");
+    if (dateSources.aceite) push(parseDate(c.data_aceite, year), "Aceite");
+    if (dateSources.criado && c.created_at) push(new Date(c.created_at), "Criado");
+    if (dateSources.saida) push(parseDate(c.saida, year), "Saída");
+    if (dateSources.retorno) push(parseDate(c.retorno, year), "Retorno");
     return dates;
   }
-  const cardsByDay = {};
   const filteredCards = filterCol === "all" ? cards : cards.filter(c => c.col_id === filterCol);
+
+  // Monta mapa YYYY-MM-DD → eventos
+  const cardsByDay = {};
   filteredCards.forEach(c => {
     getCardDates(c).forEach(({
       date,
       label,
-      col
+      col,
+      card
     }) => {
       const key = date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
       if (!cardsByDay[key]) cardsByDay[key] = [];
       cardsByDay[key].push({
-        card: c,
+        card,
         label,
         col
       });
     });
   });
+  const SRC_OPTS = [{
+    k: "adm",
+    label: "Admissão",
+    color: "#F59E0B"
+  }, {
+    k: "aceite",
+    label: "Aceite",
+    color: "#3B82F6"
+  }, {
+    k: "criado",
+    label: "Criado",
+    color: "#8B5CF6"
+  }, {
+    k: "saida",
+    label: "Saída",
+    color: "#16A34A"
+  }, {
+    k: "retorno",
+    label: "Retorno",
+    color: "#EC4899"
+  }];
+  const SRC_COLOR = SRC_OPTS.reduce((acc, o) => ({
+    ...acc,
+    [o.k]: o.color
+  }), {});
+  const labelToSrc = {
+    "Admissão": "adm",
+    "Aceite": "aceite",
+    "Criado": "criado",
+    "Saída": "saida",
+    "Retorno": "retorno"
+  };
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstWeekday = new Date(year, month, 1).getDay();
   const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
   const todayKey = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
-  const COL_DOT = {
-    pendente: "#F59E0B",
-    aceite: "#3B82F6",
-    psiquiatria: "#8B5CF6",
-    andamento: "#EF4444",
-    finalizado: "#6B7280",
-    pediatria: "#EC4899"
-  };
-  const SRC_COLORS = {
-    adm: "#F59E0B",
-    aceite: "#3B82F6",
-    criado: "#8B5CF6"
-  };
-  const SRC_LABELS = {
-    adm: "Admissão",
-    aceite: "Aceite",
-    criado: "Criado no sistema"
-  };
   function prevMonth() {
     if (month === 0) {
       setMonth(11);
@@ -2897,248 +2987,85 @@ function CalendarView({
     } else setMonth(m => m + 1);
     setSelected(null);
   }
-  function toggleSrc(key) {
+  function toggleSrc(k) {
     setDateSources(p => ({
       ...p,
-      [key]: !p[key]
+      [k]: !p[k]
     }));
     setSelected(null);
   }
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+
+  // Cria lista de dias do range
+  function getRangeDays() {
+    const days = [];
+    const s = new Date(rangeStart + "T00:00:00");
+    const e = new Date(rangeEnd + "T00:00:00");
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) return days;
+    for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+      const key = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      days.push({
+        key,
+        date: new Date(d),
+        cards: cardsByDay[key] || []
+      });
+    }
+    return days.slice(0, 62); // máx 62 dias
+  }
+  const Controls = () => /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 12,
       flexWrap: "wrap",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: prevMonth,
-    style: {
-      background: "#fff",
-      border: "1px solid #E2E8F0",
-      borderRadius: 7,
-      padding: "5px 11px",
-      cursor: "pointer",
-      fontSize: 14,
-      fontWeight: 700
-    }
-  }, "‹"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 700,
-      fontSize: 14,
-      color: "#0F172A",
-      minWidth: 160,
-      textAlign: "center"
-    }
-  }, monthNames[month], " ", year), /*#__PURE__*/React.createElement("button", {
-    onClick: nextMonth,
-    style: {
-      background: "#fff",
-      border: "1px solid #E2E8F0",
-      borderRadius: 7,
-      padding: "5px 11px",
-      cursor: "pointer",
-      fontSize: 14,
-      fontWeight: 700
-    }
-  }, "›"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setMonth(today.getMonth());
-      setYear(today.getFullYear());
-    },
-    style: {
-      background: "#0F172A",
-      border: "none",
-      borderRadius: 6,
-      padding: "5px 10px",
-      cursor: "pointer",
-      fontSize: 11,
-      fontWeight: 600,
-      color: "#fff"
-    }
-  }, "Hoje")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
       gap: 6,
-      alignItems: "center",
-      flexWrap: "wrap"
+      marginBottom: 10,
+      alignItems: "center"
     }
-  }, Object.entries(SRC_LABELS).map(([key, label]) => /*#__PURE__*/React.createElement("button", {
-    key: key,
-    onClick: () => toggleSrc(key),
+  }, SRC_OPTS.map(o => /*#__PURE__*/React.createElement("button", {
+    key: o.k,
+    onClick: () => toggleSrc(o.k),
     style: {
-      padding: "4px 10px",
-      borderRadius: 6,
-      fontSize: 11,
+      padding: "3px 9px",
+      borderRadius: 5,
+      fontSize: 10,
       fontWeight: 600,
       cursor: "pointer",
-      background: dateSources[key] ? SRC_COLORS[key] : "#F1F5F9",
-      color: dateSources[key] ? "#fff" : "#64748B",
-      border: `1px solid ${dateSources[key] ? SRC_COLORS[key] : "#E2E8F0"}`,
-      transition: "all .15s"
+      transition: "all .12s",
+      background: dateSources[o.k] ? o.color : "#F1F5F9",
+      color: dateSources[o.k] ? "#fff" : "#64748B",
+      border: `1px solid ${dateSources[o.k] ? o.color : "#E2E8F0"}`
     }
-  }, label)), /*#__PURE__*/React.createElement("select", {
+  }, o.label)), /*#__PURE__*/React.createElement("select", {
     value: filterCol,
     onChange: e => setFilterCol(e.target.value),
     style: {
-      padding: "5px 8px",
+      padding: "4px 8px",
       border: "1px solid #E2E8F0",
-      borderRadius: 7,
+      borderRadius: 6,
       fontSize: 11,
       background: "#fff",
       color: "#374151",
-      fontFamily: "inherit"
+      fontFamily: "inherit",
+      marginLeft: "auto"
     }
   }, /*#__PURE__*/React.createElement("option", {
     value: "all"
   }, "Todas as colunas"), cols.map(c => /*#__PURE__*/React.createElement("option", {
     key: c.id,
     value: c.id
-  }, c.label))))), /*#__PURE__*/React.createElement("div", {
+  }, c.label))));
+  const DayDetail = () => selected && /*#__PURE__*/React.createElement("div", {
     style: {
-      display: "flex",
-      gap: 10,
-      marginBottom: 10,
-      flexWrap: "wrap"
-    }
-  }, Object.entries(SRC_LABELS).filter(([k]) => dateSources[k]).map(([key, label]) => /*#__PURE__*/React.createElement("div", {
-    key: key,
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 4,
-      fontSize: 10,
-      color: "#64748B"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      width: 8,
-      height: 8,
-      borderRadius: 2,
-      background: SRC_COLORS[key],
-      display: "inline-block"
-    }
-  }), label))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#fff",
-      borderRadius: 12,
-      border: "1px solid #E2E8F0",
-      overflow: "hidden"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "repeat(7,1fr)",
-      background: "#F8FAFC",
-      borderBottom: "1px solid #E2E8F0"
-    }
-  }, weekDays.map(d => /*#__PURE__*/React.createElement("div", {
-    key: d,
-    style: {
-      padding: "7px 4px",
-      textAlign: "center",
-      fontSize: 10,
-      fontWeight: 700,
-      color: "#94A3B8",
-      textTransform: "uppercase",
-      letterSpacing: ".05em"
-    }
-  }, d))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "repeat(7,1fr)"
-    }
-  }, Array.from({
-    length: firstWeekday
-  }).map((_, i) => /*#__PURE__*/React.createElement("div", {
-    key: "e" + i,
-    style: {
-      minHeight: 76,
-      borderBottom: "1px solid #F1F5F9",
-      borderRight: "1px solid #F1F5F9",
-      background: "#FAFAFA"
-    }
-  })), Array.from({
-    length: daysInMonth
-  }).map((_, idx) => {
-    const day = idx + 1;
-    const key = year + "-" + String(month + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
-    const dayCards = cardsByDay[key] || [];
-    const isToday = key === todayKey;
-    const isSel = selected?.key === key;
-    return /*#__PURE__*/React.createElement("div", {
-      key: day,
-      onClick: () => setSelected(dayCards.length ? {
-        key,
-        day,
-        cards: dayCards
-      } : null),
-      style: {
-        minHeight: 76,
-        borderBottom: "1px solid #F1F5F9",
-        borderRight: "1px solid #F1F5F9",
-        padding: "4px",
-        cursor: dayCards.length ? "pointer" : "default",
-        background: isSel ? "#EFF6FF" : isToday ? "#FFF7ED" : "#fff",
-        transition: "background .1s"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11,
-        fontWeight: isToday ? 700 : 500,
-        color: isToday ? "#C2410C" : "#374151",
-        marginBottom: 2,
-        width: 20,
-        height: 20,
-        borderRadius: "50%",
-        background: isToday ? "#FED7AA" : "transparent",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center"
-      }
-    }, day), dayCards.slice(0, 3).map((item, i) => /*#__PURE__*/React.createElement("div", {
-      key: i,
-      style: {
-        fontSize: 9,
-        fontWeight: 600,
-        padding: "1px 4px",
-        borderRadius: 3,
-        marginBottom: 1,
-        background: (SRC_COLORS[item.label === "Admissão" ? "adm" : item.label === "Aceite" ? "aceite" : "criado"] || "#94A3B8") + "25",
-        color: SRC_COLORS[item.label === "Admissão" ? "adm" : item.label === "Aceite" ? "aceite" : "criado"] || "#94A3B8",
-        whiteSpace: "nowrap",
-        overflow: "hidden",
-        textOverflow: "ellipsis"
-      }
-    }, item.label[0], ": ", item.card.nome.split(" ")[0])), dayCards.length > 3 && /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 9,
-        color: "#94A3B8",
-        fontWeight: 600
-      }
-    }, "+", dayCards.length - 3));
-  }))), selected && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 12,
+      marginTop: 10,
       background: "#fff",
       border: "1px solid #E2E8F0",
-      borderRadius: 12,
-      padding: "14px 18px"
+      borderRadius: 10,
+      padding: "12px 16px"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: 10
+      marginBottom: 8
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3146,18 +3073,16 @@ function CalendarView({
       fontSize: 13,
       color: "#0F172A"
     }
-  }, selected.day, " de ", monthNames[month], " — ", selected.cards.length, " evento", selected.cards.length !== 1 ? "s" : ""), /*#__PURE__*/React.createElement("button", {
+  }, selected.day, " — ", selected.cards.length, " evento", selected.cards.length !== 1 ? "s" : ""), /*#__PURE__*/React.createElement("button", {
     onClick: () => setSelected(null),
     style: {
       background: "none",
       border: "none",
       cursor: "pointer",
       color: "#94A3B8",
-      fontSize: 17
+      fontSize: 16
     }
   }, "✕")), selected.cards.map((item, i) => {
-    const srcKey = item.label === "Admissão" ? "adm" : item.label === "Aceite" ? "aceite" : "criado";
-    const srcColor = SRC_COLORS[srcKey] || "#94A3B8";
     const gc = {
       emergencia: "#EF4444",
       urgencia: "#EAB308",
@@ -3168,23 +3093,23 @@ function CalendarView({
       retorno: "#EC4899"
     };
     const dot = gc[item.card.grav] || "#EAB308";
+    const srcColor = SRC_COLOR[labelToSrc[item.label] || "adm"] || "#94A3B8";
     return /*#__PURE__*/React.createElement("div", {
       key: i,
       style: {
         display: "flex",
-        gap: 10,
-        padding: "8px 0",
+        gap: 8,
+        padding: "7px 0",
         borderBottom: i < selected.cards.length - 1 ? "1px solid #F1F5F9" : "none",
         alignItems: "flex-start"
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         width: 3,
+        minHeight: 28,
         borderRadius: 99,
         background: dot,
-        flexShrink: 0,
-        alignSelf: "stretch",
-        minHeight: 32
+        flexShrink: 0
       }
     }), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -3193,7 +3118,7 @@ function CalendarView({
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
-        gap: 6,
+        gap: 5,
         alignItems: "center",
         marginBottom: 1
       }
@@ -3223,7 +3148,338 @@ function CalendarView({
         color: "#94A3B8"
       }
     }, colLabel[item.card.col_id])));
-  })));
+  }));
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 2,
+      marginBottom: 10,
+      background: "#F1F5F9",
+      borderRadius: 8,
+      padding: 2,
+      width: "fit-content"
+    }
+  }, [["month", "📅 Mês"], ["range", "📆 Período"]].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
+    key: id,
+    onClick: () => {
+      setViewMode(id);
+      setSelected(null);
+    },
+    style: {
+      padding: "5px 14px",
+      borderRadius: 6,
+      border: "none",
+      fontSize: 11,
+      fontWeight: viewMode === id ? 700 : 400,
+      background: viewMode === id ? "#0F172A" : "transparent",
+      color: viewMode === id ? "#fff" : "#64748B",
+      cursor: "pointer"
+    }
+  }, label))), /*#__PURE__*/React.createElement(Controls, null), viewMode === "month" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: prevMonth,
+    style: {
+      background: "#fff",
+      border: "1px solid #E2E8F0",
+      borderRadius: 6,
+      padding: "4px 10px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "‹"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#0F172A",
+      minWidth: 140,
+      textAlign: "center"
+    }
+  }, monthNames[month], " ", year), /*#__PURE__*/React.createElement("button", {
+    onClick: nextMonth,
+    style: {
+      background: "#fff",
+      border: "1px solid #E2E8F0",
+      borderRadius: 6,
+      padding: "4px 10px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "›"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setMonth(today.getMonth());
+      setYear(today.getFullYear());
+      setSelected(null);
+    },
+    style: {
+      background: "#0F172A",
+      border: "none",
+      borderRadius: 5,
+      padding: "4px 10px",
+      cursor: "pointer",
+      fontSize: 11,
+      fontWeight: 600,
+      color: "#fff"
+    }
+  }, "Hoje")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      borderRadius: 10,
+      border: "1px solid #E2E8F0",
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(7,1fr)",
+      background: "#F8FAFC",
+      borderBottom: "1px solid #E2E8F0"
+    }
+  }, weekDays.map(d => /*#__PURE__*/React.createElement("div", {
+    key: d,
+    style: {
+      padding: "6px 3px",
+      textAlign: "center",
+      fontSize: 9,
+      fontWeight: 700,
+      color: "#94A3B8",
+      textTransform: "uppercase",
+      letterSpacing: ".05em"
+    }
+  }, d))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(7,1fr)"
+    }
+  }, Array.from({
+    length: firstWeekday
+  }).map((_, i) => /*#__PURE__*/React.createElement("div", {
+    key: "e" + i,
+    style: {
+      minHeight: 68,
+      borderBottom: "1px solid #F1F5F9",
+      borderRight: "1px solid #F1F5F9",
+      background: "#FAFAFA"
+    }
+  })), Array.from({
+    length: daysInMonth
+  }).map((_, idx) => {
+    const day = idx + 1;
+    const key = year + "-" + String(month + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
+    const dayCards = cardsByDay[key] || [];
+    const isToday = key === todayKey;
+    const isSel = selected?.key === key;
+    const dayLabel = monthNames[month].slice(0, 3) + " " + day;
+    return /*#__PURE__*/React.createElement("div", {
+      key: day,
+      onClick: () => setSelected(dayCards.length ? {
+        key,
+        day: dayLabel,
+        cards: dayCards
+      } : null),
+      style: {
+        minHeight: 68,
+        borderBottom: "1px solid #F1F5F9",
+        borderRight: "1px solid #F1F5F9",
+        padding: "3px",
+        cursor: dayCards.length ? "pointer" : "default",
+        background: isSel ? "#EFF6FF" : isToday ? "#FFF7ED" : "#fff",
+        transition: "background .1s"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        fontWeight: isToday ? 700 : 500,
+        color: isToday ? "#C2410C" : "#374151",
+        marginBottom: 1,
+        width: 18,
+        height: 18,
+        borderRadius: "50%",
+        background: isToday ? "#FED7AA" : "transparent",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }
+    }, day), dayCards.slice(0, 3).map((item, i) => /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        fontSize: 8,
+        fontWeight: 600,
+        padding: "1px 3px",
+        borderRadius: 2,
+        marginBottom: 1,
+        background: (SRC_COLOR[labelToSrc[item.label] || "adm"] || "#94A3B8") + "25",
+        color: SRC_COLOR[labelToSrc[item.label] || "adm"] || "#94A3B8",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis"
+      }
+    }, item.label[0], ": ", item.card.nome.split(" ")[0])), dayCards.length > 3 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 8,
+        color: "#94A3B8",
+        fontWeight: 600
+      }
+    }, "+", dayCards.length - 3));
+  }))), /*#__PURE__*/React.createElement(DayDetail, null)), viewMode === "range" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "center",
+      marginBottom: 12,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      fontWeight: 600,
+      color: "#64748B"
+    }
+  }, "De"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: rangeStart,
+    onChange: e => {
+      setRangeStart(e.target.value);
+      setSelected(null);
+    },
+    style: {
+      padding: "5px 8px",
+      border: "1px solid #E2E8F0",
+      borderRadius: 6,
+      fontSize: 11,
+      fontFamily: "inherit"
+    }
+  }), /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      fontWeight: 600,
+      color: "#64748B"
+    }
+  }, "até"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: rangeEnd,
+    onChange: e => {
+      setRangeEnd(e.target.value);
+      setSelected(null);
+    },
+    style: {
+      padding: "5px 8px",
+      border: "1px solid #E2E8F0",
+      borderRadius: 6,
+      fontSize: 11,
+      fontFamily: "inherit"
+    }
+  })), [["7d", "7 dias"], ["14d", "14 dias"], ["30d", "30 dias"]].map(([code, label]) => /*#__PURE__*/React.createElement("button", {
+    key: code,
+    onClick: () => {
+      const s = new Date();
+      const e = new Date();
+      e.setDate(e.getDate() + (code === "7d" ? 6 : code === "14d" ? 13 : 29));
+      setRangeStart(s.toISOString().split("T")[0]);
+      setRangeEnd(e.toISOString().split("T")[0]);
+      setSelected(null);
+    },
+    style: {
+      padding: "4px 8px",
+      border: "1px solid #E2E8F0",
+      borderRadius: 5,
+      background: "#fff",
+      color: "#64748B",
+      cursor: "pointer",
+      fontSize: 10
+    }
+  }, label))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 4
+    }
+  }, getRangeDays().map(({
+    key,
+    date,
+    cards: dayCards
+  }) => {
+    if (!dayCards.length) return null;
+    const isToday = key === todayKey;
+    const isSel = selected?.key === key;
+    const dayLabel = date.toLocaleDateString("pt-BR", {
+      weekday: "short",
+      day: "2-digit",
+      month: "2-digit"
+    });
+    return /*#__PURE__*/React.createElement("div", {
+      key: key,
+      onClick: () => setSelected({
+        key,
+        day: dayLabel,
+        cards: dayCards
+      }),
+      style: {
+        display: "flex",
+        gap: 10,
+        padding: "8px 12px",
+        borderRadius: 8,
+        cursor: "pointer",
+        background: isSel ? "#EFF6FF" : isToday ? "#FFF7ED" : "#fff",
+        border: `1px solid ${isSel ? "#BFDBFE" : isToday ? "#FDE68A" : "#E2E8F0"}`,
+        transition: "background .1s"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        minWidth: 80,
+        fontWeight: isToday ? 700 : 600,
+        fontSize: 11,
+        color: isToday ? "#C2410C" : "#374151"
+      }
+    }, dayLabel), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        display: "flex",
+        gap: 4,
+        flexWrap: "wrap"
+      }
+    }, dayCards.map((item, i) => {
+      const srcColor = SRC_COLOR[labelToSrc[item.label] || "adm"] || "#94A3B8";
+      return /*#__PURE__*/React.createElement("span", {
+        key: i,
+        style: {
+          fontSize: 9,
+          fontWeight: 600,
+          padding: "1px 5px",
+          borderRadius: 3,
+          background: srcColor + "20",
+          color: srcColor,
+          whiteSpace: "nowrap"
+        }
+      }, item.label[0], ": ", item.card.nome.split(" ")[0]);
+    })), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#94A3B8",
+        flexShrink: 0
+      }
+    }, dayCards.length, " evento", dayCards.length !== 1 ? "s" : ""));
+  }), getRangeDays().filter(d => d.cards.length).length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "32px",
+      color: "#CBD5E1",
+      fontSize: 12
+    }
+  }, "Nenhum evento no período selecionado.")), /*#__PURE__*/React.createElement(DayDetail, null)));
 }
 
 /* ─── LINHA DO TEMPO ─── */
@@ -3279,6 +3535,11 @@ function TimelineView({
       if (c.adm) push(parseAdm(c.adm), "Admissão", "#F59E0B");
       if (c.data_aceite) push(parseAdm(c.data_aceite), "Aceite confirmado", "#3B82F6");
       if (c.saida) push(parseAdm(c.saida), "Saída", "#16A34A");
+      if (c.retorno) push(parseAdm(c.retorno), "Retorno", "#EC4899");
+      if (c.cross_info) {
+        const dt = parseAdm(c.cross_info);
+        if (dt) push(dt, "Cross", COL_DOT.andamento || "#EF4444");
+      }
     });
     return events.sort((a, b) => b.ts - a.ts); // mais recente primeiro
   }
@@ -3638,6 +3899,186 @@ function TimelineView({
   }, "Nenhum evento encontrado."))));
 }
 
+/* ─── INSTALL MODAL ─── */
+function InstallModal({
+  onClose
+}) {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isAndroid = /Android/.test(navigator.userAgent);
+  const isWindows = /Windows/.test(navigator.userAgent) && !isAndroid;
+  return /*#__PURE__*/React.createElement(ModalShell, {
+    title: "Instalar o app",
+    onClose: onClose,
+    maxWidth: 420
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: isAndroid ? "#F0FDF4" : "#F8FAFC",
+      border: `1px solid ${isAndroid ? "#86EFAC" : "#E2E8F0"}`,
+      borderRadius: 10,
+      padding: "12px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 12,
+      color: "#0F172A",
+      marginBottom: 6
+    }
+  }, "🤖 Android (Chrome)"), /*#__PURE__*/React.createElement("ol", {
+    style: {
+      paddingLeft: 16,
+      fontSize: 11,
+      color: "#374151",
+      lineHeight: 1.9
+    }
+  }, /*#__PURE__*/React.createElement("li", null, "Abra o app no ", /*#__PURE__*/React.createElement("strong", null, "Google Chrome")), /*#__PURE__*/React.createElement("li", null, "Toque no menu ", /*#__PURE__*/React.createElement("strong", null, "⋮"), " (canto superior direito)"), /*#__PURE__*/React.createElement("li", null, "Toque em ", /*#__PURE__*/React.createElement("strong", null, "\"Adicionar à tela inicial\"")), /*#__PURE__*/React.createElement("li", null, "Confirme em ", /*#__PURE__*/React.createElement("strong", null, "\"Adicionar\""))), isAndroid && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 6,
+      fontSize: 11,
+      color: "#16A34A",
+      fontWeight: 600
+    }
+  }, "✓ Você está no Android — siga os passos acima")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: isIOS ? "#F0FDF4" : "#F8FAFC",
+      border: `1px solid ${isIOS ? "#86EFAC" : "#E2E8F0"}`,
+      borderRadius: 10,
+      padding: "12px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 12,
+      color: "#0F172A",
+      marginBottom: 6
+    }
+  }, "🍎 iPhone / iPad (Safari)"), /*#__PURE__*/React.createElement("ol", {
+    style: {
+      paddingLeft: 16,
+      fontSize: 11,
+      color: "#374151",
+      lineHeight: 1.9
+    }
+  }, /*#__PURE__*/React.createElement("li", null, "Abra o app no ", /*#__PURE__*/React.createElement("strong", null, "Safari")), /*#__PURE__*/React.createElement("li", null, "Toque no botão de ", /*#__PURE__*/React.createElement("strong", null, "Compartilhar"), " (□↑ na barra inferior)"), /*#__PURE__*/React.createElement("li", null, "Role para baixo e toque em ", /*#__PURE__*/React.createElement("strong", null, "\"Adicionar à Tela de Início\"")), /*#__PURE__*/React.createElement("li", null, "Toque em ", /*#__PURE__*/React.createElement("strong", null, "\"Adicionar\""))), isIOS && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 6,
+      fontSize: 11,
+      color: "#16A34A",
+      fontWeight: 600
+    }
+  }, "✓ Você está no iOS — siga os passos acima")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: isWindows ? "#F0FDF4" : "#F8FAFC",
+      border: `1px solid ${isWindows ? "#86EFAC" : "#E2E8F0"}`,
+      borderRadius: 10,
+      padding: "12px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 12,
+      color: "#0F172A",
+      marginBottom: 6
+    }
+  }, "🖥 Windows (Chrome / Edge)"), /*#__PURE__*/React.createElement("ol", {
+    style: {
+      paddingLeft: 16,
+      fontSize: 11,
+      color: "#374151",
+      lineHeight: 1.9
+    }
+  }, /*#__PURE__*/React.createElement("li", null, "Abra o app no ", /*#__PURE__*/React.createElement("strong", null, "Google Chrome"), " ou ", /*#__PURE__*/React.createElement("strong", null, "Microsoft Edge")), /*#__PURE__*/React.createElement("li", null, "Clique no ícone ", /*#__PURE__*/React.createElement("strong", null, "⊕"), " na barra de endereços (canto direito)"), /*#__PURE__*/React.createElement("li", null, "Clique em ", /*#__PURE__*/React.createElement("strong", null, "\"Instalar\""))), isWindows && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 6,
+      fontSize: 11,
+      color: "#16A34A",
+      fontWeight: 600
+    }
+  }, "✓ Você está no Windows — siga os passos acima")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "#94A3B8",
+      textAlign: "center"
+    }
+  }, "Após instalar, o app abre como aplicativo nativo, sem barra do browser.")));
+}
+
+/* ─── SNAPSHOT PANEL ─── */
+function SnapshotPanel({
+  snapshots,
+  onLoad,
+  onDelete,
+  onClose
+}) {
+  return /*#__PURE__*/React.createElement(ModalShell, {
+    title: "Snapshots salvos",
+    subtitle: "Carregar estado anterior",
+    onClose: onClose,
+    maxWidth: 460,
+    footer: /*#__PURE__*/React.createElement(Btn, {
+      variant: "ghost",
+      onClick: onClose
+    }, "Fechar")
+  }, snapshots.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "32px",
+      color: "#CBD5E1",
+      fontSize: 12
+    }
+  }, "Nenhum snapshot salvo.", /*#__PURE__*/React.createElement("br", null), "Use o botão 💾 Salvar no banner de edição."), snapshots.map(snap => /*#__PURE__*/React.createElement("div", {
+    key: snap.id,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "10px 0",
+      borderBottom: "1px solid #F8FAFC",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#0F172A"
+    }
+  }, snap.label), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#94A3B8"
+    }
+  }, snap.cards?.length || 0, " pacientes · ", snap.cols?.length || 0, " colunas")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: () => onLoad(snap),
+    style: {
+      fontSize: 11,
+      padding: "4px 12px"
+    }
+  }, "Carregar"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onDelete(snap.id),
+    style: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      color: "#CBD5E1",
+      fontSize: 15,
+      padding: "4px 6px"
+    }
+  }, "✕")))));
+}
+
 /* ════════════════════════════════════════════
    MAIN APP
    ════════════════════════════════════════════ */
@@ -3664,11 +4105,15 @@ function App() {
   const [minimized, setMinimized] = useState(new Set());
   const [singleCol, setSingleCol] = useState(null);
   const [sortCol, setSortCol] = useState(null);
+  const [sortByPriority, setSortByPriority] = useState(false);
   const [toast, setToast] = useState(null);
   const [undoQueue, setUndoQueue] = useState([]); // desfazer exclusão
   const [newComAlerts, setNewComAlerts] = useState([]); // {id, card_id, card_nome, comment}
   const [showComPanel, setShowComPanel] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showInstall, setShowInstall] = useState(false);
+  const [showSnapPanel, setShowSnapPanel] = useState(false);
+  const [snapshots, setSnapshots] = useState(() => loadLS("ge_snapshots", []));
   const [showHistory, setShowHistory] = useState(false);
   const dragId = useRef(null);
   const dragOverCol = useRef(null);
@@ -3684,7 +4129,7 @@ function App() {
     loadAll();
     // polling: novos usuários pendentes (notifica admin)
     let last = Date.now();
-    const iv = setInterval(async () => {
+    const ivUsers = setInterval(async () => {
       if (!isAdmin) return;
       try {
         const rows = await sbGet("users", `status=eq.pendente&created_at=gt.${new Date(last).toISOString()}`);
@@ -3694,38 +4139,70 @@ function App() {
         }
       } catch {}
     }, 5000);
-    return () => clearInterval(iv);
+
+    // polling: verifica nova publicação para viewers (e também para admin ver lastPub)
+    let lastPubId = null;
+    const ivPub = setInterval(async () => {
+      try {
+        const pub = await sbGet("publications", "order=created_at.desc&limit=1");
+        if (!pub.length) return;
+        const p = pub[0];
+        if (p.id === lastPubId) return; // sem mudança
+        lastPubId = p.id;
+        const snap = p.snapshot;
+        setPubCards(snap.cards || []);
+        setPubCols(snap.cols || []);
+        setLastPub(new Date(p.created_at).toLocaleString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit"
+        }));
+        if (!isAdmin) showT("🔄 Kanban atualizado pela administradora!");
+      } catch {}
+    }, 15000); // a cada 15s
+
+    return () => {
+      clearInterval(ivUsers);
+      clearInterval(ivPub);
+    };
   }, [currentUser]);
 
-  // Polling de novos comentários (todos os usuários)
+  // Polling de novos comentários — knownIds em ref para não reinicializar
+  const knownComIds = useRef(new Set());
+  const cardsRef = useRef([]);
+  useEffect(() => {
+    cardsRef.current = cards;
+  }, [cards]);
   useEffect(() => {
     if (!currentUser) return;
-    let knownIds = new Set();
-    // inicializa com os IDs já carregados
-    Object.values(comments).flat().forEach(c => knownIds.add(c.id));
+    // Inicializa knownIds com comentários já carregados (só na montagem)
+    Object.values(comments).flat().forEach(c => knownComIds.current.add(c.id));
     const iv = setInterval(async () => {
       try {
-        if (!cards.length) return;
-        const ids = cards.map(x => x.id).join(",");
-        const newComs = await sbGet("comments", `card_id=in.(${ids})&order=created_at.desc&limit=20`);
-        const genuinelyNew = newComs.filter(c => !knownIds.has(c.id) && c.autor_id !== currentUser.id);
-        if (genuinelyNew.length) {
-          genuinelyNew.forEach(c => knownIds.add(c.id));
-          // Atualiza state de comentários
+        const currentCards = cardsRef.current;
+        if (!currentCards.length) return;
+        const ids = currentCards.map(x => x.id).join(",");
+        const newComs = await sbGet("comments", `card_id=in.(${ids})&order=created_at.desc&limit=30`);
+        // Marca todos como conhecidos primeiro (evita duplicar)
+        const toProcess = newComs.filter(c => !knownComIds.current.has(c.id) && c.autor_id !== currentUser.id);
+        newComs.forEach(c => knownComIds.current.add(c.id));
+        if (toProcess.length) {
           setComments(prev => {
             const next = {
               ...prev
             };
-            genuinelyNew.forEach(c => {
-              next[c.card_id] = [...(next[c.card_id] || []), c];
+            toProcess.forEach(c => {
+              const existing = next[c.card_id] || [];
+              if (!existing.find(x => x.id === c.id)) next[c.card_id] = [...existing, c];
             });
             return next;
           });
-          // Acumula alertas no painel
-          setNewComAlerts(prev => [...prev, ...genuinelyNew.map(c => ({
+          setNewComAlerts(prev => [...prev, ...toProcess.map(c => ({
             id: c.id,
             card_id: c.card_id,
-            card_nome: cards.find(k => k.id === c.card_id)?.nome || "card",
+            card_nome: currentCards.find(k => k.id === c.card_id)?.nome || "card",
             autor: c.autor_nome,
             texto: c.texto,
             hora: new Date(c.created_at).toLocaleString("pt-BR", {
@@ -3737,12 +4214,10 @@ function App() {
           }))]);
           setShowComPanel(true);
         }
-        // Também adiciona IDs conhecidos dos já carregados
-        newComs.forEach(c => knownIds.add(c.id));
       } catch {}
     }, 8000);
     return () => clearInterval(iv);
-  }, [currentUser, cards]);
+  }, [currentUser]);
 
   // Atalhos de teclado
   useEffect(() => {
@@ -4071,7 +4546,32 @@ function App() {
       showT(ex.message, "err");
     }
   }
-  async function exportPNG() {
+  async function exportPNG(targetView) {
+    showT("Gerando imagem...");
+    // Se não for kanban, captura a div da view atual
+    if (targetView && targetView !== "kanban") {
+      const el = document.getElementById("view-content");
+      if (!el) {
+        showT("Nada para capturar.", "err");
+        return;
+      }
+      try {
+        const canvas = await html2canvas(el, {
+          scale: 3,
+          backgroundColor: "#F1F5F9",
+          useCORS: true,
+          logging: false
+        });
+        const a = document.createElement("a");
+        a.href = canvas.toDataURL("image/png");
+        a.download = "ge-" + targetView + "-" + new Date().toLocaleDateString("pt-BR").replace(/\//g, "-") + ".png";
+        a.click();
+        showT("PNG exportado!");
+      } catch (e) {
+        showT("Erro: " + e.message, "err");
+      }
+      return;
+    }
     showT("Gerando imagem do Kanban completo...");
     try {
       // Cria container temporário fora da viewport com TUDO expandido
@@ -4130,7 +4630,7 @@ function App() {
       await new Promise(r => setTimeout(r, 100)); // aguarda render
 
       const canvas = await html2canvas(wrap, {
-        scale: 2,
+        scale: 3,
         backgroundColor: "#F1F5F9",
         useCORS: true,
         logging: false,
@@ -4167,37 +4667,58 @@ function App() {
         ...acc,
         [c.id]: c.label
       }), {});
+      // str() garante que nenhum valor é boolean/null/objeto — SheetJS exige strings ou números
+      const str = v => v === null || v === undefined || v === false ? "" : v === true ? "Sim" : String(v);
+      const GRAV_LABEL = {
+        emergencia: "Emergência",
+        urgencia: "Urgência",
+        andamento_cor: "Em andamento",
+        menor_gravidade: "Menor gravidade",
+        finalizado_cor: "Finalizado",
+        agendamento: "Agendamento",
+        retorno: "Retorno"
+      };
+      const CAT_LABEL = {
+        normal: "Normal",
+        pediatria: "Pediatria",
+        psiquiatria: "Psiquiatria"
+      };
       const rows = cardsData.map(c => ({
-        "Coluna": colLabel[c.col_id] || c.col_id,
-        "Prioridade": c.pr || "",
-        "Status": c.status || "",
-        "Nome": c.nome || "",
-        "Idade": c.idade || "",
-        "Admissão": c.adm || "",
-        "HD": c.hd || "",
-        "Setor/Leito": c.setor || "",
-        "Recurso": c.rec || "",
-        "Hospital": c.hosp || "",
-        "Ambulância": c.amb || "",
-        "Cross": c.cross_info || "",
-        "Receptor": c.receptor || "",
-        "Data Aceite": c.data_aceite || "",
-        "Hora Aceite": c.hora_aceite || "",
-        "Gravidade": c.grav || "",
+        "Coluna": str(colLabel[c.col_id] || c.col_id),
+        "Prioridade": str(c.pr),
+        "Status": str(c.status),
+        "Categoria": str(CAT_LABEL[c.categoria] || "Normal"),
         "RN": c.is_rn ? "Sim" : "Não",
-        "Observações": c.obs || "",
-        "Saída": c.saida || "",
-        "Retorno": c.retorno || "",
+        "Nome": str(c.nome),
+        "Idade": str(c.idade),
+        "Admissão": str(c.adm),
+        "HD": str(c.hd),
+        "Setor/Leito": str(c.setor),
+        "Recurso": str(c.rec),
+        "Hospital": str(c.hosp),
+        "Ambulância": str(c.amb),
+        "Cross": str(c.cross_info),
+        "Receptor": str(c.receptor),
+        "Data Aceite": str(c.data_aceite),
+        "Hora Aceite": str(c.hora_aceite),
+        "Gravidade": str(GRAV_LABEL[c.grav] || c.grav),
+        "Observações": str(c.obs),
+        "Saída": str(c.saida),
+        "Retorno": str(c.retorno),
         "Criado em": c.created_at ? new Date(c.created_at).toLocaleString("pt-BR") : ""
       }));
       const ws = window.XLSX.utils.json_to_sheet(rows);
       // Largura das colunas
       ws["!cols"] = [{
-        wch: 20
+        wch: 22
       }, {
         wch: 10
       }, {
-        wch: 20
+        wch: 22
+      }, {
+        wch: 12
+      }, {
+        wch: 5
       }, {
         wch: 30
       }, {
@@ -4207,7 +4728,7 @@ function App() {
       }, {
         wch: 30
       }, {
-        wch: 15
+        wch: 16
       }, {
         wch: 18
       }, {
@@ -4215,7 +4736,7 @@ function App() {
       }, {
         wch: 12
       }, {
-        wch: 20
+        wch: 22
       }, {
         wch: 20
       }, {
@@ -4223,9 +4744,7 @@ function App() {
       }, {
         wch: 10
       }, {
-        wch: 16
-      }, {
-        wch: 5
+        wch: 18
       }, {
         wch: 30
       }, {
@@ -4512,6 +5031,38 @@ function App() {
       showT("Erro ao gerar PDF: " + e.message, "err");
     }
   }
+  function saveSnapshot() {
+    const colsData = isAdmin ? cols : pubCols || cols;
+    const cardsData = isAdmin ? cards : pubCards || [];
+    const snap = {
+      id: Date.now(),
+      label: "Snapshot " + todayStr() + " " + nowStr(),
+      date: new Date().toISOString(),
+      cards: cardsData,
+      cols: colsData
+    };
+    const list = loadLS("ge_snapshots", []);
+    const updated = [snap, ...list].slice(0, 20); // mantém últimos 20
+    saveLS("ge_snapshots", updated);
+    setSnapshots(updated);
+    showT("💾 Snapshot salvo!");
+  }
+  function loadSnapshot(snap) {
+    setCards(snap.cards || []);
+    setCols(snap.cols || cols);
+    setShowSnapPanel(false);
+    showT("📂 Snapshot de " + new Date(snap.date).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    }) + " carregado.");
+  }
+  function deleteSnapshot(id) {
+    const updated = snapshots.filter(s => s.id !== id);
+    saveLS("ge_snapshots", updated);
+    setSnapshots(updated);
+  }
   function newCard(col = "pendente") {
     setSelected({
       id: "new",
@@ -4537,7 +5088,8 @@ function App() {
       is_rn: false,
       receptor: "",
       data_aceite: "",
-      hora_aceite: ""
+      hora_aceite: "",
+      categoria: "normal"
     });
   }
   const filtered = displayCards.filter(c => {
@@ -4701,6 +5253,18 @@ function App() {
       textAlign: "center"
     }
   }, newComAlerts.length)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowInstall(true),
+    title: "Instalar app",
+    style: {
+      padding: "6px 10px",
+      border: "1px solid #334155",
+      borderRadius: 7,
+      background: "none",
+      color: "#94A3B8",
+      cursor: "pointer",
+      fontSize: 12
+    }
+  }, "📲"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowSettings(true),
     style: {
       padding: "6px 10px",
@@ -4757,7 +5321,35 @@ function App() {
       gap: 6,
       alignItems: "center"
     }
-  }, /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: saveSnapshot,
+    style: {
+      padding: "3px 10px",
+      border: "1px solid #FDE68A",
+      borderRadius: 5,
+      background: "none",
+      color: "#92400E",
+      cursor: "pointer",
+      fontSize: 11,
+      fontWeight: 600
+    }
+  }, "💾 Salvar"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowSnapPanel(true),
+    style: {
+      padding: "3px 10px",
+      border: "1px solid #FDE68A",
+      borderRadius: 5,
+      background: "none",
+      color: "#92400E",
+      cursor: "pointer",
+      fontSize: 11
+    }
+  }, "📂 Carregar (", snapshots.length, ")")), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 10,
       color: "#92400E"
@@ -4862,18 +5454,18 @@ function App() {
   }), /*#__PURE__*/React.createElement(NavBtn, {
     id: "lista",
     label: "📄 Lista"
-  }), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
-    id: "usuarios",
-    label: "👥 Profissionais"
-  }), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
-    id: "historico",
-    label: "📜 Histórico"
   }), /*#__PURE__*/React.createElement(NavBtn, {
     id: "calendario",
     label: "📅 Calendário"
   }), /*#__PURE__*/React.createElement(NavBtn, {
     id: "timeline",
     label: "⏱ Linha do Tempo"
+  }), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
+    id: "usuarios",
+    label: "👥 Profissionais"
+  }), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
+    id: "historico",
+    label: "📜 Histórico"
   })), /*#__PURE__*/React.createElement("input", {
     placeholder: "Buscar…",
     value: search,
@@ -4905,7 +5497,20 @@ function App() {
   }, "Todas as gravidades"), Object.entries(GC).map(([k, v]) => /*#__PURE__*/React.createElement("option", {
     key: k,
     value: k
-  }, v.emoji, " ", v.label))), isAdmin && view === "kanban" && (showNewCol ? /*#__PURE__*/React.createElement("div", {
+  }, v.emoji, " ", v.label))), isAdmin && view === "kanban" && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setSortByPriority(p => !p),
+    style: {
+      padding: "5px 12px",
+      border: `1px solid ${sortByPriority ? "#3B82F6" : "#E2E8F0"}`,
+      borderRadius: 7,
+      background: sortByPriority ? "#EFF6FF" : "#fff",
+      color: sortByPriority ? "#1D4ED8" : "#64748B",
+      cursor: "pointer",
+      fontSize: 11,
+      fontWeight: sortByPriority ? 700 : 400,
+      transition: "all .15s"
+    }
+  }, sortByPriority ? "🔢 Prioridade ✓" : "🔢 Prioridade"), isAdmin && view === "kanban" && (showNewCol ? /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 6,
@@ -4973,22 +5578,30 @@ function App() {
       color: "#94A3B8",
       fontSize: 14
     }
-  }, "Carregando dados…"), !loading && view === "dashboard" && /*#__PURE__*/React.createElement(Dashboard, {
+  }, "Carregando dados…"), !loading && view === "dashboard" && /*#__PURE__*/React.createElement("div", {
+    id: "view-content"
+  }, /*#__PURE__*/React.createElement(Dashboard, {
     cards: filtered,
     cols: displayCols,
     dashMode: dashMode,
     setDashMode: setDashMode
-  }), !loading && view === "usuarios" && isAdmin && /*#__PURE__*/React.createElement(UsersPanel, {
+  })), !loading && view === "usuarios" && isAdmin && /*#__PURE__*/React.createElement(UsersPanel, {
     currentUser: currentUser,
     userId: userId,
     showT: showT
-  }), !loading && view === "historico" && isAdmin && /*#__PURE__*/React.createElement(HistoryPanel, null), !loading && view === "calendario" && /*#__PURE__*/React.createElement(CalendarView, {
+  }), !loading && view === "historico" && isAdmin && /*#__PURE__*/React.createElement("div", {
+    id: "view-content"
+  }, /*#__PURE__*/React.createElement(HistoryPanel, null)), !loading && view === "calendario" && /*#__PURE__*/React.createElement("div", {
+    id: "view-content"
+  }, /*#__PURE__*/React.createElement(CalendarView, {
     cards: filtered,
     cols: displayCols
-  }), !loading && view === "timeline" && /*#__PURE__*/React.createElement(TimelineView, {
+  })), !loading && view === "timeline" && /*#__PURE__*/React.createElement("div", {
+    id: "view-content"
+  }, /*#__PURE__*/React.createElement(TimelineView, {
     cards: filtered,
     cols: displayCols
-  }), !loading && view === "kanban" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  })), !loading && view === "kanban" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 12,
@@ -5025,15 +5638,25 @@ function App() {
     }
   }, (singleCol ? displayCols.filter(c => c.id === singleCol) : displayCols).map(col => {
     const colCards = filtered.filter(c => c.col_id === col.id).sort((a, b) => {
-      if (col.id !== "aceite") return 0;
-      // 1º critério: prioridade numérica (sem prioridade vai para o final)
-      const pa = a.pr ? parseInt(a.pr) : 9999;
-      const pb = b.pr ? parseInt(b.pr) : 9999;
-      if (pa !== pb) return pa - pb;
-      // 2º critério: hora do aceite (quem aceitou antes fica na frente)
-      const ha = a.hora_aceite || "99:99";
-      const hb = b.hora_aceite || "99:99";
-      return ha.localeCompare(hb);
+      // Se sortByPriority ligado: ordena TODAS as colunas por prioridade
+      if (sortByPriority) {
+        const pa = a.pr ? parseInt(a.pr) : 9999;
+        const pb = b.pr ? parseInt(b.pr) : 9999;
+        if (pa !== pb) return pa - pb;
+        const ha = a.hora_aceite || "99:99";
+        const hb = b.hora_aceite || "99:99";
+        return ha.localeCompare(hb);
+      }
+      // Coluna aceite: sempre ordena por prioridade + hora (desempate)
+      if (col.id === "aceite") {
+        const pa = a.pr ? parseInt(a.pr) : 9999;
+        const pb = b.pr ? parseInt(b.pr) : 9999;
+        if (pa !== pb) return pa - pb;
+        const ha = a.hora_aceite || "99:99";
+        const hb = b.hora_aceite || "99:99";
+        return ha.localeCompare(hb);
+      }
+      return 0;
     });
     const isMin = minimized.has(col.id);
     return /*#__PURE__*/React.createElement("div", {
@@ -5214,6 +5837,7 @@ function App() {
       onDragEnd: handleDragEnd
     }))));
   }))), !loading && view === "lista" && /*#__PURE__*/React.createElement("div", {
+    id: "view-content",
     style: {
       background: "#fff",
       border: "1px solid #E2E8F0",
@@ -5400,7 +6024,8 @@ function App() {
     showT: showT,
     exportPNG: exportPNG,
     generatePDF: generatePDF,
-    exportExcel: exportExcel
+    exportExcel: exportExcel,
+    currentView: view
   }), showSettings && /*#__PURE__*/React.createElement(SettingsModal, {
     settings: settings,
     onClose: () => setShowSettings(false),
@@ -5542,7 +6167,14 @@ function App() {
       cursor: "pointer",
       fontSize: 11
     }
-  }, "Ignorar todos"))), /*#__PURE__*/React.createElement(Toast, {
+  }, "Ignorar todos"))), showInstall && /*#__PURE__*/React.createElement(InstallModal, {
+    onClose: () => setShowInstall(false)
+  }), showSnapPanel && /*#__PURE__*/React.createElement(SnapshotPanel, {
+    snapshots: snapshots,
+    onLoad: loadSnapshot,
+    onDelete: deleteSnapshot,
+    onClose: () => setShowSnapPanel(false)
+  }), /*#__PURE__*/React.createElement(Toast, {
     toast: toast
   }));
 }
