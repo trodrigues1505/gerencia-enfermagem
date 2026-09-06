@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Remoção — Gerência de Enfermagem</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #161b27;
+    --surface-raised: #1e2536;
+    --surface-hover: #252d42;
+    --border: #2a3348;
+    --border-subtle: #1e2536;
+    --text: #e8ecf4;
+    --text-secondary: #7f8fa8;
+    --text-muted: #4a5568;
+    --primary: #3b7eff;
+    --primary-dim: rgba(59,126,255,.12);
+    --success: #22c55e;
+    --success-dim: rgba(34,197,94,.12);
+    --warning: #f59e0b;
+    --warning-dim: rgba(245,158,11,.12);
+    --danger: #ef4444;
+    --danger-dim: rgba(239,68,68,.12);
+    --red-tag: #ef4444;
+    --yellow-tag: #eab308;
+    --green-tag: #22c55e;
+    --gray-tag: #6b7280;
+    --blue-tag: #3b7eff;
+    --radius-sm: 6px;
+    --radius: 10px;
+    --radius-lg: 14px;
+    --shadow: 0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,.5);
+    --font: 'Inter', system-ui, sans-serif;
+    --transition: 150ms ease;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body, #root {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ── */
+  .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+  /* ── Topbar ── */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px; height: 56px; flex-shrink: 0;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    gap: 16px;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 12px; }
+  .topbar-logo {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 15px; font-weight: 600; color: var(--text);
+    text-decoration: none;
+  }
+  .topbar-logo svg { color: var(--primary); }
+  .topbar-sep { width: 1px; height: 20px; background: var(--border); }
+  .page-title { font-size: 14px; color: var(--text-secondary); font-weight: 500; }
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+
+  /* ── Toolbar ── */
+  .toolbar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 12px 20px; border-bottom: 1px solid var(--border);
+    background: var(--surface); flex-shrink: 0;
+  }
+  .toolbar-group { display: flex; align-items: center; gap: 8px; }
+  .toolbar-sep { width: 1px; height: 20px; background: var(--border); }
+  .search-wrap { position: relative; }
+  .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+  .search-input {
+    background: var(--surface-raised); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text);
+    padding: 7px 12px 7px 32px; font-size: 13px; width: 240px;
+    transition: var(--transition);
+    outline: none;
+    font-family: var(--font);
+  }
+  .search-input::placeholder { color: var(--text-muted); }
+  .search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-dim); }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    border: 1px solid transparent; transition: var(--transition);
+    font-family: var(--font); white-space: nowrap;
+  }
+  .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .btn-primary:hover { background: #2d6ee0; }
+  .btn-ghost { background: transparent; color: var(--text-secondary); border-color: var(--border); }
+  .btn-ghost:hover { background: var(--surface-hover); color: var(--text); }
+  .btn-danger-ghost { background: transparent; color: var(--danger); border-color: transparent; }
+  .btn-danger-ghost:hover { background: var(--danger-dim); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-icon { padding: 7px; border-radius: var(--radius-sm); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  select.filter-select {
+    background: var(--surface-raised); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text);
+    padding: 7px 28px 7px 10px; font-size: 13px;
+    appearance: none; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237f8fa8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center;
+    outline: none; font-family: var(--font);
+    transition: var(--transition);
+  }
+  select.filter-select:focus { border-color: var(--primary); }
+
+  /* ── Stats ── */
+  .stats-row {
+    display: flex; gap: 12px; padding: 12px 20px; flex-shrink: 0;
+    overflow-x: auto; background: var(--bg);
+  }
+  .stat-chip {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 8px 14px;
+    flex-shrink: 0; white-space: nowrap;
+  }
+  .stat-chip .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .stat-chip .label { color: var(--text-secondary); font-size: 12px; }
+  .stat-chip .value { font-weight: 600; font-size: 15px; }
+
+  /* ── Table container ── */
+  .table-container {
+    flex: 1; overflow: auto; padding: 0 20px 20px;
+    position: relative;
+  }
+
+  /* ── Table ── */
+  .rem-table {
+    width: 100%; border-collapse: separate; border-spacing: 0;
+    min-width: 1400px;
+  }
+  .rem-table thead { position: sticky; top: 0; z-index: 10; }
+  .rem-table thead tr th {
+    background: var(--surface);
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    position: sticky; top: 0;
+  }
+  .rem-table thead tr th:first-child { padding-left: 16px; border-radius: var(--radius-sm) 0 0 0; }
+  .rem-table thead tr th:last-child { border-radius: 0 var(--radius-sm) 0 0; }
+
+  .rem-table tbody tr {
+    transition: background var(--transition);
+  }
+  .rem-table tbody tr:hover { background: var(--surface-hover); }
+  .rem-table tbody tr.editing { background: var(--primary-dim); }
+
+  .rem-table tbody td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: middle;
+    font-size: 13px;
+  }
+  .rem-table tbody td:first-child { padding-left: 16px; }
+
+  /* ── Cells ── */
+  .cell-num { color: var(--text-muted); font-size: 12px; font-weight: 600; min-width: 32px; }
+
+  .gravity-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .3px; white-space: nowrap;
+  }
+  .gravity-badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .badge-vermelho { background: var(--danger-dim); color: var(--danger); }
+  .badge-amarelo { background: var(--warning-dim); color: var(--warning); }
+  .badge-verde { background: var(--success-dim); color: var(--success); }
+  .badge-cinza { background: rgba(107,114,128,.12); color: var(--gray-tag); }
+
+  .status-badge {
+    display: inline-block;
+    padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 500; white-space: nowrap;
+  }
+  .status-finalizada { background: var(--success-dim); color: var(--success); }
+  .status-encerrada { background: rgba(107,114,128,.12); color: var(--gray-tag); }
+  .status-nao-realizada { background: var(--danger-dim); color: var(--danger); }
+  .status-andamento { background: rgba(251,146,60,.12); color: #fb923c; }
+  .status-concluida { background: var(--primary-dim); color: var(--primary); }
+
+  .cell-text { color: var(--text); }
+  .cell-muted { color: var(--text-secondary); font-size: 12px; }
+  .cell-time { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+  .cell-team { font-size: 12px; color: var(--text-secondary); }
+  .cell-name { font-weight: 500; color: var(--text); }
+  .cell-obs { font-size: 12px; color: var(--text-secondary); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .ambu-badge {
+    display: inline-block; padding: 2px 7px;
+    border-radius: 4px; font-size: 11px; font-weight: 500;
+  }
+  .ambu-basica { background: var(--primary-dim); color: var(--primary); }
+  .ambu-avancada { background: var(--danger-dim); color: var(--danger); }
+
+  /* ── Row actions ── */
+  .row-actions {
+    display: flex; align-items: center; gap: 4px;
+    opacity: 0; transition: opacity var(--transition);
+  }
+  .rem-table tbody tr:hover .row-actions { opacity: 1; }
+  .act-btn {
+    width: 28px; height: 28px; border-radius: 6px;
+    border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: var(--transition); background: transparent; color: var(--text-secondary);
+    font-family: var(--font);
+  }
+  .act-btn:hover { background: var(--surface-raised); color: var(--text); }
+  .act-btn.del:hover { background: var(--danger-dim); color: var(--danger); }
+
+  /* ── Empty ── */
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; padding: 64px 20px; color: var(--text-muted);
+  }
+  .empty-state p { font-size: 14px; }
+
+  /* ── Modal ── */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,.6); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+    width: 100%; max-width: 860px; max-height: 90vh;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 24px; border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .modal-header h2 { font-size: 16px; font-weight: 600; }
+  .modal-header p { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+  .modal-body { flex: 1; overflow-y: auto; padding: 24px; }
+  .modal-footer {
+    display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+    padding: 16px 24px; border-top: 1px solid var(--border); flex-shrink: 0;
+  }
+
+  /* ── Form grid ── */
+  .form-section { margin-bottom: 24px; }
+  .form-section-title {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .6px; color: var(--text-muted);
+    margin-bottom: 12px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .form-grid { display: grid; gap: 14px; }
+  .form-grid-2 { grid-template-columns: 1fr 1fr; }
+  .form-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .form-grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+  .field label .req { color: var(--danger); margin-left: 2px; }
+
+  .field input, .field select, .field textarea {
+    background: var(--surface-raised); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text);
+    padding: 8px 10px; font-size: 13px;
+    outline: none; transition: var(--transition);
+    font-family: var(--font);
+    width: 100%;
+  }
+  .field input::placeholder, .field textarea::placeholder { color: var(--text-muted); }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-dim);
+  }
+  .field textarea { resize: vertical; min-height: 64px; }
+  .field select { cursor: pointer; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237f8fa8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center;
+    padding-right: 28px;
+  }
+  .field input[type="date"], .field input[type="time"] { cursor: pointer; }
+  .field input[type="date"]::-webkit-calendar-picker-indicator,
+  .field input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(.5);
+  }
+
+  /* ── Toast ── */
+  .toast-stack { position: fixed; bottom: 20px; right: 20px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface-raised); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 16px;
+    box-shadow: var(--shadow-lg); font-size: 13px;
+    animation: toastIn .2s ease;
+    max-width: 320px;
+  }
+  .toast.success { border-color: var(--success); }
+  .toast.error { border-color: var(--danger); }
+  .toast-icon { font-size: 16px; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } }
+
+  /* ── Login ── */
+  .login-wrap {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 20px;
+    background: var(--bg);
+  }
+  .login-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 40px;
+    width: 100%; max-width: 380px;
+    box-shadow: var(--shadow-lg);
+  }
+  .login-card h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .login-card p { color: var(--text-secondary); font-size: 13px; margin-bottom: 28px; }
+  .login-error { background: var(--danger-dim); color: var(--danger); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 13px; margin-bottom: 16px; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+  @media (max-width: 768px) {
+    .form-grid-2, .form-grid-3, .form-grid-4 { grid-template-columns: 1fr; }
+    .topbar { padding: 0 14px; }
+    .toolbar { padding: 10px 14px; }
+    .table-container { padding: 0 14px 14px; }
+    .stats-row { padding: 10px 14px; }
+    .search-input { width: 160px; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef, useMemo } = React;
+
+/* ── Supabase config ── */
+const SUPA_URL = "https://ahcrscstdtfawoogsugi.supabase.co";
+const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgyNzE4NDAsImV4cCI6MjA2Mzg0Nzg0MH0.I-aEBWFiGc5pGDXV_cYtZQ2Y40q8xizEF7R1C2bCAVA";
+
+const supa = {
+  headers: { "Content-Type": "application/json", apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` },
+  async get(path) {
+    const r = await fetch(`${SUPA_URL}/rest/v1/${path}`, { headers: this.headers });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  async post(path, body) {
+    const r = await fetch(`${SUPA_URL}/rest/v1/${path}`, { method: "POST", headers: { ...this.headers, Prefer: "return=representation" }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  async patch(path, body) {
+    const r = await fetch(`${SUPA_URL}/rest/v1/${path}`, { method: "PATCH", headers: { ...this.headers, Prefer: "return=representation" }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  async delete(path) {
+    const r = await fetch(`${SUPA_URL}/rest/v1/${path}`, { method: "DELETE", headers: this.headers });
+    if (!r.ok) throw new Error(await r.text());
+    return true;
+  },
+  async fn(name, body) {
+    const r = await fetch(`${SUPA_URL}/functions/v1/${name}`, { method: "POST", headers: { ...this.headers }, body: JSON.stringify(body) });
+    return r.json();
+  }
+};
+
+/* ── Constants ── */
+const STATUS_OPTIONS = [
+  "FICHA FINALIZADA",
+  "FICHA FINALIZADA VIA CROSS",
+  "FICHA FINALIZADA PELA CROSS",
+  "FICHA FINALIZADA PELA ORIGEM",
+  "FICHA ENCERRADA PELO CROSS",
+  "ENCERRADA PELO CROSS",
+  "REMOÇÃO CONCLUÍDA",
+  "REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA",
+  "ALTA HOSPITALAR",
+  "RESOLVIDO COM RECURSOS LOCAIS",
+  "CASO SEM ATUALIZAÇÃO MÉDICA HÁ 48 HORAS",
+  "EVASÃO/ALTA A PEDIDO",
+  "CANCELADA PELO CROSS",
+  "CANCELADA PELO SOLICITANTE",
+  "PACIENTE EM REMOÇÃO",
+  "PACIENTE AGUARDANDO AMBULÂNCIA",
+  "CONCLUIDO",
+  "AGENDAMENTO SECRETARIA DA SAÚDE",
+  "HEMODIÁLISE",
+  "OUTRO",
+];
+
+const GRAVIDADE_OPTIONS = ["VERMELHO", "AMARELO", "VERDE", "CINZA"];
+
+const SETOR_OPTIONS = [
+  "EMERGÊNCIA","CLÍNICA MÉDICA","OBSERVAÇÃO ADULTO","OBSERVAÇÃO INFANTIL",
+  "CLÍNICA PEDIÁTRICA","UTI","BLOCO MATERNO","EVASÃO","OUTRO",
+];
+
+const PROCEDIMENTO_OPTIONS = [
+  "AVALIAÇÃO","EXAME","LEITO","BANCO","ALTA","OUTRO",
+];
+
+const AMBU_OPTIONS = ["BÁSICA","AVANÇADA","UTI",""];
+
+const STATUS_CLASS = {
+  "FICHA FINALIZADA": "status-finalizada",
+  "FICHA FINALIZADA VIA CROSS": "status-finalizada",
+  "FICHA FINALIZADA PELA CROSS": "status-finalizada",
+  "FICHA FINALIZADA PELA ORIGEM": "status-finalizada",
+  "REMOÇÃO CONCLUÍDA": "status-concluida",
+  "CONCLUIDO": "status-concluida",
+  "PACIENTE EM REMOÇÃO": "status-andamento",
+  "PACIENTE AGUARDANDO AMBULÂNCIA": "status-andamento",
+  "REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA": "status-nao-realizada",
+  "FICHA ENCERRADA PELO CROSS": "status-encerrada",
+  "ENCERRADA PELO CROSS": "status-encerrada",
+  "EVASÃO/ALTA A PEDIDO": "status-encerrada",
+  "CANCELADA PELO CROSS": "status-encerrada",
+  "CANCELADA PELO SOLICITANTE": "status-encerrada",
+};
+
+/* ── Helpers ── */
+const fmt = (v) => v || "—";
+const fmtDate = (v) => {
+  if (!v) return "—";
+  try { return new Date(v + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" }); } catch { return v; }
+};
+const gravityDot = { VERMELHO: "#ef4444", AMARELO: "#eab308", VERDE: "#22c55e", CINZA: "#6b7280" };
+const gravityClass = { VERMELHO: "badge-vermelho", AMARELO: "badge-amarelo", VERDE: "badge-verde", CINZA: "badge-cinza" };
+
+/* ── Icons (SVG inline) ── */
+const Icon = ({ name, size = 16 }) => {
+  const paths = {
+    plus: <><path d="M12 5v14M5 12h14"/></>,
+    search: <><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></>,
+    edit: <><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>,
+    trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></>,
+    x: <><path d="M18 6 6 18M6 6l12 12"/></>,
+    filter: <><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></>,
+    download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
+    activity: <><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></>,
+    ambulance: <><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 0-5.8-1.6"/><path d="M16 13v-2h-2"/><path d="M14 11h-2"/></>,
+    kanban: <><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v10"/></>,
+    chevron_down: <><path d="m6 9 6 6 6-6"/></>,
+    check: <><polyline points="20 6 9 12 4 10"/></>,
+    info: <><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></>,
+    logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>,
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {paths[name]}
+    </svg>
+  );
+};
+
+/* ── Toast ── */
+function useToast() {
+  const [toasts, setToasts] = useState([]);
+  const push = useCallback((msg, type = "success") => {
+    const id = Date.now();
+    setToasts(t => [...t, { id, msg, type }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3500);
+  }, []);
+  return { toasts, push };
+}
+
+/* ── Empty row template ── */
+const EMPTY_ROW = {
+  data_solicitacao: "",
+  horario_solicitacao: "",
+  ficha_cross: "",
+  nome_paciente: "",
+  setor: "",
+  procedimento: "",
+  especialidade: "",
+  diagnostico: "",
+  status: "",
+  gravidade: "",
+  data_resposta_cross: "",
+  horario_resposta_cross: "",
+  instituicao_destino: "",
+  tipo_ambulancia: "",
+  data_saida_ambulancia: "",
+  horario_saida_ambulancia: "",
+  tempo_espera: "",
+  observacao: "",
+  enfermeiro: "",
+  tecnico_auxiliar: "",
+  medico: "",
+  horario_retorno: "",
+};
+
+/* ── Modal de formulário ── */
+function FormModal({ row, onClose, onSave, loading }) {
+  const [form, setForm] = useState(row ? { ...EMPTY_ROW, ...row } : { ...EMPTY_ROW });
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave(form);
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <div>
+            <h2>{row?.id ? "Editar Registro" : "Novo Registro de Remoção"}</h2>
+            <p>{row?.id ? `Ficha ${row.ficha_cross || "sem número"}` : "Preencha os dados da solicitação"}</p>
+          </div>
+          <button className="act-btn" onClick={onClose}><Icon name="x"/></button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+
+            {/* Identificação */}
+            <div className="form-section">
+              <div className="form-section-title">Identificação da Solicitação</div>
+              <div className="form-grid form-grid-3">
+                <div className="field">
+                  <label>Data da Solicitação <span className="req">*</span></label>
+                  <input type="date" value={form.data_solicitacao} onChange={e => set("data_solicitacao", e.target.value)} required/>
+                </div>
+                <div className="field">
+                  <label>Horário</label>
+                  <input type="time" value={form.horario_solicitacao} onChange={e => set("horario_solicitacao", e.target.value)}/>
+                </div>
+                <div className="field">
+                  <label>Nº Ficha CROSS</label>
+                  <input type="text" placeholder="Ex: SS-14650585-26" value={form.ficha_cross} onChange={e => set("ficha_cross", e.target.value)}/>
+                </div>
+              </div>
+            </div>
+
+            {/* Paciente */}
+            <div className="form-section">
+              <div className="form-section-title">Paciente</div>
+              <div className="form-grid form-grid-2">
+                <div className="field">
+                  <label>Nome do Paciente <span className="req">*</span></label>
+                  <input type="text" placeholder="Nome completo" value={form.nome_paciente} onChange={e => set("nome_paciente", e.target.value)} required/>
+                </div>
+                <div className="field">
+                  <label>Setor / Localização</label>
+                  <select value={form.setor} onChange={e => set("setor", e.target.value)}>
+                    <option value="">Selecione</option>
+                    {SETOR_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Clínico */}
+            <div className="form-section">
+              <div className="form-section-title">Dados Clínicos</div>
+              <div className="form-grid form-grid-3">
+                <div className="field">
+                  <label>Procedimento</label>
+                  <select value={form.procedimento} onChange={e => set("procedimento", e.target.value)}>
+                    <option value="">Selecione</option>
+                    {PROCEDIMENTO_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Especialidade</label>
+                  <input type="text" placeholder="Ex: Ortopedia, Tomografia…" value={form.especialidade} onChange={e => set("especialidade", e.target.value)}/>
+                </div>
+                <div className="field">
+                  <label>Gravidade</label>
+                  <select value={form.gravidade} onChange={e => set("gravidade", e.target.value)}>
+                    <option value="">Selecione</option>
+                    {GRAVIDADE_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div className="field" style={{ gridColumn: "1 / -1" }}>
+                  <label>Diagnóstico</label>
+                  <input type="text" placeholder="Hipótese diagnóstica ou CID" value={form.diagnostico} onChange={e => set("diagnostico", e.target.value)}/>
+                </div>
+              </div>
+            </div>
+
+            {/* CROSS / Status */}
+            <div className="form-section">
+              <div className="form-section-title">Resposta CROSS / Status</div>
+              <div className="form-grid form-grid-2">
+                <div className="field">
+                  <label>Status</label>
+                  <select value={form.status} onChange={e => set("status", e.target.value)}>
+                    <option value="">Selecione</option>
+                    {STATUS_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Instituição Destino</label>
+                  <input type="text" placeholder="Hospital receptor" value={form.instituicao_destino} onChange={e => set("instituicao_destino", e.target.value)}/>
+                </div>
+                <div className="field">
+                  <label>Data Resposta CROSS</label>
+                  <input type="date" value={form.data_resposta_cross} onChange={e => set("data_resposta_cross", e.target.value)}/>
+                </div>
+                <div className="field">
+                  <label>Horário Resposta CROSS</label>
+                  <input type="time" value={form.horario_resposta_cross} onChange={e => set("horario_resposta_cross", e.target.value)}/>
+                </div>
+              </div>
+            </div>
+
+            {/* Ambulância */}
+            <div className="form-section">
+              <div className="form-section-title">Ambulância</div>
+              <div className="form-grid form-grid-4">
+                <div className="field">
+                  <label>Tipo</label>
+                  <select value={form.tipo_ambulancia} onChange={e => set("tipo_ambulancia", e.target.value)}>
+                    <option value="">—</option>
+                    {AMBU_OPTIONS.filter(Boolean).map(o => <option key={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Data Saída Ambulância</label>
+                  <input type="date" value={form.data_saida_ambulancia} onChange={e => set("data_saida_ambulancia", e.target.value)}/>
+                </div>
+                <div className="field">
+                  <label>Horário Saída</label>
+                  <input type="time" value={form.horario_saida_ambulancia} onChange={e => set("horario_saida_ambulancia", e.target.value)}/>
+                </div>
+                <div className="field">
+                  <label>Tempo de Espera</label>
+                  <input type="text" placeholder="Ex: 01:30" value={form.tempo_espera} onChange={e => set("tempo_espera", e.target.value)}/>
+                </div>
+                <div className="field">
+                  <label>Horário de Retorno</label>
+                  <input type="time" value={form.horario_retorno} onChange={e => set("horario_retorno", e.target.value)}/>
+                </div>
+              </div>
+            </div>
+
+            {/* Equipe */}
+            <div className="form-section">
+              <div className="form-section-title">Equipe Responsável</div>
+              <div className="form-grid form-grid-3">
+                <div className="field">
+                  <label>Enfermeiro(a)</label>
+                  <input type="text" placeholder="Nome" value={form.enfermeiro} onChange={e => set("enfermeiro", e.target.value)}/>
+                </div>
+                <div className="field">
+                  <label>Técnico / Auxiliar de Enfermagem</label>
+                  <input type="text" placeholder="Nome" value={form.tecnico_auxiliar} onChange={e => set("tecnico_auxiliar", e.target.value)}/>
+                </div>
+                <div className="field">
+                  <label>Médico(a)</label>
+                  <input type="text" placeholder="Nome" value={form.medico} onChange={e => set("medico", e.target.value)}/>
+                </div>
+              </div>
+            </div>
+
+            {/* Observação */}
+            <div className="form-section" style={{ marginBottom: 0 }}>
+              <div className="form-section-title">Observação</div>
+              <div className="field">
+                <textarea rows={3} placeholder="Observações adicionais sobre a remoção…" value={form.observacao} onChange={e => set("observacao", e.target.value)}/>
+              </div>
+            </div>
+
+          </div>
+
+          <div className="modal-footer">
+            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn btn-primary" disabled={loading}>
+              {loading ? "Salvando…" : (row?.id ? "Salvar Alterações" : "Criar Registro")}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ── Main App ── */
+function App() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [modalRow, setModalRow] = useState(null); // null = closed, {} = new, {...} = edit
+  const [search, setSearch] = useState("");
+  const [filterGrav, setFilterGrav] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterMes, setFilterMes] = useState("");
+  const { toasts, push } = useToast();
+  const [user, setUser] = useState(null);
+  const [loginCoren, setLoginCoren] = useState("");
+  const [loginPwd, setLoginPwd] = useState("");
+  const [loginErr, setLoginErr] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  /* ── Auth from session ── */
+  useEffect(() => {
+    const u = sessionStorage.getItem("ge_user");
+    if (u) setUser(JSON.parse(u));
+  }, []);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginLoading(true); setLoginErr("");
+    try {
+      const res = await supa.fn("auth-login", { coren: loginCoren.trim(), password: loginPwd });
+      if (res.error) throw new Error(res.error);
+      sessionStorage.setItem("ge_user", JSON.stringify(res.user));
+      setUser(res.user);
+    } catch (err) {
+      setLoginErr(err.message || "Credenciais inválidas");
+    } finally { setLoginLoading(false); }
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem("ge_user");
+    setUser(null);
+  };
+
+  /* ── Load rows ── */
+  const loadRows = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await supa.get("remocoes?select=*&order=data_solicitacao.desc,horario_solicitacao.desc");
+      setRows(Array.isArray(data) ? data : []);
+    } catch {
+      push("Erro ao carregar registros", "error");
+    } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { if (user) loadRows(); }, [user]);
+
+  /* ── Save ── */
+  const handleSave = async (form) => {
+    setSaving(true);
+    try {
+      const payload = { ...form };
+      // Limpa campos vazios → null
+      Object.keys(payload).forEach(k => { if (payload[k] === "") payload[k] = null; });
+
+      if (form.id) {
+        await supa.patch(`remocoes?id=eq.${form.id}`, payload);
+        push("Registro atualizado");
+      } else {
+        await supa.post("remocoes", payload);
+        push("Registro criado");
+      }
+      setModalRow(null);
+      await loadRows();
+    } catch (err) {
+      push(err.message || "Erro ao salvar", "error");
+    } finally { setSaving(false); }
+  };
+
+  /* ── Delete ── */
+  const handleDelete = async (id) => {
+    if (!confirm("Excluir este registro?")) return;
+    try {
+      await supa.delete(`remocoes?id=eq.${id}`);
+      push("Registro excluído");
+      setRows(r => r.filter(x => x.id !== id));
+    } catch {
+      push("Erro ao excluir", "error");
+    }
+  };
+
+  /* ── Filter ── */
+  const filtered = useMemo(() => {
+    let data = rows;
+    if (search) {
+      const s = search.toLowerCase();
+      data = data.filter(r =>
+        (r.nome_paciente || "").toLowerCase().includes(s) ||
+        (r.ficha_cross || "").toLowerCase().includes(s) ||
+        (r.diagnostico || "").toLowerCase().includes(s) ||
+        (r.instituicao_destino || "").toLowerCase().includes(s) ||
+        (r.especialidade || "").toLowerCase().includes(s)
+      );
+    }
+    if (filterGrav) data = data.filter(r => r.gravidade === filterGrav);
+    if (filterStatus) data = data.filter(r => (r.status || "").includes(filterStatus));
+    if (filterMes) data = data.filter(r => (r.data_solicitacao || "").startsWith(filterMes));
+    return data;
+  }, [rows, search, filterGrav, filterStatus, filterMes]);
+
+  /* ── Stats ── */
+  const stats = useMemo(() => {
+    const total = filtered.length;
+    const concluidas = filtered.filter(r => ["FICHA FINALIZADA","FICHA FINALIZADA VIA CROSS","FICHA FINALIZADA PELA CROSS","REMOÇÃO CONCLUÍDA","CONCLUIDO"].includes(r.status)).length;
+    const naoRealizadas = filtered.filter(r => (r.status || "").includes("NÃO REALIZADA")).length;
+    const vermelhos = filtered.filter(r => r.gravidade === "VERMELHO").length;
+    return { total, concluidas, naoRealizadas, vermelhos };
+  }, [filtered]);
+
+  /* ── CSV Export ── */
+  const exportCSV = () => {
+    const cols = ["data_solicitacao","horario_solicitacao","ficha_cross","nome_paciente","setor","procedimento","especialidade","diagnostico","status","gravidade","data_resposta_cross","horario_resposta_cross","instituicao_destino","tipo_ambulancia","data_saida_ambulancia","horario_saida_ambulancia","tempo_espera","observacao","enfermeiro","tecnico_auxiliar","medico","horario_retorno"];
+    const headers = ["Data Solic.","Hora","Ficha CROSS","Paciente","Setor","Procedimento","Especialidade","Diagnóstico","Status","Gravidade","Data Resp.","Hora Resp.","Destino","Ambulância","Data Saída","Hora Saída","T. Espera","Observação","Enfermeiro","Técnico","Médico","Retorno"];
+    const lines = [headers.join(","), ...filtered.map(r => cols.map(c => `"${(r[c] || "").toString().replace(/"/g, '""')}"`).join(","))];
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `remocoes_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  };
+
+  /* ── LOGIN SCREEN ── */
+  if (!user) return (
+    <div className="login-wrap">
+      <div className="login-card">
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+          <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="#3b7eff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span style={{ fontWeight: 700, fontSize: 17 }}>Gerência de Enfermagem</span>
+        </div>
+        <h1>Remoção</h1>
+        <p>Acesse com suas credenciais do sistema</p>
+        {loginErr && <div className="login-error">{loginErr}</div>}
+        <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div className="field">
+            <label>COREN / CRM</label>
+            <input type="text" placeholder="Ex: 299283" value={loginCoren} onChange={e => setLoginCoren(e.target.value)} required autoFocus/>
+          </div>
+          <div className="field">
+            <label>Senha</label>
+            <input type="password" placeholder="Senha" value={loginPwd} onChange={e => setLoginPwd(e.target.value)}/>
+          </div>
+          <button type="submit" className="btn btn-primary" disabled={loginLoading} style={{ marginTop: 4 }}>
+            {loginLoading ? "Entrando…" : "Entrar"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+
+  /* ── MAIN ── */
+  return (
+    <div className="app">
+      {/* Topbar */}
+      <header className="topbar">
+        <div className="topbar-left">
+          <a href="#" className="topbar-logo">
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            Gerência de Enfermagem
+          </a>
+          <div className="topbar-sep"/>
+          <span className="page-title">Controle de Remoções</span>
+        </div>
+        <div className="topbar-right">
+          <a href="https://trodrigues1505.github.io/gerencia-enfermagem/" className="btn btn-ghost btn-sm">
+            <Icon name="kanban" size={14}/> Kanban
+          </a>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-secondary)", fontSize: 13 }}>
+            <span>{user.nome}</span>
+            <button className="act-btn" onClick={handleLogout} title="Sair"><Icon name="logout" size={15}/></button>
+          </div>
+        </div>
+      </header>
+
+      {/* Toolbar */}
+      <div className="toolbar">
+        <div className="toolbar-group">
+          <div className="search-wrap">
+            <Icon name="search" size={14}/>
+            <input
+              className="search-input"
+              placeholder="Buscar paciente, ficha, diagnóstico…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="toolbar-sep"/>
+        <div className="toolbar-group">
+          <select className="filter-select" value={filterGrav} onChange={e => setFilterGrav(e.target.value)}>
+            <option value="">Todas as gravidades</option>
+            {GRAVIDADE_OPTIONS.map(o => <option key={o}>{o}</option>)}
+          </select>
+          <select className="filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+            <option value="">Todos os status</option>
+            <option value="FINALIZADA">Finalizada</option>
+            <option value="CONCLUÍDA">Concluída</option>
+            <option value="NÃO REALIZADA">Não realizada</option>
+            <option value="ENCERRADA">Encerrada</option>
+            <option value="REMOÇÃO">Em remoção</option>
+            <option value="AGUARDANDO">Aguardando</option>
+          </select>
+          <input
+            type="month"
+            className="filter-select"
+            value={filterMes}
+            onChange={e => setFilterMes(e.target.value)}
+            style={{ width: "auto" }}
+          />
+          {(search || filterGrav || filterStatus || filterMes) && (
+            <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(""); setFilterGrav(""); setFilterStatus(""); setFilterMes(""); }}>
+              Limpar
+            </button>
+          )}
+        </div>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <button className="btn btn-ghost" onClick={exportCSV}>
+            <Icon name="download" size={14}/> Exportar CSV
+          </button>
+          <button className="btn btn-primary" onClick={() => setModalRow({})}>
+            <Icon name="plus" size={14}/> Novo Registro
+          </button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="stats-row">
+        <div className="stat-chip">
+          <span className="label">Total</span>
+          <span className="value">{stats.total}</span>
+        </div>
+        <div className="stat-chip">
+          <div className="dot" style={{ background: "var(--success)" }}/>
+          <span className="label">Concluídas</span>
+          <span className="value" style={{ color: "var(--success)" }}>{stats.concluidas}</span>
+        </div>
+        <div className="stat-chip">
+          <div className="dot" style={{ background: "var(--danger)" }}/>
+          <span className="label">Não realizadas</span>
+          <span className="value" style={{ color: "var(--danger)" }}>{stats.naoRealizadas}</span>
+        </div>
+        <div className="stat-chip">
+          <div className="dot" style={{ background: "#ef4444" }}/>
+          <span className="label">Emergências</span>
+          <span className="value" style={{ color: "#ef4444" }}>{stats.vermelhos}</span>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="table-container">
+        {loading ? (
+          <div className="empty-state"><p>Carregando registros…</p></div>
+        ) : filtered.length === 0 ? (
+          <div className="empty-state">
+            <Icon name="activity" size={32}/>
+            <p>{rows.length === 0 ? "Nenhum registro ainda. Clique em «Novo Registro» para começar." : "Nenhum resultado para o filtro aplicado."}</p>
+          </div>
+        ) : (
+          <table className="rem-table">
+            <thead>
+              <tr>
+                <th style={{ width: 36 }}>#</th>
+                <th>Data</th>
+                <th>Ficha</th>
+                <th>Paciente</th>
+                <th>Setor</th>
+                <th>Especialidade</th>
+                <th>Diagnóstico</th>
+                <th>Destino</th>
+                <th>Gravidade</th>
+                <th>Status</th>
+                <th>Ambulância</th>
+                <th>Saída</th>
+                <th>Retorno</th>
+                <th>Equipe</th>
+                <th>Obs.</th>
+                <th style={{ width: 80 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((r, i) => (
+                <tr key={r.id}>
+                  <td className="cell-num">{i + 1}</td>
+                  <td className="cell-time">{fmtDate(r.data_solicitacao)}<br/><span style={{ fontSize: 11, color: "var(--text-muted)" }}>{r.horario_solicitacao || ""}</span></td>
+                  <td className="cell-muted" style={{ fontSize: 11 }}>{fmt(r.ficha_cross)}</td>
+                  <td className="cell-name">{fmt(r.nome_paciente)}</td>
+                  <td className="cell-muted">{fmt(r.setor)}</td>
+                  <td className="cell-muted">{fmt(r.especialidade)}</td>
+                  <td><span style={{ fontSize: 12, color: "var(--text-secondary)", maxWidth: 160, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fmt(r.diagnostico)}</span></td>
+                  <td className="cell-text" style={{ fontWeight: 500, fontSize: 12 }}>{fmt(r.instituicao_destino)}</td>
+                  <td>
+                    {r.gravidade ? (
+                      <span className={`gravity-badge ${gravityClass[r.gravidade] || "badge-cinza"}`}>
+                        <span className="dot" style={{ background: gravityDot[r.gravidade] || "#6b7280" }}/>
+                        {r.gravidade}
+                      </span>
+                    ) : "—"}
+                  </td>
+                  <td>
+                    {r.status ? (
+                      <span className={`status-badge ${STATUS_CLASS[r.status] || "status-encerrada"}`}>
+                        {r.status.length > 28 ? r.status.slice(0, 28) + "…" : r.status}
+                      </span>
+                    ) : "—"}
+                  </td>
+                  <td>
+                    {r.tipo_ambulancia ? (
+                      <span className={`ambu-badge ${r.tipo_ambulancia === "AVANÇADA" ? "ambu-avancada" : "ambu-basica"}`}>
+                        {r.tipo_ambulancia}
+                      </span>
+                    ) : "—"}
+                  </td>
+                  <td className="cell-time">{r.horario_saida_ambulancia || "—"}</td>
+                  <td className="cell-time">{r.horario_retorno || "—"}</td>
+                  <td className="cell-team">
+                    {[r.enfermeiro, r.tecnico_auxiliar, r.medico].filter(Boolean).join(" · ") || "—"}
+                  </td>
+                  <td>
+                    {r.observacao ? (
+                      <span className="cell-obs" title={r.observacao}>{r.observacao}</span>
+                    ) : "—"}
+                  </td>
+                  <td>
+                    <div className="row-actions">
+                      <button className="act-btn" title="Editar" onClick={() => setModalRow(r)}><Icon name="edit" size={14}/></button>
+                      <button className="act-btn del" title="Excluir" onClick={() => handleDelete(r.id)}><Icon name="trash" size={14}/></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Modal */}
+      {modalRow !== null && (
+        <FormModal
+          row={modalRow}
+          onClose={() => setModalRow(null)}
+          onSave={handleSave}
+          loading={saving}
+        />
+      )}
+
+      {/* Toasts */}
+      <div className="toast-stack">
+        {toasts.map(t => (
+          <div key={t.id} className={`toast ${t.type}`}>
+            <span className="toast-icon">{t.type === "success" ? "✓" : "✕"}</span>
+            <span>{t.msg}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
