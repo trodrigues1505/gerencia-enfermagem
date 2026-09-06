@@ -2340,7 +2340,7 @@ function Dashboard({
       display: "flex",
       gap: 1
     }
-  }, [["acumulado", "📊 Acumulado"], ["hoje", "📅 Hoje"]].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
+  }, [["acumulado", "📊 Acumulado"], ["hoje", "📅 Hoje"], ["periodo", "📆 Período"]].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
     key: id,
     onClick: () => setDashMode(id),
     style: {
@@ -2358,7 +2358,45 @@ function Dashboard({
       fontSize: 11,
       color: "#94A3B8"
     }
-  }, "Admissões de hoje (", today, ") — ", data.length, " paciente", data.length !== 1 ? "s" : "")), /*#__PURE__*/React.createElement("div", {
+  }, "Admissões de hoje (", todayStr2, ") — ", data.length, " paciente", data.length !== 1 ? "s" : ""), dashMode === "periodo" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: dashStart,
+    onChange: e => setDashStart(e.target.value),
+    style: {
+      padding: "4px 7px",
+      border: "1px solid #E2E8F0",
+      borderRadius: 6,
+      fontSize: 11,
+      fontFamily: "inherit"
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#94A3B8"
+    }
+  }, "até"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: dashEnd,
+    onChange: e => setDashEnd(e.target.value),
+    style: {
+      padding: "4px 7px",
+      border: "1px solid #E2E8F0",
+      borderRadius: 6,
+      fontSize: 11,
+      fontFamily: "inherit"
+    }
+  }), data.length > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#94A3B8"
+    }
+  }, data.length, " paciente", data.length !== 1 ? "s" : ""))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "repeat(4,1fr)",
