@@ -26,13 +26,14 @@ input,select,textarea,button{font-family:inherit}
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:99px}
 kbd{font-family:monospace;background:#F1F5F9;padding:1px 5px;border-radius:3px;border:1px solid #E2E8F0;font-size:10px}
-#install-banner{display:none}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script>
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});}
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+}
 </script>
 <script>
 const {
@@ -63,6 +64,24 @@ async function sbGet(table, params = "") {
   });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
+}
+
+/* ─── Supabase Realtime client (carregado lazy via CDN) ─── */
+let _sbClient = null;
+async function getSbClient() {
+  if (_sbClient) return _sbClient;
+  // Carrega lib se não estiver disponível
+  if (!window.supabase) {
+    await new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
+      s.onload = res;
+      s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+  _sbClient = window.supabase.createClient(SB_URL, SB_KEY);
+  return _sbClient;
 }
 async function fn(name, body, userId) {
   const r = await fetch(`${FN_URL}/${name}`, {
@@ -2001,7 +2020,9 @@ function Dashboard({
   cards,
   cols,
   dashMode,
-  setDashMode
+  setDashMode,
+  isAdmin,
+  lastPub
 }) {
   const today = new Date();
   const todayStr2 = today.toLocaleDateString("pt-BR", {
@@ -2129,6 +2150,180 @@ function Dashboard({
       borderRadius: 99
     }
   })));
+
+  // ── VIEWER: dashboard simplificado ──
+  if (!isAdmin) {
+    const peds = cards.filter(c => c.categoria === "pediatria" || c.is_rn).length;
+    const psis = cards.filter(c => c.categoria === "psiquiatria").length;
+    return /*#__PURE__*/React.createElement("div", null, lastPub && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#EFF6FF",
+        border: "1px solid #BFDBFE",
+        borderRadius: 10,
+        padding: "10px 16px",
+        marginBottom: 16,
+        display: "flex",
+        gap: 8,
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 16
+      }
+    }, "🕒"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: "#1E40AF"
+      }
+    }, "Última publicação"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "#3B82F6"
+      }
+    }, lastPub))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))",
+        gap: 10,
+        marginBottom: 16
+      }
+    }, cols.map(c => {
+      const n = cards.filter(k => k.col_id === c.id).length;
+      const accent = c.accent || "#94A3B8";
+      return /*#__PURE__*/React.createElement("div", {
+        key: c.id,
+        style: {
+          background: "#fff",
+          border: "1px solid #E2E8F0",
+          borderTop: `3px solid ${accent}`,
+          borderRadius: 10,
+          padding: "14px 16px",
+          textAlign: "center"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 20
+        }
+      }, c.emoji), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 26,
+          fontWeight: 700,
+          color: accent,
+          margin: "4px 0"
+        }
+      }, n), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 9,
+          fontWeight: 600,
+          color: "#94A3B8",
+          textTransform: "uppercase",
+          letterSpacing: ".04em",
+          lineHeight: 1.3
+        }
+      }, c.label));
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "repeat(3,1fr)",
+        gap: 10,
+        marginBottom: 16
+      }
+    }, [["Total", "🧑‍⚕️", cards.length, "#0F172A", "#fff"], ["Emergências", "🔴", cards.filter(c => c.grav === "emergencia").length, "#EF4444", "#FEF2F2"], ["Amb. Avançada", "🚨", cards.filter(c => c.amb === "Avançada").length, "#F59E0B", "#FFFBEB"]].map(([label, icon, val, color, bg]) => /*#__PURE__*/React.createElement("div", {
+      key: label,
+      style: {
+        background: bg,
+        border: "1px solid #E2E8F0",
+        borderRadius: 10,
+        padding: "12px 14px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        fontWeight: 600,
+        color: "#94A3B8",
+        textTransform: "uppercase",
+        letterSpacing: ".04em"
+      }
+    }, label), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 16
+      }
+    }, icon)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 24,
+        fontWeight: 700,
+        color,
+        marginTop: 4
+      }
+    }, val)))), (peds > 0 || psis > 0) && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        flexWrap: "wrap"
+      }
+    }, peds > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#FDF2F8",
+        border: "1px solid #F9A8D4",
+        borderRadius: 8,
+        padding: "8px 14px",
+        display: "flex",
+        gap: 8,
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 16
+      }
+    }, "👶"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: "#831843",
+        fontWeight: 600,
+        textTransform: "uppercase"
+      }
+    }, "Pediatria"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 20,
+        fontWeight: 700,
+        color: "#EC4899"
+      }
+    }, peds))), psis > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#F5F3FF",
+        border: "1px solid #C4B5FD",
+        borderRadius: 8,
+        padding: "8px 14px",
+        display: "flex",
+        gap: 8,
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 16
+      }
+    }, "🧠"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: "#4C1D95",
+        fontWeight: 600,
+        textTransform: "uppercase"
+      }
+    }, "Psiquiatria"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 20,
+        fontWeight: 700,
+        color: "#8B5CF6"
+      }
+    }, psis)))));
+  }
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -2321,6 +2516,217 @@ function Dashboard({
       fontWeight: 600
     }
   }, "⚠️ ", evadiu, " evasão", evadiu > 1 ? "ões" : ""))));
+}
+
+/* ─── PUBLICATIONS HISTORY ─── */
+function PublicationsHistory({
+  onRestoreSnapshot
+}) {
+  const [pubs, setPubs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(null);
+  useEffect(() => {
+    sbGet("publications", "order=created_at.desc&limit=50").then(rows => {
+      setPubs(rows);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+  function handleRestore(pub) {
+    if (!window.confirm(`Restaurar o kanban para a versão de "${pub.label}"?
+
+Isso vai substituir a visualização atual pelos dados desse snapshot.`)) return;
+    const snap = pub.snapshot || {};
+    onRestoreSnapshot(snap.cards || [], snap.cols || []);
+  }
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 16,
+      color: "#0F172A",
+      marginBottom: 4
+    }
+  }, "Histórico de publicações"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#64748B",
+      marginBottom: 16
+    }
+  }, "Todas as versões publicadas — clique para expandir e restaurar"), loading && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: 32,
+      color: "#94A3B8"
+    }
+  }, "Carregando…"), !loading && pubs.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: 32,
+      color: "#CBD5E1",
+      fontSize: 13
+    }
+  }, "Nenhuma publicação registrada."), pubs.map((pub, i) => {
+    const isAuto = pub.label?.includes("automático");
+    const snap = pub.snapshot || {};
+    const cards = snap.cards || [];
+    const isExp = expanded === pub.id;
+    const cols = snap.cols || [];
+    return /*#__PURE__*/React.createElement("div", {
+      key: pub.id,
+      style: {
+        background: "#fff",
+        border: "1px solid #E2E8F0",
+        borderRadius: 10,
+        marginBottom: 8,
+        overflow: "hidden"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      onClick: () => setExpanded(isExp ? null : pub.id),
+      style: {
+        padding: "12px 16px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        cursor: "pointer",
+        background: isExp ? "#F8FAFC" : "#fff"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        alignItems: "center",
+        marginBottom: 2
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        fontWeight: 700,
+        color: "#0F172A"
+      }
+    }, pub.label || "Publicação"), isAuto && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        fontWeight: 700,
+        padding: "1px 5px",
+        borderRadius: 3,
+        background: "#F1F5F9",
+        color: "#94A3B8"
+      }
+    }, "AUTO")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "#94A3B8"
+      }
+    }, new Date(pub.created_at).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    }), pub.published_by_nome && /*#__PURE__*/React.createElement("span", null, " · por ", pub.published_by_nome), /*#__PURE__*/React.createElement("span", null, " · ", cards.length, " pacientes"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: e => {
+        e.stopPropagation();
+        handleRestore(pub);
+      },
+      style: {
+        padding: "4px 12px",
+        border: "1px solid #BFDBFE",
+        borderRadius: 6,
+        background: "none",
+        color: "#1E40AF",
+        cursor: "pointer",
+        fontSize: 11,
+        fontWeight: 600
+      }
+    }, "Restaurar"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "#CBD5E1",
+        fontSize: 13
+      }
+    }, isExp ? "▲" : "▼"))), isExp && /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "0 16px 14px",
+        borderTop: "1px solid #F1F5F9"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        flexWrap: "wrap",
+        marginTop: 10
+      }
+    }, cols.map(col => {
+      const n = cards.filter(c => c.col_id === col.id).length;
+      return /*#__PURE__*/React.createElement("div", {
+        key: col.id,
+        style: {
+          background: "#F8FAFC",
+          borderRadius: 7,
+          padding: "6px 12px",
+          display: "flex",
+          gap: 6,
+          alignItems: "center"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12
+        }
+      }, col.emoji), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 11,
+          color: "#374151"
+        }
+      }, col.label), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          fontWeight: 700,
+          color: "#0F172A"
+        }
+      }, n));
+    })), cards.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 10,
+        maxHeight: 200,
+        overflowY: "auto"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        fontWeight: 600,
+        color: "#94A3B8",
+        marginBottom: 6,
+        textTransform: "uppercase",
+        letterSpacing: ".05em"
+      }
+    }, "Pacientes neste snapshot"), cards.slice(0, 20).map((c, i) => /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        fontSize: 11,
+        color: "#374151",
+        padding: "3px 0",
+        borderBottom: "1px solid #F8FAFC"
+      }
+    }, c.nome, " ", c.idade ? "· " + c.idade : "", " ", /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "#94A3B8"
+      }
+    }, "(", c.hd, ")"))), cards.length > 20 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "#94A3B8",
+        marginTop: 4
+      }
+    }, "…e mais ", cards.length - 20, " pacientes"))));
+  }));
 }
 
 /* ─── HISTORY PANEL ─── */
@@ -4140,16 +4546,22 @@ function App() {
       } catch {}
     }, 5000);
 
-    // polling: verifica nova publicação para viewers (e também para admin ver lastPub)
+    // Realtime: escuta novas publicações via WebSocket do Supabase
+    let realtimeChannel = null;
     let lastPubId = null;
-    const ivPub = setInterval(async () => {
-      try {
-        const pub = await sbGet("publications", "order=created_at.desc&limit=1");
-        if (!pub.length) return;
-        const p = pub[0];
-        if (p.id === lastPubId) return; // sem mudança
+    getSbClient().then(sb => {
+      realtimeChannel = sb.channel("publications-changes").on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "publications"
+      }, payload => {
+        const p = payload.new;
+        if (!p || p.id === lastPubId) return;
         lastPubId = p.id;
-        const snap = p.snapshot;
+        // Ignora snapshots automáticos — só publicações manuais da Fabiana atualizam viewers
+        const isAutoSnap = (p.label || "").includes("automático");
+        if (isAutoSnap) return;
+        const snap = p.snapshot || {};
         setPubCards(snap.cards || []);
         setPubCols(snap.cols || []);
         setLastPub(new Date(p.created_at).toLocaleString("pt-BR", {
@@ -4160,12 +4572,42 @@ function App() {
           minute: "2-digit"
         }));
         if (!isAdmin) showT("🔄 Kanban atualizado pela administradora!");
-      } catch {}
-    }, 15000); // a cada 15s
-
+      }).on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "users"
+      }, payload => {
+        const u = payload.new;
+        if (isAdmin && u?.status === "pendente") showT(`📋 Novo cadastro pendente: ${u.nome}`);
+      }).subscribe();
+    }).catch(() => {
+      // fallback: polling se realtime falhar
+      const ivPub = setInterval(async () => {
+        try {
+          // Busca última publicação MANUAL (não automática)
+          const allPubs = await sbGet("publications", "order=created_at.desc&limit=10");
+          const pub = allPubs.find(p => !(p.label || "").includes("automático"));
+          if (!pub) return;
+          if (pub.id === lastPubId) return;
+          lastPubId = pub.id;
+          const snap = pub.snapshot || {};
+          setPubCards(snap.cards || []);
+          setPubCols(snap.cols || []);
+          setLastPub(new Date(pub.created_at).toLocaleString("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit"
+          }));
+          if (!isAdmin) showT("🔄 Kanban atualizado!");
+        } catch {}
+      }, 15000);
+      return () => clearInterval(ivPub);
+    });
     return () => {
       clearInterval(ivUsers);
-      clearInterval(ivPub);
+      if (realtimeChannel) getSbClient().then(sb => sb.removeChannel(realtimeChannel)).catch(() => {});
     };
   }, [currentUser]);
 
@@ -4177,46 +4619,88 @@ function App() {
   }, [cards]);
   useEffect(() => {
     if (!currentUser) return;
-    // Inicializa knownIds com comentários já carregados (só na montagem)
     Object.values(comments).flat().forEach(c => knownComIds.current.add(c.id));
-    const iv = setInterval(async () => {
-      try {
-        const currentCards = cardsRef.current;
-        if (!currentCards.length) return;
-        const ids = currentCards.map(x => x.id).join(",");
-        const newComs = await sbGet("comments", `card_id=in.(${ids})&order=created_at.desc&limit=30`);
-        // Marca todos como conhecidos primeiro (evita duplicar)
-        const toProcess = newComs.filter(c => !knownComIds.current.has(c.id) && c.autor_id !== currentUser.id);
-        newComs.forEach(c => knownComIds.current.add(c.id));
-        if (toProcess.length) {
-          setComments(prev => {
-            const next = {
-              ...prev
-            };
-            toProcess.forEach(c => {
-              const existing = next[c.card_id] || [];
-              if (!existing.find(x => x.id === c.id)) next[c.card_id] = [...existing, c];
-            });
-            return next;
-          });
-          setNewComAlerts(prev => [...prev, ...toProcess.map(c => ({
-            id: c.id,
-            card_id: c.card_id,
-            card_nome: currentCards.find(k => k.id === c.card_id)?.nome || "card",
-            autor: c.autor_nome,
-            texto: c.texto,
-            hora: new Date(c.created_at).toLocaleString("pt-BR", {
-              day: "2-digit",
-              month: "2-digit",
-              hour: "2-digit",
-              minute: "2-digit"
-            })
-          }))]);
-          setShowComPanel(true);
+    let comChannel = null;
+    getSbClient().then(sb => {
+      comChannel = sb.channel("comments-realtime-" + currentUser.id).on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "comments"
+      }, payload => {
+        const c = payload.new;
+        if (!c || knownComIds.current.has(c.id)) return;
+        if (c.autor_id === currentUser.id) {
+          knownComIds.current.add(c.id);
+          return;
         }
-      } catch {}
-    }, 8000);
-    return () => clearInterval(iv);
+        knownComIds.current.add(c.id);
+        setComments(prev => {
+          const next = {
+            ...prev
+          };
+          const existing = next[c.card_id] || [];
+          if (!existing.find(x => x.id === c.id)) next[c.card_id] = [...existing, c];
+          return next;
+        });
+        const cardName = cardsRef.current.find(k => k.id === c.card_id)?.nome || "card";
+        setNewComAlerts(prev => [...prev, {
+          id: c.id,
+          card_id: c.card_id,
+          card_nome: cardName,
+          autor: c.autor_nome,
+          texto: c.texto,
+          hora: new Date(c.created_at).toLocaleString("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit"
+          })
+        }]);
+        setShowComPanel(true);
+      }).subscribe();
+    }).catch(() => {
+      // fallback polling se realtime falhar
+      const iv = setInterval(async () => {
+        try {
+          const currentCards = cardsRef.current;
+          if (!currentCards.length) return;
+          const ids = currentCards.map(x => x.id).join(",");
+          const newComs = await sbGet("comments", `card_id=in.(${ids})&order=created_at.desc&limit=30`);
+          const toProcess = newComs.filter(c => !knownComIds.current.has(c.id) && c.autor_id !== currentUser.id);
+          newComs.forEach(c => knownComIds.current.add(c.id));
+          if (toProcess.length) {
+            setComments(prev => {
+              const next = {
+                ...prev
+              };
+              toProcess.forEach(c => {
+                const ex = next[c.card_id] || [];
+                if (!ex.find(x => x.id === c.id)) next[c.card_id] = [...ex, c];
+              });
+              return next;
+            });
+            setNewComAlerts(prev => [...prev, ...toProcess.map(c => ({
+              id: c.id,
+              card_id: c.card_id,
+              card_nome: cardsRef.current.find(k => k.id === c.card_id)?.nome || "card",
+              autor: c.autor_nome,
+              texto: c.texto,
+              hora: new Date(c.created_at).toLocaleString("pt-BR", {
+                day: "2-digit",
+                month: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit"
+              })
+            }))]);
+            setShowComPanel(true);
+          }
+        } catch {}
+      }, 8000);
+      return () => clearInterval(iv);
+    });
+    return () => {
+      if (comChannel) getSbClient().then(sb => sb.removeChannel(comChannel)).catch(() => {});
+    };
   }, [currentUser]);
 
   // Atalhos de teclado
@@ -4245,16 +4729,18 @@ function App() {
   async function loadAll() {
     setLoading(true);
     try {
-      const [c, cl, s, pub] = await Promise.all([sbGet("cards", "order=card_order.asc,created_at.asc"), sbGet("columns", "order=col_order.asc"), sbGet("settings", "id=eq.1&limit=1"), sbGet("publications", "order=created_at.desc&limit=1")]);
+      const [c, cl, s, pub] = await Promise.all([sbGet("cards", "order=card_order.asc,created_at.asc"), sbGet("columns", "order=col_order.asc"), sbGet("settings", "id=eq.1&limit=1"), sbGet("publications", "order=created_at.desc&label=not.like.*automático*&limit=10")]);
       setCards(c);
       setCols(cl);
       if (s.length) setSettings(s[0]);
       // versão publicada
-      if (pub.length) {
-        const snap = pub[0].snapshot;
+      // Pega a última publicação manual (ignora automáticas)
+      const manualPub = pub.find(p => !(p.label || "").includes("automático"));
+      if (manualPub) {
+        const snap = manualPub.snapshot;
         setPubCards(snap.cards || []);
         setPubCols(snap.cols || cl);
-        setLastPub(new Date(pub[0].created_at).toLocaleString("pt-BR", {
+        setLastPub(new Date(manualPub.created_at).toLocaleString("pt-BR", {
           day: "2-digit",
           month: "2-digit",
           year: "numeric",
@@ -4276,6 +4762,22 @@ function App() {
       showT("Erro ao carregar dados.", "err");
     }
     setLoading(false);
+    // Dispara snapshot diário após carregar (sem bloquear)
+    if (isAdmin) setTimeout(() => maybeAutoSnapshot(), 2000);
+  }
+
+  // Snapshot diário automático no banco (só admin, uma vez por dia)
+  async function maybeAutoSnapshot(currentCards, currentCols) {
+    if (!isAdmin) return;
+    const key = "ge_auto_snap_" + new Date().toISOString().split("T")[0];
+    if (loadLS(key, false)) return; // já fez hoje
+    try {
+      // Salva como publication com label especial
+      await fn("publish", {
+        label: "Snapshot automático " + todayStr()
+      }, userId);
+      saveLS(key, true);
+    } catch {} // silencioso — não interrompe o usuário
   }
   function showT(msg, type = "ok") {
     setToast({
@@ -5466,6 +5968,9 @@ function App() {
   }), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
     id: "historico",
     label: "📜 Histórico"
+  }), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
+    id: "publicacoes",
+    label: "📰 Publicações"
   })), /*#__PURE__*/React.createElement("input", {
     placeholder: "Buscar…",
     value: search,
@@ -5584,14 +6089,25 @@ function App() {
     cards: filtered,
     cols: displayCols,
     dashMode: dashMode,
-    setDashMode: setDashMode
+    setDashMode: setDashMode,
+    isAdmin: isAdmin,
+    lastPub: lastPub
   })), !loading && view === "usuarios" && isAdmin && /*#__PURE__*/React.createElement(UsersPanel, {
     currentUser: currentUser,
     userId: userId,
     showT: showT
   }), !loading && view === "historico" && isAdmin && /*#__PURE__*/React.createElement("div", {
     id: "view-content"
-  }, /*#__PURE__*/React.createElement(HistoryPanel, null)), !loading && view === "calendario" && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(HistoryPanel, null)), !loading && view === "publicacoes" && isAdmin && /*#__PURE__*/React.createElement("div", {
+    id: "view-content"
+  }, /*#__PURE__*/React.createElement(PublicationsHistory, {
+    onRestoreSnapshot: (c, cl) => {
+      setCards(c);
+      setCols(cl);
+      showT("Snapshot restaurado!");
+      setView("kanban");
+    }
+  })), !loading && view === "calendario" && /*#__PURE__*/React.createElement("div", {
     id: "view-content"
   }, /*#__PURE__*/React.createElement(CalendarView, {
     cards: filtered,
