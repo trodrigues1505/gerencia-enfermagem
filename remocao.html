@@ -52,17 +52,17 @@ select.fs:focus{border-color:#3B82F6}
 .rt{width:100%;border-collapse:separate;border-spacing:0;min-width:1800px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden}
 .rt thead tr th{background:#F8FAFC;padding:9px 10px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748B;border-bottom:1px solid #E2E8F0;white-space:nowrap;position:sticky;top:0}
 .rt thead tr th:first-child{padding-left:14px;width:32px}
-.rt tbody tr{transition:background .12s}
+.rt tbody tr{transition:background .12s}.rt tbody tr:nth-child(even){background:#FAFAFA}.rt tbody tr:nth-child(even):hover{background:#F1F5F9}
 .rt tbody tr:hover{background:#F8FAFC}
-.rt tbody td{padding:0;border-bottom:1px solid #F1F5F9;vertical-align:middle;font-size:13px;color:#374151;height:42px}
+.rt tbody td{padding:0;border-bottom:1px solid #F1F5F9;vertical-align:middle;font-size:13px;color:#374151;height:36px}
 .rt tbody td:first-child{padding-left:14px;color:#94A3B8;font-size:11px;font-weight:700;min-width:32px}
 .rt tbody tr:last-child td{border-bottom:none}
 
-.cv2{padding:0 10px;height:42px;display:flex;align-items:center;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;min-width:80px;color:#374151;font-size:13px}
+.cv2{padding:0 10px;height:36px;display:flex;align-items:center;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;min-width:80px;color:#374151;font-size:13px}
 .cv2:hover{background:#F1F5F9;border-radius:4px}
 .cv2.empty{color:#CBD5E1}
-.ci{width:100%;height:42px;padding:0 10px;border:none;border-left:2px solid #3B82F6;background:#EFF6FF;font-size:13px;color:#0F172A;outline:none;min-width:120px}
-.csel{width:100%;height:42px;padding:0 8px;border:none;border-left:2px solid #3B82F6;background:#EFF6FF;font-size:12px;color:#0F172A;outline:none;appearance:none;cursor:pointer;min-width:120px}
+.ci{width:100%;height:36px;padding:0 10px;border:none;border-left:2px solid #3B82F6;background:#EFF6FF;font-size:13px;color:#0F172A;outline:none;min-width:120px}
+.csel{width:100%;height:36px;padding:0 8px;border:none;border-left:2px solid #3B82F6;background:#EFF6FF;font-size:12px;color:#0F172A;outline:none;appearance:none;cursor:pointer;min-width:120px}
 
 .gb{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;white-space:nowrap;border:1px solid transparent}
 .gb .gd{width:5px;height:5px;border-radius:50%}
@@ -156,38 +156,36 @@ async function apiGet(path) {
 
 // Extrai campos da ficha CROSS colada pelo usuário usando IA
 async function extractCROSS(texto) {
-  const prompt = `Você vai receber o texto de uma ficha CROSS (regulação hospitalar brasileira) e deve extrair os campos abaixo em JSON.
-Retorne APENAS o JSON, sem explicações, sem markdown, sem blocos de código.
-
-Campos a extrair:
-- data_solicitacao: data no formato YYYY-MM-DD (campo "Data" da ficha)
-- horario_solicitacao: horário no formato HH:MM (campo "Hora" da ficha)
-- ficha_cross: número da ficha/código CROSS se houver (procure por "SS-" ou "Código" ou número identificador)
-- nome_paciente: nome completo do paciente
-- setor: unidade solicitante (campo "Unidade Solicitante")
-- procedimento: tipo do recurso solicitado (campo "1º Recurso" — ex: "Exame", "Leito", "Avaliação")
-- especialidade: especialidade ou nome do exame do recurso solicitado (ex: "TOMOGRAFIA COMPUTADORIZADA")
-- diagnostico: CID + descrição do campo "CID 1" ou resumo clínico principal
-- gravidade: baseado na "Prioridade de atendimento" — se "1" → "VERMELHO", "2" → "AMARELO", "3" → "VERDE", "4" → "CINZA", se vazio → "AMARELO"
-- instituicao_destino: deixar vazio (ainda não definido)
-- observacao: primeiros 300 caracteres do "Resumo Clínico"
-- medico: nome do médico solicitante (campo "Médico Solicitante")
-
-Texto da ficha:
-${texto}`;
-
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+  // Usa Edge Function como proxy para evitar CORS da API da Anthropic
+  const r = await fetch("https://ahcrscstdtfawoogsugi.supabase.co/functions/v1/extract-cross", {
     method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1000,
-      messages: [{role:"user", content:prompt}]
-    })
+    headers: {"Content-Type":"application/json","apikey":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjk1MDgsImV4cCI6MjEwNDIwNTUwOH0.8ivWRA99AXXyBVFT3TQd5NuSod2eiowiI490Blt2zHM","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjk1MDgsImV4cCI6MjEwNDIwNTUwOH0.8ivWRA99AXXyBVFT3TQd5NuSod2eiowiI490Blt2zHM"},
+    body: JSON.stringify({texto})
   });
-  const data = await resp.json();
-  const raw = data.content?.[0]?.text || "{}";
-  return JSON.parse(raw.replace(/```json|```/g,"").trim());
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || "Erro na extração");
+  // Mapear campos do card → campos da planilha de remoção
+  return {
+    data_solicitacao: d.adm ? (d.adm.includes("/") ? (() => {
+      const p = d.adm.split("/");
+      const y = new Date().getFullYear();
+      return `${y}-${String(p[1]||"01").padStart(2,"0")}-${String(p[0]||"01").padStart(2,"0")}`;
+    })() : d.adm) : new Date().toISOString().split("T")[0],
+    horario_solicitacao: "",
+    ficha_cross: "",
+    nome_paciente: d.nome || "",
+    setor: d.setor || "",
+    procedimento: "EXAME",
+    especialidade: d.rec || "",
+    diagnostico: d.hd || "",
+    gravidade: {emergencia:"VERMELHO",urgencia:"AMARELO",menor_gravidade:"VERDE",agendamento:"CINZA"}[d.grav] || "AMARELO",
+    status: "",
+    instituicao_destino: "",
+    observacao: d.obs || "",
+    medico: "",
+    enfermeiro: "",
+    tecnico_auxiliar: "",
+  };
 }
 
 const STATUS_OPTS = ["FICHA FINALIZADA","FICHA FINALIZADA VIA CROSS","FICHA FINALIZADA PELA CROSS","FICHA FINALIZADA PELA ORIGEM","FICHA ENCERRADA PELO CROSS","ENCERRADA PELO CROSS","REMOÇÃO CONCLUÍDA","REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA","ALTA HOSPITALAR","RESOLVIDO COM RECURSOS LOCAIS","CASO SEM ATUALIZAÇÃO MÉDICA HÁ 48 HORAS","EVASÃO/ALTA A PEDIDO","CANCELADA PELO CROSS","CANCELADA PELO SOLICITANTE","PACIENTE EM REMOÇÃO","PACIENTE AGUARDANDO AMBULÂNCIA","CONCLUIDO","AGENDAMENTO SECRETARIA DA SAÚDE","HEMODIÁLISE","OUTRO"];
