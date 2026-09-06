@@ -5585,14 +5585,7 @@ function App() {
     const updated = [snap, ...list].slice(0, 20); // mantém últimos 20
     saveLS("ge_snapshots", updated);
     setSnapshots(updated);
-    // Baixa arquivo JSON local como backup
-    const blob = new Blob([JSON.stringify(snap, null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "ge-backup-" + new Date().toISOString().slice(0,16).replace("T","-").replace(/:/g,"-") + ".json";
-    a.click();
-    URL.revokeObjectURL(a.href);
-    showT("💾 Snapshot salvo e baixado!");
+    showT("💾 Snapshot salvo!");
   }
   function loadSnapshot(snap) {
     setCards(snap.cards || []);
@@ -5998,16 +5991,15 @@ function App() {
   }), /*#__PURE__*/React.createElement(NavBtn, {
     id: "kanban",
     label: "📋 Kanban"
-  }), /*#__PURE__*/React.createElement(NavBtn, {
-    id: "lista",
-    label: "📄 Lista"
-  }), /*#__PURE__*/React.createElement(NavBtn, {
-    id: "calendario",
-    label: "📅 Calendário"
-  }), /*#__PURE__*/React.createElement(NavBtn, {
-    id: "timeline",
-    label: "⏱ Linha do Tempo"
-  }), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
+  }), /*#__PURE__*/React.createElement("a", {
+    href: "remocao.html",
+    style: {
+      padding: "5px 14px", borderRadius: 6, border: "none", fontSize: 12,
+      fontWeight: 400, background: "transparent", color: "#64748B",
+      cursor: "pointer", textDecoration: "none",
+      display: "inline-flex", alignItems: "center"
+    }
+  }, "🚑 Remoção"), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
     id: "usuarios",
     label: "👥 Profissionais"
   }), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
@@ -6162,7 +6154,39 @@ function App() {
   }, /*#__PURE__*/React.createElement(TimelineView, {
     cards: filtered,
     cols: displayCols
-  })), !loading && view === "kanban" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  })), !loading && view === "kanban" && /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", gap: 16, alignItems: "flex-start" }
+  },
+  /*#__PURE__*/React.createElement("div", {
+    style: {
+      flexShrink: 0, width: 152,
+      background: "#fff", border: "1px solid #E2E8F0",
+      borderRadius: 10, overflow: "hidden",
+      alignSelf: "flex-start", position: "sticky", top: 68
+    }
+  },
+    /*#__PURE__*/React.createElement("div", {
+      style: { padding: "8px 14px 5px", fontSize: 9, fontWeight: 700,
+        color: "#CBD5E1", textTransform: "uppercase", letterSpacing: ".06em" }
+    }, "Visualizações"),
+    [["lista","📄","Lista"],["calendario","📅","Calendário"],["timeline","⏱","Linha do Tempo"]].map(function(it) {
+      return /*#__PURE__*/React.createElement("button", {
+        key: it[0],
+        onClick: function() { setView(it[0]); },
+        style: {
+          display: "flex", alignItems: "center", gap: 8,
+          width: "100%", padding: "7px 14px",
+          border: "none", background: "transparent",
+          fontSize: 12, fontWeight: 400, color: "#64748B",
+          cursor: "pointer", textAlign: "left", transition: "all .12s"
+        },
+        onMouseEnter: function(e) { e.currentTarget.style.background="#F1F5F9"; e.currentTarget.style.color="#0F172A"; },
+        onMouseLeave: function(e) { e.currentTarget.style.background="transparent"; e.currentTarget.style.color="#64748B"; }
+      }, it[1], " ", it[2]);
+    })
+  ),
+  /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+  /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 12,
@@ -6397,7 +6421,9 @@ function App() {
       onDragStart: handleDragStart,
       onDragEnd: handleDragEnd
     }))));
-  }))), !loading && view === "lista" && /*#__PURE__*/React.createElement("div", {
+  }))  /* fecha div flex:1 kanban-content */
+  )    /* fecha div flex-row wrapper */
+  ), !loading && view === "lista" && /*#__PURE__*/React.createElement("div", {
     id: "view-content",
     style: {
       background: "#fff",
