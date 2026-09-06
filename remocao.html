@@ -11,120 +11,125 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body,#root{height:100%;font-family:'Inter',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;background:#F1F5F9;color:#0F172A}
+html,body,#root{min-height:100%;font-family:'Inter',system-ui,-apple-system,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased;background:#F1F5F9;color:#0F172A}
 input,select,textarea,button{font-family:inherit}
 
 .topbar{background:#0F172A;padding:0 20px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.2)}
-.topbar-inner{max-width:1600px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:52px}
-.t-brand{display:flex;align-items:center;gap:10px}
-.t-icon{width:30px;height:30px;border-radius:8px;background:#1E40AF;display:flex;align-items:center;justify-content:center}
-.t-icon span{color:#fff;font-size:14px;font-weight:700}
-.t-name{font-weight:700;font-size:14px;color:#fff;letter-spacing:-.01em}
-.t-sub{font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.08em}
+.ti{max-width:1600px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:52px}
+.tb{display:flex;align-items:center;gap:10px}
+.tico{width:30px;height:30px;border-radius:8px;background:#1E40AF;display:flex;align-items:center;justify-content:center}
+.tico span{color:#fff;font-size:14px;font-weight:700}
+.tn{font-weight:700;font-size:14px;color:#fff}
+.ts{font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.08em}
 
 .toolbar{background:#fff;border-bottom:1px solid #E2E8F0;padding:0 20px}
-.toolbar-inner{max-width:1600px;margin:0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0}
+.tbi{max-width:1600px;margin:0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0}
 
 .btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;white-space:nowrap}
-.btn-primary{background:#0F172A;color:#fff}.btn-primary:hover{background:#1E293B}
-.btn-ghost{background:none;color:#64748B;border:1px solid #E2E8F0}.btn-ghost:hover{background:#F8FAFC;color:#0F172A}
+.btn-p{background:#0F172A;color:#fff}.btn-p:hover{background:#1E293B}
+.btn-g{background:none;color:#64748B;border:1px solid #E2E8F0}.btn-g:hover{background:#F8FAFC;color:#0F172A}
+.btn-ai{background:#6D28D9;color:#fff}.btn-ai:hover{background:#5B21B6}
 .btn-sm{padding:5px 10px;font-size:12px}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 
-.s-wrap{position:relative}
-.s-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94A3B8;pointer-events:none}
-.s-input{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;color:#0F172A;padding:7px 12px 7px 32px;font-size:13px;width:220px;outline:none;transition:all .15s;font-family:inherit}
-.s-input::placeholder{color:#CBD5E1}
-.s-input:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.sw{position:relative}
+.sw svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94A3B8;pointer-events:none}
+.si{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;color:#0F172A;padding:7px 12px 7px 32px;font-size:13px;width:220px;outline:none;transition:all .15s}
+.si::placeholder{color:#CBD5E1}
+.si:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
 
-select.fsel{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;color:#374151;padding:7px 28px 7px 10px;font-size:13px;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;outline:none;font-family:inherit}
-select.fsel:focus{border-color:#3B82F6}
+select.fs{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;color:#374151;padding:7px 28px 7px 10px;font-size:13px;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;outline:none}
+select.fs:focus{border-color:#3B82F6}
 
 .stats{max-width:1600px;margin:0 auto;padding:12px 20px;display:flex;gap:10px;flex-wrap:wrap}
 .chip{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:8px 14px;white-space:nowrap}
-.chip .dot{width:8px;height:8px;border-radius:50%}
-.chip .lbl{color:#64748B;font-size:12px}
-.chip .val{font-weight:700;font-size:15px}
+.chip .cdot{width:8px;height:8px;border-radius:50%}
+.chip .cl{color:#64748B;font-size:12px}
+.chip .cv{font-weight:700;font-size:15px}
 
-/* Tabela estilo kanban */
-.twrap{max-width:1600px;margin:0 auto;padding:0 20px 24px;overflow-x:auto}
-.rtable{width:100%;border-collapse:separate;border-spacing:0;min-width:1320px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden}
-.rtable thead tr th{background:#F8FAFC;padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748B;border-bottom:1px solid #E2E8F0;white-space:nowrap;cursor:default}
-.rtable thead tr th:first-child{padding-left:16px;width:36px}
-.rtable tbody tr{transition:background .12s}
-.rtable tbody tr:hover{background:#F8FAFC}
-.rtable tbody tr.editing-row{background:#EFF6FF}
-.rtable tbody td{padding:0;border-bottom:1px solid #F1F5F9;vertical-align:middle;font-size:13px;color:#374151;height:44px}
-.rtable tbody td:first-child{padding-left:16px;color:#94A3B8;font-size:11px;font-weight:700}
-.rtable tbody tr:last-child td{border-bottom:none}
+/* Tabela */
+.tw{max-width:1600px;margin:0 auto;padding:0 20px 24px;overflow-x:auto}
+.rt{width:100%;border-collapse:separate;border-spacing:0;min-width:1800px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden}
+.rt thead tr th{background:#F8FAFC;padding:9px 10px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748B;border-bottom:1px solid #E2E8F0;white-space:nowrap;position:sticky;top:0}
+.rt thead tr th:first-child{padding-left:14px;width:32px}
+.rt tbody tr{transition:background .12s}
+.rt tbody tr:hover{background:#F8FAFC}
+.rt tbody td{padding:0;border-bottom:1px solid #F1F5F9;vertical-align:middle;font-size:13px;color:#374151;height:42px}
+.rt tbody td:first-child{padding-left:14px;color:#94A3B8;font-size:11px;font-weight:700;min-width:32px}
+.rt tbody tr:last-child td{border-bottom:none}
 
-/* Células inline editáveis */
-.cell-view{padding:0 12px;height:44px;display:flex;align-items:center;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
-.cell-view:hover{text-decoration:underline;text-decoration-style:dotted;text-decoration-color:#CBD5E1}
-.cell-input{width:100%;height:44px;padding:0 10px;border:none;border-left:2px solid #3B82F6;background:#EFF6FF;font-size:13px;font-family:inherit;color:#0F172A;outline:none}
-.cell-select{width:100%;height:44px;padding:0 8px;border:none;border-left:2px solid #3B82F6;background:#EFF6FF;font-size:12px;font-family:inherit;color:#0F172A;outline:none;appearance:none;cursor:pointer}
+.cv2{padding:0 10px;height:42px;display:flex;align-items:center;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;min-width:80px;color:#374151;font-size:13px}
+.cv2:hover{background:#F1F5F9;border-radius:4px}
+.cv2.empty{color:#CBD5E1}
+.ci{width:100%;height:42px;padding:0 10px;border:none;border-left:2px solid #3B82F6;background:#EFF6FF;font-size:13px;color:#0F172A;outline:none;min-width:120px}
+.csel{width:100%;height:42px;padding:0 8px;border:none;border-left:2px solid #3B82F6;background:#EFF6FF;font-size:12px;color:#0F172A;outline:none;appearance:none;cursor:pointer;min-width:120px}
 
-/* Badges */
 .gb{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;white-space:nowrap;border:1px solid transparent}
-.gb .dot{width:5px;height:5px;border-radius:50%}
+.gb .gd{width:5px;height:5px;border-radius:50%}
 .gv{background:#FEE2E2;color:#991B1B;border-color:#FCA5A5}
 .ga{background:#FEF9C3;color:#713F12;border-color:#FDE047}
 .gg{background:#DCFCE7;color:#14532D;border-color:#86EFAC}
 .gc{background:#F1F5F9;color:#475569;border-color:#E2E8F0}
 
-.sb{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em}
+.sb2{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em;max-width:160px;overflow:hidden;text-overflow:ellipsis}
 .sf{background:#DCFCE7;color:#14532D}.se{background:#F1F5F9;color:#475569}
 .sn{background:#FEE2E2;color:#991B1B}.sa{background:#FEF3C7;color:#92400E}
 .sc{background:#EFF6FF;color:#1E40AF}
 
-.ab2{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600}
+.abg{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600}
 .abb{background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE}
 .aba{background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5}
 
-.ra{display:flex;align-items:center;gap:3px;opacity:0;transition:opacity .12s;padding:0 8px}
-.rtable tbody tr:hover .ra{opacity:1}
-.ab3{width:28px;height:28px;border-radius:6px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;background:none;color:#94A3B8;transition:all .12s}
-.ab3:hover{background:#F1F5F9;color:#0F172A}
-.ab3.del:hover{background:#FEE2E2;color:#991B1B}
+.ra{display:flex;align-items:center;gap:3px;opacity:0;transition:opacity .12s;padding:0 6px}
+.rt tbody tr:hover .ra{opacity:1}
+.ab4{width:26px;height:26px;border-radius:6px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;background:none;color:#94A3B8;transition:all .12s}
+.ab4:hover{background:#F1F5F9;color:#0F172A}
+.ab4.del:hover{background:#FEE2E2;color:#991B1B}
 
 /* Modal */
 .mbk{position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;padding:16px}
-.mdl{background:#fff;border-radius:16px;width:100%;max-width:860px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.22)}
-.mhd{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #F1F5F9;position:sticky;top:0;background:#fff;border-radius:16px 16px 0 0;z-index:1}
+.mdl{background:#fff;border-radius:16px;width:100%;max-width:900px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.22)}
+.mhd{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #F1F5F9;background:#fff;border-radius:16px 16px 0 0}
 .mhd h2{font-size:15px;font-weight:700;color:#0F172A}
 .mhd p{font-size:11px;color:#94A3B8;margin-top:2px}
 .mbd{flex:1;overflow-y:auto;padding:20px}
-.mft{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 20px;border-top:1px solid #F1F5F9;position:sticky;bottom:0;background:#fff;border-radius:0 0 16px 16px}
+.mft{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 20px;border-top:1px solid #F1F5F9;background:#fff;border-radius:0 0 16px 16px}
 
-.fs{margin-bottom:20px}
+.fsc{margin-bottom:20px}
 .fst{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #F1F5F9}
-.fg{display:grid;gap:12px}
+.fgrid{display:grid;gap:12px}
 .fg2{grid-template-columns:1fr 1fr}
 .fg3{grid-template-columns:1fr 1fr 1fr}
 .fg4{grid-template-columns:1fr 1fr 1fr 1fr}
 .fd{display:flex;flex-direction:column;gap:3px}
 .fd label{font-size:10px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em}
 .fd label .req{color:#EF4444;margin-left:2px}
-.fd input,.fd select,.fd textarea{background:#fff;border:1px solid #E2E8F0;border-radius:7px;color:#0F172A;padding:8px 10px;font-size:13px;outline:none;transition:all .15s;font-family:inherit;width:100%}
+.fd input,.fd select,.fd textarea{background:#fff;border:1px solid #E2E8F0;border-radius:7px;color:#0F172A;padding:8px 10px;font-size:13px;outline:none;transition:all .15s;width:100%}
 .fd input::placeholder,.fd textarea::placeholder{color:#CBD5E1}
 .fd input:focus,.fd select:focus,.fd textarea:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
 .fd textarea{resize:vertical;min-height:60px}
 .fd select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:28px}
 
+/* Modal IA CROSS */
+.ai-modal{background:#fff;border-radius:16px;width:100%;max-width:680px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.22)}
+.ai-hd{background:#6D28D9;padding:16px 20px;border-radius:16px 16px 0 0}
+.ai-hd h2{color:#fff;font-size:15px;font-weight:700}
+.ai-hd p{color:#DDD6FE;font-size:12px;margin-top:2px}
+.ai-body{padding:20px;flex:1;overflow-y:auto}
+.ai-ta{width:100%;min-height:240px;padding:12px;border:1px solid #E2E8F0;border-radius:8px;font-size:12px;font-family:'Inter',monospace;resize:vertical;outline:none;color:#374151;line-height:1.6}
+.ai-ta:focus{border-color:#7C3AED;box-shadow:0 0 0 3px rgba(124,58,237,.1)}
+.ai-status{margin-top:10px;font-size:12px;color:#6D28D9;min-height:18px}
+
 .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:64px 20px;color:#CBD5E1;font-size:13px;background:#fff;border:1px solid #E2E8F0;border-radius:12px}
 
-.tstack{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.tst{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
 .toast{display:flex;align-items:center;gap:10px;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 4px 20px rgba(0,0,0,.14);white-space:nowrap}
 .toast.ok{background:#F0FDF4;border:1px solid #86EFAC;color:#166534}
 .toast.err{background:#FEE2E2;border:1px solid #FCA5A5;color:#991B1B}
 
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:99px}
-
-@media(max-width:768px){
-  .fg2,.fg3,.fg4{grid-template-columns:1fr}
-  .s-input{width:140px}
-}
+@media(max-width:768px){.fg2,.fg3,.fg4{grid-template-columns:1fr}.si{width:140px}}
 </style>
 </head>
 <body>
@@ -135,7 +140,7 @@ const { useState, useEffect, useCallback, useMemo, useRef } = React;
 const SB_URL = "https://ahcrscstdtfawoogsugi.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjk1MDgsImV4cCI6MjEwNDIwNTUwOH0.8ivWRA99AXXyBVFT3TQd5NuSod2eiowiI490Blt2zHM";
 const FN_URL = `${SB_URL}/functions/v1/remocoes-write`;
-const H = {"Content-Type":"application/json", apikey:SB_KEY, Authorization:`Bearer ${SB_KEY}`};
+const H = {"Content-Type":"application/json",apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`};
 
 async function apiFn(body) {
   const r = await fetch(FN_URL,{method:"POST",headers:H,body:JSON.stringify(body)});
@@ -149,115 +154,181 @@ async function apiGet(path) {
   return r.json();
 }
 
-const STATUS_OPTS = [
-  "FICHA FINALIZADA","FICHA FINALIZADA VIA CROSS","FICHA FINALIZADA PELA CROSS",
-  "FICHA FINALIZADA PELA ORIGEM","FICHA ENCERRADA PELO CROSS","ENCERRADA PELO CROSS",
-  "REMOÇÃO CONCLUÍDA","REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA",
-  "ALTA HOSPITALAR","RESOLVIDO COM RECURSOS LOCAIS",
-  "CASO SEM ATUALIZAÇÃO MÉDICA HÁ 48 HORAS","EVASÃO/ALTA A PEDIDO",
-  "CANCELADA PELO CROSS","CANCELADA PELO SOLICITANTE",
-  "PACIENTE EM REMOÇÃO","PACIENTE AGUARDANDO AMBULÂNCIA",
-  "CONCLUIDO","AGENDAMENTO SECRETARIA DA SAÚDE","HEMODIÁLISE","OUTRO",
-];
+// Extrai campos da ficha CROSS colada pelo usuário usando IA
+async function extractCROSS(texto) {
+  const prompt = `Você vai receber o texto de uma ficha CROSS (regulação hospitalar brasileira) e deve extrair os campos abaixo em JSON.
+Retorne APENAS o JSON, sem explicações, sem markdown, sem blocos de código.
+
+Campos a extrair:
+- data_solicitacao: data no formato YYYY-MM-DD (campo "Data" da ficha)
+- horario_solicitacao: horário no formato HH:MM (campo "Hora" da ficha)
+- ficha_cross: número da ficha/código CROSS se houver (procure por "SS-" ou "Código" ou número identificador)
+- nome_paciente: nome completo do paciente
+- setor: unidade solicitante (campo "Unidade Solicitante")
+- procedimento: tipo do recurso solicitado (campo "1º Recurso" — ex: "Exame", "Leito", "Avaliação")
+- especialidade: especialidade ou nome do exame do recurso solicitado (ex: "TOMOGRAFIA COMPUTADORIZADA")
+- diagnostico: CID + descrição do campo "CID 1" ou resumo clínico principal
+- gravidade: baseado na "Prioridade de atendimento" — se "1" → "VERMELHO", "2" → "AMARELO", "3" → "VERDE", "4" → "CINZA", se vazio → "AMARELO"
+- instituicao_destino: deixar vazio (ainda não definido)
+- observacao: primeiros 300 caracteres do "Resumo Clínico"
+- medico: nome do médico solicitante (campo "Médico Solicitante")
+
+Texto da ficha:
+${texto}`;
+
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1000,
+      messages: [{role:"user", content:prompt}]
+    })
+  });
+  const data = await resp.json();
+  const raw = data.content?.[0]?.text || "{}";
+  return JSON.parse(raw.replace(/```json|```/g,"").trim());
+}
+
+const STATUS_OPTS = ["FICHA FINALIZADA","FICHA FINALIZADA VIA CROSS","FICHA FINALIZADA PELA CROSS","FICHA FINALIZADA PELA ORIGEM","FICHA ENCERRADA PELO CROSS","ENCERRADA PELO CROSS","REMOÇÃO CONCLUÍDA","REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA","ALTA HOSPITALAR","RESOLVIDO COM RECURSOS LOCAIS","CASO SEM ATUALIZAÇÃO MÉDICA HÁ 48 HORAS","EVASÃO/ALTA A PEDIDO","CANCELADA PELO CROSS","CANCELADA PELO SOLICITANTE","PACIENTE EM REMOÇÃO","PACIENTE AGUARDANDO AMBULÂNCIA","CONCLUIDO","AGENDAMENTO SECRETARIA DA SAÚDE","HEMODIÁLISE","OUTRO"];
 const GRAV_OPTS = ["VERMELHO","AMARELO","VERDE","CINZA"];
 const SETOR_OPTS = ["EMERGÊNCIA","CLÍNICA MÉDICA","OBSERVAÇÃO ADULTO","OBSERVAÇÃO INFANTIL","CLÍNICA PEDIÁTRICA","UTI","BLOCO MATERNO","EVASÃO","OUTRO"];
 const PROC_OPTS = ["AVALIAÇÃO","EXAME","LEITO","BANCO","ALTA","OUTRO"];
 const AMBU_OPTS = ["BÁSICA","AVANÇADA","UTI"];
 
-const STATUS_CLS = {
-  "FICHA FINALIZADA":"sf","FICHA FINALIZADA VIA CROSS":"sf","FICHA FINALIZADA PELA CROSS":"sf",
-  "FICHA FINALIZADA PELA ORIGEM":"sf","REMOÇÃO CONCLUÍDA":"sc","CONCLUIDO":"sc",
-  "PACIENTE EM REMOÇÃO":"sa","PACIENTE AGUARDANDO AMBULÂNCIA":"sa",
-  "REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA":"sn",
-  "FICHA ENCERRADA PELO CROSS":"se","ENCERRADA PELO CROSS":"se",
-  "EVASÃO/ALTA A PEDIDO":"se","CANCELADA PELO CROSS":"se","CANCELADA PELO SOLICITANTE":"se",
-};
+const STATUS_CLS = {"FICHA FINALIZADA":"sf","FICHA FINALIZADA VIA CROSS":"sf","FICHA FINALIZADA PELA CROSS":"sf","FICHA FINALIZADA PELA ORIGEM":"sf","REMOÇÃO CONCLUÍDA":"sc","CONCLUIDO":"sc","PACIENTE EM REMOÇÃO":"sa","PACIENTE AGUARDANDO AMBULÂNCIA":"sa","REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA":"sn","FICHA ENCERRADA PELO CROSS":"se","ENCERRADA PELO CROSS":"se","EVASÃO/ALTA A PEDIDO":"se","CANCELADA PELO CROSS":"se","CANCELADA PELO SOLICITANTE":"se"};
 const GRAV_DOT = {VERMELHO:"#EF4444",AMARELO:"#EAB308",VERDE:"#22C55E",CINZA:"#94A3B8"};
 const GRAV_CLS = {VERMELHO:"gv",AMARELO:"ga",VERDE:"gg",CINZA:"gc"};
 
-const fmt = v => v||"—";
+const EMPTY = {data_solicitacao:"",horario_solicitacao:"",ficha_cross:"",nome_paciente:"",setor:"",procedimento:"",especialidade:"",diagnostico:"",status:"",gravidade:"",data_resposta_cross:"",horario_resposta_cross:"",instituicao_destino:"",tipo_ambulancia:"",data_saida_ambulancia:"",horario_saida_ambulancia:"",tempo_espera:"",observacao:"",enfermeiro:"",tecnico_auxiliar:"",medico:"",horario_retorno:""};
+
+const COLS_HEADER = [
+  ["data_solicitacao","DATA SOLICITAÇÃO"],["horario_solicitacao","HORÁRIO"],
+  ["ficha_cross","Nº FICHA CROSS"],["nome_paciente","NOME PACIENTE"],
+  ["setor","LOCALIZAÇÃO / SETOR"],["procedimento","PROCEDIMENTO"],
+  ["especialidade","ESPECIALIDADE"],["diagnostico","DIAGNÓSTICO"],
+  ["status","STATUS"],["gravidade","GRAVIDADE"],
+  ["data_resposta_cross","DATA RESP. CROSS"],["horario_resposta_cross","HOR. RESP. CROSS"],
+  ["instituicao_destino","INSTITUIÇÃO DESTINO"],["tipo_ambulancia","TIPO AMBULÂNCIA"],
+  ["data_saida_ambulancia","DATA BASE AMBULÂNCIA"],["horario_saida_ambulancia","HORÁRIO SAÍDA SCFM"],
+  ["tempo_espera","TEMPO ESPERA"],["observacao","OBSERVAÇÃO"],
+  ["enfermeiro","ENFERMEIRO"],["tecnico_auxiliar","TÉCNICO/AUX. ENFERMA"],
+  ["medico","MÉDICO"],["horario_retorno","RETORNO PACIENTE"],
+];
+
 const fmtD = v => {
-  if(!v) return "—";
+  if(!v) return "";
   try{ return new Date(v+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"2-digit"}); }catch{return v;}
 };
 
-const EMPTY = {
-  data_solicitacao:"",horario_solicitacao:"",ficha_cross:"",nome_paciente:"",
-  setor:"",procedimento:"",especialidade:"",diagnostico:"",status:"",gravidade:"",
-  data_resposta_cross:"",horario_resposta_cross:"",instituicao_destino:"",
-  tipo_ambulancia:"",data_saida_ambulancia:"",horario_saida_ambulancia:"",
-  tempo_espera:"",observacao:"",enfermeiro:"",tecnico_auxiliar:"",medico:"",horario_retorno:"",
-};
-
-/* Ícones */
+/* Ícones SVG */
 const Ico = ({n,s=16}) => {
   const d={
-    plus:<path d="M12 5v14M5 12h14"/>,
     search:<><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></>,
     trash:<><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></>,
     x:<path d="M18 6 6 18M6 6l12 12"/>,
     dl:<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
     pulse:<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>,
-    arrow:<path d="M19 12H5M12 5l-7 7 7 7"/>,
-    check:<polyline points="20 6 9 12 4 10"/>,
+    ai:<><path d="M12 2a10 10 0 0 1 10 10"/><path d="M12 6a6 6 0 0 1 6 6"/><circle cx="12" cy="12" r="2"/></>,
+    plus:<path d="M12 5v14M5 12h14"/>,
   };
   return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{d[n]}</svg>;
 };
 
 /* Toast */
 function useToast(){
-  const [toasts,setToasts]=useState([]);
+  const [ts,setTs]=useState([]);
   const push=useCallback((msg,type="ok")=>{
     const id=Date.now();
-    setToasts(t=>[...t,{id,msg,type}]);
-    setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),4000);
+    setTs(t=>[...t,{id,msg,type}]);
+    setTimeout(()=>setTs(t=>t.filter(x=>x.id!==id)),4500);
   },[]);
-  return {toasts,push};
+  return {ts,push};
 }
 
 /* Célula inline editável */
-function EditCell({rowId, field, value, type="text", opts=null, onSave}){
+function Cell({rowId,field,value,type="text",opts=null,onSave}){
   const [editing,setEditing]=useState(false);
   const [val,setVal]=useState(value||"");
   const ref=useRef();
-
   useEffect(()=>{setVal(value||"");},[value]);
-  useEffect(()=>{if(editing && ref.current) ref.current.focus();},[editing]);
-
+  useEffect(()=>{if(editing&&ref.current)ref.current.focus();},[editing]);
   function commit(){
     setEditing(false);
-    if(val!==(value||"")) onSave(rowId,field,val);
+    if(val!==(value||""))onSave(rowId,field,val);
   }
-
   if(!editing) return (
-    <div className="cell-view" onClick={()=>setEditing(true)}
-      title="Clique para editar">
-      {val||<span style={{color:"#CBD5E1"}}>—</span>}
+    <div className={`cv2 ${!val?"empty":""}`} onClick={()=>setEditing(true)} title="Clique para editar">
+      {val||"—"}
     </div>
   );
-
   if(opts) return (
-    <select ref={ref} className="cell-select" value={val}
-      onChange={e=>setVal(e.target.value)}
-      onBlur={commit}
+    <select ref={ref} className="csel" value={val}
+      onChange={e=>setVal(e.target.value)} onBlur={commit}
       onKeyDown={e=>e.key==="Escape"&&(setEditing(false),setVal(value||""))}>
       <option value="">—</option>
       {opts.map(o=><option key={o}>{o}</option>)}
     </select>
   );
-
   return (
-    <input ref={ref} className="cell-input" type={type} value={val}
-      onChange={e=>setVal(e.target.value)}
-      onBlur={commit}
-      onKeyDown={e=>{
-        if(e.key==="Enter") commit();
-        if(e.key==="Escape"){setEditing(false);setVal(value||"");}
-      }}/>
+    <input ref={ref} className="ci" type={type} value={val}
+      onChange={e=>setVal(e.target.value)} onBlur={commit}
+      onKeyDown={e=>{if(e.key==="Enter")commit();if(e.key==="Escape"){setEditing(false);setVal(value||"");}}}/>
   );
 }
 
-/* Modal de novo registro */
+/* Modal IA — colar ficha CROSS */
+function AIModal({onClose,onExtracted}){
+  const [texto,setTexto]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [status,setStatus]=useState("");
+
+  async function extrair(){
+    if(!texto.trim())return;
+    setLoading(true);
+    setStatus("Analisando ficha…");
+    try{
+      const campos = await extractCROSS(texto);
+      setStatus("✓ Campos extraídos com sucesso!");
+      setTimeout(()=>{onExtracted(campos);onClose();},800);
+    }catch(e){
+      setStatus("Erro ao extrair: "+e.message);
+    }finally{
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="mbk" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="ai-modal">
+        <div className="ai-hd">
+          <h2>✨ Extração IA — Ficha CROSS</h2>
+          <p>Cole o texto copiado da ficha CROSS. A IA extrai e preenche os campos automaticamente.</p>
+        </div>
+        <div className="ai-body">
+          <div style={{marginBottom:8,fontSize:12,color:"#64748B"}}>
+            Copie todo o conteúdo da ficha (Ctrl+A, Ctrl+C) e cole abaixo:
+          </div>
+          <textarea
+            className="ai-ta"
+            placeholder="Cole aqui o texto da ficha CROSS..."
+            value={texto}
+            onChange={e=>setTexto(e.target.value)}
+          />
+          <div className="ai-status">{status}</div>
+        </div>
+        <div className="mft">
+          <button className="btn btn-g" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-ai" disabled={loading||!texto.trim()} onClick={extrair}>
+            {loading?"Extraindo…":"✨ Extrair com IA"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Modal novo/editar registro */
 function FormModal({row,onClose,onSave,loading}){
   const [form,setForm]=useState(row?{...EMPTY,...row}:{...EMPTY});
   const set=(k,v)=>setForm(f=>(({...f,[k]:v})));
@@ -269,12 +340,11 @@ function FormModal({row,onClose,onSave,loading}){
             <h2>{row?.id?"Editar Registro":"Novo Registro de Remoção"}</h2>
             <p>{row?.id?`Ficha ${row.ficha_cross||"sem número"}`:"Preencha os dados"}</p>
           </div>
-          <button className="ab3" onClick={onClose}><Ico n="x"/></button>
+          <button className="ab4" onClick={onClose}><Ico n="x"/></button>
         </div>
         <div className="mbd">
-          <div className="fs">
-            <div className="fst">Identificação</div>
-            <div className="fg fg3">
+          <div className="fsc"><div className="fst">Identificação</div>
+            <div className="fgrid fg3">
               <div className="fd"><label>Data Solicitação <span className="req">*</span></label>
                 <input type="date" value={form.data_solicitacao} onChange={e=>set("data_solicitacao",e.target.value)}/></div>
               <div className="fd"><label>Horário</label>
@@ -283,37 +353,34 @@ function FormModal({row,onClose,onSave,loading}){
                 <input type="text" placeholder="SS-14650585-26" value={form.ficha_cross} onChange={e=>set("ficha_cross",e.target.value)}/></div>
             </div>
           </div>
-          <div className="fs">
-            <div className="fst">Paciente</div>
-            <div className="fg fg2">
+          <div className="fsc"><div className="fst">Paciente</div>
+            <div className="fgrid fg2">
               <div className="fd"><label>Nome <span className="req">*</span></label>
                 <input type="text" placeholder="Nome completo" value={form.nome_paciente} onChange={e=>set("nome_paciente",e.target.value)}/></div>
-              <div className="fd"><label>Setor</label>
+              <div className="fd"><label>Localização / Setor</label>
                 <select value={form.setor} onChange={e=>set("setor",e.target.value)}>
                   <option value="">Selecione</option>{SETOR_OPTS.map(o=><option key={o}>{o}</option>)}
                 </select></div>
             </div>
           </div>
-          <div className="fs">
-            <div className="fst">Dados Clínicos</div>
-            <div className="fg fg3">
+          <div className="fsc"><div className="fst">Dados Clínicos</div>
+            <div className="fgrid fg3">
               <div className="fd"><label>Procedimento</label>
                 <select value={form.procedimento} onChange={e=>set("procedimento",e.target.value)}>
                   <option value="">Selecione</option>{PROC_OPTS.map(o=><option key={o}>{o}</option>)}
                 </select></div>
               <div className="fd"><label>Especialidade</label>
-                <input type="text" placeholder="Ortopedia…" value={form.especialidade} onChange={e=>set("especialidade",e.target.value)}/></div>
+                <input type="text" placeholder="Ortopedia, TC..." value={form.especialidade} onChange={e=>set("especialidade",e.target.value)}/></div>
               <div className="fd"><label>Gravidade</label>
                 <select value={form.gravidade} onChange={e=>set("gravidade",e.target.value)}>
                   <option value="">Selecione</option>{GRAV_OPTS.map(o=><option key={o}>{o}</option>)}
                 </select></div>
-              <div className="fd" style={{gridColumn:"1 / -1"}}><label>Diagnóstico</label>
+              <div className="fd" style={{gridColumn:"1/-1"}}><label>Diagnóstico</label>
                 <input type="text" placeholder="Hipótese ou CID" value={form.diagnostico} onChange={e=>set("diagnostico",e.target.value)}/></div>
             </div>
           </div>
-          <div className="fs">
-            <div className="fst">Resposta CROSS / Status</div>
-            <div className="fg fg2">
+          <div className="fsc"><div className="fst">Resposta CROSS / Status</div>
+            <div className="fgrid fg2">
               <div className="fd"><label>Status</label>
                 <select value={form.status} onChange={e=>set("status",e.target.value)}>
                   <option value="">Selecione</option>{STATUS_OPTS.map(o=><option key={o}>{o}</option>)}
@@ -326,44 +393,41 @@ function FormModal({row,onClose,onSave,loading}){
                 <input type="time" value={form.horario_resposta_cross} onChange={e=>set("horario_resposta_cross",e.target.value)}/></div>
             </div>
           </div>
-          <div className="fs">
-            <div className="fst">Ambulância</div>
-            <div className="fg fg4">
+          <div className="fsc"><div className="fst">Ambulância</div>
+            <div className="fgrid fg4">
               <div className="fd"><label>Tipo</label>
                 <select value={form.tipo_ambulancia} onChange={e=>set("tipo_ambulancia",e.target.value)}>
                   <option value="">—</option>{AMBU_OPTS.map(o=><option key={o}>{o}</option>)}
                 </select></div>
-              <div className="fd"><label>Data Saída</label>
+              <div className="fd"><label>Solicitação Base — Data</label>
                 <input type="date" value={form.data_saida_ambulancia} onChange={e=>set("data_saida_ambulancia",e.target.value)}/></div>
-              <div className="fd"><label>Horário Saída</label>
+              <div className="fd"><label>Horário Saída SCFM</label>
                 <input type="time" value={form.horario_saida_ambulancia} onChange={e=>set("horario_saida_ambulancia",e.target.value)}/></div>
-              <div className="fd"><label>Tempo Espera</label>
+              <div className="fd"><label>Tempo de Espera</label>
                 <input type="text" placeholder="01:30" value={form.tempo_espera} onChange={e=>set("tempo_espera",e.target.value)}/></div>
-              <div className="fd"><label>Retorno</label>
+              <div className="fd"><label>Retorno do Paciente</label>
                 <input type="time" value={form.horario_retorno} onChange={e=>set("horario_retorno",e.target.value)}/></div>
             </div>
           </div>
-          <div className="fs">
-            <div className="fst">Equipe</div>
-            <div className="fg fg3">
+          <div className="fsc"><div className="fst">Equipe</div>
+            <div className="fgrid fg3">
               <div className="fd"><label>Enfermeiro(a)</label>
                 <input type="text" placeholder="Nome" value={form.enfermeiro} onChange={e=>set("enfermeiro",e.target.value)}/></div>
-              <div className="fd"><label>Técnico / Auxiliar</label>
+              <div className="fd"><label>Técnico / Auxiliar de Enfermagem</label>
                 <input type="text" placeholder="Nome" value={form.tecnico_auxiliar} onChange={e=>set("tecnico_auxiliar",e.target.value)}/></div>
               <div className="fd"><label>Médico(a)</label>
                 <input type="text" placeholder="Nome" value={form.medico} onChange={e=>set("medico",e.target.value)}/></div>
             </div>
           </div>
-          <div className="fs" style={{marginBottom:0}}>
-            <div className="fst">Observação</div>
+          <div className="fsc" style={{marginBottom:0}}><div className="fst">Observação</div>
             <div className="fd">
-              <textarea rows={3} placeholder="Observações…" value={form.observacao} onChange={e=>set("observacao",e.target.value)}/>
+              <textarea rows={3} placeholder="Observações adicionais…" value={form.observacao} onChange={e=>set("observacao",e.target.value)}/>
             </div>
           </div>
         </div>
         <div className="mft">
-          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-primary" disabled={loading||!form.nome_paciente} onClick={()=>onSave(form)}>
+          <button className="btn btn-g" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-p" disabled={loading||!form.nome_paciente} onClick={()=>onSave(form)}>
             {loading?"Salvando…":(row?.id?"Salvar":"Criar Registro")}
           </button>
         </div>
@@ -372,17 +436,19 @@ function FormModal({row,onClose,onSave,loading}){
   );
 }
 
-/* App principal */
+/* ── App ── */
 function App(){
   const [rows,setRows]=useState([]);
   const [loading,setLoading]=useState(true);
   const [saving,setSaving]=useState(false);
-  const [modal,setModal]=useState(null);
+  const [modal,setModal]=useState(null);   // null | {} | row
+  const [showAI,setShowAI]=useState(false);
+  const [aiPrefill,setAiPrefill]=useState(null); // campos extraídos pela IA
   const [search,setSearch]=useState("");
   const [fGrav,setFGrav]=useState("");
   const [fStatus,setFStatus]=useState("");
   const [fMes,setFMes]=useState("");
-  const {toasts,push}=useToast();
+  const {ts,push}=useToast();
 
   const load=useCallback(async()=>{
     setLoading(true);
@@ -392,25 +458,22 @@ function App(){
     }catch(e){push("Erro ao carregar: "+e.message,"err");}
     finally{setLoading(false);}
   },[]);
-
   useEffect(()=>{load();},[]);
 
-  /* Salva registro completo */
   const handleSave=async(form)=>{
     setSaving(true);
     try{
       const p={...form};
       Object.keys(p).forEach(k=>{if(p[k]==="")p[k]=null;});
       if(form.id){await apiFn({action:"update",id:form.id,...p});push("Atualizado");}
-      else{await apiFn({action:"create",...p});push("Criado");}
-      setModal(null);
+      else{await apiFn({action:"create",...p});push("Registro criado com sucesso!");}
+      setModal(null);setAiPrefill(null);
       await load();
-    }catch(e){push(e.message||"Erro","err");}
+    }catch(e){push(e.message||"Erro ao salvar","err");}
     finally{setSaving(false);}
   };
 
-  /* Edição inline de célula */
-  const handleCellSave=async(rowId,field,value)=>{
+  const handleCell=async(rowId,field,value)=>{
     try{
       await apiFn({action:"update",id:rowId,[field]:value||null});
       setRows(r=>r.map(x=>x.id===rowId?{...x,[field]:value}:x));
@@ -418,7 +481,7 @@ function App(){
   };
 
   const handleDelete=async(id)=>{
-    if(!confirm("Excluir este registro?")) return;
+    if(!confirm("Excluir este registro?"))return;
     try{
       await apiFn({action:"delete",id});
       push("Excluído");
@@ -426,12 +489,18 @@ function App(){
     }catch(e){push(e.message||"Erro","err");}
   };
 
+  const handleAIExtracted=(campos)=>{
+    push("✨ Campos extraídos! Revise e salve.");
+    setAiPrefill(campos);
+    setModal(campos); // abre o modal já preenchido
+  };
+
   const filtered=useMemo(()=>{
     let d=rows;
     if(search){const s=search.toLowerCase();d=d.filter(r=>(r.nome_paciente||"").toLowerCase().includes(s)||(r.ficha_cross||"").toLowerCase().includes(s)||(r.diagnostico||"").toLowerCase().includes(s)||(r.instituicao_destino||"").toLowerCase().includes(s));}
-    if(fGrav) d=d.filter(r=>r.gravidade===fGrav);
-    if(fStatus) d=d.filter(r=>(r.status||"").includes(fStatus));
-    if(fMes) d=d.filter(r=>(r.data_solicitacao||"").startsWith(fMes));
+    if(fGrav)d=d.filter(r=>r.gravidade===fGrav);
+    if(fStatus)d=d.filter(r=>(r.status||"").includes(fStatus));
+    if(fMes)d=d.filter(r=>(r.data_solicitacao||"").startsWith(fMes));
     return d;
   },[rows,search,fGrav,fStatus,fMes]);
 
@@ -444,9 +513,9 @@ function App(){
   },[filtered]);
 
   const exportCSV=()=>{
-    const cols=["data_solicitacao","horario_solicitacao","ficha_cross","nome_paciente","setor","procedimento","especialidade","diagnostico","status","gravidade","data_resposta_cross","horario_resposta_cross","instituicao_destino","tipo_ambulancia","data_saida_ambulancia","horario_saida_ambulancia","tempo_espera","observacao","enfermeiro","tecnico_auxiliar","medico","horario_retorno"];
-    const hdrs=["Data","Hora","Ficha","Paciente","Setor","Procedimento","Especialidade","Diagnóstico","Status","Gravidade","Data Resp.","Hora Resp.","Destino","Ambulância","Data Saída","Hora Saída","T.Espera","Obs.","Enfermeiro","Técnico","Médico","Retorno"];
-    const lines=[hdrs.join(","),...filtered.map(r=>cols.map(c=>`"${(r[c]||"").toString().replace(/"/g,'""')}"`).join(","))];
+    const fields=COLS_HEADER.map(c=>c[0]);
+    const hdrs=COLS_HEADER.map(c=>c[1]);
+    const lines=[hdrs.join(","),...filtered.map(r=>fields.map(f=>`"${(r[f]||"").toString().replace(/"/g,'""')}"`).join(","))];
     const b=new Blob([lines.join("\n")],{type:"text/csv;charset=utf-8"});
     const a=document.createElement("a");
     a.href=URL.createObjectURL(b);
@@ -459,31 +528,31 @@ function App(){
   return (
     <div style={{minHeight:"100vh",background:"#F1F5F9"}}>
       <div className="topbar">
-        <div className="topbar-inner">
-          <div className="t-brand">
-            <div className="t-icon"><span>+</span></div>
+        <div className="ti">
+          <div className="tb">
+            <div className="tico"><span>+</span></div>
             <div>
-              <div className="t-name">Gerência de Enfermagem</div>
-              <div className="t-sub">Controle de Remoções</div>
+              <div className="tn">Gerência de Enfermagem</div>
+              <div className="ts">Controle de Remoções</div>
             </div>
           </div>
-          <a href="." style={{padding:"6px 12px",border:"1px solid #334155",borderRadius:7,background:"none",color:"#94A3B8",cursor:"pointer",fontSize:12,textDecoration:"none",display:"inline-flex",alignItems:"center",gap:6}}>
+          <a href="." style={{padding:"6px 12px",border:"1px solid #334155",borderRadius:7,background:"none",color:"#94A3B8",fontSize:12,textDecoration:"none",display:"inline-flex",alignItems:"center",gap:6}}>
             ← Kanban
           </a>
         </div>
       </div>
 
       <div className="toolbar">
-        <div className="toolbar-inner">
-          <div className="s-wrap">
+        <div className="tbi">
+          <div className="sw">
             <Ico n="search" s={14}/>
-            <input className="s-input" placeholder="Buscar paciente, ficha, diagnóstico…" value={search} onChange={e=>setSearch(e.target.value)}/>
+            <input className="si" placeholder="Buscar paciente, ficha, diagnóstico…" value={search} onChange={e=>setSearch(e.target.value)}/>
           </div>
-          <select className="fsel" value={fGrav} onChange={e=>setFGrav(e.target.value)}>
+          <select className="fs" value={fGrav} onChange={e=>setFGrav(e.target.value)}>
             <option value="">Todas as gravidades</option>
             {GRAV_OPTS.map(o=><option key={o}>{o}</option>)}
           </select>
-          <select className="fsel" value={fStatus} onChange={e=>setFStatus(e.target.value)}>
+          <select className="fs" value={fStatus} onChange={e=>setFStatus(e.target.value)}>
             <option value="">Todos os status</option>
             <option value="FINALIZADA">Finalizada</option>
             <option value="CONCLUÍDA">Concluída</option>
@@ -492,108 +561,80 @@ function App(){
             <option value="REMOÇÃO">Em remoção</option>
             <option value="AGUARDANDO">Aguardando</option>
           </select>
-          <input type="month" className="fsel" value={fMes} onChange={e=>setFMes(e.target.value)} style={{width:"auto"}}/>
-          {hasFilter&&<button className="btn btn-ghost btn-sm" onClick={()=>{setSearch("");setFGrav("");setFStatus("");setFMes("");}}>Limpar</button>}
+          <input type="month" className="fs" value={fMes} onChange={e=>setFMes(e.target.value)} style={{width:"auto"}}/>
+          {hasFilter&&<button className="btn btn-g btn-sm" onClick={()=>{setSearch("");setFGrav("");setFStatus("");setFMes("");}}>Limpar</button>}
           <div style={{marginLeft:"auto",display:"flex",gap:8}}>
-            <button className="btn btn-ghost" onClick={exportCSV}><Ico n="dl" s={14}/> Exportar CSV</button>
-            <button className="btn btn-primary" onClick={()=>setModal({})}>+ Novo Registro</button>
+            <button className="btn btn-g" onClick={exportCSV}><Ico n="dl" s={14}/> Exportar CSV</button>
+            <button className="btn btn-ai" onClick={()=>setShowAI(true)}>✨ Colar Ficha CROSS</button>
+            <button className="btn btn-p" onClick={()=>setModal({})}><Ico n="plus" s={14}/> Novo Registro</button>
           </div>
         </div>
       </div>
 
       <div className="stats">
-        <div className="chip"><span className="lbl">Total</span><span className="val">{stats.total}</span></div>
-        <div className="chip"><div className="dot" style={{background:"#16A34A"}}/><span className="lbl">Concluídas</span><span className="val" style={{color:"#16A34A"}}>{stats.conc}</span></div>
-        <div className="chip"><div className="dot" style={{background:"#EF4444"}}/><span className="lbl">Não realizadas</span><span className="val" style={{color:"#EF4444"}}>{stats.nao}</span></div>
-        <div className="chip"><div className="dot" style={{background:"#EF4444"}}/><span className="lbl">Emergências</span><span className="val" style={{color:"#EF4444"}}>{stats.verm}</span></div>
+        <div className="chip"><span className="cl">Total</span><span className="cv">{stats.total}</span></div>
+        <div className="chip"><div className="cdot" style={{background:"#16A34A"}}/><span className="cl">Concluídas</span><span className="cv" style={{color:"#16A34A"}}>{stats.conc}</span></div>
+        <div className="chip"><div className="cdot" style={{background:"#EF4444"}}/><span className="cl">Não realizadas</span><span className="cv" style={{color:"#EF4444"}}>{stats.nao}</span></div>
+        <div className="chip"><div className="cdot" style={{background:"#EF4444"}}/><span className="cl">Emergências</span><span className="cv" style={{color:"#EF4444"}}>{stats.verm}</span></div>
       </div>
 
-      <div className="twrap">
+      <div className="tw">
         {loading?(
           <div className="empty"><Ico n="pulse" s={32}/><p>Carregando…</p></div>
         ):filtered.length===0?(
           <div className="empty">
             <Ico n="pulse" s={32}/>
-            <p>{rows.length===0?"Nenhum registro. Clique em «Novo Registro» para começar.":"Nenhum resultado para o filtro aplicado."}</p>
+            <p>{rows.length===0?"Nenhum registro. Clique em «Novo Registro» ou «✨ Colar Ficha CROSS» para começar.":"Nenhum resultado para o filtro."}</p>
           </div>
         ):(
-          <table className="rtable">
+          <table className="rt">
             <thead><tr>
               <th>#</th>
-              <th>Data / Hora</th>
-              <th>Ficha CROSS</th>
-              <th>Paciente</th>
-              <th>Setor</th>
-              <th>Especialidade</th>
-              <th>Diagnóstico</th>
-              <th>Destino</th>
-              <th>Gravidade</th>
-              <th>Status</th>
-              <th>Ambulância</th>
-              <th>Saída</th>
-              <th>Retorno</th>
-              <th>Enfermeiro</th>
-              <th>Técnico</th>
-              <th>Médico</th>
-              <th>Obs.</th>
-              <th style={{width:64}}></th>
+              {COLS_HEADER.map(([f,h])=><th key={f}>{h}</th>)}
+              <th style={{width:48}}></th>
             </tr></thead>
             <tbody>
               {filtered.map((r,i)=>(
                 <tr key={r.id}>
                   <td>{i+1}</td>
-                  <td>
-                    <div style={{padding:"0 12px"}}>
-                      <div style={{fontSize:12,color:"#374151",fontVariantNumeric:"tabular-nums"}}>{fmtD(r.data_solicitacao)}</div>
-                      <div style={{fontSize:10,color:"#94A3B8"}}>{r.horario_solicitacao||""}</div>
-                    </div>
-                  </td>
-                  <td><EditCell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCellSave}/></td>
-                  <td><EditCell rowId={r.id} field="nome_paciente" value={r.nome_paciente} onSave={handleCellSave}/></td>
-                  <td><EditCell rowId={r.id} field="setor" value={r.setor} opts={SETOR_OPTS} onSave={handleCellSave}/></td>
-                  <td><EditCell rowId={r.id} field="especialidade" value={r.especialidade} onSave={handleCellSave}/></td>
-                  <td><EditCell rowId={r.id} field="diagnostico" value={r.diagnostico} onSave={handleCellSave}/></td>
-                  <td><EditCell rowId={r.id} field="instituicao_destino" value={r.instituicao_destino} onSave={handleCellSave}/></td>
-                  <td>
-                    {r.gravidade
-                      ?<div style={{padding:"0 12px"}}>
-                          <span className={`gb ${GRAV_CLS[r.gravidade]||"gc"}`}>
-                            <span className="dot" style={{background:GRAV_DOT[r.gravidade]||"#94A3B8"}}/>
-                            {r.gravidade}
-                          </span>
-                        </div>
-                      :<EditCell rowId={r.id} field="gravidade" value={r.gravidade} opts={GRAV_OPTS} onSave={handleCellSave}/>
-                    }
-                  </td>
+                  <td><div style={{padding:"0 10px",fontSize:12,color:"#374151"}}><div>{fmtD(r.data_solicitacao)||"—"}</div></div></td>
+                  <td><Cell rowId={r.id} field="horario_solicitacao" value={r.horario_solicitacao} type="time" onSave={handleCell}/></td>
+                  <td><Cell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCell}/></td>
+                  <td><Cell rowId={r.id} field="nome_paciente" value={r.nome_paciente} onSave={handleCell}/></td>
+                  <td><Cell rowId={r.id} field="setor" value={r.setor} opts={SETOR_OPTS} onSave={handleCell}/></td>
+                  <td><Cell rowId={r.id} field="procedimento" value={r.procedimento} opts={PROC_OPTS} onSave={handleCell}/></td>
+                  <td><Cell rowId={r.id} field="especialidade" value={r.especialidade} onSave={handleCell}/></td>
+                  <td><Cell rowId={r.id} field="diagnostico" value={r.diagnostico} onSave={handleCell}/></td>
                   <td>
                     {r.status
-                      ?<div style={{padding:"0 8px"}}>
-                          <span className={`sb ${STATUS_CLS[r.status]||"se"}`}>
-                            {r.status.length>22?r.status.slice(0,22)+"…":r.status}
-                          </span>
-                        </div>
-                      :<EditCell rowId={r.id} field="status" value={r.status} opts={STATUS_OPTS} onSave={handleCellSave}/>
+                      ?<div style={{padding:"0 8px"}}><span className={`sb2 ${STATUS_CLS[r.status]||"se"}`} title={r.status}>{r.status.length>18?r.status.slice(0,18)+"…":r.status}</span></div>
+                      :<Cell rowId={r.id} field="status" value={r.status} opts={STATUS_OPTS} onSave={handleCell}/>
                     }
                   </td>
+                  <td>
+                    {r.gravidade
+                      ?<div style={{padding:"0 8px"}}><span className={`gb ${GRAV_CLS[r.gravidade]||"gc"}`}><span className="gd" style={{background:GRAV_DOT[r.gravidade]||"#94A3B8"}}/> {r.gravidade}</span></div>
+                      :<Cell rowId={r.id} field="gravidade" value={r.gravidade} opts={GRAV_OPTS} onSave={handleCell}/>
+                    }
+                  </td>
+                  <td><Cell rowId={r.id} field="data_resposta_cross" value={r.data_resposta_cross} type="date" onSave={handleCell}/></td>
+                  <td><Cell rowId={r.id} field="horario_resposta_cross" value={r.horario_resposta_cross} type="time" onSave={handleCell}/></td>
+                  <td><Cell rowId={r.id} field="instituicao_destino" value={r.instituicao_destino} onSave={handleCell}/></td>
                   <td>
                     {r.tipo_ambulancia
-                      ?<div style={{padding:"0 8px"}}>
-                          <span className={`ab2 ${r.tipo_ambulancia==="AVANÇADA"?"aba":"abb"}`}>{r.tipo_ambulancia}</span>
-                        </div>
-                      :<EditCell rowId={r.id} field="tipo_ambulancia" value={r.tipo_ambulancia} opts={AMBU_OPTS} onSave={handleCellSave}/>
+                      ?<div style={{padding:"0 8px"}}><span className={`abg ${r.tipo_ambulancia==="AVANÇADA"?"aba":"abb"}`}>{r.tipo_ambulancia}</span></div>
+                      :<Cell rowId={r.id} field="tipo_ambulancia" value={r.tipo_ambulancia} opts={AMBU_OPTS} onSave={handleCell}/>
                     }
                   </td>
-                  <td><EditCell rowId={r.id} field="horario_saida_ambulancia" value={r.horario_saida_ambulancia} type="time" onSave={handleCellSave}/></td>
-                  <td><EditCell rowId={r.id} field="horario_retorno" value={r.horario_retorno} type="time" onSave={handleCellSave}/></td>
-                  <td><EditCell rowId={r.id} field="enfermeiro" value={r.enfermeiro} onSave={handleCellSave}/></td>
-                  <td><EditCell rowId={r.id} field="tecnico_auxiliar" value={r.tecnico_auxiliar} onSave={handleCellSave}/></td>
-                  <td><EditCell rowId={r.id} field="medico" value={r.medico} onSave={handleCellSave}/></td>
-                  <td><EditCell rowId={r.id} field="observacao" value={r.observacao} onSave={handleCellSave}/></td>
-                  <td>
-                    <div className="ra">
-                      <button className="ab3 del" title="Excluir" onClick={()=>handleDelete(r.id)}><Ico n="trash" s={14}/></button>
-                    </div>
-                  </td>
+                  <td><Cell rowId={r.id} field="data_saida_ambulancia" value={r.data_saida_ambulancia} type="date" onSave={handleCell}/></td>
+                  <td><Cell rowId={r.id} field="horario_saida_ambulancia" value={r.horario_saida_ambulancia} type="time" onSave={handleCell}/></td>
+                  <td><Cell rowId={r.id} field="tempo_espera" value={r.tempo_espera} onSave={handleCell}/></td>
+                  <td><Cell rowId={r.id} field="observacao" value={r.observacao} onSave={handleCell}/></td>
+                  <td><Cell rowId={r.id} field="enfermeiro" value={r.enfermeiro} onSave={handleCell}/></td>
+                  <td><Cell rowId={r.id} field="tecnico_auxiliar" value={r.tecnico_auxiliar} onSave={handleCell}/></td>
+                  <td><Cell rowId={r.id} field="medico" value={r.medico} onSave={handleCell}/></td>
+                  <td><Cell rowId={r.id} field="horario_retorno" value={r.horario_retorno} type="time" onSave={handleCell}/></td>
+                  <td><div className="ra"><button className="ab4 del" title="Excluir" onClick={()=>handleDelete(r.id)}><Ico n="trash" s={13}/></button></div></td>
                 </tr>
               ))}
             </tbody>
@@ -601,15 +642,11 @@ function App(){
         )}
       </div>
 
-      {modal!==null&&<FormModal row={modal} onClose={()=>setModal(null)} onSave={handleSave} loading={saving}/>}
+      {showAI&&<AIModal onClose={()=>setShowAI(false)} onExtracted={handleAIExtracted}/>}
+      {modal!==null&&<FormModal row={modal} onClose={()=>{setModal(null);setAiPrefill(null);}} onSave={handleSave} loading={saving}/>}
 
-      <div className="tstack">
-        {toasts.map(t=>(
-          <div key={t.id} className={`toast ${t.type}`}>
-            <span>{t.type==="ok"?"✓":"✕"}</span>
-            <span>{t.msg}</span>
-          </div>
-        ))}
+      <div className="tst">
+        {ts.map(t=><div key={t.id} className={`toast ${t.type}`}><span>{t.type==="ok"?"✓":"✕"}</span><span>{t.msg}</span></div>)}
       </div>
     </div>
   );
