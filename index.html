@@ -5585,7 +5585,14 @@ function App() {
     const updated = [snap, ...list].slice(0, 20); // mantém últimos 20
     saveLS("ge_snapshots", updated);
     setSnapshots(updated);
-    showT("💾 Snapshot salvo!");
+    // Baixa arquivo JSON local como backup
+    const blob = new Blob([JSON.stringify(snap, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "ge-backup-" + new Date().toISOString().slice(0,16).replace("T","-").replace(/:/g,"-") + ".json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showT("💾 Snapshot salvo e baixado!");
   }
   function loadSnapshot(snap) {
     setCards(snap.cards || []);
@@ -6000,22 +6007,7 @@ function App() {
   }), /*#__PURE__*/React.createElement(NavBtn, {
     id: "timeline",
     label: "⏱ Linha do Tempo"
-  }), /*#__PURE__*/React.createElement("a", {
-    href: "remocao.html",
-    style: {
-      padding: "5px 14px",
-      borderRadius: 6,
-      border: "none",
-      fontSize: 12,
-      fontWeight: 400,
-      background: "transparent",
-      color: "#64748B",
-      cursor: "pointer",
-      textDecoration: "none",
-      display: "inline-flex",
-      alignItems: "center"
-    }
-  }, "🚑 Remoção"), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
+  }), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
     id: "usuarios",
     label: "👥 Profissionais"
   }), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
