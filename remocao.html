@@ -13,254 +13,210 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body,#root{height:100%;font-family:'Inter',system-ui,sans-serif;font-size:13px;-webkit-font-smoothing:antialiased;background:#F1F5F9;color:#0F172A}
 input,select,textarea,button{font-family:inherit}
-
-/* Layout fixo */
 .app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
-
-/* Topbar */
-.topbar{background:#0F172A;padding:0 16px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.3);z-index:200}
+.topbar{background:#0F172A;padding:0 16px;flex-shrink:0;z-index:200}
 .ti{display:flex;align-items:center;justify-content:space-between;height:44px}
 .tb{display:flex;align-items:center;gap:8px}
-.tico{width:26px;height:26px;border-radius:6px;background:#1E40AF;display:flex;align-items:center;justify-content:center}
+.tico{width:26px;height:26px;border-radius:6px;background:#1E40AF;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .tico span{color:#fff;font-size:12px;font-weight:700}
 .tn{font-weight:700;font-size:13px;color:#fff}
 .ts{font-size:8px;color:#475569;text-transform:uppercase;letter-spacing:.08em}
-
-/* Toolbar horizontal sempre visível */
 .toolbar{background:#fff;border-bottom:2px solid #E2E8F0;padding:0 16px;flex-shrink:0;z-index:150}
-.tbi{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;padding:6px 0;overflow-x:auto}
-
+.tbi{display:flex;align-items:center;gap:8px;padding:7px 0;overflow-x:auto}
+.tbi::-webkit-scrollbar{height:4px}
+.tbi::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:99px}
 .btn{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all .15s;white-space:nowrap;flex-shrink:0}
 .btn-p{background:#0F172A;color:#fff}.btn-p:hover{background:#1E293B}
 .btn-g{background:none;color:#64748B;border:1px solid #E2E8F0}.btn-g:hover{background:#F8FAFC;color:#0F172A}
-.btn-blue{background:none;color:#3B82F6;border:1px solid #BFDBFE}.btn-blue:hover{background:#EFF6FF}
+.btn-blue{background:#EFF6FF;color:#3B82F6;border:1px solid #BFDBFE}.btn-blue:hover{background:#DBEAFE}
+.btn-green{background:#F0FDF4;color:#16A34A;border:1px solid #86EFAC}.btn-green:hover{background:#DCFCE7}
 .btn-sm{padding:3px 8px;font-size:11px}
 .btn:disabled{opacity:.5;cursor:not-allowed}
-
 .sw{position:relative;flex-shrink:0}
 .sw svg{position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94A3B8;pointer-events:none}
-.si{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;color:#0F172A;padding:5px 10px 5px 28px;font-size:12px;width:180px;outline:none}
+.si{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;color:#0F172A;padding:5px 10px 5px 28px;font-size:12px;width:170px;outline:none}
 .si:focus{border-color:#3B82F6}
-
-select.fsel{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;color:#374151;padding:5px 24px 5px 8px;font-size:12px;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;outline:none;flex-shrink:0}
-
-/* Stats bar */
-.stats{background:#fff;border-bottom:1px solid #E2E8F0;padding:4px 16px;display:flex;gap:16px;flex-shrink:0;z-index:100}
-.chip{display:flex;align-items:center;gap:6px;white-space:nowrap;padding:2px 0}
+select.fsel{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;color:#374151;padding:5px 22px 5px 8px;font-size:12px;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;outline:none;flex-shrink:0}
+.stats{background:#fff;border-bottom:1px solid #E2E8F0;padding:5px 16px;display:flex;gap:14px;flex-shrink:0;align-items:center;overflow-x:auto}
+.stats::-webkit-scrollbar{height:4px}
+.chip{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .chip .cdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .chip .cl{color:#64748B;font-size:11px}
 .chip .cv{font-weight:700;font-size:13px}
-.chip-sep{width:1px;height:16px;background:#E2E8F0;flex-shrink:0}
-
-/* Tabela container com scroll */
-.tw{flex:1;overflow:auto;padding:0}
-
-/* Tabela compacta */
-.rt{width:100%;border-collapse:separate;border-spacing:0;min-width:2200px;table-layout:fixed}
-
-/* Cabeçalho sticky */
+.csep{width:1px;height:14px;background:#E2E8F0;flex-shrink:0}
+/* Scrollbars grossas */
+.tw{flex:1;overflow:auto;background:#F1F5F9}
+.tw::-webkit-scrollbar{width:12px;height:12px}
+.tw::-webkit-scrollbar-track{background:#E2E8F0}
+.tw::-webkit-scrollbar-thumb{background:#94A3B8;border-radius:6px;border:3px solid #E2E8F0}
+.tw::-webkit-scrollbar-thumb:hover{background:#475569}
+.tw::-webkit-scrollbar-corner{background:#E2E8F0}
+/* Tabela */
+.rt{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0}
 .rt thead{position:sticky;top:0;z-index:50}
-.rt thead tr th{background:#1E293B;padding:5px 8px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#94A3B8;border-right:1px solid #334155;white-space:nowrap;cursor:pointer;position:sticky;top:0}
+.rt thead tr th{background:#1E293B;padding:4px 8px;height:36px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#94A3B8;border-right:1px solid #334155;cursor:pointer;vertical-align:top}
 .rt thead tr th:hover{background:#334155;color:#E2E8F0}
-.rt thead tr th.sorted{color:#60A5FA;background:#1E3A5F}
-.rt thead tr th:first-child{width:28px;cursor:default;text-align:center}
-.rt thead tr th:first-child:hover{background:#1E293B}
-.rt thead tr th:last-child{width:36px;cursor:default;border-right:none}
-.th-inner{display:flex;align-items:center;gap:3px}
-.sort-arr{font-size:8px;opacity:.4}
-.sort-arr.on{opacity:1;color:#60A5FA}
-
-/* Tooltip no header */
-.th-tip{position:relative}
-.th-tip:hover .tip-box{display:block}
-.tip-box{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:999;background:#0F172A;color:#E2E8F0;font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;padding:6px 10px;border-radius:6px;white-space:normal;width:220px;line-height:1.5;box-shadow:0 4px 12px rgba(0,0,0,.4);pointer-events:none}
-
-/* Linhas ultra-compactas */
-.rt tbody tr:nth-child(odd){background:#ffffff}
+.rt thead tr th.sorted{color:#60A5FA;background:#1D3557}
+.rt thead tr th:first-child{width:32px;text-align:center;cursor:default;border-right:2px solid #475569;vertical-align:middle}
+.rt thead tr th:first-child:hover{background:#1E293B;color:#94A3B8}
+.rt thead tr th:last-child{width:32px;cursor:default;border-right:none}
+.th-inner{display:flex;align-items:flex-start;gap:3px;line-height:1.25;white-space:normal;word-break:break-word}
+.sarr{font-size:8px;opacity:.4;flex-shrink:0;margin-top:1px}.sarr.on{opacity:1;color:#60A5FA}
+/* Tooltip */
+.th-wrap{position:relative}
+.th-wrap:hover .tipbox{display:block}
+.tipbox{display:none;position:absolute;top:calc(100% + 2px);left:0;z-index:999;background:#0F172A;color:#CBD5E1;font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;padding:8px 12px;border-radius:8px;white-space:normal;width:250px;line-height:1.6;box-shadow:0 4px 16px rgba(0,0,0,.5);pointer-events:none;border:1px solid #334155}
+.tipbox strong{color:#fff;display:block;margin-bottom:2px}
+/* Zebra compacta */
+.rt tbody tr:nth-child(odd){background:#fff}
 .rt tbody tr:nth-child(even){background:#EEF2FF}
-.rt tbody tr:hover{background:#DBEAFE!important}
-.rt tbody td{padding:0;border-bottom:1px solid #E2E8F0;border-right:1px solid #F1F5F9;vertical-align:middle;font-size:11px;color:#374151;height:22px;overflow:hidden}
-.rt tbody td:first-child{text-align:center;color:#94A3B8;font-size:10px;font-weight:700;border-right:1px solid #E2E8F0;padding:0 4px}
+.rt tbody tr:hover td{background:#DBEAFE!important}
+.rt tbody td{border-bottom:1px solid #E2E8F0;border-right:1px solid #F1F5F9;vertical-align:middle;font-size:11px;color:#374151;height:24px;padding:0;overflow:visible}
+.rt tbody td:first-child{text-align:center;color:#94A3B8;font-size:10px;font-weight:700;border-right:2px solid #E2E8F0;padding:0 4px}
 .rt tbody td:last-child{border-right:none}
 .rt tbody tr:last-child td{border-bottom:none}
-
-/* Células inline — muito compactas, com quebra de texto */
-.cv2{padding:1px 6px;height:22px;display:flex;align-items:center;cursor:pointer;font-size:11px;
-  white-space:normal;word-break:break-word;overflow:hidden;min-width:60px;line-height:1.3}
-.cv2:hover{background:rgba(59,130,246,.1);border-radius:3px}
-.cv2.empty{color:#CBD5E1;font-style:italic}
-.ci{width:100%;height:22px;padding:0 6px;border:none;border-left:2px solid #3B82F6;background:#EFF6FF;font-size:11px;color:#0F172A;outline:none;min-width:80px}
-.csel{width:100%;height:22px;padding:0 4px;border:none;border-left:2px solid #3B82F6;background:#EFF6FF;font-size:10px;color:#0F172A;outline:none;appearance:none;cursor:pointer;min-width:80px}
-
-/* Larguras das colunas */
-.col-data{width:70px}.col-hora{width:52px}.col-ficha{width:110px}
-.col-nome{width:160px}.col-setor{width:100px}.col-proc{width:80px}
-.col-esp{width:120px}.col-diag{width:150px}.col-status{width:140px}
-.col-grav{width:78px}.col-drdata{width:70px}.col-drhora{width:52px}
-.col-dest{width:110px}.col-amb{width:72px}.col-bdata{width:70px}
-.col-saida{width:52px}.col-esp2{width:60px}.col-obs{width:160px}
-.col-enf{width:100px}.col-tec{width:100px}.col-med{width:100px}
-.col-ret{width:52px}
-
-.gb{display:inline-flex;align-items:center;gap:3px;padding:1px 5px;border-radius:99px;font-size:9px;font-weight:700;white-space:nowrap;border:1px solid transparent}
-.gb .gd{width:4px;height:4px;border-radius:50%;flex-shrink:0}
+/* Células */
+.cv{padding:2px 6px;height:24px;display:flex;align-items:center;cursor:pointer;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:50px}
+.cv:hover{background:rgba(59,130,246,.12);border-radius:3px}
+.cv.emp{color:#CBD5E1;font-style:italic;font-size:10px}
+.cinp{width:100%;height:24px;padding:0 6px;border:none;border-left:2px solid #3B82F6;background:#EFF6FF;font-size:11px;color:#0F172A;outline:none}
+.csel{width:100%;height:24px;padding:0 4px;border:none;border-left:2px solid #3B82F6;background:#EFF6FF;font-size:10px;color:#0F172A;outline:none;appearance:none;cursor:pointer}
+/* Badges */
+.gb{display:inline-flex;align-items:center;gap:3px;padding:1px 5px;border-radius:99px;font-size:9px;font-weight:700;border:1px solid transparent;white-space:nowrap}
+.gd{width:4px;height:4px;border-radius:50%;flex-shrink:0}
 .gv{background:#FEE2E2;color:#991B1B;border-color:#FCA5A5}
 .ga{background:#FEF9C3;color:#713F12;border-color:#FDE047}
 .gg{background:#DCFCE7;color:#14532D;border-color:#86EFAC}
 .gc{background:#F1F5F9;color:#475569;border-color:#E2E8F0}
-
-.sb2{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700;white-space:nowrap;text-transform:uppercase;letter-spacing:.03em;max-width:130px;overflow:hidden;text-overflow:ellipsis}
+.sb{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700;white-space:nowrap;text-transform:uppercase;max-width:130px;overflow:hidden;text-overflow:ellipsis}
 .sf{background:#DCFCE7;color:#14532D}.se{background:#F1F5F9;color:#475569}
-.sn{background:#FEE2E2;color:#991B1B}.sa{background:#FEF3C7;color:#92400E}
-.sc{background:#EFF6FF;color:#1E40AF}
-
-.abg{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700}
+.sn{background:#FEE2E2;color:#991B1B}.sa{background:#FEF3C7;color:#92400E}.sc{background:#EFF6FF;color:#1E40AF}
+.ab{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700}
 .abb{background:#EFF6FF;color:#1E40AF}.aba{background:#FEE2E2;color:#991B1B}
-
-.ra{display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .1s}
-.rt tbody tr:hover .ra{opacity:1}
-.ab4{width:22px;height:22px;border-radius:4px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;background:none;color:#94A3B8;transition:all .1s}
-.ab4:hover{background:#FEE2E2;color:#991B1B}
-
+/* Del button */
+.delbtn{width:24px;height:24px;border-radius:4px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;background:none;color:#CBD5E1;transition:all .1s;margin:0 auto}
+.delbtn:hover{background:#FEE2E2;color:#DC2626}
+.rt tbody tr .delbtn{opacity:0}
+.rt tbody tr:hover .delbtn{opacity:1}
 /* Modal */
 .mbk{position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:12px}
 .mdl{background:#fff;border-radius:14px;width:100%;max-width:860px;max-height:94vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)}
-.mhd{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid #F1F5F9;background:#fff;flex-shrink:0}
-.mhd h2{font-size:14px;font-weight:700;color:#0F172A}
-.mhd p{font-size:11px;color:#94A3B8;margin-top:1px}
+.mhd{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid #F1F5F9;flex-shrink:0}
+.mhd h2{font-size:14px;font-weight:700}.mhd p{font-size:11px;color:#94A3B8;margin-top:1px}
 .mbd{flex:1;overflow-y:auto;padding:16px}
-.mft{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 18px;border-top:1px solid #F1F5F9;flex-shrink:0}
-
+.mft{display:flex;justify-content:flex-end;gap:8px;padding:10px 18px;border-top:1px solid #F1F5F9;flex-shrink:0}
 .fsc{margin-bottom:14px}
-.fst{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;margin-bottom:7px;padding-bottom:4px;border-bottom:1px solid #F1F5F9}
-.fgrid{display:grid;gap:8px}
-.fg2{grid-template-columns:1fr 1fr}
-.fg3{grid-template-columns:1fr 1fr 1fr}
-.fg4{grid-template-columns:1fr 1fr 1fr 1fr}
+.fst{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #F1F5F9}
+.fg{display:grid;gap:8px}.fg2{grid-template-columns:1fr 1fr}.fg3{grid-template-columns:1fr 1fr 1fr}.fg4{grid-template-columns:1fr 1fr 1fr 1fr}
 .fd{display:flex;flex-direction:column;gap:2px}
-.fd label{font-size:9px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em}
-.fd label .req{color:#EF4444;margin-left:2px}
-.fd input,.fd select,.fd textarea{background:#fff;border:1px solid #E2E8F0;border-radius:6px;color:#0F172A;padding:6px 8px;font-size:12px;outline:none;transition:all .15s;width:100%}
+.fd label{font-size:9px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.04em}
+.req{color:#EF4444;margin-left:2px}
+.fd input,.fd select,.fd textarea{border:1px solid #E2E8F0;border-radius:6px;color:#0F172A;padding:6px 8px;font-size:12px;outline:none;width:100%;background:#fff}
 .fd input:focus,.fd select:focus,.fd textarea:focus{border-color:#3B82F6;box-shadow:0 0 0 2px rgba(59,130,246,.1)}
 .fd textarea{resize:vertical;min-height:48px}
 .fd select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;padding-right:22px}
-
 /* Modal aceite */
-.ci-card{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;margin-bottom:6px;background:#fff;cursor:pointer;transition:all .12s}
-.ci-card:hover{border-color:#93C5FD;background:#F0F9FF}
-.ci-card.sel{border-color:#3B82F6;background:#EFF6FF}
-.ci-check{width:18px;height:18px;border-radius:4px;border:2px solid #CBD5E1;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .12s}
-.ci-card.sel .ci-check{border-color:#3B82F6;background:#3B82F6}
-
-.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:40px 20px;color:#CBD5E1;font-size:13px}
-
+.ccard{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;margin-bottom:6px;background:#fff;cursor:pointer;transition:all .12s}
+.ccard:hover{border-color:#93C5FD;background:#F0F9FF}
+.ccard.sel{border-color:#3B82F6;background:#EFF6FF}
+.cchk{width:18px;height:18px;border-radius:4px;border:2px solid #CBD5E1;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .12s}
+.ccard.sel .cchk{border-color:#3B82F6;background:#3B82F6}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:40px;color:#CBD5E1;font-size:13px}
 .tst{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:6px;pointer-events:none}
 .toast{display:flex;align-items:center;gap:8px;padding:8px 18px;border-radius:8px;font-size:12px;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,.14);white-space:nowrap}
 .toast.ok{background:#F0FDF4;border:1px solid #86EFAC;color:#166534}
 .toast.err{background:#FEE2E2;border:1px solid #FCA5A5;color:#991B1B}
-
-::-webkit-scrollbar{width:4px;height:4px}
-::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:99px}
 @media(max-width:768px){.fg2,.fg3,.fg4{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
+
 const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
 const SB_URL = "https://ahcrscstdtfawoogsugi.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjk1MDgsImV4cCI6MjEwNDIwNTUwOH0.8ivWRA99AXXyBVFT3TQd5NuSod2eiowiI490Blt2zHM";
-const FN_URL = `${SB_URL}/functions/v1/remocoes-write`;
+const FN = `${SB_URL}/functions/v1/remocoes-write`;
 const H = {"Content-Type":"application/json",apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`};
 
-async function apiFn(body) {
-  const r = await fetch(FN_URL,{method:"POST",headers:H,body:JSON.stringify(body)});
+async function api(body) {
+  const r = await fetch(FN,{method:"POST",headers:H,body:JSON.stringify(body)});
   const d = await r.json();
   if(!r.ok) throw new Error(d.error||"Erro");
   return d;
 }
-async function apiGet(path) {
+async function get(path) {
   const r = await fetch(`${SB_URL}/rest/v1/${path}`,{headers:H});
   if(!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
-/* Cálculo automático tempo de espera */
-function calcTempo(horaSolic, horaSaida) {
-  if(!horaSolic||!horaSaida) return "";
+function calcTempo(hs, hsa) {
+  if(!hs||!hsa) return "";
   try {
-    const [h1,m1]=horaSolic.split(":").map(Number);
-    const [h2,m2]=horaSaida.split(":").map(Number);
-    let diff=(h2*60+m2)-(h1*60+m1);
-    if(diff<0) diff+=24*60;
-    const hh=Math.floor(diff/60).toString().padStart(2,"0");
-    const mm=(diff%60).toString().padStart(2,"0");
-    return `${hh}:${mm}`;
-  }catch{return "";}
+    const [h1,m1]=hs.split(":").map(Number);
+    const [h2,m2]=hsa.split(":").map(Number);
+    let d=(h2*60+m2)-(h1*60+m1);
+    if(d<0)d+=1440;
+    return `${String(Math.floor(d/60)).padStart(2,"0")}:${String(d%60).padStart(2,"0")}`;
+  } catch { return ""; }
 }
 
-const STATUS_OPTS = ["FICHA FINALIZADA","FICHA FINALIZADA VIA CROSS","FICHA FINALIZADA PELA CROSS","FICHA FINALIZADA PELA ORIGEM","FICHA ENCERRADA PELO CROSS","ENCERRADA PELO CROSS","REMOÇÃO CONCLUÍDA","REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA","ALTA HOSPITALAR","RESOLVIDO COM RECURSOS LOCAIS","CASO SEM ATUALIZAÇÃO MÉDICA HÁ 48 HORAS","EVASÃO/ALTA A PEDIDO","CANCELADA PELO CROSS","CANCELADA PELO SOLICITANTE","PACIENTE EM REMOÇÃO","PACIENTE AGUARDANDO AMBULÂNCIA","CONCLUIDO","AGENDAMENTO SECRETARIA DA SAÚDE","HEMODIÁLISE","OUTRO"];
-const GRAV_OPTS = ["VERMELHO","AMARELO","VERDE","CINZA"];
-const SETOR_OPTS = ["EMERGÊNCIA","CLÍNICA MÉDICA","OBSERVAÇÃO ADULTO","OBSERVAÇÃO INFANTIL","CLÍNICA PEDIÁTRICA","UTI","BLOCO MATERNO","EVASÃO","OUTRO"];
-const PROC_OPTS = ["AVALIAÇÃO","EXAME","LEITO","BANCO","ALTA","OUTRO"];
-const AMBU_OPTS = ["BÁSICA","AVANÇADA","UTI"];
+const S_OPTS=["FICHA FINALIZADA","FICHA FINALIZADA VIA CROSS","FICHA FINALIZADA PELA CROSS","FICHA FINALIZADA PELA ORIGEM","FICHA ENCERRADA PELO CROSS","ENCERRADA PELO CROSS","REMOÇÃO CONCLUÍDA","REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA","ALTA HOSPITALAR","RESOLVIDO COM RECURSOS LOCAIS","CASO SEM ATUALIZAÇÃO MÉDICA HÁ 48 HORAS","EVASÃO/ALTA A PEDIDO","CANCELADA PELO CROSS","CANCELADA PELO SOLICITANTE","PACIENTE EM REMOÇÃO","PACIENTE AGUARDANDO AMBULÂNCIA","CONCLUIDO","AGENDAMENTO SECRETARIA DA SAÚDE","HEMODIÁLISE","OUTRO"];
+const G_OPTS=["VERMELHO","AMARELO","VERDE","CINZA"];
+const ST_OPTS=["EMERGÊNCIA","CLÍNICA MÉDICA","OBSERVAÇÃO ADULTO","OBSERVAÇÃO INFANTIL","CLÍNICA PEDIÁTRICA","UTI","BLOCO MATERNO","EVASÃO","OUTRO"];
+const P_OPTS=["AVALIAÇÃO","EXAME","LEITO","BANCO","ALTA","OUTRO"];
+const A_OPTS=["BÁSICA","AVANÇADA","UTI"];
+const S_CLS={"FICHA FINALIZADA":"sf","FICHA FINALIZADA VIA CROSS":"sf","FICHA FINALIZADA PELA CROSS":"sf","FICHA FINALIZADA PELA ORIGEM":"sf","REMOÇÃO CONCLUÍDA":"sc","CONCLUIDO":"sc","PACIENTE EM REMOÇÃO":"sa","PACIENTE AGUARDANDO AMBULÂNCIA":"sa","REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA":"sn","FICHA ENCERRADA PELO CROSS":"se","ENCERRADA PELO CROSS":"se","EVASÃO/ALTA A PEDIDO":"se","CANCELADA PELO CROSS":"se","CANCELADA PELO SOLICITANTE":"se"};
+const G_DOT={VERMELHO:"#EF4444",AMARELO:"#EAB308",VERDE:"#22C55E",CINZA:"#94A3B8"};
+const G_CLS={VERMELHO:"gv",Amarelo:"ga",VERDE:"gg",CINZA:"gc"};
+const GC={emergencia:"VERMELHO",urgencia:"AMARELO",andamento_cor:"AMARELO",menor_gravidade:"VERDE",finalizado_cor:"CINZA",agendamento:"CINZA",retorno:"CINZA"};
+const AM={"Básica":"BÁSICA","Avançada":"AVANÇADA"};
 
-const STATUS_CLS = {"FICHA FINALIZADA":"sf","FICHA FINALIZADA VIA CROSS":"sf","FICHA FINALIZADA PELA CROSS":"sf","FICHA FINALIZADA PELA ORIGEM":"sf","REMOÇÃO CONCLUÍDA":"sc","CONCLUIDO":"sc","PACIENTE EM REMOÇÃO":"sa","PACIENTE AGUARDANDO AMBULÂNCIA":"sa","REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA":"sn","FICHA ENCERRADA PELO CROSS":"se","ENCERRADA PELO CROSS":"se","EVASÃO/ALTA A PEDIDO":"se","CANCELADA PELO CROSS":"se","CANCELADA PELO SOLICITANTE":"se"};
-const GRAV_DOT = {VERMELHO:"#EF4444",AMARELO:"#EAB308",VERDE:"#22C55E",CINZA:"#94A3B8"};
-const GRAV_CLS = {VERMELHO:"gv",AMARELO:"ga",VERDE:"gg",CINZA:"gc"};
-const GC_MAP = {emergencia:"VERMELHO",urgencia:"AMARELO",andamento_cor:"AMARELO",menor_gravidade:"VERDE",finalizado_cor:"CINZA",agendamento:"CINZA",retorno:"CINZA"};
-const AMB_MAP = {["Básica"]:"BÁSICA",["Avançada"]:"AVANÇADA"};
-
+// [field, label_planilha, label_xls, kanban, tipo, optsKey, tooltip, width_px]
 const COLS = [
-  ["data_solicitacao",       "DATA SOLIC.",    "col-data",  "date",  null,       "Data da abertura da ficha CROSS (campo 'Data'). Fonte: CROSS"],
-  ["horario_solicitacao",    "HORA",           "col-hora",  "time",  null,       "Horário da abertura da ficha CROSS. Fonte: CROSS campo 'Hora'"],
-  ["ficha_cross",            "Nº FICHA CROSS", "col-ficha", "text",  null,       "Número da ficha CROSS (ex: SS-14650585-26). Fonte: CROSS"],
-  ["nome_paciente",          "PACIENTE",       "col-nome",  "text",  null,       "Nome completo do paciente. Fonte: CROSS campo 'Nome do Paciente' / Kanban campo 'nome'"],
-  ["setor",                  "SETOR",          "col-setor", "sel",   "SETOR_OPTS","Localização do paciente. Fonte: CROSS campo 'Unidade Solicitante' / Kanban campo 'setor'"],
-  ["procedimento",           "PROCEDIMENTO",   "col-proc",  "sel",   "PROC_OPTS","Tipo do recurso solicitado (Exame, Leito, Avaliação...). Fonte: CROSS campo '1º Recurso'"],
-  ["especialidade",          "ESPECIALIDADE",  "col-esp",   "text",  null,       "Nome do exame ou especialidade. Fonte: CROSS campo '1º Recurso' / Kanban campo 'rec'"],
-  ["diagnostico",            "DIAGNÓSTICO",    "col-diag",  "text",  null,       "Hipótese diagnóstica ou CID. Fonte: CROSS campo 'CID 1' / Kanban campo 'hd'"],
-  ["status",                 "STATUS",         "col-status","sel",   "STATUS_OPTS","Status atual da remoção"],
-  ["gravidade",              "GRAVIDADE",      "col-grav",  "sel",   "GRAV_OPTS","Gravidade — baseada na Prioridade CROSS: 1=VERMELHO, 2=AMARELO, 3=VERDE"],
-  ["data_resposta_cross",    "DATA RESP.",     "col-drdata","date",  null,       "Data em que o CROSS respondeu à solicitação"],
-  ["horario_resposta_cross", "HOR. RESP.",     "col-drhora","time",  null,       "Horário em que o CROSS respondeu"],
-  ["instituicao_destino",    "DESTINO",        "col-dest",  "text",  null,       "Hospital ou instituição receptora. Fonte: Kanban campo 'hosp'"],
-  ["tipo_ambulancia",        "AMBULÂNCIA",     "col-amb",   "sel",   "AMBU_OPTS","Tipo: BÁSICA (SBV) ou AVANÇADA (SAV). Fonte: Kanban campo 'amb'"],
-  ["data_saida_ambulancia",  "BASE AMB. DATA", "col-bdata", "date",  null,       "Data da solicitação à base de ambulância"],
-  ["horario_saida_ambulancia","SAÍDA SCFM",    "col-saida", "time",  null,       "Horário de saída da ambulância da SCFM. Fonte: Kanban campo 'saida'"],
-  ["tempo_espera",           "T. ESPERA",      "col-esp2",  "text",  null,       "Calculado automaticamente: Saída SCFM − Horário Solicitação. Formato HH:MM"],
-  ["observacao",             "OBSERVAÇÃO",     "col-obs",   "text",  null,       "Obs. adicionais. Fonte: CROSS 'Resumo Clínico' / Kanban 'obs'"],
-  ["enfermeiro",             "ENFERMEIRO",     "col-enf",   "text",  null,       "Nome do enfermeiro responsável pela remoção"],
-  ["tecnico_auxiliar",       "TÉCNICO/AUX.",   "col-tec",   "text",  null,       "Nome do técnico ou auxiliar de enfermagem"],
-  ["medico",                 "MÉDICO",         "col-med",   "text",  null,       "Nome do médico. Fonte: CROSS campo 'Médico Solicitante'"],
-  ["horario_retorno",        "RETORNO",        "col-ret",   "time",  null,       "Horário de retorno do paciente. Fonte: Kanban campo 'retorno'"],
+  ["data_solicitacao",        "DATA DA SOLICITAÇÃO",                    "DATA SOLIC.",       "adm",    "date",null,       "Data da abertura da ficha CROSS (campo 'Data'). Fonte: CROSS",80],
+  ["horario_solicitacao",     "HORÁRIO DA SOLICITAÇÃO",                 "HORA SOLIC.",       "—",      "time",null,       "Horário da abertura (campo 'Hora' no CROSS). Fonte: CROSS",58],
+  ["ficha_cross",             "Nº DA FICHA CROSS",                      "Nº FICHA CROSS",    "—",      "text",null,       "Número da ficha CROSS (ex: SS-14650585-26). Fonte: CROSS",120],
+  ["nome_paciente",           "NOME PACIENTE",                          "NOME PACIENTE",     "nome",   "text",null,       "Nome do paciente. CROSS: 'Nome do Paciente' | Kanban: 'nome'",170],
+  ["setor",                   "LOCALIZAÇÃO/SETOR DO PACIENTE",          "LOCALIZAÇÃO/SETOR", "setor",  "sel","ST_OPTS",   "Setor/localização. CROSS: 'Unidade Solicitante' | Kanban: 'setor'",110],
+  ["procedimento",            "PROCEDIMENTO",                           "PROCEDIMENTO",      "—",      "sel","P_OPTS",    "Tipo do recurso. CROSS: '1º Recurso' (Exame, Leito, Avaliação...)",100],
+  ["especialidade",           "ESPECIALIDADE",                          "ESPECIALIDADE",     "rec",    "text",null,       "Nome do exame/especialidade. CROSS: '1º Recurso' | Kanban: 'rec'",130],
+  ["diagnostico",             "DIAGNÓSTICO",                            "DIAGNÓSTICO",       "hd",     "text",null,       "CID ou hipótese. CROSS: 'CID 1' | Kanban: 'hd'",160],
+  ["status",                  "STATUS",                                 "STATUS",            "—",      "sel","S_OPTS",    "Status da remoção. Preenchimento manual",150],
+  ["gravidade",               "GRAVIDADE",                              "GRAVIDADE",         "grav",   "sel","G_OPTS",    "CROSS: 'Prioridade' (1=VERMELHO, 2=AMARELO, 3=VERDE) | Kanban: 'grav'",80],
+  ["data_resposta_cross",     "DATA DA RESPOSTA CROSS",                 "DATA RESP. CROSS",  "—",      "date",null,       "Data da resposta do CROSS. Manual",80],
+  ["horario_resposta_cross",  "HORÁRIO DA RESPOSTA CROSS",              "HOR. RESP. CROSS",  "—",      "time",null,       "Horário da resposta do CROSS. Manual",60],
+  ["instituicao_destino",     "INSTITUIÇÃO DESTINO",                    "INSTITUIÇÃO DEST.", "hosp",   "text",null,       "Hospital receptor. Kanban: 'hosp'",130],
+  ["tipo_ambulancia",         "TIPO DE AMBULÂNCIA",                     "TIPO AMBULÂNCIA",   "amb",    "sel","A_OPTS",    "Tipo: BÁSICA (SBV) ou AVANÇADA (SAV). Kanban: 'amb'",90],
+  ["data_saida_ambulancia",   "SOLICITAÇÃO BASE AMBULANCIA DATA",       "DATA BASE AMB.",    "—",      "date",null,       "Data da solicitação à base de ambulância. Manual",80],
+  ["horario_saida_ambulancia","HORÁRIO DE SAÍDA DA AMBULÂNCIA DA SCFM", "SAÍDA AMB. SCFM",  "saida",  "time",null,       "Horário saída da ambulância. Kanban: 'saida'",60],
+  ["tempo_espera",            "TEMPO DE ESPERA DA AMBULÂNCIA",          "TEMPO ESPERA",      "—",      "text",null,       "Calculado: Saída SCFM − Hora Solicitação. Formato HH:MM",64],
+  ["observacao",              "OBSERVAÇÃO",                             "OBSERVAÇÃO",        "obs",    "text",null,       "Obs. CROSS: 'Resumo Clínico' | Kanban: 'obs'",180],
+  ["enfermeiro",              "ENFERMEIRO",                             "ENFERMEIRO",        "—",      "text",null,       "Enfermeiro responsável. Manual",110],
+  ["tecnico_auxiliar",        "TÉCNICO/AUXILIAR ENFERMAGEM",            "TÉCNICO/AUX. ENF.", "—",      "text",null,       "Técnico ou auxiliar. Manual",110],
+  ["medico",                  "MÉDICO",                                 "MÉDICO",            "—",      "text",null,       "Médico. CROSS: 'Médico Solicitante'",110],
+  ["horario_retorno",         "HORARIO DO RETORNO DO PACIENTE",         "RETORNO PACIENTE",  "retorno","time",null,       "Retorno do paciente. Kanban: 'retorno'",60],
 ];
 
 const EMPTY = Object.fromEntries(COLS.map(([f])=>[f,""]));
+const fmtD=v=>{if(!v)return"";try{return new Date(v+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"2-digit"})}catch{return v}};
 
-const fmtD = v => {
-  if(!v) return "";
-  try{ return new Date(v+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"2-digit"}); }catch{return v;}
-};
-
-/* Ícones */
-const Ico = ({n,s=14}) => {
+const Ico=(({n,s=14})=>{
   const d={
     search:<><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></>,
     trash:<><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></>,
     x:<path d="M18 6 6 18M6 6l12 12"/>,
-    dl:<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
-    pulse:<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>,
     plus:<path d="M12 5v14M5 12h14"/>,
     import:<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></>,
     check:<polyline points="20 6 9 12 4 10"/>,
     excel:<><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></>,
+    pulse:<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>,
   };
   return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{d[n]}</svg>;
-};
+});
 
-/* Toast */
 function useToast(){
   const [ts,setTs]=useState([]);
   const push=useCallback((msg,type="ok")=>{
@@ -271,96 +227,74 @@ function useToast(){
   return {ts,push};
 }
 
-/* Célula editável */
-function Cell({rowId,field,value,type,opts,onSave}){
-  const [editing,setEditing]=useState(false);
+function Cell({rowId,field,value,tipo,optsKey,onSave}){
+  const [ed,setEd]=useState(false);
   const [val,setVal]=useState(value||"");
   const ref=useRef();
+  const OPTS_MAP={S_OPTS,G_OPTS,ST_OPTS,P_OPTS,A_OPTS};
+  const opts=optsKey?OPTS_MAP[optsKey]:null;
   useEffect(()=>{setVal(value||"");},[value]);
-  useEffect(()=>{if(editing&&ref.current)ref.current.focus();},[editing]);
-  function commit(){
-    setEditing(false);
-    if(val!==(value||""))onSave(rowId,field,val);
-  }
-  if(!editing) return (
-    <div className={`cv2 ${!val?"empty":""}`} onClick={()=>setEditing(true)} title={val||"Clique para editar"}>
-      {val||"—"}
-    </div>
+  useEffect(()=>{if(ed&&ref.current)ref.current.focus();},[ed]);
+  function commit(){setEd(false);if(val!==(value||""))onSave(rowId,field,val);}
+  if(!ed) return(
+    <div className={`cv ${!val?"emp":""}`} onClick={()=>setEd(true)} title={val||"Clique para editar"}>{val||"—"}</div>
   );
-  if(opts) return (
-    <select ref={ref} className="csel" value={val}
-      onChange={e=>setVal(e.target.value)} onBlur={commit}
-      onKeyDown={e=>e.key==="Escape"&&(setEditing(false),setVal(value||""))}>
-      <option value="">—</option>
-      {opts.map(o=><option key={o}>{o}</option>)}
+  if(opts) return(
+    <select ref={ref} className="csel" value={val} onChange={e=>setVal(e.target.value)} onBlur={commit}
+      onKeyDown={e=>e.key==="Escape"&&(setEd(false),setVal(value||""))}>
+      <option value="">— selecione —</option>
+      {opts.map(o=><option key={o} value={o}>{o}</option>)}
     </select>
   );
-  return (
-    <input ref={ref} className="ci" type={type||"text"} value={val}
+  return(
+    <input ref={ref} className="cinp" type={tipo||"text"} value={val}
       onChange={e=>setVal(e.target.value)} onBlur={commit}
-      onKeyDown={e=>{if(e.key==="Enter")commit();if(e.key==="Escape"){setEditing(false);setVal(value||"");}}}/>
+      onKeyDown={e=>{if(e.key==="Enter")commit();if(e.key==="Escape"){setEd(false);setVal(value||"");}}}/>
   );
 }
 
-/* Modal importar aceite */
 function AceiteModal({onClose,onImport}){
   const [cards,setCards]=useState([]);
-  const [loading,setLoading]=useState(true);
+  const [load,setLoad]=useState(true);
   const [sel,setSel]=useState(new Set());
-
   useEffect(()=>{
-    apiGet("cards?col_id=eq.aceite&select=*&order=created_at.asc")
+    get("cards?col_id=eq.aceite&select=*&order=created_at.asc")
       .then(d=>setCards(Array.isArray(d)?d:[]))
       .catch(()=>setCards([]))
-      .finally(()=>setLoading(false));
+      .finally(()=>setLoad(false));
   },[]);
-
-  const allSel = cards.length>0 && sel.size===cards.length;
-
-  function toggleAll(){
-    if(allSel) setSel(new Set());
-    else setSel(new Set(cards.map(c=>c.id)));
-  }
-  function toggle(id){
-    setSel(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});
-  }
-
-  return (
+  const allSel=cards.length>0&&sel.size===cards.length;
+  function toggleAll(){setSel(allSel?new Set():new Set(cards.map(c=>c.id)));}
+  function toggle(id){setSel(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});}
+  return(
     <div className="mbk" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="mdl" style={{maxWidth:520}}>
         <div className="mhd">
-          <div>
-            <h2>📋 Importar do Kanban — Aceite</h2>
-            <p>Cards atualmente na coluna Aceite Confirmado</p>
-          </div>
-          <button className="ab4" style={{width:24,height:24}} onClick={onClose}><Ico n="x" s={12}/></button>
+          <div><h2>📋 Importar do Kanban — Aceite</h2><p>Cards na coluna Aceite Confirmado</p></div>
+          <button className="btn btn-g btn-sm" onClick={onClose}><Ico n="x" s={12}/></button>
         </div>
         <div className="mbd">
-          {!loading && cards.length>0 && (
-            <div style={{marginBottom:10}}>
+          {!load&&cards.length>0&&(
+            <div style={{marginBottom:10,display:"flex",alignItems:"center",gap:8}}>
               <button className="btn btn-g btn-sm" onClick={toggleAll}>
-                {allSel?"Desmarcar todos":"Selecionar todos"} ({cards.length})
+                {allSel?"☐ Desmarcar todos":"☑ Selecionar todos"} ({cards.length})
               </button>
+              <span style={{fontSize:11,color:"#64748B"}}>{sel.size} selecionado{sel.size!==1?"s":""}</span>
             </div>
           )}
-          {loading && <div className="empty"><Ico n="pulse" s={24}/><p>Carregando…</p></div>}
-          {!loading && cards.length===0 && <div className="empty"><p>Nenhum card na coluna Aceite.</p></div>}
+          {load&&<div className="empty"><Ico n="pulse" s={24}/><p>Carregando…</p></div>}
+          {!load&&cards.length===0&&<div className="empty"><p>Nenhum card na coluna Aceite.</p></div>}
           {cards.map(c=>{
             const s=sel.has(c.id);
-            const grav=GC_MAP[c.grav]||"AMARELO";
-            const gc={VERMELHO:"#EF4444",AMARELO:"#EAB308",VERDE:"#22C55E",CINZA:"#94A3B8"}[grav];
-            return (
-              <div key={c.id} className={`ci-card ${s?"sel":""}`} onClick={()=>toggle(c.id)}>
-                <div className="ci-check">
-                  {s&&<Ico n="check" s={10}/>}
-                </div>
+            const gc={VERMELHO:"#EF4444",AMARELO:"#EAB308",VERDE:"#22C55E",CINZA:"#94A3B8"}[GC[c.grav]||"AMARELO"];
+            return(
+              <div key={c.id} className={`ccard ${s?"sel":""}`} onClick={()=>toggle(c.id)}>
+                <div className="cchk">{s&&<Ico n="check" s={10}/>}</div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:600,fontSize:12,color:"#0F172A",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                  <div style={{fontWeight:600,fontSize:12,color:"#0F172A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                     {c.nome}{c.idade?` — ${c.idade}`:""}
                   </div>
-                  <div style={{fontSize:10,color:"#64748B",marginTop:1}}>
-                    {[c.setor,c.rec,c.hosp].filter(Boolean).join(" · ")||"Sem detalhes"}
-                  </div>
+                  <div style={{fontSize:10,color:"#64748B",marginTop:1}}>{[c.setor,c.rec,c.hosp].filter(Boolean).join(" · ")||"—"}</div>
                   {c.hd&&<div style={{fontSize:10,color:"#94A3B8"}}>HD: {c.hd}</div>}
                 </div>
                 <span style={{width:7,height:7,borderRadius:"50%",background:gc,flexShrink:0}}/>
@@ -372,118 +306,84 @@ function AceiteModal({onClose,onImport}){
           <button className="btn btn-g" onClick={onClose}>Cancelar</button>
           <button className="btn btn-p" disabled={sel.size===0}
             onClick={()=>{onImport(cards.filter(c=>sel.has(c.id)));onClose();}}>
-            Importar {sel.size>0?`${sel.size} card${sel.size>1?"s":""}`:""}
-          </button>
+            Importar {sel.size>0?`${sel.size} card${sel.size>1?"s":""}`:""}</button>
         </div>
       </div>
     </div>
   );
 }
 
-/* Modal novo/editar */
 function FormModal({row,onClose,onSave,saving}){
   const [form,setForm]=useState(row?{...EMPTY,...row}:{...EMPTY,data_solicitacao:new Date().toISOString().split("T")[0]});
   const set=(k,v)=>setForm(f=>{
-    const next={...f,[k]:v};
-    // Calcular tempo de espera automaticamente
-    if(k==="horario_saida_ambulancia"||k==="horario_solicitacao"){
-      next.tempo_espera=calcTempo(k==="horario_solicitacao"?v:next.horario_solicitacao, k==="horario_saida_ambulancia"?v:next.horario_saida_ambulancia);
-    }
-    return next;
+    const n={...f,[k]:v};
+    if(k==="horario_saida_ambulancia"||k==="horario_solicitacao")
+      n.tempo_espera=calcTempo(k==="horario_solicitacao"?v:n.horario_solicitacao,k==="horario_saida_ambulancia"?v:n.horario_saida_ambulancia);
+    return n;
   });
-  return (
+  const Sel=({field,opts})=>(
+    <select value={form[field]||""} onChange={e=>set(field,e.target.value)}>
+      <option value="">— selecione —</option>
+      {opts.map(o=><option key={o} value={o}>{o}</option>)}
+    </select>
+  );
+  return(
     <div className="mbk" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="mdl">
         <div className="mhd">
-          <div>
-            <h2>{row?.id?"Editar Registro":"Novo Registro"}</h2>
-            <p>{row?.id?`Ficha ${row.ficha_cross||"sem número"}`:"Preencha os dados da remoção"}</p>
-          </div>
-          <button className="ab4" style={{width:24,height:24}} onClick={onClose}><Ico n="x" s={12}/></button>
+          <div><h2>{row?.id?"Editar Registro":"Novo Registro de Remoção"}</h2>
+            <p>{row?.id?`Ficha ${row.ficha_cross||"—"}`:"Preencha os dados"}</p></div>
+          <button className="btn btn-g btn-sm" onClick={onClose}><Ico n="x" s={12}/></button>
         </div>
         <div className="mbd">
           <div className="fsc"><div className="fst">Identificação</div>
-            <div className="fgrid fg3">
-              <div className="fd"><label>Data Solicitação <span className="req">*</span></label>
-                <input type="date" value={form.data_solicitacao} onChange={e=>set("data_solicitacao",e.target.value)}/></div>
-              <div className="fd"><label>Horário</label>
-                <input type="time" value={form.horario_solicitacao} onChange={e=>set("horario_solicitacao",e.target.value)}/></div>
-              <div className="fd"><label>Nº Ficha CROSS</label>
-                <input type="text" placeholder="SS-XXXXXXXX-XX" value={form.ficha_cross} onChange={e=>set("ficha_cross",e.target.value)}/></div>
+            <div className="fg fg3">
+              <div className="fd"><label>Data Solicitação <span className="req">*</span></label><input type="date" value={form.data_solicitacao} onChange={e=>set("data_solicitacao",e.target.value)}/></div>
+              <div className="fd"><label>Horário</label><input type="time" value={form.horario_solicitacao} onChange={e=>set("horario_solicitacao",e.target.value)}/></div>
+              <div className="fd"><label>Nº Ficha CROSS</label><input type="text" placeholder="SS-XXXXXXXX-XX" value={form.ficha_cross} onChange={e=>set("ficha_cross",e.target.value)}/></div>
             </div>
           </div>
           <div className="fsc"><div className="fst">Paciente</div>
-            <div className="fgrid fg2">
-              <div className="fd"><label>Nome <span className="req">*</span></label>
-                <input type="text" placeholder="Nome completo" value={form.nome_paciente} onChange={e=>set("nome_paciente",e.target.value)}/></div>
-              <div className="fd"><label>Localização / Setor</label>
-                <select value={form.setor} onChange={e=>set("setor",e.target.value)}>
-                  <option value="">Selecione</option>{SETOR_OPTS.map(o=><option key={o}>{o}</option>)}
-                </select></div>
+            <div className="fg fg2">
+              <div className="fd"><label>Nome <span className="req">*</span></label><input type="text" placeholder="Nome completo" value={form.nome_paciente} onChange={e=>set("nome_paciente",e.target.value)}/></div>
+              <div className="fd"><label>Localização / Setor</label><Sel field="setor" opts={ST_OPTS}/></div>
             </div>
           </div>
           <div className="fsc"><div className="fst">Dados Clínicos</div>
-            <div className="fgrid fg3">
-              <div className="fd"><label>Procedimento</label>
-                <select value={form.procedimento} onChange={e=>set("procedimento",e.target.value)}>
-                  <option value="">Selecione</option>{PROC_OPTS.map(o=><option key={o}>{o}</option>)}
-                </select></div>
-              <div className="fd"><label>Especialidade</label>
-                <input type="text" placeholder="Ortopedia, TC..." value={form.especialidade} onChange={e=>set("especialidade",e.target.value)}/></div>
-              <div className="fd"><label>Gravidade</label>
-                <select value={form.gravidade} onChange={e=>set("gravidade",e.target.value)}>
-                  <option value="">Selecione</option>{GRAV_OPTS.map(o=><option key={o}>{o}</option>)}
-                </select></div>
-              <div className="fd" style={{gridColumn:"1/-1"}}><label>Diagnóstico</label>
-                <input type="text" placeholder="CID ou hipótese" value={form.diagnostico} onChange={e=>set("diagnostico",e.target.value)}/></div>
+            <div className="fg fg3">
+              <div className="fd"><label>Procedimento</label><Sel field="procedimento" opts={P_OPTS}/></div>
+              <div className="fd"><label>Especialidade</label><input type="text" placeholder="TC, Ortopedia..." value={form.especialidade} onChange={e=>set("especialidade",e.target.value)}/></div>
+              <div className="fd"><label>Gravidade</label><Sel field="gravidade" opts={G_OPTS}/></div>
+              <div className="fd" style={{gridColumn:"1/-1"}}><label>Diagnóstico</label><input type="text" placeholder="CID ou hipótese" value={form.diagnostico} onChange={e=>set("diagnostico",e.target.value)}/></div>
             </div>
           </div>
-          <div className="fsc"><div className="fst">Resposta CROSS / Status</div>
-            <div className="fgrid fg2">
-              <div className="fd"><label>Status</label>
-                <select value={form.status} onChange={e=>set("status",e.target.value)}>
-                  <option value="">Selecione</option>{STATUS_OPTS.map(o=><option key={o}>{o}</option>)}
-                </select></div>
-              <div className="fd"><label>Instituição Destino</label>
-                <input type="text" placeholder="Hospital receptor" value={form.instituicao_destino} onChange={e=>set("instituicao_destino",e.target.value)}/></div>
-              <div className="fd"><label>Data Resposta CROSS</label>
-                <input type="date" value={form.data_resposta_cross} onChange={e=>set("data_resposta_cross",e.target.value)}/></div>
-              <div className="fd"><label>Horário Resposta</label>
-                <input type="time" value={form.horario_resposta_cross} onChange={e=>set("horario_resposta_cross",e.target.value)}/></div>
+          <div className="fsc"><div className="fst">Status / Resposta CROSS</div>
+            <div className="fg fg2">
+              <div className="fd"><label>Status</label><Sel field="status" opts={S_OPTS}/></div>
+              <div className="fd"><label>Instituição Destino</label><input type="text" placeholder="Hospital receptor" value={form.instituicao_destino} onChange={e=>set("instituicao_destino",e.target.value)}/></div>
+              <div className="fd"><label>Data Resposta CROSS</label><input type="date" value={form.data_resposta_cross} onChange={e=>set("data_resposta_cross",e.target.value)}/></div>
+              <div className="fd"><label>Horário Resposta CROSS</label><input type="time" value={form.horario_resposta_cross} onChange={e=>set("horario_resposta_cross",e.target.value)}/></div>
             </div>
           </div>
           <div className="fsc"><div className="fst">Ambulância</div>
-            <div className="fgrid fg4">
-              <div className="fd"><label>Tipo</label>
-                <select value={form.tipo_ambulancia} onChange={e=>set("tipo_ambulancia",e.target.value)}>
-                  <option value="">—</option>{AMBU_OPTS.map(o=><option key={o}>{o}</option>)}
-                </select></div>
-              <div className="fd"><label>Data Base Amb.</label>
-                <input type="date" value={form.data_saida_ambulancia} onChange={e=>set("data_saida_ambulancia",e.target.value)}/></div>
-              <div className="fd"><label>Saída SCFM</label>
-                <input type="time" value={form.horario_saida_ambulancia} onChange={e=>set("horario_saida_ambulancia",e.target.value)}/></div>
-              <div className="fd">
-                <label>Tempo Espera <span style={{color:"#3B82F6",fontWeight:400}}>auto</span></label>
-                <input type="text" readOnly value={form.tempo_espera||calcTempo(form.horario_solicitacao,form.horario_saida_ambulancia)} style={{background:"#F8FAFC",color:"#64748B"}} placeholder="HH:MM"/>
-              </div>
-              <div className="fd"><label>Retorno</label>
-                <input type="time" value={form.horario_retorno} onChange={e=>set("horario_retorno",e.target.value)}/></div>
+            <div className="fg fg4">
+              <div className="fd"><label>Tipo</label><Sel field="tipo_ambulancia" opts={A_OPTS}/></div>
+              <div className="fd"><label>Data Base Amb.</label><input type="date" value={form.data_saida_ambulancia} onChange={e=>set("data_saida_ambulancia",e.target.value)}/></div>
+              <div className="fd"><label>Saída SCFM</label><input type="time" value={form.horario_saida_ambulancia} onChange={e=>set("horario_saida_ambulancia",e.target.value)}/></div>
+              <div className="fd"><label>Tempo Espera <span style={{color:"#7C3AED",fontWeight:400,textTransform:"none"}}>(auto)</span></label>
+                <input type="text" readOnly value={form.tempo_espera||calcTempo(form.horario_solicitacao,form.horario_saida_ambulancia)} style={{background:"#F5F3FF",color:"#7C3AED",fontWeight:700}}/></div>
+              <div className="fd"><label>Retorno Paciente</label><input type="time" value={form.horario_retorno} onChange={e=>set("horario_retorno",e.target.value)}/></div>
             </div>
           </div>
           <div className="fsc"><div className="fst">Equipe</div>
-            <div className="fgrid fg3">
-              <div className="fd"><label>Enfermeiro(a)</label>
-                <input type="text" placeholder="Nome" value={form.enfermeiro} onChange={e=>set("enfermeiro",e.target.value)}/></div>
-              <div className="fd"><label>Técnico / Auxiliar</label>
-                <input type="text" placeholder="Nome" value={form.tecnico_auxiliar} onChange={e=>set("tecnico_auxiliar",e.target.value)}/></div>
-              <div className="fd"><label>Médico(a)</label>
-                <input type="text" placeholder="Nome" value={form.medico} onChange={e=>set("medico",e.target.value)}/></div>
+            <div className="fg fg3">
+              <div className="fd"><label>Enfermeiro(a)</label><input type="text" placeholder="Nome" value={form.enfermeiro} onChange={e=>set("enfermeiro",e.target.value)}/></div>
+              <div className="fd"><label>Técnico/Aux. Enfermagem</label><input type="text" placeholder="Nome" value={form.tecnico_auxiliar} onChange={e=>set("tecnico_auxiliar",e.target.value)}/></div>
+              <div className="fd"><label>Médico(a)</label><input type="text" placeholder="Nome" value={form.medico} onChange={e=>set("medico",e.target.value)}/></div>
             </div>
           </div>
           <div className="fsc" style={{marginBottom:0}}><div className="fst">Observação</div>
-            <div className="fd">
-              <textarea rows={3} placeholder="Observações…" value={form.observacao} onChange={e=>set("observacao",e.target.value)}/>
-            </div>
+            <div className="fd"><textarea rows={3} placeholder="Observações…" value={form.observacao} onChange={e=>set("observacao",e.target.value)}/></div>
           </div>
         </div>
         <div className="mft">
@@ -497,7 +397,6 @@ function FormModal({row,onClose,onSave,saving}){
   );
 }
 
-/* App */
 function App(){
   const [rows,setRows]=useState([]);
   const [loading,setLoading]=useState(true);
@@ -505,19 +404,17 @@ function App(){
   const [modal,setModal]=useState(null);
   const [showAceite,setShowAceite]=useState(false);
   const [search,setSearch]=useState("");
-  const [fGrav,setFGrav]=useState("");
-  const [fStatus,setFStatus]=useState("");
-  const [fMes,setFMes]=useState("");
-  const [sortCol,setSortCol]=useState("created_at");
-  const [sortDir,setSortDir]=useState("desc");
+  const [fG,setFG]=useState("");
+  const [fS,setFS]=useState("");
+  const [fM,setFM]=useState("");
+  const [sc,setSc]=useState("created_at");
+  const [sd,setSd]=useState("desc");
   const {ts,push}=useToast();
 
   const load=useCallback(async()=>{
     setLoading(true);
-    try{
-      const d=await apiGet("remocoes?select=*&order=created_at.desc");
-      setRows(Array.isArray(d)?d:[]);
-    }catch(e){push("Erro: "+e.message,"err");}
+    try{const d=await get("remocoes?select=*&order=created_at.desc");setRows(Array.isArray(d)?d:[]);}
+    catch(e){push("Erro: "+e.message,"err");}
     finally{setLoading(false);}
   },[]);
   useEffect(()=>{load();},[]);
@@ -526,42 +423,33 @@ function App(){
     setSaving(true);
     try{
       const p={...form};
-      // Calcular tempo de espera antes de salvar
-      if(p.horario_solicitacao&&p.horario_saida_ambulancia&&!p.tempo_espera){
+      if(p.horario_solicitacao&&p.horario_saida_ambulancia&&!p.tempo_espera)
         p.tempo_espera=calcTempo(p.horario_solicitacao,p.horario_saida_ambulancia);
-      }
       Object.keys(p).forEach(k=>{if(p[k]==="")p[k]=null;});
-      if(form.id){await apiFn({action:"update",id:form.id,...p});push("Atualizado");}
-      else{await apiFn({action:"create",...p});push("Criado!");}
-      setModal(null);
-      await load();
+      if(form.id){await api({action:"update",id:form.id,...p});push("Atualizado");}
+      else{await api({action:"create",...p});push("Criado!");}
+      setModal(null);await load();
     }catch(e){push(e.message||"Erro","err");}
     finally{setSaving(false);}
   };
 
   const handleCell=async(rowId,field,value)=>{
     try{
-      const update={action:"update",id:rowId,[field]:value||null};
-      // Recalcular tempo de espera se campo relevante mudou
+      const u={action:"update",id:rowId,[field]:value||null};
       const row=rows.find(r=>r.id===rowId);
       if(row&&(field==="horario_saida_ambulancia"||field==="horario_solicitacao")){
-        const hs=field==="horario_solicitacao"?value:row.horario_solicitacao;
-        const hsa=field==="horario_saida_ambulancia"?value:row.horario_saida_ambulancia;
-        const te=calcTempo(hs,hsa);
-        if(te) update.tempo_espera=te;
+        const te=calcTempo(field==="horario_solicitacao"?value:row.horario_solicitacao,field==="horario_saida_ambulancia"?value:row.horario_saida_ambulancia);
+        if(te)u.tempo_espera=te;
       }
-      await apiFn(update);
-      setRows(r=>r.map(x=>x.id===rowId?{...x,[field]:value,...(update.tempo_espera?{tempo_espera:update.tempo_espera}:{})}:x));
+      await api(u);
+      setRows(r=>r.map(x=>x.id===rowId?{...x,[field]:value,...(u.tempo_espera?{tempo_espera:u.tempo_espera}:{})}:x));
     }catch(e){push(e.message,"err");}
   };
 
   const handleDelete=async(id)=>{
     if(!confirm("Excluir este registro permanentemente?"))return;
-    try{
-      await apiFn({action:"delete",id});
-      push("Excluído");
-      setRows(r=>r.filter(x=>x.id!==id));
-    }catch(e){push(e.message||"Erro ao excluir","err");}
+    try{await api({action:"delete",id});push("Excluído");setRows(r=>r.filter(x=>x.id!==id));}
+    catch(e){push(e.message||"Erro ao excluir","err");}
   };
 
   const handleImport=async(cards)=>{
@@ -570,7 +458,7 @@ function App(){
       try{
         const hoje=new Date().toISOString().split("T")[0];
         const agora=new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
-        await apiFn({action:"create",nome_paciente:c.nome||"",setor:c.setor||"",especialidade:c.rec||"",diagnostico:c.hd||"",instituicao_destino:c.hosp||"",tipo_ambulancia:AMB_MAP[c.amb]||"",gravidade:GC_MAP[c.grav]||"AMARELO",data_solicitacao:hoje,horario_solicitacao:agora,status:"PACIENTE AGUARDANDO AMBULÂNCIA",horario_saida_ambulancia:c.saida||"",horario_retorno:c.retorno||"",enfermeiro:"",tecnico_auxiliar:"",medico:""});
+        await api({action:"create",nome_paciente:c.nome||"",setor:c.setor||"",especialidade:c.rec||"",diagnostico:c.hd||"",instituicao_destino:c.hosp||"",tipo_ambulancia:AM[c.amb]||"",gravidade:GC[c.grav]||"AMARELO",data_solicitacao:hoje,horario_solicitacao:agora,status:"PACIENTE AGUARDANDO AMBULÂNCIA",horario_saida_ambulancia:c.saida||"",horario_retorno:c.retorno||""});
         ok++;
       }catch{fail++;}
     }
@@ -578,57 +466,52 @@ function App(){
     await load();
   };
 
-  function toggleSort(col){
-    if(sortCol===col)setSortDir(d=>d==="asc"?"desc":"asc");
-    else{setSortCol(col);setSortDir("asc");}
-  }
+  function toggleSort(col){if(sc===col)setSd(d=>d==="asc"?"desc":"asc");else{setSc(col);setSd("asc");}}
 
   const filtered=useMemo(()=>{
     let d=rows;
     if(search){const s=search.toLowerCase();d=d.filter(r=>(r.nome_paciente||"").toLowerCase().includes(s)||(r.ficha_cross||"").toLowerCase().includes(s)||(r.diagnostico||"").toLowerCase().includes(s)||(r.instituicao_destino||"").toLowerCase().includes(s));}
-    if(fGrav)d=d.filter(r=>r.gravidade===fGrav);
-    if(fStatus)d=d.filter(r=>(r.status||"").includes(fStatus));
-    if(fMes)d=d.filter(r=>(r.data_solicitacao||"").startsWith(fMes));
+    if(fG)d=d.filter(r=>r.gravidade===fG);
+    if(fS)d=d.filter(r=>(r.status||"").includes(fS));
+    if(fM)d=d.filter(r=>(r.data_solicitacao||"").startsWith(fM));
     return [...d].sort((a,b)=>{
-      const av=(a[sortCol]||"").toString().toLowerCase();
-      const bv=(b[sortCol]||"").toString().toLowerCase();
-      return sortDir==="asc"?av.localeCompare(bv,"pt"):bv.localeCompare(av,"pt");
+      const av=(a[sc]||"").toString().toLowerCase();
+      const bv=(b[sc]||"").toString().toLowerCase();
+      return sd==="asc"?av.localeCompare(bv,"pt"):bv.localeCompare(av,"pt");
     });
-  },[rows,search,fGrav,fStatus,fMes,sortCol,sortDir]);
+  },[rows,search,fG,fS,fM,sc,sd]);
 
   const stats=useMemo(()=>{
     const total=filtered.length;
     const conc=filtered.filter(r=>["FICHA FINALIZADA","FICHA FINALIZADA VIA CROSS","FICHA FINALIZADA PELA CROSS","REMOÇÃO CONCLUÍDA","CONCLUIDO"].includes(r.status)).length;
     const nao=filtered.filter(r=>(r.status||"").includes("NÃO REALIZADA")).length;
     const verm=filtered.filter(r=>r.gravidade==="VERMELHO").length;
-    // Dashboard horários
-    const comSaida=filtered.filter(r=>r.horario_saida_ambulancia).length;
-    const tempos=filtered.filter(r=>r.tempo_espera).map(r=>{
-      const [h,m]=r.tempo_espera.split(":").map(Number);
-      return h*60+m;
-    }).filter(n=>!isNaN(n));
-    const mediaMin=tempos.length?Math.round(tempos.reduce((a,b)=>a+b,0)/tempos.length):0;
-    const mediaStr=tempos.length?`${Math.floor(mediaMin/60).toString().padStart(2,"0")}: ${(mediaMin%60).toString().padStart(2,"0")}`:"-";
-    return {total,conc,nao,verm,comSaida,mediaEspera:mediaStr};
+    const tempos=filtered.filter(r=>r.tempo_espera).map(r=>{const[h,m]=r.tempo_espera.split(":").map(Number);return h*60+m;}).filter(n=>!isNaN(n));
+    const med=tempos.length?Math.round(tempos.reduce((a,b)=>a+b,0)/tempos.length):0;
+    const medStr=tempos.length?`${String(Math.floor(med/60)).padStart(2,"0")}:${String(med%60).padStart(2,"0")}`:"—";
+    return {total,conc,nao,verm,medStr,comTempos:tempos.length};
   },[filtered]);
 
-  /* Export XLS */
   function exportXLS(){
-    const hdrs=COLS.map(([,h])=>h);
-    const fields=COLS.map(([f])=>f);
-    const data=[hdrs,...filtered.map(r=>fields.map(f=>r[f]||""))];
-    const ws=window.XLSX.utils.aoa_to_sheet(data);
-    // Larguras
-    const colWidths={"col-data":10,"col-hora":8,"col-ficha":16,"col-nome":24,"col-setor":16,"col-proc":14,"col-esp":18,"col-diag":22,"col-status":24,"col-grav":12,"col-drdata":10,"col-drhora":8,"col-dest":16,"col-amb":12,"col-bdata":10,"col-saida":8,"col-esp2":10,"col-obs":24,"col-enf":16,"col-tec":16,"col-med":16,"col-ret":8};
-    ws["!cols"]=COLS.map(([,,cls])=>({wch:colWidths[cls]||14}));
-    const wb=window.XLSX.utils.book_new();
-    window.XLSX.utils.book_append_sheet(wb,"Remoções",ws);
-    window.XLSX.writeFile(wb,`remocoes_${new Date().toISOString().slice(0,10)}.xlsx`);
+    if(!window.XLSX){push("XLSX não carregado","err");return;}
+    try{
+      const hdr=["#",...COLS.map(([,planilha_label])=>planilha_label)];
+      const data=filtered.map((r,i)=>[i+1,...COLS.map(([f,,,,,,,, tipo])=>{
+        const v=r[f]||"";
+        if(f==="data_solicitacao"&&v){try{return new Date(v+"T12:00:00").toLocaleDateString("pt-BR");}catch{return v;}}
+        return v;
+      })]);
+      const ws=window.XLSX.utils.aoa_to_sheet([hdr,...data]);
+      const colWidths={"data_solicitacao":12,"horario_solicitacao":8,"ficha_cross":18,"nome_paciente":26,"setor":18,"procedimento":14,"especialidade":18,"diagnostico":24,"status":28,"gravidade":10,"data_resposta_cross":12,"horario_resposta_cross":8,"instituicao_destino":20,"tipo_ambulancia":12,"data_saida_ambulancia":12,"horario_saida_ambulancia":8,"tempo_espera":10,"observacao":28,"enfermeiro":16,"tecnico_auxiliar":16,"medico":16,"horario_retorno":8};
+      ws["!cols"]=[{wch:4},...COLS.map(([f])=>({wch:colWidths[f]||14}))];
+      const wb=window.XLSX.utils.book_new();
+      window.XLSX.utils.book_append_sheet(wb,"Remoções",ws);
+      window.XLSX.writeFile(wb,`remocoes_${new Date().toISOString().slice(0,10)}.xlsx`);
+      push("Excel exportado!");
+    }catch(e){push("Erro: "+e.message,"err");}
   }
 
-  const opts={SETOR_OPTS,PROC_OPTS,STATUS_OPTS,GRAV_OPTS,AMBU_OPTS};
-
-  return (
+  return(
     <div className="app">
       <div className="topbar">
         <div className="ti">
@@ -642,15 +525,11 @@ function App(){
 
       <div className="toolbar">
         <div className="tbi">
-          <div className="sw">
-            <Ico n="search" s={13}/>
-            <input className="si" placeholder="Buscar…" value={search} onChange={e=>setSearch(e.target.value)}/>
-          </div>
-          <select className="fsel" value={fGrav} onChange={e=>setFGrav(e.target.value)}>
-            <option value="">Gravidade</option>
-            {GRAV_OPTS.map(o=><option key={o}>{o}</option>)}
+          <div className="sw"><Ico n="search" s={13}/><input className="si" placeholder="Buscar nome, ficha…" value={search} onChange={e=>setSearch(e.target.value)}/></div>
+          <select className="fsel" value={fG} onChange={e=>setFG(e.target.value)}>
+            <option value="">Gravidade</option>{G_OPTS.map(o=><option key={o}>{o}</option>)}
           </select>
-          <select className="fsel" value={fStatus} onChange={e=>setFStatus(e.target.value)}>
+          <select className="fsel" value={fS} onChange={e=>setFS(e.target.value)}>
             <option value="">Status</option>
             <option value="FINALIZADA">Finalizada</option>
             <option value="NÃO REALIZADA">Não realizada</option>
@@ -658,11 +537,11 @@ function App(){
             <option value="AGUARDANDO">Aguardando</option>
             <option value="ENCERRADA">Encerrada</option>
           </select>
-          <input type="month" className="fsel" value={fMes} onChange={e=>setFMes(e.target.value)} style={{width:"auto"}}/>
-          {(search||fGrav||fStatus||fMes)&&<button className="btn btn-g btn-sm" onClick={()=>{setSearch("");setFGrav("");setFStatus("");setFMes("");}}>✕ Limpar</button>}
-          <div style={{marginLeft:"auto",display:"flex",gap:6}}>
-            <button className="btn btn-g" onClick={exportXLS} style={{color:"#16A34A",borderColor:"#86EFAC"}}><Ico n="excel"/> Excel</button>
-            <button className="btn btn-blue" onClick={()=>setShowAceite(true)}><Ico n="import"/> Importar Aceite</button>
+          <input type="month" className="fsel" value={fM} onChange={e=>setFM(e.target.value)} style={{width:"auto"}}/>
+          {(search||fG||fS||fM)&&<button className="btn btn-g btn-sm" onClick={()=>{setSearch("");setFG("");setFS("");setFM("");}}>✕</button>}
+          <div style={{marginLeft:"auto",display:"flex",gap:6,flexShrink:0}}>
+            <button className="btn btn-green" onClick={exportXLS}><Ico n="excel"/> Excel</button>
+            <button className="btn btn-blue" onClick={()=>setShowAceite(true)}><Ico n="import"/> Aceite</button>
             <button className="btn btn-p" onClick={()=>setModal({})}><Ico n="plus"/> Novo</button>
           </div>
         </div>
@@ -670,92 +549,84 @@ function App(){
 
       <div className="stats">
         <div className="chip"><span className="cl">Total</span><span className="cv">{stats.total}</span></div>
-        <div className="chip-sep"/>
+        <div className="csep"/>
         <div className="chip"><div className="cdot" style={{background:"#16A34A"}}/><span className="cl">Concluídas</span><span className="cv" style={{color:"#16A34A"}}>{stats.conc}</span></div>
-        <div className="chip-sep"/>
+        <div className="csep"/>
         <div className="chip"><div className="cdot" style={{background:"#EF4444"}}/><span className="cl">Não realizadas</span><span className="cv" style={{color:"#EF4444"}}>{stats.nao}</span></div>
-        <div className="chip-sep"/>
+        <div className="csep"/>
         <div className="chip"><div className="cdot" style={{background:"#EF4444"}}/><span className="cl">Emergências</span><span className="cv" style={{color:"#EF4444"}}>{stats.verm}</span></div>
-        <div className="chip-sep"/>
-        <div className="chip"><span className="cl">Com saída AMB</span><span className="cv">{stats.comSaida}</span></div>
-        <div className="chip-sep"/>
-        <div className="chip"><span className="cl">⏱ Média espera</span><span className="cv" style={{color:"#7C3AED"}}>{stats.mediaEspera}</span></div>
+        <div className="csep"/>
+        <div className="chip"><span className="cl">⏱ Média espera</span><span className="cv" style={{color:"#7C3AED"}}>{stats.medStr}</span><span className="cl" style={{marginLeft:4}}>({stats.comTempos} reg.)</span></div>
       </div>
 
       <div className="tw">
-        {loading?(
-          <div className="empty" style={{marginTop:40}}><Ico n="pulse" s={24}/><p>Carregando…</p></div>
-        ):filtered.length===0?(
-          <div className="empty" style={{marginTop:40}}>
-            <p>{rows.length===0?"Nenhum registro. Clique em «Novo» para começar.":"Nenhum resultado para o filtro."}</p>
-          </div>
-        ):(
+        {loading?(<div className="empty" style={{marginTop:60}}><Ico n="pulse" s={24}/><p>Carregando…</p></div>)
+        :filtered.length===0?(<div className="empty" style={{marginTop:60}}><p>{rows.length===0?"Nenhum registro. Clique em «Novo» para começar.":"Nenhum resultado."}</p></div>)
+        :(
           <table className="rt">
             <thead><tr>
-              <th>#</th>
-              {COLS.map(([f,h,cls,,, tip])=>(
-                <th key={f} className={`${cls} th-tip${sortCol===f?" sorted":""}`} onClick={()=>toggleSort(f)}>
-                  <div className="th-inner">
-                    {h}
-                    <span className={`sort-arr${sortCol===f?" on":""}`}>
-                      {sortCol===f?(sortDir==="asc"?"▲":"▼"):"⇅"}
-                    </span>
+              <th style={{width:32,cursor:"default"}}>#</th>
+              {COLS.map(([f,planilha_label,xls_label,kanban,,,tip,w])=>(
+                <th key={f} style={{width:w||100}} className={`th-wrap${sc===f?" sorted":""}`} onClick={()=>toggleSort(f)}>
+                  <div className="th-inner" style={{whiteSpace:"normal",lineHeight:1.3,minHeight:30,alignItems:"flex-start",paddingTop:2}}>
+                    <span>{xls_label}</span>
+                    <span className={`sarr${sc===f?" on":""}`}>{sc===f?(sd==="asc"?"▲":"▼"):"⇅"}</span>
                   </div>
-                  <div className="tip-box">{tip}</div>
+                  <div className="tipbox">
+                    <strong>Planilha:</strong> {planilha_label}<br/>
+                    <strong>Kanban:</strong> {kanban||"—"}<br/>
+                    {tip}
+                  </div>
                 </th>
               ))}
-              <th></th>
+              <th style={{width:32,cursor:"default"}}></th>
             </tr></thead>
             <tbody>
               {filtered.map((r,i)=>(
                 <tr key={r.id}>
                   <td>{i+1}</td>
-                  <td className="col-data"><div style={{padding:"0 6px",fontSize:10,whiteSpace:"nowrap"}}>{fmtD(r.data_solicitacao)||"—"}</div></td>
-                  <td className="col-hora"><Cell rowId={r.id} field="horario_solicitacao" value={r.horario_solicitacao} type="time" onSave={handleCell}/></td>
-                  <td className="col-ficha"><Cell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCell}/></td>
-                  <td className="col-nome"><Cell rowId={r.id} field="nome_paciente" value={r.nome_paciente} onSave={handleCell}/></td>
-                  <td className="col-setor"><Cell rowId={r.id} field="setor" value={r.setor} opts={SETOR_OPTS} onSave={handleCell}/></td>
-                  <td className="col-proc"><Cell rowId={r.id} field="procedimento" value={r.procedimento} opts={PROC_OPTS} onSave={handleCell}/></td>
-                  <td className="col-esp"><Cell rowId={r.id} field="especialidade" value={r.especialidade} onSave={handleCell}/></td>
-                  <td className="col-diag"><Cell rowId={r.id} field="diagnostico" value={r.diagnostico} onSave={handleCell}/></td>
-                  <td className="col-status">
+                  <td style={{width:80}}><div style={{padding:"0 6px",fontSize:10,whiteSpace:"nowrap"}}>{fmtD(r.data_solicitacao)||"—"}</div></td>
+                  <td style={{width:58}}><Cell rowId={r.id} field="horario_solicitacao" value={r.horario_solicitacao} tipo="time" onSave={handleCell}/></td>
+                  <td style={{width:120}}><Cell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCell}/></td>
+                  <td style={{width:170}}><Cell rowId={r.id} field="nome_paciente" value={r.nome_paciente} onSave={handleCell}/></td>
+                  <td style={{width:110}}><Cell rowId={r.id} field="setor" value={r.setor} tipo="sel" optsKey="ST_OPTS" onSave={handleCell}/></td>
+                  <td style={{width:100}}><Cell rowId={r.id} field="procedimento" value={r.procedimento} tipo="sel" optsKey="P_OPTS" onSave={handleCell}/></td>
+                  <td style={{width:130}}><Cell rowId={r.id} field="especialidade" value={r.especialidade} onSave={handleCell}/></td>
+                  <td style={{width:160}}><Cell rowId={r.id} field="diagnostico" value={r.diagnostico} onSave={handleCell}/></td>
+                  <td style={{width:150}}>
                     {r.status
-                      ?<div style={{padding:"0 6px"}}><span className={`sb2 ${STATUS_CLS[r.status]||"se"}`} title={r.status}>{r.status.length>22?r.status.slice(0,22)+"…":r.status}</span></div>
-                      :<Cell rowId={r.id} field="status" value={r.status} opts={STATUS_OPTS} onSave={handleCell}/>
+                      ?<div style={{padding:"0 6px"}}><span className={`sb ${S_CLS[r.status]||"se"}`} title={r.status}>{r.status.length>20?r.status.slice(0,20)+"…":r.status}</span></div>
+                      :<Cell rowId={r.id} field="status" value={r.status} tipo="sel" optsKey="S_OPTS" onSave={handleCell}/>
                     }
                   </td>
-                  <td className="col-grav">
+                  <td style={{width:80}}>
                     {r.gravidade
-                      ?<div style={{padding:"0 6px"}}><span className={`gb ${GRAV_CLS[r.gravidade]||"gc"}`}><span className="gd" style={{background:GRAV_DOT[r.gravidade]||"#94A3B8"}}/> {r.gravidade}</span></div>
-                      :<Cell rowId={r.id} field="gravidade" value={r.gravidade} opts={GRAV_OPTS} onSave={handleCell}/>
+                      ?<div style={{padding:"0 6px"}}><span className={`gb ${G_CLS[r.gravidade]||"gc"}`}><span className="gd" style={{background:G_DOT[r.gravidade]}}/>{r.gravidade}</span></div>
+                      :<Cell rowId={r.id} field="gravidade" value={r.gravidade} tipo="sel" optsKey="G_OPTS" onSave={handleCell}/>
                     }
                   </td>
-                  <td className="col-drdata"><Cell rowId={r.id} field="data_resposta_cross" value={r.data_resposta_cross} type="date" onSave={handleCell}/></td>
-                  <td className="col-drhora"><Cell rowId={r.id} field="horario_resposta_cross" value={r.horario_resposta_cross} type="time" onSave={handleCell}/></td>
-                  <td className="col-dest"><Cell rowId={r.id} field="instituicao_destino" value={r.instituicao_destino} onSave={handleCell}/></td>
-                  <td className="col-amb">
+                  <td style={{width:80}}><Cell rowId={r.id} field="data_resposta_cross" value={r.data_resposta_cross} tipo="date" onSave={handleCell}/></td>
+                  <td style={{width:60}}><Cell rowId={r.id} field="horario_resposta_cross" value={r.horario_resposta_cross} tipo="time" onSave={handleCell}/></td>
+                  <td style={{width:130}}><Cell rowId={r.id} field="instituicao_destino" value={r.instituicao_destino} onSave={handleCell}/></td>
+                  <td style={{width:90}}>
                     {r.tipo_ambulancia
-                      ?<div style={{padding:"0 6px"}}><span className={`abg ${r.tipo_ambulancia==="AVANÇADA"?"aba":"abb"}`}>{r.tipo_ambulancia}</span></div>
-                      :<Cell rowId={r.id} field="tipo_ambulancia" value={r.tipo_ambulancia} opts={AMBU_OPTS} onSave={handleCell}/>
+                      ?<div style={{padding:"0 6px"}}><span className={`ab ${r.tipo_ambulancia==="AVANÇADA"?"aba":"abb"}`}>{r.tipo_ambulancia}</span></div>
+                      :<Cell rowId={r.id} field="tipo_ambulancia" value={r.tipo_ambulancia} tipo="sel" optsKey="A_OPTS" onSave={handleCell}/>
                     }
                   </td>
-                  <td className="col-bdata"><Cell rowId={r.id} field="data_saida_ambulancia" value={r.data_saida_ambulancia} type="date" onSave={handleCell}/></td>
-                  <td className="col-saida"><Cell rowId={r.id} field="horario_saida_ambulancia" value={r.horario_saida_ambulancia} type="time" onSave={handleCell}/></td>
-                  <td className="col-esp2">
-                    <div style={{padding:"0 6px",fontSize:10,color:r.tempo_espera?"#7C3AED":"#CBD5E1",fontWeight:r.tempo_espera?600:400}}>
+                  <td style={{width:80}}><Cell rowId={r.id} field="data_saida_ambulancia" value={r.data_saida_ambulancia} tipo="date" onSave={handleCell}/></td>
+                  <td style={{width:60}}><Cell rowId={r.id} field="horario_saida_ambulancia" value={r.horario_saida_ambulancia} tipo="time" onSave={handleCell}/></td>
+                  <td style={{width:64}}>
+                    <div style={{padding:"0 6px",fontSize:10,color:r.tempo_espera?"#7C3AED":"#CBD5E1",fontWeight:r.tempo_espera?700:400}}>
                       {r.tempo_espera||calcTempo(r.horario_solicitacao,r.horario_saida_ambulancia)||"—"}
                     </div>
                   </td>
-                  <td className="col-obs"><Cell rowId={r.id} field="observacao" value={r.observacao} onSave={handleCell}/></td>
-                  <td className="col-enf"><Cell rowId={r.id} field="enfermeiro" value={r.enfermeiro} onSave={handleCell}/></td>
-                  <td className="col-tec"><Cell rowId={r.id} field="tecnico_auxiliar" value={r.tecnico_auxiliar} onSave={handleCell}/></td>
-                  <td className="col-med"><Cell rowId={r.id} field="medico" value={r.medico} onSave={handleCell}/></td>
-                  <td className="col-ret"><Cell rowId={r.id} field="horario_retorno" value={r.horario_retorno} type="time" onSave={handleCell}/></td>
-                  <td>
-                    <div className="ra">
-                      <button className="ab4" title="Excluir" onClick={()=>handleDelete(r.id)}><Ico n="trash" s={11}/></button>
-                    </div>
-                  </td>
+                  <td style={{width:180}}><Cell rowId={r.id} field="observacao" value={r.observacao} onSave={handleCell}/></td>
+                  <td style={{width:110}}><Cell rowId={r.id} field="enfermeiro" value={r.enfermeiro} onSave={handleCell}/></td>
+                  <td style={{width:110}}><Cell rowId={r.id} field="tecnico_auxiliar" value={r.tecnico_auxiliar} onSave={handleCell}/></td>
+                  <td style={{width:110}}><Cell rowId={r.id} field="medico" value={r.medico} onSave={handleCell}/></td>
+                  <td style={{width:60}}><Cell rowId={r.id} field="horario_retorno" value={r.horario_retorno} tipo="time" onSave={handleCell}/></td>
+                  <td style={{width:32}}><button className="delbtn" title="Excluir" onClick={()=>handleDelete(r.id)}><Ico n="trash" s={11}/></button></td>
                 </tr>
               ))}
             </tbody>
@@ -765,15 +636,14 @@ function App(){
 
       {showAceite&&<AceiteModal onClose={()=>setShowAceite(false)} onImport={handleImport}/>}
       {modal!==null&&<FormModal row={modal} onClose={()=>setModal(null)} onSave={handleSave} saving={saving}/>}
-
       <div className="tst">
         {ts.map(t=><div key={t.id} className={`toast ${t.type}`}><span>{t.type==="ok"?"✓":"✕"}</span><span>{t.msg}</span></div>)}
       </div>
     </div>
   );
 }
-
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+
 </script>
 </body>
 </html>
