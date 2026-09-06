@@ -4900,6 +4900,37 @@ function App() {
       }, userId);
       setCards(p => p.map(c => c.id === cardId ? data : c));
       showT("Card movido.");
+      // ── Auto-preenche Remoção quando card entra em Aceite ou Andamento ──
+      if (newColId === "aceite" || newColId === "andamento") {
+        try {
+          const hoje = new Date().toISOString().split("T")[0];
+          const agora = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+          const payload = {
+            action: "create",
+            nome_paciente: data.nome || "",
+            setor: data.setor || "",
+            especialidade: data.rec || "",
+            diagnostico: data.hd || "",
+            instituicao_destino: data.hosp || "",
+            tipo_ambulancia: data.amb === "Avançada" ? "AVANÇADA" : data.amb === "Básica" ? "BÁSICA" : "",
+            gravidade: data.grav === "emergencia" ? "VERMELHO" : data.grav === "urgencia" ? "AMARELO" : data.grav === "menor_gravidade" ? "VERDE" : "CINZA",
+            data_solicitacao: hoje,
+            horario_solicitacao: agora,
+            status: newColId === "aceite" ? "PACIENTE AGUARDANDO AMBULÂNCIA" : "PACIENTE EM REMOÇÃO",
+            receptor: aceiteData?.receptor || data.receptor || "",
+            horario_saida_ambulancia: data.saida || "",
+            horario_retorno: data.retorno || "",
+          };
+          await fetch("https://ahcrscstdtfawoogsugi.supabase.co/functions/v1/remocoes-write", {
+            method: "POST",
+            headers: {"Content-Type":"application/json","apikey":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjk1MDgsImV4cCI6MjEwNDIwNTUwOH0.8ivWRA99AXXyBVFT3TQd5NuSod2eiowiI490Blt2zHM","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjk1MDgsImV4cCI6MjEwNDIwNTUwOH0.8ivWRA99AXXyBVFT3TQd5NuSod2eiowiI490Blt2zHM"},
+            body: JSON.stringify(payload)
+          });
+          showT("✅ Card movido e remoção criada automaticamente.");
+        } catch (e2) {
+          // silencioso — não bloqueia o fluxo do kanban
+        }
+      }
     } catch (ex) {
       showT(ex.message, "err");
     }
@@ -5993,12 +6024,7 @@ function App() {
     label: "📋 Kanban"
   }), /*#__PURE__*/React.createElement("a", {
     href: "remocao.html",
-    style: {
-      padding: "5px 14px", borderRadius: 6, border: "none", fontSize: 12,
-      fontWeight: 400, background: "transparent", color: "#64748B",
-      cursor: "pointer", textDecoration: "none",
-      display: "inline-flex", alignItems: "center"
-    }
+    style: {padding:"5px 14px",borderRadius:6,border:"none",fontSize:12,fontWeight:400,background:"transparent",color:"#64748B",cursor:"pointer",textDecoration:"none",display:"inline-flex",alignItems:"center"}
   }, "🚑 Remoção"), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
     id: "usuarios",
     label: "👥 Profissionais"
@@ -6154,38 +6180,25 @@ function App() {
   }, /*#__PURE__*/React.createElement(TimelineView, {
     cards: filtered,
     cols: displayCols
-  })), !loading && view === "kanban" && /*#__PURE__*/React.createElement("div", {
-    style: { display: "flex", gap: 16, alignItems: "flex-start" }
-  },
+  })), !loading && view === "kanban" && /*#__PURE__*/React.createElement("div", null,
   /*#__PURE__*/React.createElement("div", {
-    style: {
-      flexShrink: 0, width: 152,
-      background: "#fff", border: "1px solid #E2E8F0",
-      borderRadius: 10, overflow: "hidden",
-      alignSelf: "flex-start", position: "sticky", top: 68
-    }
+    style: {background:"#fff",border:"1px solid #E2E8F0",borderRadius:10,marginBottom:12,overflow:"hidden"}
   },
     /*#__PURE__*/React.createElement("div", {
-      style: { padding: "8px 14px 5px", fontSize: 9, fontWeight: 700,
-        color: "#CBD5E1", textTransform: "uppercase", letterSpacing: ".06em" }
-    }, "Visualizações"),
-    [["lista","📄","Lista"],["calendario","📅","Calendário"],["timeline","⏱","Linha do Tempo"]].map(function(it) {
-      return /*#__PURE__*/React.createElement("button", {
-        key: it[0],
-        onClick: function() { setView(it[0]); },
-        style: {
-          display: "flex", alignItems: "center", gap: 8,
-          width: "100%", padding: "7px 14px",
-          border: "none", background: "transparent",
-          fontSize: 12, fontWeight: 400, color: "#64748B",
-          cursor: "pointer", textAlign: "left", transition: "all .12s"
-        },
-        onMouseEnter: function(e) { e.currentTarget.style.background="#F1F5F9"; e.currentTarget.style.color="#0F172A"; },
-        onMouseLeave: function(e) { e.currentTarget.style.background="transparent"; e.currentTarget.style.color="#64748B"; }
-      }, it[1], " ", it[2]);
-    })
+      style: {display:"flex",gap:1,padding:"2px"}
+    },
+      [["lista","📄 Lista"],["calendario","📅 Calendário"],["timeline","⏱ Linha do Tempo"]].map(function(it){
+        return /*#__PURE__*/React.createElement("button",{
+          key:it[0],
+          onClick:function(){setView(it[0]);},
+          style:{flex:1,padding:"7px 12px",border:"none",borderRadius:8,fontSize:12,fontWeight:400,
+            background:"transparent",color:"#64748B",cursor:"pointer",transition:"all .15s",textAlign:"center"},
+          onMouseEnter:function(e){e.currentTarget.style.background="#F1F5F9";e.currentTarget.style.color="#0F172A";},
+          onMouseLeave:function(e){e.currentTarget.style.background="transparent";e.currentTarget.style.color="#64748B";}
+        }, it[1]);
+      })
+    )
   ),
-  /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
   /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -6421,9 +6434,7 @@ function App() {
       onDragStart: handleDragStart,
       onDragEnd: handleDragEnd
     }))));
-  }))  /* fecha div flex:1 kanban-content */
-  )    /* fecha div flex-row wrapper */
-  ), !loading && view === "lista" && /*#__PURE__*/React.createElement("div", {
+  }))), !loading && view === "lista" && /*#__PURE__*/React.createElement("div", {
     id: "view-content",
     style: {
       background: "#fff",
