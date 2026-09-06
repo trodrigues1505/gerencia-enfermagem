@@ -10,146 +10,132 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
-/* ── mesmas variáveis do kanban ── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body,#root{height:100%;font-family:'Inter',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;background:#F1F5F9;color:#0F172A}
 input,select,textarea,button{font-family:inherit}
 
-/* Topbar — igual ao kanban */
 .topbar{background:#0F172A;padding:0 20px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.2)}
 .topbar-inner{max-width:1600px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:52px}
-.topbar-brand{display:flex;align-items:center;gap:10px}
-.topbar-icon{width:30px;height:30px;border-radius:8px;background:#1E40AF;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.topbar-icon span{color:#fff;font-size:14px;font-weight:700}
-.topbar-name{font-weight:700;font-size:14px;color:#fff;letter-spacing:-.01em}
-.topbar-sub{font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.08em}
-.topbar-right{display:flex;align-items:center;gap:6px}
+.t-brand{display:flex;align-items:center;gap:10px}
+.t-icon{width:30px;height:30px;border-radius:8px;background:#1E40AF;display:flex;align-items:center;justify-content:center}
+.t-icon span{color:#fff;font-size:14px;font-weight:700}
+.t-name{font-weight:700;font-size:14px;color:#fff;letter-spacing:-.01em}
+.t-sub{font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.08em}
 
-/* Toolbar */
-.toolbar{background:#fff;border-bottom:1px solid #E2E8F0;padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.toolbar-inner{max-width:1600px;margin:0 auto;width:100%;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.toolbar{background:#fff;border-bottom:1px solid #E2E8F0;padding:0 20px}
+.toolbar-inner{max-width:1600px;margin:0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0}
 
-/* Botões — mesmo padrão do kanban */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;white-space:nowrap}
-.btn-primary{background:#0F172A;color:#fff}
-.btn-primary:hover{background:#1E293B}
-.btn-ghost{background:none;color:#64748B;border:1px solid #E2E8F0}
-.btn-ghost:hover{background:#F8FAFC;color:#0F172A}
+.btn-primary{background:#0F172A;color:#fff}.btn-primary:hover{background:#1E293B}
+.btn-ghost{background:none;color:#64748B;border:1px solid #E2E8F0}.btn-ghost:hover{background:#F8FAFC;color:#0F172A}
 .btn-sm{padding:5px 10px;font-size:12px}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 
-/* Search */
-.search-wrap{position:relative}
-.search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94A3B8;pointer-events:none}
-.search-input{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;color:#0F172A;padding:7px 12px 7px 32px;font-size:13px;width:240px;outline:none;transition:all .15s;font-family:inherit}
-.search-input::placeholder{color:#CBD5E1}
-.search-input:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.s-wrap{position:relative}
+.s-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94A3B8;pointer-events:none}
+.s-input{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;color:#0F172A;padding:7px 12px 7px 32px;font-size:13px;width:220px;outline:none;transition:all .15s;font-family:inherit}
+.s-input::placeholder{color:#CBD5E1}
+.s-input:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
 
-/* Select filtro */
-select.filter-sel{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;color:#374151;padding:7px 28px 7px 10px;font-size:13px;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;outline:none;font-family:inherit;transition:all .15s}
-select.filter-sel:focus{border-color:#3B82F6}
+select.fsel{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;color:#374151;padding:7px 28px 7px 10px;font-size:13px;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;outline:none;font-family:inherit}
+select.fsel:focus{border-color:#3B82F6}
 
-/* Stats chips */
-.stats-row{max-width:1600px;margin:0 auto;padding:12px 20px;display:flex;gap:10px;flex-wrap:wrap}
-.stat-chip{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:8px 14px;white-space:nowrap}
-.stat-chip .dot{width:8px;height:8px;border-radius:50%}
-.stat-chip .label{color:#64748B;font-size:12px}
-.stat-chip .value{font-weight:700;font-size:15px}
+.stats{max-width:1600px;margin:0 auto;padding:12px 20px;display:flex;gap:10px;flex-wrap:wrap}
+.chip{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:8px 14px;white-space:nowrap}
+.chip .dot{width:8px;height:8px;border-radius:50%}
+.chip .lbl{color:#64748B;font-size:12px}
+.chip .val{font-weight:700;font-size:15px}
 
-/* Tabela */
-.table-wrap{max-width:1600px;margin:0 auto;padding:0 20px 24px;overflow-x:auto}
-.rem-table{width:100%;border-collapse:separate;border-spacing:0;min-width:1320px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden}
-.rem-table thead tr th{background:#F8FAFC;padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748B;border-bottom:1px solid #E2E8F0;white-space:nowrap}
-.rem-table thead tr th:first-child{padding-left:16px}
-.rem-table tbody tr{transition:background .12s}
-.rem-table tbody tr:hover{background:#F8FAFC}
-.rem-table tbody td{padding:9px 12px;border-bottom:1px solid #F1F5F9;vertical-align:middle;font-size:13px;color:#374151}
-.rem-table tbody td:first-child{padding-left:16px}
-.rem-table tbody tr:last-child td{border-bottom:none}
+/* Tabela estilo kanban */
+.twrap{max-width:1600px;margin:0 auto;padding:0 20px 24px;overflow-x:auto}
+.rtable{width:100%;border-collapse:separate;border-spacing:0;min-width:1320px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden}
+.rtable thead tr th{background:#F8FAFC;padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748B;border-bottom:1px solid #E2E8F0;white-space:nowrap;cursor:default}
+.rtable thead tr th:first-child{padding-left:16px;width:36px}
+.rtable tbody tr{transition:background .12s}
+.rtable tbody tr:hover{background:#F8FAFC}
+.rtable tbody tr.editing-row{background:#EFF6FF}
+.rtable tbody td{padding:0;border-bottom:1px solid #F1F5F9;vertical-align:middle;font-size:13px;color:#374151;height:44px}
+.rtable tbody td:first-child{padding-left:16px;color:#94A3B8;font-size:11px;font-weight:700}
+.rtable tbody tr:last-child td{border-bottom:none}
+
+/* Células inline editáveis */
+.cell-view{padding:0 12px;height:44px;display:flex;align-items:center;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
+.cell-view:hover{text-decoration:underline;text-decoration-style:dotted;text-decoration-color:#CBD5E1}
+.cell-input{width:100%;height:44px;padding:0 10px;border:none;border-left:2px solid #3B82F6;background:#EFF6FF;font-size:13px;font-family:inherit;color:#0F172A;outline:none}
+.cell-select{width:100%;height:44px;padding:0 8px;border:none;border-left:2px solid #3B82F6;background:#EFF6FF;font-size:12px;font-family:inherit;color:#0F172A;outline:none;appearance:none;cursor:pointer}
 
 /* Badges */
-.grav-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;white-space:nowrap}
-.grav-badge .dot{width:5px;height:5px;border-radius:50%}
-.gv{background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5}
-.ga{background:#FEF9C3;color:#713F12;border:1px solid #FDE047}
-.gg{background:#DCFCE7;color:#14532D;border:1px solid #86EFAC}
-.gc{background:#F1F5F9;color:#475569;border:1px solid #E2E8F0}
+.gb{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;white-space:nowrap;border:1px solid transparent}
+.gb .dot{width:5px;height:5px;border-radius:50%}
+.gv{background:#FEE2E2;color:#991B1B;border-color:#FCA5A5}
+.ga{background:#FEF9C3;color:#713F12;border-color:#FDE047}
+.gg{background:#DCFCE7;color:#14532D;border-color:#86EFAC}
+.gc{background:#F1F5F9;color:#475569;border-color:#E2E8F0}
 
-.status-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em}
-.sf{background:#DCFCE7;color:#14532D}
-.se{background:#F1F5F9;color:#475569}
-.sn{background:#FEE2E2;color:#991B1B}
-.sa{background:#FEF3C7;color:#92400E}
+.sb{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em}
+.sf{background:#DCFCE7;color:#14532D}.se{background:#F1F5F9;color:#475569}
+.sn{background:#FEE2E2;color:#991B1B}.sa{background:#FEF3C7;color:#92400E}
 .sc{background:#EFF6FF;color:#1E40AF}
 
-.ambu-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600}
-.ab{background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE}
-.av{background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5}
+.ab2{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600}
+.abb{background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE}
+.aba{background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5}
 
-.cell-name{font-weight:600;color:#0F172A}
-.cell-muted{color:#64748B;font-size:12px}
-.cell-time{font-variant-numeric:tabular-nums;font-size:12px;color:#64748B;white-space:nowrap}
-.cell-obs{font-size:12px;color:#64748B;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ra{display:flex;align-items:center;gap:3px;opacity:0;transition:opacity .12s;padding:0 8px}
+.rtable tbody tr:hover .ra{opacity:1}
+.ab3{width:28px;height:28px;border-radius:6px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;background:none;color:#94A3B8;transition:all .12s}
+.ab3:hover{background:#F1F5F9;color:#0F172A}
+.ab3.del:hover{background:#FEE2E2;color:#991B1B}
 
-.row-actions{display:flex;align-items:center;gap:3px;opacity:0;transition:opacity .12s}
-.rem-table tbody tr:hover .row-actions{opacity:1}
-.act-btn{width:28px;height:28px;border-radius:6px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;background:none;color:#94A3B8;transition:all .12s}
-.act-btn:hover{background:#F1F5F9;color:#0F172A}
-.act-btn.del:hover{background:#FEE2E2;color:#991B1B}
+/* Modal */
+.mbk{position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;padding:16px}
+.mdl{background:#fff;border-radius:16px;width:100%;max-width:860px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.22)}
+.mhd{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #F1F5F9;position:sticky;top:0;background:#fff;border-radius:16px 16px 0 0;z-index:1}
+.mhd h2{font-size:15px;font-weight:700;color:#0F172A}
+.mhd p{font-size:11px;color:#94A3B8;margin-top:2px}
+.mbd{flex:1;overflow-y:auto;padding:20px}
+.mft{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 20px;border-top:1px solid #F1F5F9;position:sticky;bottom:0;background:#fff;border-radius:0 0 16px 16px}
 
-/* Empty */
-.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:64px 20px;color:#CBD5E1;font-size:13px;background:#fff;border:1px solid #E2E8F0;border-radius:12px}
-
-/* Modal — igual ModalShell do kanban */
-.modal-backdrop{position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;padding:16px}
-.modal{background:#fff;border-radius:16px;width:100%;max-width:860px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.22)}
-.modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #F1F5F9;position:sticky;top:0;background:#fff;border-radius:16px 16px 0 0;z-index:1}
-.modal-header h2{font-size:15px;font-weight:700;color:#0F172A}
-.modal-header p{font-size:11px;color:#94A3B8;margin-top:2px}
-.modal-body{flex:1;overflow-y:auto;padding:20px}
-.modal-footer{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 20px;border-top:1px solid #F1F5F9;position:sticky;bottom:0;background:#fff;border-radius:0 0 16px 16px}
-
-/* Form */
-.form-section{margin-bottom:20px}
-.form-section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #F1F5F9}
-.form-grid{display:grid;gap:12px}
+.fs{margin-bottom:20px}
+.fst{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #F1F5F9}
+.fg{display:grid;gap:12px}
 .fg2{grid-template-columns:1fr 1fr}
 .fg3{grid-template-columns:1fr 1fr 1fr}
 .fg4{grid-template-columns:1fr 1fr 1fr 1fr}
-.field{display:flex;flex-direction:column;gap:3px}
-.field label{font-size:10px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em}
-.field label .req{color:#EF4444;margin-left:2px}
-.field input,.field select,.field textarea{background:#fff;border:1px solid #E2E8F0;border-radius:7px;color:#0F172A;padding:8px 10px;font-size:13px;outline:none;transition:all .15s;font-family:inherit;width:100%}
-.field input::placeholder,.field textarea::placeholder{color:#CBD5E1}
-.field input:focus,.field select:focus,.field textarea:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
-.field textarea{resize:vertical;min-height:60px}
-.field select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:28px}
-.field input[type="date"]::-webkit-calendar-picker-indicator,.field input[type="time"]::-webkit-calendar-picker-indicator{cursor:pointer}
+.fd{display:flex;flex-direction:column;gap:3px}
+.fd label{font-size:10px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em}
+.fd label .req{color:#EF4444;margin-left:2px}
+.fd input,.fd select,.fd textarea{background:#fff;border:1px solid #E2E8F0;border-radius:7px;color:#0F172A;padding:8px 10px;font-size:13px;outline:none;transition:all .15s;font-family:inherit;width:100%}
+.fd input::placeholder,.fd textarea::placeholder{color:#CBD5E1}
+.fd input:focus,.fd select:focus,.fd textarea:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.fd textarea{resize:vertical;min-height:60px}
+.fd select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:28px}
 
-/* Toast */
-.toast-stack{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px}
-.toast{display:flex;align-items:center;gap:10px;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 4px 20px rgba(0,0,0,.14);white-space:nowrap;pointer-events:none}
-.toast.success{background:#F0FDF4;border:1px solid #86EFAC;color:#166534}
-.toast.error{background:#FEE2E2;border:1px solid #FCA5A5;color:#991B1B}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:64px 20px;color:#CBD5E1;font-size:13px;background:#fff;border:1px solid #E2E8F0;border-radius:12px}
+
+.tstack{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{display:flex;align-items:center;gap:10px;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 4px 20px rgba(0,0,0,.14);white-space:nowrap}
+.toast.ok{background:#F0FDF4;border:1px solid #86EFAC;color:#166534}
+.toast.err{background:#FEE2E2;border:1px solid #FCA5A5;color:#991B1B}
 
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:99px}
 
 @media(max-width:768px){
   .fg2,.fg3,.fg4{grid-template-columns:1fr}
-  .search-input{width:160px}
+  .s-input{width:140px}
 }
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useEffect, useCallback, useMemo } = React;
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
 const SB_URL = "https://ahcrscstdtfawoogsugi.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgyNzE4NDAsImV4cCI6MjA2Mzg0Nzg0MH0.I-aEBWFiGc5pGDXV_cYtZQ2Y40q8xizEF7R1C2bCAVA";
-const FN_URL  = `${SB_URL}/functions/v1/remocoes-write`;
-const H = { "Content-Type":"application/json", apikey:SB_KEY, Authorization:`Bearer ${SB_KEY}` };
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjk1MDgsImV4cCI6MjEwNDIwNTUwOH0.8ivWRA99AXXyBVFT3TQd5NuSod2eiowiI490Blt2zHM";
+const FN_URL = `${SB_URL}/functions/v1/remocoes-write`;
+const H = {"Content-Type":"application/json", apikey:SB_KEY, Authorization:`Bearer ${SB_KEY}`};
 
 async function apiFn(body) {
   const r = await fetch(FN_URL,{method:"POST",headers:H,body:JSON.stringify(body)});
@@ -163,7 +149,7 @@ async function apiGet(path) {
   return r.json();
 }
 
-const STATUS_OPTIONS = [
+const STATUS_OPTS = [
   "FICHA FINALIZADA","FICHA FINALIZADA VIA CROSS","FICHA FINALIZADA PELA CROSS",
   "FICHA FINALIZADA PELA ORIGEM","FICHA ENCERRADA PELO CROSS","ENCERRADA PELO CROSS",
   "REMOÇÃO CONCLUÍDA","REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA",
@@ -173,12 +159,12 @@ const STATUS_OPTIONS = [
   "PACIENTE EM REMOÇÃO","PACIENTE AGUARDANDO AMBULÂNCIA",
   "CONCLUIDO","AGENDAMENTO SECRETARIA DA SAÚDE","HEMODIÁLISE","OUTRO",
 ];
-const GRAVIDADE_OPTIONS = ["VERMELHO","AMARELO","VERDE","CINZA"];
-const SETOR_OPTIONS = ["EMERGÊNCIA","CLÍNICA MÉDICA","OBSERVAÇÃO ADULTO","OBSERVAÇÃO INFANTIL","CLÍNICA PEDIÁTRICA","UTI","BLOCO MATERNO","EVASÃO","OUTRO"];
-const PROCEDIMENTO_OPTIONS = ["AVALIAÇÃO","EXAME","LEITO","BANCO","ALTA","OUTRO"];
-const AMBU_OPTIONS = ["BÁSICA","AVANÇADA","UTI"];
+const GRAV_OPTS = ["VERMELHO","AMARELO","VERDE","CINZA"];
+const SETOR_OPTS = ["EMERGÊNCIA","CLÍNICA MÉDICA","OBSERVAÇÃO ADULTO","OBSERVAÇÃO INFANTIL","CLÍNICA PEDIÁTRICA","UTI","BLOCO MATERNO","EVASÃO","OUTRO"];
+const PROC_OPTS = ["AVALIAÇÃO","EXAME","LEITO","BANCO","ALTA","OUTRO"];
+const AMBU_OPTS = ["BÁSICA","AVANÇADA","UTI"];
 
-const STATUS_CLASS = {
+const STATUS_CLS = {
   "FICHA FINALIZADA":"sf","FICHA FINALIZADA VIA CROSS":"sf","FICHA FINALIZADA PELA CROSS":"sf",
   "FICHA FINALIZADA PELA ORIGEM":"sf","REMOÇÃO CONCLUÍDA":"sc","CONCLUIDO":"sc",
   "PACIENTE EM REMOÇÃO":"sa","PACIENTE AGUARDANDO AMBULÂNCIA":"sa",
@@ -187,12 +173,12 @@ const STATUS_CLASS = {
   "EVASÃO/ALTA A PEDIDO":"se","CANCELADA PELO CROSS":"se","CANCELADA PELO SOLICITANTE":"se",
 };
 const GRAV_DOT = {VERMELHO:"#EF4444",AMARELO:"#EAB308",VERDE:"#22C55E",CINZA:"#94A3B8"};
-const GRAV_CLASS = {VERMELHO:"gv",AMARELO:"ga",VERDE:"gg",CINZA:"gc"};
+const GRAV_CLS = {VERMELHO:"gv",AMARELO:"ga",VERDE:"gg",CINZA:"gc"};
 
 const fmt = v => v||"—";
-const fmtDate = v => {
+const fmtD = v => {
   if(!v) return "—";
-  try { return new Date(v+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"2-digit"}); } catch { return v; }
+  try{ return new Date(v+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"2-digit"}); }catch{return v;}
 };
 
 const EMPTY = {
@@ -203,25 +189,25 @@ const EMPTY = {
   tempo_espera:"",observacao:"",enfermeiro:"",tecnico_auxiliar:"",medico:"",horario_retorno:"",
 };
 
-/* ── Ícones ── */
+/* Ícones */
 const Ico = ({n,s=16}) => {
   const d={
     plus:<path d="M12 5v14M5 12h14"/>,
     search:<><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></>,
-    edit:<><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>,
-    trash:<><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></>,
+    trash:<><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></>,
     x:<path d="M18 6 6 18M6 6l12 12"/>,
     dl:<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
     pulse:<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>,
     arrow:<path d="M19 12H5M12 5l-7 7 7 7"/>,
+    check:<polyline points="20 6 9 12 4 10"/>,
   };
   return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{d[n]}</svg>;
 };
 
-/* ── Toast ── */
+/* Toast */
 function useToast(){
   const [toasts,setToasts]=useState([]);
-  const push=useCallback((msg,type="success")=>{
+  const push=useCallback((msg,type="ok")=>{
     const id=Date.now();
     setToasts(t=>[...t,{id,msg,type}]);
     setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),4000);
@@ -229,119 +215,156 @@ function useToast(){
   return {toasts,push};
 }
 
-/* ── Modal de formulário ── */
+/* Célula inline editável */
+function EditCell({rowId, field, value, type="text", opts=null, onSave}){
+  const [editing,setEditing]=useState(false);
+  const [val,setVal]=useState(value||"");
+  const ref=useRef();
+
+  useEffect(()=>{setVal(value||"");},[value]);
+  useEffect(()=>{if(editing && ref.current) ref.current.focus();},[editing]);
+
+  function commit(){
+    setEditing(false);
+    if(val!==(value||"")) onSave(rowId,field,val);
+  }
+
+  if(!editing) return (
+    <div className="cell-view" onClick={()=>setEditing(true)}
+      title="Clique para editar">
+      {val||<span style={{color:"#CBD5E1"}}>—</span>}
+    </div>
+  );
+
+  if(opts) return (
+    <select ref={ref} className="cell-select" value={val}
+      onChange={e=>setVal(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e=>e.key==="Escape"&&(setEditing(false),setVal(value||""))}>
+      <option value="">—</option>
+      {opts.map(o=><option key={o}>{o}</option>)}
+    </select>
+  );
+
+  return (
+    <input ref={ref} className="cell-input" type={type} value={val}
+      onChange={e=>setVal(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e=>{
+        if(e.key==="Enter") commit();
+        if(e.key==="Escape"){setEditing(false);setVal(value||"");}
+      }}/>
+  );
+}
+
+/* Modal de novo registro */
 function FormModal({row,onClose,onSave,loading}){
   const [form,setForm]=useState(row?{...EMPTY,...row}:{...EMPTY});
-  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const set=(k,v)=>setForm(f=>(({...f,[k]:v})));
   return (
-    <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal">
-        <div className="modal-header">
+    <div className="mbk" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="mdl">
+        <div className="mhd">
           <div>
             <h2>{row?.id?"Editar Registro":"Novo Registro de Remoção"}</h2>
-            <p>{row?.id?`Ficha ${row.ficha_cross||"sem número"}`:"Preencha os dados da solicitação"}</p>
+            <p>{row?.id?`Ficha ${row.ficha_cross||"sem número"}`:"Preencha os dados"}</p>
           </div>
-          <button className="act-btn" onClick={onClose}><Ico n="x"/></button>
+          <button className="ab3" onClick={onClose}><Ico n="x"/></button>
         </div>
-        <div className="modal-body">
-          <div className="form-section">
-            <div className="form-section-title">Identificação</div>
-            <div className="form-grid fg3">
-              <div className="field"><label>Data da Solicitação <span className="req">*</span></label>
+        <div className="mbd">
+          <div className="fs">
+            <div className="fst">Identificação</div>
+            <div className="fg fg3">
+              <div className="fd"><label>Data Solicitação <span className="req">*</span></label>
                 <input type="date" value={form.data_solicitacao} onChange={e=>set("data_solicitacao",e.target.value)}/></div>
-              <div className="field"><label>Horário</label>
+              <div className="fd"><label>Horário</label>
                 <input type="time" value={form.horario_solicitacao} onChange={e=>set("horario_solicitacao",e.target.value)}/></div>
-              <div className="field"><label>Nº Ficha CROSS</label>
-                <input type="text" placeholder="Ex: SS-14650585-26" value={form.ficha_cross} onChange={e=>set("ficha_cross",e.target.value)}/></div>
+              <div className="fd"><label>Nº Ficha CROSS</label>
+                <input type="text" placeholder="SS-14650585-26" value={form.ficha_cross} onChange={e=>set("ficha_cross",e.target.value)}/></div>
             </div>
           </div>
-          <div className="form-section">
-            <div className="form-section-title">Paciente</div>
-            <div className="form-grid fg2">
-              <div className="field"><label>Nome do Paciente <span className="req">*</span></label>
+          <div className="fs">
+            <div className="fst">Paciente</div>
+            <div className="fg fg2">
+              <div className="fd"><label>Nome <span className="req">*</span></label>
                 <input type="text" placeholder="Nome completo" value={form.nome_paciente} onChange={e=>set("nome_paciente",e.target.value)}/></div>
-              <div className="field"><label>Setor</label>
+              <div className="fd"><label>Setor</label>
                 <select value={form.setor} onChange={e=>set("setor",e.target.value)}>
-                  <option value="">Selecione</option>
-                  {SETOR_OPTIONS.map(o=><option key={o}>{o}</option>)}
+                  <option value="">Selecione</option>{SETOR_OPTS.map(o=><option key={o}>{o}</option>)}
                 </select></div>
             </div>
           </div>
-          <div className="form-section">
-            <div className="form-section-title">Dados Clínicos</div>
-            <div className="form-grid fg3">
-              <div className="field"><label>Procedimento</label>
+          <div className="fs">
+            <div className="fst">Dados Clínicos</div>
+            <div className="fg fg3">
+              <div className="fd"><label>Procedimento</label>
                 <select value={form.procedimento} onChange={e=>set("procedimento",e.target.value)}>
-                  <option value="">Selecione</option>
-                  {PROCEDIMENTO_OPTIONS.map(o=><option key={o}>{o}</option>)}
+                  <option value="">Selecione</option>{PROC_OPTS.map(o=><option key={o}>{o}</option>)}
                 </select></div>
-              <div className="field"><label>Especialidade</label>
-                <input type="text" placeholder="Ex: Ortopedia" value={form.especialidade} onChange={e=>set("especialidade",e.target.value)}/></div>
-              <div className="field"><label>Gravidade</label>
+              <div className="fd"><label>Especialidade</label>
+                <input type="text" placeholder="Ortopedia…" value={form.especialidade} onChange={e=>set("especialidade",e.target.value)}/></div>
+              <div className="fd"><label>Gravidade</label>
                 <select value={form.gravidade} onChange={e=>set("gravidade",e.target.value)}>
-                  <option value="">Selecione</option>
-                  {GRAVIDADE_OPTIONS.map(o=><option key={o}>{o}</option>)}
+                  <option value="">Selecione</option>{GRAV_OPTS.map(o=><option key={o}>{o}</option>)}
                 </select></div>
-              <div className="field" style={{gridColumn:"1 / -1"}}><label>Diagnóstico</label>
-                <input type="text" placeholder="Hipótese diagnóstica ou CID" value={form.diagnostico} onChange={e=>set("diagnostico",e.target.value)}/></div>
+              <div className="fd" style={{gridColumn:"1 / -1"}}><label>Diagnóstico</label>
+                <input type="text" placeholder="Hipótese ou CID" value={form.diagnostico} onChange={e=>set("diagnostico",e.target.value)}/></div>
             </div>
           </div>
-          <div className="form-section">
-            <div className="form-section-title">Resposta CROSS / Status</div>
-            <div className="form-grid fg2">
-              <div className="field"><label>Status</label>
+          <div className="fs">
+            <div className="fst">Resposta CROSS / Status</div>
+            <div className="fg fg2">
+              <div className="fd"><label>Status</label>
                 <select value={form.status} onChange={e=>set("status",e.target.value)}>
-                  <option value="">Selecione</option>
-                  {STATUS_OPTIONS.map(o=><option key={o}>{o}</option>)}
+                  <option value="">Selecione</option>{STATUS_OPTS.map(o=><option key={o}>{o}</option>)}
                 </select></div>
-              <div className="field"><label>Instituição Destino</label>
+              <div className="fd"><label>Instituição Destino</label>
                 <input type="text" placeholder="Hospital receptor" value={form.instituicao_destino} onChange={e=>set("instituicao_destino",e.target.value)}/></div>
-              <div className="field"><label>Data Resposta CROSS</label>
+              <div className="fd"><label>Data Resposta CROSS</label>
                 <input type="date" value={form.data_resposta_cross} onChange={e=>set("data_resposta_cross",e.target.value)}/></div>
-              <div className="field"><label>Horário Resposta CROSS</label>
+              <div className="fd"><label>Horário Resposta</label>
                 <input type="time" value={form.horario_resposta_cross} onChange={e=>set("horario_resposta_cross",e.target.value)}/></div>
             </div>
           </div>
-          <div className="form-section">
-            <div className="form-section-title">Ambulância</div>
-            <div className="form-grid fg4">
-              <div className="field"><label>Tipo</label>
+          <div className="fs">
+            <div className="fst">Ambulância</div>
+            <div className="fg fg4">
+              <div className="fd"><label>Tipo</label>
                 <select value={form.tipo_ambulancia} onChange={e=>set("tipo_ambulancia",e.target.value)}>
-                  <option value="">—</option>
-                  {AMBU_OPTIONS.map(o=><option key={o}>{o}</option>)}
+                  <option value="">—</option>{AMBU_OPTS.map(o=><option key={o}>{o}</option>)}
                 </select></div>
-              <div className="field"><label>Data Saída</label>
+              <div className="fd"><label>Data Saída</label>
                 <input type="date" value={form.data_saida_ambulancia} onChange={e=>set("data_saida_ambulancia",e.target.value)}/></div>
-              <div className="field"><label>Horário Saída</label>
+              <div className="fd"><label>Horário Saída</label>
                 <input type="time" value={form.horario_saida_ambulancia} onChange={e=>set("horario_saida_ambulancia",e.target.value)}/></div>
-              <div className="field"><label>Tempo de Espera</label>
+              <div className="fd"><label>Tempo Espera</label>
                 <input type="text" placeholder="01:30" value={form.tempo_espera} onChange={e=>set("tempo_espera",e.target.value)}/></div>
-              <div className="field"><label>Horário Retorno</label>
+              <div className="fd"><label>Retorno</label>
                 <input type="time" value={form.horario_retorno} onChange={e=>set("horario_retorno",e.target.value)}/></div>
             </div>
           </div>
-          <div className="form-section">
-            <div className="form-section-title">Equipe</div>
-            <div className="form-grid fg3">
-              <div className="field"><label>Enfermeiro(a)</label>
+          <div className="fs">
+            <div className="fst">Equipe</div>
+            <div className="fg fg3">
+              <div className="fd"><label>Enfermeiro(a)</label>
                 <input type="text" placeholder="Nome" value={form.enfermeiro} onChange={e=>set("enfermeiro",e.target.value)}/></div>
-              <div className="field"><label>Técnico / Auxiliar</label>
+              <div className="fd"><label>Técnico / Auxiliar</label>
                 <input type="text" placeholder="Nome" value={form.tecnico_auxiliar} onChange={e=>set("tecnico_auxiliar",e.target.value)}/></div>
-              <div className="field"><label>Médico(a)</label>
+              <div className="fd"><label>Médico(a)</label>
                 <input type="text" placeholder="Nome" value={form.medico} onChange={e=>set("medico",e.target.value)}/></div>
             </div>
           </div>
-          <div className="form-section" style={{marginBottom:0}}>
-            <div className="form-section-title">Observação</div>
-            <div className="field">
-              <textarea rows={3} placeholder="Observações adicionais…" value={form.observacao} onChange={e=>set("observacao",e.target.value)}/>
+          <div className="fs" style={{marginBottom:0}}>
+            <div className="fst">Observação</div>
+            <div className="fd">
+              <textarea rows={3} placeholder="Observações…" value={form.observacao} onChange={e=>set("observacao",e.target.value)}/>
             </div>
           </div>
         </div>
-        <div className="modal-footer">
-          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-          <button type="button" className="btn btn-primary" disabled={loading||!form.nome_paciente} onClick={()=>onSave(form)}>
-            {loading?"Salvando…":(row?.id?"Salvar Alterações":"Criar Registro")}
+        <div className="mft">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary" disabled={loading||!form.nome_paciente} onClick={()=>onSave(form)}>
+            {loading?"Salvando…":(row?.id?"Salvar":"Criar Registro")}
           </button>
         </div>
       </div>
@@ -349,7 +372,7 @@ function FormModal({row,onClose,onSave,loading}){
   );
 }
 
-/* ── App ── */
+/* App principal */
 function App(){
   const [rows,setRows]=useState([]);
   const [loading,setLoading]=useState(true);
@@ -366,23 +389,32 @@ function App(){
     try{
       const d=await apiGet("remocoes?select=*&order=data_solicitacao.desc,horario_solicitacao.desc");
       setRows(Array.isArray(d)?d:[]);
-    }catch{push("Erro ao carregar","error");}
+    }catch(e){push("Erro ao carregar: "+e.message,"err");}
     finally{setLoading(false);}
   },[]);
 
   useEffect(()=>{load();},[]);
 
+  /* Salva registro completo */
   const handleSave=async(form)=>{
     setSaving(true);
     try{
       const p={...form};
       Object.keys(p).forEach(k=>{if(p[k]==="")p[k]=null;});
-      if(form.id){await apiFn({action:"update",id:form.id,...p});push("Registro atualizado");}
-      else{await apiFn({action:"create",...p});push("Registro criado");}
+      if(form.id){await apiFn({action:"update",id:form.id,...p});push("Atualizado");}
+      else{await apiFn({action:"create",...p});push("Criado");}
       setModal(null);
       await load();
-    }catch(e){push(e.message||"Erro ao salvar","error");}
+    }catch(e){push(e.message||"Erro","err");}
     finally{setSaving(false);}
+  };
+
+  /* Edição inline de célula */
+  const handleCellSave=async(rowId,field,value)=>{
+    try{
+      await apiFn({action:"update",id:rowId,[field]:value||null});
+      setRows(r=>r.map(x=>x.id===rowId?{...x,[field]:value}:x));
+    }catch(e){push(e.message,"err");}
   };
 
   const handleDelete=async(id)=>{
@@ -391,28 +423,29 @@ function App(){
       await apiFn({action:"delete",id});
       push("Excluído");
       setRows(r=>r.filter(x=>x.id!==id));
-    }catch(e){push(e.message||"Erro","error");}
+    }catch(e){push(e.message||"Erro","err");}
   };
 
   const filtered=useMemo(()=>{
     let d=rows;
-    if(search){const s=search.toLowerCase();d=d.filter(r=>(r.nome_paciente||"").toLowerCase().includes(s)||(r.ficha_cross||"").toLowerCase().includes(s)||(r.diagnostico||"").toLowerCase().includes(s)||(r.instituicao_destino||"").toLowerCase().includes(s)||(r.especialidade||"").toLowerCase().includes(s));}
+    if(search){const s=search.toLowerCase();d=d.filter(r=>(r.nome_paciente||"").toLowerCase().includes(s)||(r.ficha_cross||"").toLowerCase().includes(s)||(r.diagnostico||"").toLowerCase().includes(s)||(r.instituicao_destino||"").toLowerCase().includes(s));}
     if(fGrav) d=d.filter(r=>r.gravidade===fGrav);
     if(fStatus) d=d.filter(r=>(r.status||"").includes(fStatus));
     if(fMes) d=d.filter(r=>(r.data_solicitacao||"").startsWith(fMes));
     return d;
   },[rows,search,fGrav,fStatus,fMes]);
 
-  const stats=useMemo(()=>({
-    total:filtered.length,
-    concluidas:filtered.filter(r=>["FICHA FINALIZADA","FICHA FINALIZADA VIA CROSS","FICHA FINALIZADA PELA CROSS","REMOÇÃO CONCLUÍDA","CONCLUIDO"].includes(r.status)).length,
-    naoRealizadas:filtered.filter(r=>(r.status||"").includes("NÃO REALIZADA")).length,
-    vermelhos:filtered.filter(r=>r.gravidade==="VERMELHO").length,
-  }),[filtered]);
+  const stats=useMemo(()=>{
+    const total=filtered.length;
+    const conc=filtered.filter(r=>["FICHA FINALIZADA","FICHA FINALIZADA VIA CROSS","FICHA FINALIZADA PELA CROSS","REMOÇÃO CONCLUÍDA","CONCLUIDO"].includes(r.status)).length;
+    const nao=filtered.filter(r=>(r.status||"").includes("NÃO REALIZADA")).length;
+    const verm=filtered.filter(r=>r.gravidade==="VERMELHO").length;
+    return {total,conc,nao,verm};
+  },[filtered]);
 
   const exportCSV=()=>{
     const cols=["data_solicitacao","horario_solicitacao","ficha_cross","nome_paciente","setor","procedimento","especialidade","diagnostico","status","gravidade","data_resposta_cross","horario_resposta_cross","instituicao_destino","tipo_ambulancia","data_saida_ambulancia","horario_saida_ambulancia","tempo_espera","observacao","enfermeiro","tecnico_auxiliar","medico","horario_retorno"];
-    const hdrs=["Data Solic.","Hora","Ficha CROSS","Paciente","Setor","Procedimento","Especialidade","Diagnóstico","Status","Gravidade","Data Resp.","Hora Resp.","Destino","Ambulância","Data Saída","Hora Saída","T. Espera","Observação","Enfermeiro","Técnico","Médico","Retorno"];
+    const hdrs=["Data","Hora","Ficha","Paciente","Setor","Procedimento","Especialidade","Diagnóstico","Status","Gravidade","Data Resp.","Hora Resp.","Destino","Ambulância","Data Saída","Hora Saída","T.Espera","Obs.","Enfermeiro","Técnico","Médico","Retorno"];
     const lines=[hdrs.join(","),...filtered.map(r=>cols.map(c=>`"${(r[c]||"").toString().replace(/"/g,'""')}"`).join(","))];
     const b=new Blob([lines.join("\n")],{type:"text/csv;charset=utf-8"});
     const a=document.createElement("a");
@@ -425,36 +458,32 @@ function App(){
 
   return (
     <div style={{minHeight:"100vh",background:"#F1F5F9"}}>
-      {/* Topbar — idêntico ao kanban */}
       <div className="topbar">
         <div className="topbar-inner">
-          <div className="topbar-brand">
-            <div className="topbar-icon"><span>+</span></div>
+          <div className="t-brand">
+            <div className="t-icon"><span>+</span></div>
             <div>
-              <div className="topbar-name">Gerência de Enfermagem</div>
-              <div className="topbar-sub">Controle de Remoções</div>
+              <div className="t-name">Gerência de Enfermagem</div>
+              <div className="t-sub">Controle de Remoções</div>
             </div>
           </div>
-          <div className="topbar-right">
-            <a href="." style={{padding:"6px 12px",border:"1px solid #334155",borderRadius:7,background:"none",color:"#94A3B8",cursor:"pointer",fontSize:12,textDecoration:"none",display:"inline-flex",alignItems:"center",gap:6}}>
-              <Ico n="arrow" s={13}/> Kanban
-            </a>
-          </div>
+          <a href="." style={{padding:"6px 12px",border:"1px solid #334155",borderRadius:7,background:"none",color:"#94A3B8",cursor:"pointer",fontSize:12,textDecoration:"none",display:"inline-flex",alignItems:"center",gap:6}}>
+            ← Kanban
+          </a>
         </div>
       </div>
 
-      {/* Toolbar */}
       <div className="toolbar">
         <div className="toolbar-inner">
-          <div className="search-wrap">
+          <div className="s-wrap">
             <Ico n="search" s={14}/>
-            <input className="search-input" placeholder="Buscar paciente, ficha, diagnóstico…" value={search} onChange={e=>setSearch(e.target.value)}/>
+            <input className="s-input" placeholder="Buscar paciente, ficha, diagnóstico…" value={search} onChange={e=>setSearch(e.target.value)}/>
           </div>
-          <select className="filter-sel" value={fGrav} onChange={e=>setFGrav(e.target.value)}>
+          <select className="fsel" value={fGrav} onChange={e=>setFGrav(e.target.value)}>
             <option value="">Todas as gravidades</option>
-            {GRAVIDADE_OPTIONS.map(o=><option key={o}>{o}</option>)}
+            {GRAV_OPTS.map(o=><option key={o}>{o}</option>)}
           </select>
-          <select className="filter-sel" value={fStatus} onChange={e=>setFStatus(e.target.value)}>
+          <select className="fsel" value={fStatus} onChange={e=>setFStatus(e.target.value)}>
             <option value="">Todos os status</option>
             <option value="FINALIZADA">Finalizada</option>
             <option value="CONCLUÍDA">Concluída</option>
@@ -463,7 +492,7 @@ function App(){
             <option value="REMOÇÃO">Em remoção</option>
             <option value="AGUARDANDO">Aguardando</option>
           </select>
-          <input type="month" className="filter-sel" value={fMes} onChange={e=>setFMes(e.target.value)} style={{width:"auto"}}/>
+          <input type="month" className="fsel" value={fMes} onChange={e=>setFMes(e.target.value)} style={{width:"auto"}}/>
           {hasFilter&&<button className="btn btn-ghost btn-sm" onClick={()=>{setSearch("");setFGrav("");setFStatus("");setFMes("");}}>Limpar</button>}
           <div style={{marginLeft:"auto",display:"flex",gap:8}}>
             <button className="btn btn-ghost" onClick={exportCSV}><Ico n="dl" s={14}/> Exportar CSV</button>
@@ -472,55 +501,99 @@ function App(){
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="stats-row">
-        <div className="stat-chip"><span className="label">Total</span><span className="value">{stats.total}</span></div>
-        <div className="stat-chip"><div className="dot" style={{background:"#16A34A"}}/><span className="label">Concluídas</span><span className="value" style={{color:"#16A34A"}}>{stats.concluidas}</span></div>
-        <div className="stat-chip"><div className="dot" style={{background:"#EF4444"}}/><span className="label">Não realizadas</span><span className="value" style={{color:"#EF4444"}}>{stats.naoRealizadas}</span></div>
-        <div className="stat-chip"><div className="dot" style={{background:"#EF4444"}}/><span className="label">Emergências</span><span className="value" style={{color:"#EF4444"}}>{stats.vermelhos}</span></div>
+      <div className="stats">
+        <div className="chip"><span className="lbl">Total</span><span className="val">{stats.total}</span></div>
+        <div className="chip"><div className="dot" style={{background:"#16A34A"}}/><span className="lbl">Concluídas</span><span className="val" style={{color:"#16A34A"}}>{stats.conc}</span></div>
+        <div className="chip"><div className="dot" style={{background:"#EF4444"}}/><span className="lbl">Não realizadas</span><span className="val" style={{color:"#EF4444"}}>{stats.nao}</span></div>
+        <div className="chip"><div className="dot" style={{background:"#EF4444"}}/><span className="lbl">Emergências</span><span className="val" style={{color:"#EF4444"}}>{stats.verm}</span></div>
       </div>
 
-      {/* Tabela */}
-      <div className="table-wrap">
+      <div className="twrap">
         {loading?(
-          <div className="empty-state"><Ico n="pulse" s={32}/><p>Carregando registros…</p></div>
+          <div className="empty"><Ico n="pulse" s={32}/><p>Carregando…</p></div>
         ):filtered.length===0?(
-          <div className="empty-state">
+          <div className="empty">
             <Ico n="pulse" s={32}/>
-            <p>{rows.length===0?"Nenhum registro ainda. Clique em «Novo Registro» para começar.":"Nenhum resultado para o filtro aplicado."}</p>
+            <p>{rows.length===0?"Nenhum registro. Clique em «Novo Registro» para começar.":"Nenhum resultado para o filtro aplicado."}</p>
           </div>
         ):(
-          <table className="rem-table">
+          <table className="rtable">
             <thead><tr>
-              <th style={{width:36}}>#</th>
-              <th>Data</th><th>Ficha</th><th>Paciente</th><th>Setor</th>
-              <th>Especialidade</th><th>Diagnóstico</th><th>Destino</th>
-              <th>Gravidade</th><th>Status</th><th>Ambulância</th>
-              <th>Saída</th><th>Retorno</th><th>Equipe</th><th>Obs.</th>
-              <th style={{width:80}}></th>
+              <th>#</th>
+              <th>Data / Hora</th>
+              <th>Ficha CROSS</th>
+              <th>Paciente</th>
+              <th>Setor</th>
+              <th>Especialidade</th>
+              <th>Diagnóstico</th>
+              <th>Destino</th>
+              <th>Gravidade</th>
+              <th>Status</th>
+              <th>Ambulância</th>
+              <th>Saída</th>
+              <th>Retorno</th>
+              <th>Enfermeiro</th>
+              <th>Técnico</th>
+              <th>Médico</th>
+              <th>Obs.</th>
+              <th style={{width:64}}></th>
             </tr></thead>
             <tbody>
               {filtered.map((r,i)=>(
                 <tr key={r.id}>
-                  <td style={{color:"#94A3B8",fontSize:11,fontWeight:700}}>{i+1}</td>
-                  <td className="cell-time">{fmtDate(r.data_solicitacao)}<br/><span style={{fontSize:10,color:"#CBD5E1"}}>{r.horario_solicitacao||""}</span></td>
-                  <td className="cell-muted" style={{fontSize:10}}>{fmt(r.ficha_cross)}</td>
-                  <td className="cell-name">{fmt(r.nome_paciente)}</td>
-                  <td className="cell-muted">{fmt(r.setor)}</td>
-                  <td className="cell-muted">{fmt(r.especialidade)}</td>
-                  <td><span style={{fontSize:12,color:"#64748B",maxWidth:150,display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fmt(r.diagnostico)}</span></td>
-                  <td style={{fontWeight:600,fontSize:12,color:"#0F172A"}}>{fmt(r.instituicao_destino)}</td>
-                  <td>{r.gravidade?<span className={`grav-badge ${GRAV_CLASS[r.gravidade]||"gc"}`}><span className="dot" style={{background:GRAV_DOT[r.gravidade]||"#94A3B8"}}/>{r.gravidade}</span>:"—"}</td>
-                  <td>{r.status?<span className={`status-badge ${STATUS_CLASS[r.status]||"se"}`}>{r.status.length>28?r.status.slice(0,28)+"…":r.status}</span>:"—"}</td>
-                  <td>{r.tipo_ambulancia?<span className={`ambu-badge ${r.tipo_ambulancia==="AVANÇADA"?"av":"ab"}`}>{r.tipo_ambulancia}</span>:"—"}</td>
-                  <td className="cell-time">{r.horario_saida_ambulancia||"—"}</td>
-                  <td className="cell-time">{r.horario_retorno||"—"}</td>
-                  <td className="cell-muted" style={{fontSize:11}}>{[r.enfermeiro,r.tecnico_auxiliar,r.medico].filter(Boolean).join(" · ")||"—"}</td>
-                  <td>{r.observacao?<span className="cell-obs" title={r.observacao}>{r.observacao}</span>:"—"}</td>
-                  <td><div className="row-actions">
-                    <button className="act-btn" title="Editar" onClick={()=>setModal(r)}><Ico n="edit" s={14}/></button>
-                    <button className="act-btn del" title="Excluir" onClick={()=>handleDelete(r.id)}><Ico n="trash" s={14}/></button>
-                  </div></td>
+                  <td>{i+1}</td>
+                  <td>
+                    <div style={{padding:"0 12px"}}>
+                      <div style={{fontSize:12,color:"#374151",fontVariantNumeric:"tabular-nums"}}>{fmtD(r.data_solicitacao)}</div>
+                      <div style={{fontSize:10,color:"#94A3B8"}}>{r.horario_solicitacao||""}</div>
+                    </div>
+                  </td>
+                  <td><EditCell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCellSave}/></td>
+                  <td><EditCell rowId={r.id} field="nome_paciente" value={r.nome_paciente} onSave={handleCellSave}/></td>
+                  <td><EditCell rowId={r.id} field="setor" value={r.setor} opts={SETOR_OPTS} onSave={handleCellSave}/></td>
+                  <td><EditCell rowId={r.id} field="especialidade" value={r.especialidade} onSave={handleCellSave}/></td>
+                  <td><EditCell rowId={r.id} field="diagnostico" value={r.diagnostico} onSave={handleCellSave}/></td>
+                  <td><EditCell rowId={r.id} field="instituicao_destino" value={r.instituicao_destino} onSave={handleCellSave}/></td>
+                  <td>
+                    {r.gravidade
+                      ?<div style={{padding:"0 12px"}}>
+                          <span className={`gb ${GRAV_CLS[r.gravidade]||"gc"}`}>
+                            <span className="dot" style={{background:GRAV_DOT[r.gravidade]||"#94A3B8"}}/>
+                            {r.gravidade}
+                          </span>
+                        </div>
+                      :<EditCell rowId={r.id} field="gravidade" value={r.gravidade} opts={GRAV_OPTS} onSave={handleCellSave}/>
+                    }
+                  </td>
+                  <td>
+                    {r.status
+                      ?<div style={{padding:"0 8px"}}>
+                          <span className={`sb ${STATUS_CLS[r.status]||"se"}`}>
+                            {r.status.length>22?r.status.slice(0,22)+"…":r.status}
+                          </span>
+                        </div>
+                      :<EditCell rowId={r.id} field="status" value={r.status} opts={STATUS_OPTS} onSave={handleCellSave}/>
+                    }
+                  </td>
+                  <td>
+                    {r.tipo_ambulancia
+                      ?<div style={{padding:"0 8px"}}>
+                          <span className={`ab2 ${r.tipo_ambulancia==="AVANÇADA"?"aba":"abb"}`}>{r.tipo_ambulancia}</span>
+                        </div>
+                      :<EditCell rowId={r.id} field="tipo_ambulancia" value={r.tipo_ambulancia} opts={AMBU_OPTS} onSave={handleCellSave}/>
+                    }
+                  </td>
+                  <td><EditCell rowId={r.id} field="horario_saida_ambulancia" value={r.horario_saida_ambulancia} type="time" onSave={handleCellSave}/></td>
+                  <td><EditCell rowId={r.id} field="horario_retorno" value={r.horario_retorno} type="time" onSave={handleCellSave}/></td>
+                  <td><EditCell rowId={r.id} field="enfermeiro" value={r.enfermeiro} onSave={handleCellSave}/></td>
+                  <td><EditCell rowId={r.id} field="tecnico_auxiliar" value={r.tecnico_auxiliar} onSave={handleCellSave}/></td>
+                  <td><EditCell rowId={r.id} field="medico" value={r.medico} onSave={handleCellSave}/></td>
+                  <td><EditCell rowId={r.id} field="observacao" value={r.observacao} onSave={handleCellSave}/></td>
+                  <td>
+                    <div className="ra">
+                      <button className="ab3 del" title="Excluir" onClick={()=>handleDelete(r.id)}><Ico n="trash" s={14}/></button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -530,10 +603,10 @@ function App(){
 
       {modal!==null&&<FormModal row={modal} onClose={()=>setModal(null)} onSave={handleSave} loading={saving}/>}
 
-      <div className="toast-stack">
+      <div className="tstack">
         {toasts.map(t=>(
           <div key={t.id} className={`toast ${t.type}`}>
-            <span>{t.type==="success"?"✓":"✕"}</span>
+            <span>{t.type==="ok"?"✓":"✕"}</span>
             <span>{t.msg}</span>
           </div>
         ))}
