@@ -780,8 +780,30 @@ function CardModal({
       onClick: onClose
     }, "Cancelar"), /*#__PURE__*/React.createElement(Btn, {
       onClick: () => onSave(form)
-    }, "Salvar"))), isAdmin && /*#__PURE__*/React.createElement("div", {style:{marginBottom:10}}, !showAiBox ? /*#__PURE__*/React.createElement("button", {onClick:function(){setShowAiBox(true);}, style:{width:"100%",padding:"7px 14px",border:"1px dashed #7C3AED",borderRadius:8,background:"#F5F3FF",color:"#6D28D9",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit"}}, "✨ Preencher com IA — colar ficha CROSS") : /*#__PURE__*/React.createElement("div",{style:{background:"#F5F3FF",border:"1px solid #DDD6FE",borderRadius:10,padding:12}},/*#__PURE__*/React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#6D28D9",marginBottom:6}},"Cole o texto da ficha CROSS:"),/*#__PURE__*/React.createElement("textarea",{value:aiText,onChange:function(e){setAiText(e.target.value);},placeholder:"Cole aqui o texto da ficha CROSS...",rows:6,style:{width:"100%",padding:"8px 10px",border:"1px solid #C4B5FD",borderRadius:7,fontSize:12,fontFamily:"inherit",resize:"vertical",outline:"none",background:"#fff",color:"#0F172A",lineHeight:1.6}}),aiStatus&&/*#__PURE__*/React.createElement("div",{style:{fontSize:11,color:"#6D28D9",marginTop:4}},aiStatus),/*#__PURE__*/React.createElement("div",{style:{display:"flex",gap:8,marginTop:8,justifyContent:"flex-end"}},/*#__PURE__*/React.createElement("button",{onClick:function(){setShowAiBox(false);setAiText("");setAiStatus("");},style:{padding:"5px 12px",border:"1px solid #E2E8F0",borderRadius:7,background:"none",color:"#64748B",cursor:"pointer",fontSize:12,fontFamily:"inherit"}},"Cancelar"),/*#__PURE__*/React.createElement("button",{onClick:runExtract,disabled:aiLoading||!aiText.trim(),style:{padding:"5px 14px",border:"none",borderRadius:7,background:"#6D28D9",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit",opacity:(aiLoading||!aiText.trim())?0.6:1}},aiLoading?"Extraindo…":"✨ Extrair com IA")))
-  ), /*#__PURE__*/React.createElement("div", {
+    }, "Salvar")))
+  }, isAdmin && /*#__PURE__*/React.createElement("div", {
+    style: {marginBottom:10}
+  },
+    !showAiBox
+      ? /*#__PURE__*/React.createElement("button", {
+          onClick: function(){setShowAiBox(true);},
+          style:{width:"100%",padding:"7px 14px",border:"1px dashed #7C3AED",
+            borderRadius:8,background:"#F5F3FF",color:"#6D28D9",cursor:"pointer",
+            fontSize:12,fontWeight:600,fontFamily:"inherit"}
+        }, "✨ Preencher com IA — colar ficha CROSS")
+      : /*#__PURE__*/React.createElement("div", {
+          style:{background:"#F5F3FF",border:"1px solid #DDD6FE",borderRadius:10,padding:12}
+        },
+          /*#__PURE__*/React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#6D28D9",marginBottom:6}},"Cole o texto da ficha CROSS:"),
+          /*#__PURE__*/React.createElement("textarea",{value:aiText,onChange:function(e){setAiText(e.target.value);},placeholder:"Cole aqui o texto copiado da ficha CROSS...",rows:6,style:{width:"100%",padding:"8px 10px",border:"1px solid #C4B5FD",borderRadius:7,fontSize:12,fontFamily:"inherit",resize:"vertical",outline:"none",background:"#fff",color:"#0F172A",lineHeight:1.6}}),
+          aiStatus&&/*#__PURE__*/React.createElement("div",{style:{fontSize:11,color:"#6D28D9",marginTop:4}},aiStatus),
+          /*#__PURE__*/React.createElement("div",{style:{display:"flex",gap:8,marginTop:8,justifyContent:"flex-end"}},
+            /*#__PURE__*/React.createElement("button",{onClick:function(){setShowAiBox(false);setAiText("");setAiStatus("");},style:{padding:"5px 12px",border:"1px solid #E2E8F0",borderRadius:7,background:"none",color:"#64748B",cursor:"pointer",fontSize:12,fontFamily:"inherit"}},"Cancelar"),
+            /*#__PURE__*/React.createElement("button",{onClick:runExtract,disabled:aiLoading||!aiText.trim(),style:{padding:"5px 14px",border:"none",borderRadius:7,background:"#6D28D9",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit",opacity:(aiLoading||!aiText.trim())?0.6:1}},aiLoading?"…":"✨ Extrair com IA")
+          )
+        )
+  ),
+  /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 2,
@@ -5760,6 +5782,57 @@ function App() {
           color: view==="kanban" ? "#0F172A" : "#374151",
           cursor:"pointer", textAlign:"left", fontFamily:"inherit"
         },
+        onMouseEnter: function(e){ e.currentTarget.style.background="#F8FAFC"; },
+        onMouseLeave: function(e){ e.currentTarget.style.background=view==="kanban"?"#F1F5F9":"transparent"; }
+      }, "📋 Kanban")
+    )
+  );
+}
+
+function KanbanDropdown({ view, setView }) {
+  const [open, setOpen] = React.useState(false);
+  const SUB = [["lista","📄 Lista"],["calendario","📅 Calendário"],["timeline","⏱ Linha do Tempo"]];
+  const isSubView = SUB.some(s => s[0] === view);
+  const activeLabel = isSubView ? SUB.find(s => s[0] === view)[1] : "📋 Kanban";
+  return /*#__PURE__*/React.createElement("div", {
+    style: { position:"relative", display:"inline-block" },
+    onMouseEnter: function() { setOpen(true); },
+    onMouseLeave: function() { setOpen(false); }
+  },
+    /*#__PURE__*/React.createElement("button", {
+      onClick: function() { setView("kanban"); },
+      style: { padding:"5px 14px", borderRadius:6, border:"none", fontSize:12,
+        fontWeight: view==="kanban"||isSubView ? 600 : 400,
+        background: view==="kanban"||isSubView ? "#0F172A" : "transparent",
+        color: view==="kanban"||isSubView ? "#fff" : "#64748B",
+        cursor:"pointer", display:"inline-flex", alignItems:"center", gap:4, fontFamily:"inherit" }
+    }, activeLabel, " ▾"),
+    open && /*#__PURE__*/React.createElement("div", {
+      style: { position:"absolute", top:"100%", left:0, zIndex:500,
+        background:"#fff", border:"1px solid #E2E8F0", borderRadius:10,
+        boxShadow:"0 8px 24px rgba(0,0,0,.12)", padding:"4px 0", minWidth:168, marginTop:2 }
+    },
+      /*#__PURE__*/React.createElement("div", {
+        style:{padding:"5px 14px 4px",fontSize:9,fontWeight:700,color:"#CBD5E1",textTransform:"uppercase",letterSpacing:".06em"}
+      }, "Outras visualizações"),
+      SUB.map(function(it) {
+        return /*#__PURE__*/React.createElement("button", {
+          key: it[0], onClick: function() { setView(it[0]); setOpen(false); },
+          style: { display:"flex", alignItems:"center", gap:8, width:"100%",
+            padding:"8px 14px", border:"none", background: view===it[0] ? "#F1F5F9" : "transparent",
+            fontSize:13, fontWeight: view===it[0] ? 600 : 400, color: view===it[0] ? "#0F172A" : "#374151",
+            cursor:"pointer", textAlign:"left", fontFamily:"inherit" },
+          onMouseEnter: function(e){ e.currentTarget.style.background="#F8FAFC"; },
+          onMouseLeave: function(e){ e.currentTarget.style.background=view===it[0]?"#F1F5F9":"transparent"; }
+        }, it[1]);
+      }),
+      /*#__PURE__*/React.createElement("div", { style:{height:1,background:"#F1F5F9",margin:"3px 0"} }),
+      /*#__PURE__*/React.createElement("button", {
+        onClick: function() { setView("kanban"); setOpen(false); },
+        style: { display:"flex", alignItems:"center", gap:8, width:"100%",
+          padding:"8px 14px", border:"none", background: view==="kanban" ? "#F1F5F9" : "transparent",
+          fontSize:13, fontWeight: view==="kanban" ? 600 : 400, color: view==="kanban" ? "#0F172A" : "#374151",
+          cursor:"pointer", textAlign:"left", fontFamily:"inherit" },
         onMouseEnter: function(e){ e.currentTarget.style.background="#F8FAFC"; },
         onMouseLeave: function(e){ e.currentTarget.style.background=view==="kanban"?"#F1F5F9":"transparent"; }
       }, "📋 Kanban")
