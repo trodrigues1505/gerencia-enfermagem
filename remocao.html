@@ -7,136 +7,161 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body,#root{min-height:100%;font-family:'Inter',system-ui,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased;background:#F1F5F9;color:#0F172A}
+html,body,#root{height:100%;font-family:'Inter',system-ui,sans-serif;font-size:13px;-webkit-font-smoothing:antialiased;background:#F1F5F9;color:#0F172A}
 input,select,textarea,button{font-family:inherit}
 
-.topbar{background:#0F172A;padding:0 20px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.2)}
-.ti{max-width:1600px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:52px}
-.tb{display:flex;align-items:center;gap:10px}
-.tico{width:30px;height:30px;border-radius:8px;background:#1E40AF;display:flex;align-items:center;justify-content:center}
-.tico span{color:#fff;font-size:14px;font-weight:700}
-.tn{font-weight:700;font-size:14px;color:#fff}
-.ts{font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.08em}
+/* Layout fixo */
+.app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
 
-.toolbar{background:#fff;border-bottom:1px solid #E2E8F0;padding:0 20px}
-.tbi{max-width:1600px;margin:0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0}
+/* Topbar */
+.topbar{background:#0F172A;padding:0 16px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.3);z-index:200}
+.ti{display:flex;align-items:center;justify-content:space-between;height:44px}
+.tb{display:flex;align-items:center;gap:8px}
+.tico{width:26px;height:26px;border-radius:6px;background:#1E40AF;display:flex;align-items:center;justify-content:center}
+.tico span{color:#fff;font-size:12px;font-weight:700}
+.tn{font-weight:700;font-size:13px;color:#fff}
+.ts{font-size:8px;color:#475569;text-transform:uppercase;letter-spacing:.08em}
 
-.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;white-space:nowrap}
+/* Toolbar horizontal sempre visível */
+.toolbar{background:#fff;border-bottom:2px solid #E2E8F0;padding:0 16px;flex-shrink:0;z-index:150}
+.tbi{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;padding:6px 0;overflow-x:auto}
+
+.btn{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all .15s;white-space:nowrap;flex-shrink:0}
 .btn-p{background:#0F172A;color:#fff}.btn-p:hover{background:#1E293B}
 .btn-g{background:none;color:#64748B;border:1px solid #E2E8F0}.btn-g:hover{background:#F8FAFC;color:#0F172A}
-.btn-sm{padding:4px 10px;font-size:12px}
+.btn-blue{background:none;color:#3B82F6;border:1px solid #BFDBFE}.btn-blue:hover{background:#EFF6FF}
+.btn-sm{padding:3px 8px;font-size:11px}
 .btn:disabled{opacity:.5;cursor:not-allowed}
-.btn-danger{background:none;color:#DC2626;border:1px solid #FCA5A5}.btn-danger:hover{background:#FEE2E2}
 
-.sw{position:relative}
-.sw svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94A3B8;pointer-events:none}
-.si{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;color:#0F172A;padding:6px 12px 6px 32px;font-size:13px;width:200px;outline:none;transition:all .15s}
-.si:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.sw{position:relative;flex-shrink:0}
+.sw svg{position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94A3B8;pointer-events:none}
+.si{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;color:#0F172A;padding:5px 10px 5px 28px;font-size:12px;width:180px;outline:none}
+.si:focus{border-color:#3B82F6}
 
-select.fsel{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;color:#374151;padding:6px 28px 6px 10px;font-size:13px;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;outline:none}
+select.fsel{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;color:#374151;padding:5px 24px 5px 8px;font-size:12px;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;outline:none;flex-shrink:0}
 
-.stats{max-width:1600px;margin:0 auto;padding:10px 20px;display:flex;gap:10px;flex-wrap:wrap}
-.chip{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:7px 14px;white-space:nowrap}
-.chip .cdot{width:8px;height:8px;border-radius:50%}
-.chip .cl{color:#64748B;font-size:12px}
-.chip .cv{font-weight:700;font-size:14px}
+/* Stats bar */
+.stats{background:#fff;border-bottom:1px solid #E2E8F0;padding:4px 16px;display:flex;gap:16px;flex-shrink:0;z-index:100}
+.chip{display:flex;align-items:center;gap:6px;white-space:nowrap;padding:2px 0}
+.chip .cdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.chip .cl{color:#64748B;font-size:11px}
+.chip .cv{font-weight:700;font-size:13px}
+.chip-sep{width:1px;height:16px;background:#E2E8F0;flex-shrink:0}
 
-/* Tabela */
-.tw{max-width:1600px;margin:0 auto;padding:0 20px 24px;overflow-x:auto}
-.rt{width:100%;border-collapse:separate;border-spacing:0;min-width:1800px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden}
+/* Tabela container com scroll */
+.tw{flex:1;overflow:auto;padding:0}
 
-/* Cabeçalho clicável para sort */
-.rt thead tr th{background:#F8FAFC;padding:8px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748B;border-bottom:1px solid #E2E8F0;white-space:nowrap;user-select:none;cursor:pointer;position:sticky;top:0}
-.rt thead tr th:hover{background:#F1F5F9;color:#0F172A}
-.rt thead tr th.sorted{color:#3B82F6;background:#EFF6FF}
-.th-inner{display:flex;align-items:center;gap:4px}
-.sort-arrow{font-size:9px;opacity:.5}
-.sort-arrow.active{opacity:1;color:#3B82F6}
+/* Tabela compacta */
+.rt{width:100%;border-collapse:separate;border-spacing:0;min-width:2200px;table-layout:fixed}
 
-.rt thead tr th:first-child{padding-left:14px;width:32px;cursor:default}
-.rt thead tr th:first-child:hover{background:#F8FAFC;color:#64748B}
+/* Cabeçalho sticky */
+.rt thead{position:sticky;top:0;z-index:50}
+.rt thead tr th{background:#1E293B;padding:5px 8px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#94A3B8;border-right:1px solid #334155;white-space:nowrap;cursor:pointer;position:sticky;top:0}
+.rt thead tr th:hover{background:#334155;color:#E2E8F0}
+.rt thead tr th.sorted{color:#60A5FA;background:#1E3A5F}
+.rt thead tr th:first-child{width:28px;cursor:default;text-align:center}
+.rt thead tr th:first-child:hover{background:#1E293B}
+.rt thead tr th:last-child{width:36px;cursor:default;border-right:none}
+.th-inner{display:flex;align-items:center;gap:3px}
+.sort-arr{font-size:8px;opacity:.4}
+.sort-arr.on{opacity:1;color:#60A5FA}
 
-/* Linhas compactas */
-.rt tbody tr{transition:background .12s}
-.rt tbody tr:nth-child(even){background:#FAFAFA}
-.rt tbody tr:nth-child(even):hover{background:#F1F5F9}
-.rt tbody tr:hover{background:#F1F5F9}
-.rt tbody td{padding:0;border-bottom:1px solid #F1F5F9;vertical-align:middle;font-size:13px;color:#374151}
-.rt tbody td:first-child{padding-left:14px;color:#94A3B8;font-size:11px;font-weight:700;min-width:32px}
+/* Tooltip no header */
+.th-tip{position:relative}
+.th-tip:hover .tip-box{display:block}
+.tip-box{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:999;background:#0F172A;color:#E2E8F0;font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;padding:6px 10px;border-radius:6px;white-space:normal;width:220px;line-height:1.5;box-shadow:0 4px 12px rgba(0,0,0,.4);pointer-events:none}
+
+/* Linhas ultra-compactas */
+.rt tbody tr:nth-child(odd){background:#ffffff}
+.rt tbody tr:nth-child(even){background:#EEF2FF}
+.rt tbody tr:hover{background:#DBEAFE!important}
+.rt tbody td{padding:0;border-bottom:1px solid #E2E8F0;border-right:1px solid #F1F5F9;vertical-align:middle;font-size:11px;color:#374151;height:22px;overflow:hidden}
+.rt tbody td:first-child{text-align:center;color:#94A3B8;font-size:10px;font-weight:700;border-right:1px solid #E2E8F0;padding:0 4px}
+.rt tbody td:last-child{border-right:none}
 .rt tbody tr:last-child td{border-bottom:none}
 
-/* Células inline — altura compacta */
-.cv2{padding:0 10px;height:32px;display:flex;align-items:center;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;min-width:80px;font-size:12px}
-.cv2:hover{background:#EFF6FF;border-radius:4px}
-.cv2.empty{color:#CBD5E1}
-.ci{width:100%;height:32px;padding:0 10px;border:none;border-left:2px solid #3B82F6;background:#EFF6FF;font-size:12px;color:#0F172A;outline:none;min-width:120px}
-.csel{width:100%;height:32px;padding:0 8px;border:none;border-left:2px solid #3B82F6;background:#EFF6FF;font-size:11px;color:#0F172A;outline:none;appearance:none;cursor:pointer;min-width:120px}
+/* Células inline — muito compactas, com quebra de texto */
+.cv2{padding:1px 6px;height:22px;display:flex;align-items:center;cursor:pointer;font-size:11px;
+  white-space:normal;word-break:break-word;overflow:hidden;min-width:60px;line-height:1.3}
+.cv2:hover{background:rgba(59,130,246,.1);border-radius:3px}
+.cv2.empty{color:#CBD5E1;font-style:italic}
+.ci{width:100%;height:22px;padding:0 6px;border:none;border-left:2px solid #3B82F6;background:#EFF6FF;font-size:11px;color:#0F172A;outline:none;min-width:80px}
+.csel{width:100%;height:22px;padding:0 4px;border:none;border-left:2px solid #3B82F6;background:#EFF6FF;font-size:10px;color:#0F172A;outline:none;appearance:none;cursor:pointer;min-width:80px}
 
-.gb{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:99px;font-size:10px;font-weight:600;white-space:nowrap;border:1px solid transparent}
-.gb .gd{width:5px;height:5px;border-radius:50%}
+/* Larguras das colunas */
+.col-data{width:70px}.col-hora{width:52px}.col-ficha{width:110px}
+.col-nome{width:160px}.col-setor{width:100px}.col-proc{width:80px}
+.col-esp{width:120px}.col-diag{width:150px}.col-status{width:140px}
+.col-grav{width:78px}.col-drdata{width:70px}.col-drhora{width:52px}
+.col-dest{width:110px}.col-amb{width:72px}.col-bdata{width:70px}
+.col-saida{width:52px}.col-esp2{width:60px}.col-obs{width:160px}
+.col-enf{width:100px}.col-tec{width:100px}.col-med{width:100px}
+.col-ret{width:52px}
+
+.gb{display:inline-flex;align-items:center;gap:3px;padding:1px 5px;border-radius:99px;font-size:9px;font-weight:700;white-space:nowrap;border:1px solid transparent}
+.gb .gd{width:4px;height:4px;border-radius:50%;flex-shrink:0}
 .gv{background:#FEE2E2;color:#991B1B;border-color:#FCA5A5}
 .ga{background:#FEF9C3;color:#713F12;border-color:#FDE047}
 .gg{background:#DCFCE7;color:#14532D;border-color:#86EFAC}
 .gc{background:#F1F5F9;color:#475569;border-color:#E2E8F0}
 
-.sb2{display:inline-block;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:700;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em;max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.sb2{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700;white-space:nowrap;text-transform:uppercase;letter-spacing:.03em;max-width:130px;overflow:hidden;text-overflow:ellipsis}
 .sf{background:#DCFCE7;color:#14532D}.se{background:#F1F5F9;color:#475569}
 .sn{background:#FEE2E2;color:#991B1B}.sa{background:#FEF3C7;color:#92400E}
 .sc{background:#EFF6FF;color:#1E40AF}
 
-.abg{display:inline-block;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600}
-.abb{background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE}
-.aba{background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5}
+.abg{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700}
+.abb{background:#EFF6FF;color:#1E40AF}.aba{background:#FEE2E2;color:#991B1B}
 
-.ra{display:flex;align-items:center;gap:3px;opacity:0;transition:opacity .12s;padding:0 6px}
+.ra{display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .1s}
 .rt tbody tr:hover .ra{opacity:1}
-.ab4{width:26px;height:26px;border-radius:6px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;background:none;color:#94A3B8;transition:all .12s}
-.ab4:hover{background:#F1F5F9;color:#0F172A}
-.ab4.del:hover{background:#FEE2E2;color:#991B1B}
+.ab4{width:22px;height:22px;border-radius:4px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;background:none;color:#94A3B8;transition:all .1s}
+.ab4:hover{background:#FEE2E2;color:#991B1B}
 
 /* Modal */
-.mbk{position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;padding:16px}
-.mdl{background:#fff;border-radius:16px;width:100%;max-width:900px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.22)}
-.mhd{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #F1F5F9;background:#fff;border-radius:16px 16px 0 0}
-.mhd h2{font-size:15px;font-weight:700;color:#0F172A}
-.mhd p{font-size:11px;color:#94A3B8;margin-top:2px}
-.mbd{flex:1;overflow-y:auto;padding:20px}
-.mft{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 20px;border-top:1px solid #F1F5F9;background:#fff;border-radius:0 0 16px 16px}
+.mbk{position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:12px}
+.mdl{background:#fff;border-radius:14px;width:100%;max-width:860px;max-height:94vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.mhd{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid #F1F5F9;background:#fff;flex-shrink:0}
+.mhd h2{font-size:14px;font-weight:700;color:#0F172A}
+.mhd p{font-size:11px;color:#94A3B8;margin-top:1px}
+.mbd{flex:1;overflow-y:auto;padding:16px}
+.mft{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 18px;border-top:1px solid #F1F5F9;flex-shrink:0}
 
-.fsc{margin-bottom:18px}
-.fst{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #F1F5F9}
-.fgrid{display:grid;gap:10px}
+.fsc{margin-bottom:14px}
+.fst{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;margin-bottom:7px;padding-bottom:4px;border-bottom:1px solid #F1F5F9}
+.fgrid{display:grid;gap:8px}
 .fg2{grid-template-columns:1fr 1fr}
 .fg3{grid-template-columns:1fr 1fr 1fr}
 .fg4{grid-template-columns:1fr 1fr 1fr 1fr}
-.fd{display:flex;flex-direction:column;gap:3px}
-.fd label{font-size:10px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em}
+.fd{display:flex;flex-direction:column;gap:2px}
+.fd label{font-size:9px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em}
 .fd label .req{color:#EF4444;margin-left:2px}
-.fd input,.fd select,.fd textarea{background:#fff;border:1px solid #E2E8F0;border-radius:7px;color:#0F172A;padding:7px 10px;font-size:13px;outline:none;transition:all .15s;width:100%}
-.fd input:focus,.fd select:focus,.fd textarea:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
-.fd textarea{resize:vertical;min-height:56px}
-.fd select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:28px}
+.fd input,.fd select,.fd textarea{background:#fff;border:1px solid #E2E8F0;border-radius:6px;color:#0F172A;padding:6px 8px;font-size:12px;outline:none;transition:all .15s;width:100%}
+.fd input:focus,.fd select:focus,.fd textarea:focus{border-color:#3B82F6;box-shadow:0 0 0 2px rgba(59,130,246,.1)}
+.fd textarea{resize:vertical;min-height:48px}
+.fd select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;padding-right:22px}
 
-/* Modal aceite import */
-.card-item{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid #E2E8F0;border-radius:10px;margin-bottom:8px;background:#fff;transition:all .15s}
-.card-item:hover{border-color:#3B82F6;background:#F8FAFC}
-.card-item.selected{border-color:#3B82F6;background:#EFF6FF}
-.card-info h4{font-size:13px;font-weight:600;color:#0F172A}
-.card-info p{font-size:11px;color:#64748B;margin-top:2px}
+/* Modal aceite */
+.ci-card{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;margin-bottom:6px;background:#fff;cursor:pointer;transition:all .12s}
+.ci-card:hover{border-color:#93C5FD;background:#F0F9FF}
+.ci-card.sel{border-color:#3B82F6;background:#EFF6FF}
+.ci-check{width:18px;height:18px;border-radius:4px;border:2px solid #CBD5E1;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .12s}
+.ci-card.sel .ci-check{border-color:#3B82F6;background:#3B82F6}
 
-.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:48px 20px;color:#CBD5E1;font-size:13px;background:#fff;border:1px solid #E2E8F0;border-radius:12px}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:40px 20px;color:#CBD5E1;font-size:13px}
 
-.tst{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
-.toast{display:flex;align-items:center;gap:10px;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 4px 20px rgba(0,0,0,.14);white-space:nowrap}
+.tst{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.toast{display:flex;align-items:center;gap:8px;padding:8px 18px;border-radius:8px;font-size:12px;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,.14);white-space:nowrap}
 .toast.ok{background:#F0FDF4;border:1px solid #86EFAC;color:#166534}
 .toast.err{background:#FEE2E2;border:1px solid #FCA5A5;color:#991B1B}
 
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:99px}
-@media(max-width:768px){.fg2,.fg3,.fg4{grid-template-columns:1fr}.si{width:140px}}
+@media(max-width:768px){.fg2,.fg3,.fg4{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -161,6 +186,20 @@ async function apiGet(path) {
   return r.json();
 }
 
+/* Cálculo automático tempo de espera */
+function calcTempo(horaSolic, horaSaida) {
+  if(!horaSolic||!horaSaida) return "";
+  try {
+    const [h1,m1]=horaSolic.split(":").map(Number);
+    const [h2,m2]=horaSaida.split(":").map(Number);
+    let diff=(h2*60+m2)-(h1*60+m1);
+    if(diff<0) diff+=24*60;
+    const hh=Math.floor(diff/60).toString().padStart(2,"0");
+    const mm=(diff%60).toString().padStart(2,"0");
+    return `${hh}:${mm}`;
+  }catch{return "";}
+}
+
 const STATUS_OPTS = ["FICHA FINALIZADA","FICHA FINALIZADA VIA CROSS","FICHA FINALIZADA PELA CROSS","FICHA FINALIZADA PELA ORIGEM","FICHA ENCERRADA PELO CROSS","ENCERRADA PELO CROSS","REMOÇÃO CONCLUÍDA","REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA","ALTA HOSPITALAR","RESOLVIDO COM RECURSOS LOCAIS","CASO SEM ATUALIZAÇÃO MÉDICA HÁ 48 HORAS","EVASÃO/ALTA A PEDIDO","CANCELADA PELO CROSS","CANCELADA PELO SOLICITANTE","PACIENTE EM REMOÇÃO","PACIENTE AGUARDANDO AMBULÂNCIA","CONCLUIDO","AGENDAMENTO SECRETARIA DA SAÚDE","HEMODIÁLISE","OUTRO"];
 const GRAV_OPTS = ["VERMELHO","AMARELO","VERDE","CINZA"];
 const SETOR_OPTS = ["EMERGÊNCIA","CLÍNICA MÉDICA","OBSERVAÇÃO ADULTO","OBSERVAÇÃO INFANTIL","CLÍNICA PEDIÁTRICA","UTI","BLOCO MATERNO","EVASÃO","OUTRO"];
@@ -170,33 +209,43 @@ const AMBU_OPTS = ["BÁSICA","AVANÇADA","UTI"];
 const STATUS_CLS = {"FICHA FINALIZADA":"sf","FICHA FINALIZADA VIA CROSS":"sf","FICHA FINALIZADA PELA CROSS":"sf","FICHA FINALIZADA PELA ORIGEM":"sf","REMOÇÃO CONCLUÍDA":"sc","CONCLUIDO":"sc","PACIENTE EM REMOÇÃO":"sa","PACIENTE AGUARDANDO AMBULÂNCIA":"sa","REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA":"sn","FICHA ENCERRADA PELO CROSS":"se","ENCERRADA PELO CROSS":"se","EVASÃO/ALTA A PEDIDO":"se","CANCELADA PELO CROSS":"se","CANCELADA PELO SOLICITANTE":"se"};
 const GRAV_DOT = {VERMELHO:"#EF4444",AMARELO:"#EAB308",VERDE:"#22C55E",CINZA:"#94A3B8"};
 const GRAV_CLS = {VERMELHO:"gv",AMARELO:"ga",VERDE:"gg",CINZA:"gc"};
+const GC_MAP = {emergencia:"VERMELHO",urgencia:"AMARELO",andamento_cor:"AMARELO",menor_gravidade:"VERDE",finalizado_cor:"CINZA",agendamento:"CINZA",retorno:"CINZA"};
+const AMB_MAP = {["Básica"]:"BÁSICA",["Avançada"]:"AVANÇADA"};
 
-const COLS_HDR = [
-  ["data_solicitacao","DATA SOLIC."],["horario_solicitacao","HORA"],
-  ["ficha_cross","Nº FICHA CROSS"],["nome_paciente","NOME PACIENTE"],
-  ["setor","LOCALIZAÇÃO/SETOR"],["procedimento","PROCEDIMENTO"],
-  ["especialidade","ESPECIALIDADE"],["diagnostico","DIAGNÓSTICO"],
-  ["status","STATUS"],["gravidade","GRAVIDADE"],
-  ["data_resposta_cross","DATA RESP."],["horario_resposta_cross","HOR. RESP."],
-  ["instituicao_destino","DESTINO"],["tipo_ambulancia","AMBULÂNCIA"],
-  ["data_saida_ambulancia","DATA BASE AMB."],["horario_saida_ambulancia","SAÍDA SCFM"],
-  ["tempo_espera","T. ESPERA"],["observacao","OBSERVAÇÃO"],
-  ["enfermeiro","ENFERMEIRO"],["tecnico_auxiliar","TÉCNICO/AUX."],
-  ["medico","MÉDICO"],["horario_retorno","RETORNO"],
+const COLS = [
+  ["data_solicitacao",       "DATA SOLIC.",    "col-data",  "date",  null,       "Data da abertura da ficha CROSS (campo 'Data'). Fonte: CROSS"],
+  ["horario_solicitacao",    "HORA",           "col-hora",  "time",  null,       "Horário da abertura da ficha CROSS. Fonte: CROSS campo 'Hora'"],
+  ["ficha_cross",            "Nº FICHA CROSS", "col-ficha", "text",  null,       "Número da ficha CROSS (ex: SS-14650585-26). Fonte: CROSS"],
+  ["nome_paciente",          "PACIENTE",       "col-nome",  "text",  null,       "Nome completo do paciente. Fonte: CROSS campo 'Nome do Paciente' / Kanban campo 'nome'"],
+  ["setor",                  "SETOR",          "col-setor", "sel",   "SETOR_OPTS","Localização do paciente. Fonte: CROSS campo 'Unidade Solicitante' / Kanban campo 'setor'"],
+  ["procedimento",           "PROCEDIMENTO",   "col-proc",  "sel",   "PROC_OPTS","Tipo do recurso solicitado (Exame, Leito, Avaliação...). Fonte: CROSS campo '1º Recurso'"],
+  ["especialidade",          "ESPECIALIDADE",  "col-esp",   "text",  null,       "Nome do exame ou especialidade. Fonte: CROSS campo '1º Recurso' / Kanban campo 'rec'"],
+  ["diagnostico",            "DIAGNÓSTICO",    "col-diag",  "text",  null,       "Hipótese diagnóstica ou CID. Fonte: CROSS campo 'CID 1' / Kanban campo 'hd'"],
+  ["status",                 "STATUS",         "col-status","sel",   "STATUS_OPTS","Status atual da remoção"],
+  ["gravidade",              "GRAVIDADE",      "col-grav",  "sel",   "GRAV_OPTS","Gravidade — baseada na Prioridade CROSS: 1=VERMELHO, 2=AMARELO, 3=VERDE"],
+  ["data_resposta_cross",    "DATA RESP.",     "col-drdata","date",  null,       "Data em que o CROSS respondeu à solicitação"],
+  ["horario_resposta_cross", "HOR. RESP.",     "col-drhora","time",  null,       "Horário em que o CROSS respondeu"],
+  ["instituicao_destino",    "DESTINO",        "col-dest",  "text",  null,       "Hospital ou instituição receptora. Fonte: Kanban campo 'hosp'"],
+  ["tipo_ambulancia",        "AMBULÂNCIA",     "col-amb",   "sel",   "AMBU_OPTS","Tipo: BÁSICA (SBV) ou AVANÇADA (SAV). Fonte: Kanban campo 'amb'"],
+  ["data_saida_ambulancia",  "BASE AMB. DATA", "col-bdata", "date",  null,       "Data da solicitação à base de ambulância"],
+  ["horario_saida_ambulancia","SAÍDA SCFM",    "col-saida", "time",  null,       "Horário de saída da ambulância da SCFM. Fonte: Kanban campo 'saida'"],
+  ["tempo_espera",           "T. ESPERA",      "col-esp2",  "text",  null,       "Calculado automaticamente: Saída SCFM − Horário Solicitação. Formato HH:MM"],
+  ["observacao",             "OBSERVAÇÃO",     "col-obs",   "text",  null,       "Obs. adicionais. Fonte: CROSS 'Resumo Clínico' / Kanban 'obs'"],
+  ["enfermeiro",             "ENFERMEIRO",     "col-enf",   "text",  null,       "Nome do enfermeiro responsável pela remoção"],
+  ["tecnico_auxiliar",       "TÉCNICO/AUX.",   "col-tec",   "text",  null,       "Nome do técnico ou auxiliar de enfermagem"],
+  ["medico",                 "MÉDICO",         "col-med",   "text",  null,       "Nome do médico. Fonte: CROSS campo 'Médico Solicitante'"],
+  ["horario_retorno",        "RETORNO",        "col-ret",   "time",  null,       "Horário de retorno do paciente. Fonte: Kanban campo 'retorno'"],
 ];
 
-const EMPTY = {data_solicitacao:"",horario_solicitacao:"",ficha_cross:"",nome_paciente:"",setor:"",procedimento:"",especialidade:"",diagnostico:"",status:"",gravidade:"",data_resposta_cross:"",horario_resposta_cross:"",instituicao_destino:"",tipo_ambulancia:"",data_saida_ambulancia:"",horario_saida_ambulancia:"",tempo_espera:"",observacao:"",enfermeiro:"",tecnico_auxiliar:"",medico:"",horario_retorno:""};
+const EMPTY = Object.fromEntries(COLS.map(([f])=>[f,""]));
 
 const fmtD = v => {
   if(!v) return "";
   try{ return new Date(v+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"2-digit"}); }catch{return v;}
 };
 
-const GC_MAP = {emergencia:"VERMELHO",urgencia:"AMARELO",andamento_cor:"AMARELO",menor_gravidade:"VERDE",finalizado_cor:"CINZA",agendamento:"CINZA",retorno:"CINZA"};
-const AMB_MAP = {["Básica"]:"BÁSICA",["Avançada"]:"AVANÇADA"};
-
 /* Ícones */
-const Ico = ({n,s=15}) => {
+const Ico = ({n,s=14}) => {
   const d={
     search:<><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></>,
     trash:<><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></>,
@@ -206,6 +255,7 @@ const Ico = ({n,s=15}) => {
     plus:<path d="M12 5v14M5 12h14"/>,
     import:<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></>,
     check:<polyline points="20 6 9 12 4 10"/>,
+    excel:<><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></>,
   };
   return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{d[n]}</svg>;
 };
@@ -221,8 +271,8 @@ function useToast(){
   return {ts,push};
 }
 
-/* Célula inline editável */
-function Cell({rowId,field,value,type="text",opts=null,onSave}){
+/* Célula editável */
+function Cell({rowId,field,value,type,opts,onSave}){
   const [editing,setEditing]=useState(false);
   const [val,setVal]=useState(value||"");
   const ref=useRef();
@@ -233,7 +283,7 @@ function Cell({rowId,field,value,type="text",opts=null,onSave}){
     if(val!==(value||""))onSave(rowId,field,val);
   }
   if(!editing) return (
-    <div className={`cv2 ${!val?"empty":""}`} onClick={()=>setEditing(true)} title="Clique para editar">
+    <div className={`cv2 ${!val?"empty":""}`} onClick={()=>setEditing(true)} title={val||"Clique para editar"}>
       {val||"—"}
     </div>
   );
@@ -246,17 +296,17 @@ function Cell({rowId,field,value,type="text",opts=null,onSave}){
     </select>
   );
   return (
-    <input ref={ref} className="ci" type={type} value={val}
+    <input ref={ref} className="ci" type={type||"text"} value={val}
       onChange={e=>setVal(e.target.value)} onBlur={commit}
       onKeyDown={e=>{if(e.key==="Enter")commit();if(e.key==="Escape"){setEditing(false);setVal(value||"");}}}/>
   );
 }
 
-/* Modal importar cards do aceite */
-function AceiteImportModal({onClose,onImport}){
+/* Modal importar aceite */
+function AceiteModal({onClose,onImport}){
   const [cards,setCards]=useState([]);
   const [loading,setLoading]=useState(true);
-  const [selected,setSelected]=useState(new Set());
+  const [sel,setSel]=useState(new Set());
 
   useEffect(()=>{
     apiGet("cards?col_id=eq.aceite&select=*&order=created_at.asc")
@@ -265,62 +315,64 @@ function AceiteImportModal({onClose,onImport}){
       .finally(()=>setLoading(false));
   },[]);
 
-  function toggle(id){
-    setSelected(s=>{
-      const n=new Set(s);
-      n.has(id)?n.delete(id):n.add(id);
-      return n;
-    });
-  }
+  const allSel = cards.length>0 && sel.size===cards.length;
 
-  function doImport(){
-    const toImport=cards.filter(c=>selected.has(c.id));
-    onImport(toImport);
-    onClose();
+  function toggleAll(){
+    if(allSel) setSel(new Set());
+    else setSel(new Set(cards.map(c=>c.id)));
+  }
+  function toggle(id){
+    setSel(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});
   }
 
   return (
     <div className="mbk" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="mdl" style={{maxWidth:560}}>
+      <div className="mdl" style={{maxWidth:520}}>
         <div className="mhd">
           <div>
             <h2>📋 Importar do Kanban — Aceite</h2>
-            <p>Selecione os cards para criar registros de remoção</p>
+            <p>Cards atualmente na coluna Aceite Confirmado</p>
           </div>
-          <button className="ab4" onClick={onClose}><Ico n="x"/></button>
+          <button className="ab4" style={{width:24,height:24}} onClick={onClose}><Ico n="x" s={12}/></button>
         </div>
         <div className="mbd">
-          {loading && <div className="empty"><Ico n="pulse" s={28}/><p>Carregando cards…</p></div>}
-          {!loading && cards.length===0 && (
-            <div className="empty">
-              <p>Nenhum card na coluna <strong>Aceite</strong> no momento.</p>
+          {!loading && cards.length>0 && (
+            <div style={{marginBottom:10}}>
+              <button className="btn btn-g btn-sm" onClick={toggleAll}>
+                {allSel?"Desmarcar todos":"Selecionar todos"} ({cards.length})
+              </button>
             </div>
           )}
+          {loading && <div className="empty"><Ico n="pulse" s={24}/><p>Carregando…</p></div>}
+          {!loading && cards.length===0 && <div className="empty"><p>Nenhum card na coluna Aceite.</p></div>}
           {cards.map(c=>{
-            const sel=selected.has(c.id);
+            const s=sel.has(c.id);
             const grav=GC_MAP[c.grav]||"AMARELO";
-            const gravColor={VERMELHO:"#EF4444",AMARELO:"#EAB308",VERDE:"#22C55E",CINZA:"#94A3B8"}[grav];
+            const gc={VERMELHO:"#EF4444",AMARELO:"#EAB308",VERDE:"#22C55E",CINZA:"#94A3B8"}[grav];
             return (
-              <div key={c.id} className={`card-item ${sel?"selected":""}`} onClick={()=>toggle(c.id)}>
-                <div className="card-info">
-                  <h4>{c.nome}{c.idade?` — ${c.idade}`:""} </h4>
-                  <p>{[c.setor,c.rec,c.hosp].filter(Boolean).join(" · ")||"Sem detalhes"}</p>
-                  <p style={{marginTop:2,fontSize:10,color:"#94A3B8"}}>HD: {c.hd||"—"}</p>
+              <div key={c.id} className={`ci-card ${s?"sel":""}`} onClick={()=>toggle(c.id)}>
+                <div className="ci-check">
+                  {s&&<Ico n="check" s={10}/>}
                 </div>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{width:8,height:8,borderRadius:"50%",background:gravColor,flexShrink:0}}/>
-                  <div style={{width:20,height:20,borderRadius:4,border:`2px solid ${sel?"#3B82F6":"#CBD5E1"}`,background:sel?"#3B82F6":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    {sel&&<Ico n="check" s={12}/>}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:600,fontSize:12,color:"#0F172A",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                    {c.nome}{c.idade?` — ${c.idade}`:""}
                   </div>
+                  <div style={{fontSize:10,color:"#64748B",marginTop:1}}>
+                    {[c.setor,c.rec,c.hosp].filter(Boolean).join(" · ")||"Sem detalhes"}
+                  </div>
+                  {c.hd&&<div style={{fontSize:10,color:"#94A3B8"}}>HD: {c.hd}</div>}
                 </div>
+                <span style={{width:7,height:7,borderRadius:"50%",background:gc,flexShrink:0}}/>
               </div>
             );
           })}
         </div>
         <div className="mft">
           <button className="btn btn-g" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-p" disabled={selected.size===0} onClick={doImport}>
-            Importar {selected.size>0?`${selected.size} card${selected.size>1?"s":""}`:""}
+          <button className="btn btn-p" disabled={sel.size===0}
+            onClick={()=>{onImport(cards.filter(c=>sel.has(c.id)));onClose();}}>
+            Importar {sel.size>0?`${sel.size} card${sel.size>1?"s":""}`:""}
           </button>
         </div>
       </div>
@@ -329,18 +381,25 @@ function AceiteImportModal({onClose,onImport}){
 }
 
 /* Modal novo/editar */
-function FormModal({row,onClose,onSave,loading}){
-  const [form,setForm]=useState(row?{...EMPTY,...row}:{...EMPTY});
-  const set=(k,v)=>setForm(f=>(({...f,[k]:v})));
+function FormModal({row,onClose,onSave,saving}){
+  const [form,setForm]=useState(row?{...EMPTY,...row}:{...EMPTY,data_solicitacao:new Date().toISOString().split("T")[0]});
+  const set=(k,v)=>setForm(f=>{
+    const next={...f,[k]:v};
+    // Calcular tempo de espera automaticamente
+    if(k==="horario_saida_ambulancia"||k==="horario_solicitacao"){
+      next.tempo_espera=calcTempo(k==="horario_solicitacao"?v:next.horario_solicitacao, k==="horario_saida_ambulancia"?v:next.horario_saida_ambulancia);
+    }
+    return next;
+  });
   return (
     <div className="mbk" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="mdl">
         <div className="mhd">
           <div>
             <h2>{row?.id?"Editar Registro":"Novo Registro"}</h2>
-            <p>{row?.id?`Ficha ${row.ficha_cross||"sem número"}`:"Preencha os dados"}</p>
+            <p>{row?.id?`Ficha ${row.ficha_cross||"sem número"}`:"Preencha os dados da remoção"}</p>
           </div>
-          <button className="ab4" onClick={onClose}><Ico n="x"/></button>
+          <button className="ab4" style={{width:24,height:24}} onClick={onClose}><Ico n="x" s={12}/></button>
         </div>
         <div className="mbd">
           <div className="fsc"><div className="fst">Identificação</div>
@@ -376,7 +435,7 @@ function FormModal({row,onClose,onSave,loading}){
                   <option value="">Selecione</option>{GRAV_OPTS.map(o=><option key={o}>{o}</option>)}
                 </select></div>
               <div className="fd" style={{gridColumn:"1/-1"}}><label>Diagnóstico</label>
-                <input type="text" placeholder="Hipótese ou CID" value={form.diagnostico} onChange={e=>set("diagnostico",e.target.value)}/></div>
+                <input type="text" placeholder="CID ou hipótese" value={form.diagnostico} onChange={e=>set("diagnostico",e.target.value)}/></div>
             </div>
           </div>
           <div className="fsc"><div className="fst">Resposta CROSS / Status</div>
@@ -403,8 +462,10 @@ function FormModal({row,onClose,onSave,loading}){
                 <input type="date" value={form.data_saida_ambulancia} onChange={e=>set("data_saida_ambulancia",e.target.value)}/></div>
               <div className="fd"><label>Saída SCFM</label>
                 <input type="time" value={form.horario_saida_ambulancia} onChange={e=>set("horario_saida_ambulancia",e.target.value)}/></div>
-              <div className="fd"><label>Tempo Espera</label>
-                <input type="text" placeholder="01:30" value={form.tempo_espera} onChange={e=>set("tempo_espera",e.target.value)}/></div>
+              <div className="fd">
+                <label>Tempo Espera <span style={{color:"#3B82F6",fontWeight:400}}>auto</span></label>
+                <input type="text" readOnly value={form.tempo_espera||calcTempo(form.horario_solicitacao,form.horario_saida_ambulancia)} style={{background:"#F8FAFC",color:"#64748B"}} placeholder="HH:MM"/>
+              </div>
               <div className="fd"><label>Retorno</label>
                 <input type="time" value={form.horario_retorno} onChange={e=>set("horario_retorno",e.target.value)}/></div>
             </div>
@@ -427,8 +488,8 @@ function FormModal({row,onClose,onSave,loading}){
         </div>
         <div className="mft">
           <button className="btn btn-g" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-p" disabled={loading||!form.nome_paciente} onClick={()=>onSave(form)}>
-            {loading?"Salvando…":(row?.id?"Salvar":"Criar Registro")}
+          <button className="btn btn-p" disabled={saving||!form.nome_paciente} onClick={()=>onSave(form)}>
+            {saving?"Salvando…":(row?.id?"Salvar":"Criar Registro")}
           </button>
         </div>
       </div>
@@ -436,7 +497,7 @@ function FormModal({row,onClose,onSave,loading}){
   );
 }
 
-/* App principal */
+/* App */
 function App(){
   const [rows,setRows]=useState([]);
   const [loading,setLoading]=useState(true);
@@ -447,95 +508,87 @@ function App(){
   const [fGrav,setFGrav]=useState("");
   const [fStatus,setFStatus]=useState("");
   const [fMes,setFMes]=useState("");
-  const [sortCol,setSortCol]=useState("data_solicitacao");
+  const [sortCol,setSortCol]=useState("created_at");
   const [sortDir,setSortDir]=useState("desc");
   const {ts,push}=useToast();
 
-  /* Carregar — mais recente primeiro por padrão */
   const load=useCallback(async()=>{
     setLoading(true);
     try{
       const d=await apiGet("remocoes?select=*&order=created_at.desc");
       setRows(Array.isArray(d)?d:[]);
-    }catch(e){push("Erro ao carregar: "+e.message,"err");}
+    }catch(e){push("Erro: "+e.message,"err");}
     finally{setLoading(false);}
   },[]);
   useEffect(()=>{load();},[]);
 
-  /* Salvar */
   const handleSave=async(form)=>{
     setSaving(true);
     try{
       const p={...form};
+      // Calcular tempo de espera antes de salvar
+      if(p.horario_solicitacao&&p.horario_saida_ambulancia&&!p.tempo_espera){
+        p.tempo_espera=calcTempo(p.horario_solicitacao,p.horario_saida_ambulancia);
+      }
       Object.keys(p).forEach(k=>{if(p[k]==="")p[k]=null;});
       if(form.id){await apiFn({action:"update",id:form.id,...p});push("Atualizado");}
-      else{await apiFn({action:"create",...p});push("Registro criado!");}
+      else{await apiFn({action:"create",...p});push("Criado!");}
       setModal(null);
       await load();
     }catch(e){push(e.message||"Erro","err");}
     finally{setSaving(false);}
   };
 
-  /* Edição inline */
   const handleCell=async(rowId,field,value)=>{
     try{
-      await apiFn({action:"update",id:rowId,[field]:value||null});
-      setRows(r=>r.map(x=>x.id===rowId?{...x,[field]:value}:x));
+      const update={action:"update",id:rowId,[field]:value||null};
+      // Recalcular tempo de espera se campo relevante mudou
+      const row=rows.find(r=>r.id===rowId);
+      if(row&&(field==="horario_saida_ambulancia"||field==="horario_solicitacao")){
+        const hs=field==="horario_solicitacao"?value:row.horario_solicitacao;
+        const hsa=field==="horario_saida_ambulancia"?value:row.horario_saida_ambulancia;
+        const te=calcTempo(hs,hsa);
+        if(te) update.tempo_espera=te;
+      }
+      await apiFn(update);
+      setRows(r=>r.map(x=>x.id===rowId?{...x,[field]:value,...(update.tempo_espera?{tempo_espera:update.tempo_espera}:{})}:x));
     }catch(e){push(e.message,"err");}
   };
 
-  /* Excluir */
   const handleDelete=async(id)=>{
     if(!confirm("Excluir este registro permanentemente?"))return;
     try{
       await apiFn({action:"delete",id});
       push("Excluído");
       setRows(r=>r.filter(x=>x.id!==id));
-    }catch(e){push(e.message||"Erro","err");}
+    }catch(e){push(e.message||"Erro ao excluir","err");}
   };
 
-  /* Importar cards do aceite */
   const handleImport=async(cards)=>{
     let ok=0,fail=0;
     for(const c of cards){
       try{
         const hoje=new Date().toISOString().split("T")[0];
         const agora=new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
-        await apiFn({
-          action:"create",
-          nome_paciente:c.nome||"",
-          setor:c.setor||"",
-          especialidade:c.rec||"",
-          diagnostico:c.hd||"",
-          instituicao_destino:c.hosp||"",
-          tipo_ambulancia:AMB_MAP[c.amb]||"",
-          gravidade:GC_MAP[c.grav]||"AMARELO",
-          data_solicitacao:hoje,
-          horario_solicitacao:agora,
-          status:"PACIENTE AGUARDANDO AMBULÂNCIA",
-          enfermeiro:"",tecnico_auxiliar:"",medico:"",
-        });
+        await apiFn({action:"create",nome_paciente:c.nome||"",setor:c.setor||"",especialidade:c.rec||"",diagnostico:c.hd||"",instituicao_destino:c.hosp||"",tipo_ambulancia:AMB_MAP[c.amb]||"",gravidade:GC_MAP[c.grav]||"AMARELO",data_solicitacao:hoje,horario_solicitacao:agora,status:"PACIENTE AGUARDANDO AMBULÂNCIA",horario_saida_ambulancia:c.saida||"",horario_retorno:c.retorno||"",enfermeiro:"",tecnico_auxiliar:"",medico:""});
         ok++;
       }catch{fail++;}
     }
-    push(`${ok} importado${ok!==1?"s":""}${fail>0?` (${fail} erro${fail!==1?"s":""})`:""}`, fail>0?"err":"ok");
+    push(`${ok} importado${ok!==1?"s":""}${fail>0?` (${fail} erro${fail!==1?"s":""})`:""}`,fail>0?"err":"ok");
     await load();
   };
 
-  /* Sort */
   function toggleSort(col){
-    if(sortCol===col){setSortDir(d=>d==="asc"?"desc":"asc");}
+    if(sortCol===col)setSortDir(d=>d==="asc"?"desc":"asc");
     else{setSortCol(col);setSortDir("asc");}
   }
 
-  /* Filtrar + sort */
   const filtered=useMemo(()=>{
     let d=rows;
     if(search){const s=search.toLowerCase();d=d.filter(r=>(r.nome_paciente||"").toLowerCase().includes(s)||(r.ficha_cross||"").toLowerCase().includes(s)||(r.diagnostico||"").toLowerCase().includes(s)||(r.instituicao_destino||"").toLowerCase().includes(s));}
     if(fGrav)d=d.filter(r=>r.gravidade===fGrav);
     if(fStatus)d=d.filter(r=>(r.status||"").includes(fStatus));
     if(fMes)d=d.filter(r=>(r.data_solicitacao||"").startsWith(fMes));
-    // Sort
     return [...d].sort((a,b)=>{
       const av=(a[sortCol]||"").toString().toLowerCase();
       const bv=(b[sortCol]||"").toString().toLowerCase();
@@ -548,46 +601,59 @@ function App(){
     const conc=filtered.filter(r=>["FICHA FINALIZADA","FICHA FINALIZADA VIA CROSS","FICHA FINALIZADA PELA CROSS","REMOÇÃO CONCLUÍDA","CONCLUIDO"].includes(r.status)).length;
     const nao=filtered.filter(r=>(r.status||"").includes("NÃO REALIZADA")).length;
     const verm=filtered.filter(r=>r.gravidade==="VERMELHO").length;
-    return {total,conc,nao,verm};
+    // Dashboard horários
+    const comSaida=filtered.filter(r=>r.horario_saida_ambulancia).length;
+    const tempos=filtered.filter(r=>r.tempo_espera).map(r=>{
+      const [h,m]=r.tempo_espera.split(":").map(Number);
+      return h*60+m;
+    }).filter(n=>!isNaN(n));
+    const mediaMin=tempos.length?Math.round(tempos.reduce((a,b)=>a+b,0)/tempos.length):0;
+    const mediaStr=tempos.length?`${Math.floor(mediaMin/60).toString().padStart(2,"0")}: ${(mediaMin%60).toString().padStart(2,"0")}`:"-";
+    return {total,conc,nao,verm,comSaida,mediaEspera:mediaStr};
   },[filtered]);
 
-  const exportCSV=()=>{
-    const fields=COLS_HDR.map(c=>c[0]);
-    const hdrs=COLS_HDR.map(c=>c[1]);
-    const lines=[hdrs.join(","),...filtered.map(r=>fields.map(f=>`"${(r[f]||"").toString().replace(/"/g,'""')}"`).join(","))];
-    const b=new Blob([lines.join("\n")],{type:"text/csv;charset=utf-8"});
-    const a=document.createElement("a");a.href=URL.createObjectURL(b);
-    a.download=`remocoes_${new Date().toISOString().slice(0,10)}.csv`;a.click();
-  };
+  /* Export XLS */
+  function exportXLS(){
+    const hdrs=COLS.map(([,h])=>h);
+    const fields=COLS.map(([f])=>f);
+    const data=[hdrs,...filtered.map(r=>fields.map(f=>r[f]||""))];
+    const ws=window.XLSX.utils.aoa_to_sheet(data);
+    // Larguras
+    ws["!cols"]=COLS.map(([,,cls])=>{
+      const w={col-data:10,col-hora:8,col-ficha:16,col-nome:24,col-setor:16,col-proc:14,col-esp:18,col-diag:22,col-status:24,col-grav:12,col-drdata:10,col-drhora:8,col-dest:16,col-amb:12,col-bdata:10,col-saida:8,col-esp2:10,col-obs:24,col-enf:16,col-tec:16,col-med:16,col-ret:8}[cls]||14;
+      return {wch:w};
+    });
+    const wb=window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(wb,"Remoções",ws);
+    window.XLSX.writeFile(wb,`remocoes_${new Date().toISOString().slice(0,10)}.xlsx`);
+  }
 
-  const hasFilter=search||fGrav||fStatus||fMes;
+  const opts={SETOR_OPTS,PROC_OPTS,STATUS_OPTS,GRAV_OPTS,AMBU_OPTS};
 
   return (
-    <div style={{minHeight:"100vh",background:"#F1F5F9"}}>
+    <div className="app">
       <div className="topbar">
         <div className="ti">
           <div className="tb">
             <div className="tico"><span>+</span></div>
             <div><div className="tn">Gerência de Enfermagem</div><div className="ts">Controle de Remoções</div></div>
           </div>
-          <a href="." style={{padding:"6px 12px",border:"1px solid #334155",borderRadius:7,background:"none",color:"#94A3B8",fontSize:12,textDecoration:"none",display:"inline-flex",alignItems:"center",gap:6}}>
-            ← Kanban
-          </a>
+          <a href="." style={{padding:"5px 10px",border:"1px solid #334155",borderRadius:6,background:"none",color:"#94A3B8",fontSize:11,textDecoration:"none",display:"inline-flex",alignItems:"center",gap:5}}>← Kanban</a>
         </div>
       </div>
 
       <div className="toolbar">
         <div className="tbi">
           <div className="sw">
-            <Ico n="search" s={14}/>
-            <input className="si" placeholder="Buscar paciente, ficha…" value={search} onChange={e=>setSearch(e.target.value)}/>
+            <Ico n="search" s={13}/>
+            <input className="si" placeholder="Buscar…" value={search} onChange={e=>setSearch(e.target.value)}/>
           </div>
           <select className="fsel" value={fGrav} onChange={e=>setFGrav(e.target.value)}>
-            <option value="">Todas gravidades</option>
+            <option value="">Gravidade</option>
             {GRAV_OPTS.map(o=><option key={o}>{o}</option>)}
           </select>
           <select className="fsel" value={fStatus} onChange={e=>setFStatus(e.target.value)}>
-            <option value="">Todos os status</option>
+            <option value="">Status</option>
             <option value="FINALIZADA">Finalizada</option>
             <option value="NÃO REALIZADA">Não realizada</option>
             <option value="REMOÇÃO">Em remoção</option>
@@ -595,91 +661,101 @@ function App(){
             <option value="ENCERRADA">Encerrada</option>
           </select>
           <input type="month" className="fsel" value={fMes} onChange={e=>setFMes(e.target.value)} style={{width:"auto"}}/>
-          {hasFilter&&<button className="btn btn-g btn-sm" onClick={()=>{setSearch("");setFGrav("");setFStatus("");setFMes("");}}>Limpar</button>}
-          <div style={{marginLeft:"auto",display:"flex",gap:8}}>
-            <button className="btn btn-g" onClick={exportCSV}><Ico n="dl"/> Exportar CSV</button>
-            <button className="btn btn-g" onClick={()=>setShowAceite(true)} style={{borderColor:"#3B82F6",color:"#3B82F6"}}>
-              <Ico n="import"/> Importar Aceite
-            </button>
-            <button className="btn btn-p" onClick={()=>setModal({})}><Ico n="plus"/> Novo Registro</button>
+          {(search||fGrav||fStatus||fMes)&&<button className="btn btn-g btn-sm" onClick={()=>{setSearch("");setFGrav("");setFStatus("");setFMes("");}}>✕ Limpar</button>}
+          <div style={{marginLeft:"auto",display:"flex",gap:6}}>
+            <button className="btn btn-g" onClick={exportXLS} style={{color:"#16A34A",borderColor:"#86EFAC"}}><Ico n="excel"/> Excel</button>
+            <button className="btn btn-blue" onClick={()=>setShowAceite(true)}><Ico n="import"/> Importar Aceite</button>
+            <button className="btn btn-p" onClick={()=>setModal({})}><Ico n="plus"/> Novo</button>
           </div>
         </div>
       </div>
 
       <div className="stats">
         <div className="chip"><span className="cl">Total</span><span className="cv">{stats.total}</span></div>
+        <div className="chip-sep"/>
         <div className="chip"><div className="cdot" style={{background:"#16A34A"}}/><span className="cl">Concluídas</span><span className="cv" style={{color:"#16A34A"}}>{stats.conc}</span></div>
+        <div className="chip-sep"/>
         <div className="chip"><div className="cdot" style={{background:"#EF4444"}}/><span className="cl">Não realizadas</span><span className="cv" style={{color:"#EF4444"}}>{stats.nao}</span></div>
+        <div className="chip-sep"/>
         <div className="chip"><div className="cdot" style={{background:"#EF4444"}}/><span className="cl">Emergências</span><span className="cv" style={{color:"#EF4444"}}>{stats.verm}</span></div>
+        <div className="chip-sep"/>
+        <div className="chip"><span className="cl">Com saída AMB</span><span className="cv">{stats.comSaida}</span></div>
+        <div className="chip-sep"/>
+        <div className="chip"><span className="cl">⏱ Média espera</span><span className="cv" style={{color:"#7C3AED"}}>{stats.mediaEspera}</span></div>
       </div>
 
       <div className="tw">
         {loading?(
-          <div className="empty"><Ico n="pulse" s={28}/><p>Carregando…</p></div>
+          <div className="empty" style={{marginTop:40}}><Ico n="pulse" s={24}/><p>Carregando…</p></div>
         ):filtered.length===0?(
-          <div className="empty">
-            <p>{rows.length===0?"Nenhum registro. Clique em «Novo Registro» para começar.":"Nenhum resultado para o filtro."}</p>
+          <div className="empty" style={{marginTop:40}}>
+            <p>{rows.length===0?"Nenhum registro. Clique em «Novo» para começar.":"Nenhum resultado para o filtro."}</p>
           </div>
         ):(
           <table className="rt">
             <thead><tr>
-              <th style={{cursor:"default"}}>#</th>
-              {COLS_HDR.map(([f,h])=>(
-                <th key={f} onClick={()=>toggleSort(f)} className={sortCol===f?"sorted":""}>
+              <th>#</th>
+              {COLS.map(([f,h,cls,,, tip])=>(
+                <th key={f} className={`${cls} th-tip${sortCol===f?" sorted":""}`} onClick={()=>toggleSort(f)}>
                   <div className="th-inner">
                     {h}
-                    <span className={`sort-arrow ${sortCol===f?"active":""}`}>
+                    <span className={`sort-arr${sortCol===f?" on":""}`}>
                       {sortCol===f?(sortDir==="asc"?"▲":"▼"):"⇅"}
                     </span>
                   </div>
+                  <div className="tip-box">{tip}</div>
                 </th>
               ))}
-              <th style={{width:48,cursor:"default"}}></th>
+              <th></th>
             </tr></thead>
             <tbody>
               {filtered.map((r,i)=>(
                 <tr key={r.id}>
                   <td>{i+1}</td>
-                  <td><div style={{padding:"0 10px",fontSize:11,color:"#374151",whiteSpace:"nowrap"}}>{fmtD(r.data_solicitacao)||"—"}</div></td>
-                  <td><Cell rowId={r.id} field="horario_solicitacao" value={r.horario_solicitacao} type="time" onSave={handleCell}/></td>
-                  <td><Cell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCell}/></td>
-                  <td><Cell rowId={r.id} field="nome_paciente" value={r.nome_paciente} onSave={handleCell}/></td>
-                  <td><Cell rowId={r.id} field="setor" value={r.setor} opts={SETOR_OPTS} onSave={handleCell}/></td>
-                  <td><Cell rowId={r.id} field="procedimento" value={r.procedimento} opts={PROC_OPTS} onSave={handleCell}/></td>
-                  <td><Cell rowId={r.id} field="especialidade" value={r.especialidade} onSave={handleCell}/></td>
-                  <td><Cell rowId={r.id} field="diagnostico" value={r.diagnostico} onSave={handleCell}/></td>
-                  <td>
+                  <td className="col-data"><div style={{padding:"0 6px",fontSize:10,whiteSpace:"nowrap"}}>{fmtD(r.data_solicitacao)||"—"}</div></td>
+                  <td className="col-hora"><Cell rowId={r.id} field="horario_solicitacao" value={r.horario_solicitacao} type="time" onSave={handleCell}/></td>
+                  <td className="col-ficha"><Cell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCell}/></td>
+                  <td className="col-nome"><Cell rowId={r.id} field="nome_paciente" value={r.nome_paciente} onSave={handleCell}/></td>
+                  <td className="col-setor"><Cell rowId={r.id} field="setor" value={r.setor} opts={SETOR_OPTS} onSave={handleCell}/></td>
+                  <td className="col-proc"><Cell rowId={r.id} field="procedimento" value={r.procedimento} opts={PROC_OPTS} onSave={handleCell}/></td>
+                  <td className="col-esp"><Cell rowId={r.id} field="especialidade" value={r.especialidade} onSave={handleCell}/></td>
+                  <td className="col-diag"><Cell rowId={r.id} field="diagnostico" value={r.diagnostico} onSave={handleCell}/></td>
+                  <td className="col-status">
                     {r.status
-                      ?<div style={{padding:"0 8px"}}><span className={`sb2 ${STATUS_CLS[r.status]||"se"}`} title={r.status}>{r.status.length>20?r.status.slice(0,20)+"…":r.status}</span></div>
+                      ?<div style={{padding:"0 6px"}}><span className={`sb2 ${STATUS_CLS[r.status]||"se"}`} title={r.status}>{r.status.length>22?r.status.slice(0,22)+"…":r.status}</span></div>
                       :<Cell rowId={r.id} field="status" value={r.status} opts={STATUS_OPTS} onSave={handleCell}/>
                     }
                   </td>
-                  <td>
+                  <td className="col-grav">
                     {r.gravidade
-                      ?<div style={{padding:"0 8px"}}><span className={`gb ${GRAV_CLS[r.gravidade]||"gc"}`}><span className="gd" style={{background:GRAV_DOT[r.gravidade]||"#94A3B8"}}/> {r.gravidade}</span></div>
+                      ?<div style={{padding:"0 6px"}}><span className={`gb ${GRAV_CLS[r.gravidade]||"gc"}`}><span className="gd" style={{background:GRAV_DOT[r.gravidade]||"#94A3B8"}}/> {r.gravidade}</span></div>
                       :<Cell rowId={r.id} field="gravidade" value={r.gravidade} opts={GRAV_OPTS} onSave={handleCell}/>
                     }
                   </td>
-                  <td><Cell rowId={r.id} field="data_resposta_cross" value={r.data_resposta_cross} type="date" onSave={handleCell}/></td>
-                  <td><Cell rowId={r.id} field="horario_resposta_cross" value={r.horario_resposta_cross} type="time" onSave={handleCell}/></td>
-                  <td><Cell rowId={r.id} field="instituicao_destino" value={r.instituicao_destino} onSave={handleCell}/></td>
-                  <td>
+                  <td className="col-drdata"><Cell rowId={r.id} field="data_resposta_cross" value={r.data_resposta_cross} type="date" onSave={handleCell}/></td>
+                  <td className="col-drhora"><Cell rowId={r.id} field="horario_resposta_cross" value={r.horario_resposta_cross} type="time" onSave={handleCell}/></td>
+                  <td className="col-dest"><Cell rowId={r.id} field="instituicao_destino" value={r.instituicao_destino} onSave={handleCell}/></td>
+                  <td className="col-amb">
                     {r.tipo_ambulancia
-                      ?<div style={{padding:"0 8px"}}><span className={`abg ${r.tipo_ambulancia==="AVANÇADA"?"aba":"abb"}`}>{r.tipo_ambulancia}</span></div>
+                      ?<div style={{padding:"0 6px"}}><span className={`abg ${r.tipo_ambulancia==="AVANÇADA"?"aba":"abb"}`}>{r.tipo_ambulancia}</span></div>
                       :<Cell rowId={r.id} field="tipo_ambulancia" value={r.tipo_ambulancia} opts={AMBU_OPTS} onSave={handleCell}/>
                     }
                   </td>
-                  <td><Cell rowId={r.id} field="data_saida_ambulancia" value={r.data_saida_ambulancia} type="date" onSave={handleCell}/></td>
-                  <td><Cell rowId={r.id} field="horario_saida_ambulancia" value={r.horario_saida_ambulancia} type="time" onSave={handleCell}/></td>
-                  <td><Cell rowId={r.id} field="tempo_espera" value={r.tempo_espera} onSave={handleCell}/></td>
-                  <td><Cell rowId={r.id} field="observacao" value={r.observacao} onSave={handleCell}/></td>
-                  <td><Cell rowId={r.id} field="enfermeiro" value={r.enfermeiro} onSave={handleCell}/></td>
-                  <td><Cell rowId={r.id} field="tecnico_auxiliar" value={r.tecnico_auxiliar} onSave={handleCell}/></td>
-                  <td><Cell rowId={r.id} field="medico" value={r.medico} onSave={handleCell}/></td>
-                  <td><Cell rowId={r.id} field="horario_retorno" value={r.horario_retorno} type="time" onSave={handleCell}/></td>
+                  <td className="col-bdata"><Cell rowId={r.id} field="data_saida_ambulancia" value={r.data_saida_ambulancia} type="date" onSave={handleCell}/></td>
+                  <td className="col-saida"><Cell rowId={r.id} field="horario_saida_ambulancia" value={r.horario_saida_ambulancia} type="time" onSave={handleCell}/></td>
+                  <td className="col-esp2">
+                    <div style={{padding:"0 6px",fontSize:10,color:r.tempo_espera?"#7C3AED":"#CBD5E1",fontWeight:r.tempo_espera?600:400}}>
+                      {r.tempo_espera||calcTempo(r.horario_solicitacao,r.horario_saida_ambulancia)||"—"}
+                    </div>
+                  </td>
+                  <td className="col-obs"><Cell rowId={r.id} field="observacao" value={r.observacao} onSave={handleCell}/></td>
+                  <td className="col-enf"><Cell rowId={r.id} field="enfermeiro" value={r.enfermeiro} onSave={handleCell}/></td>
+                  <td className="col-tec"><Cell rowId={r.id} field="tecnico_auxiliar" value={r.tecnico_auxiliar} onSave={handleCell}/></td>
+                  <td className="col-med"><Cell rowId={r.id} field="medico" value={r.medico} onSave={handleCell}/></td>
+                  <td className="col-ret"><Cell rowId={r.id} field="horario_retorno" value={r.horario_retorno} type="time" onSave={handleCell}/></td>
                   <td>
                     <div className="ra">
-                      <button className="ab4 del" title="Excluir registro" onClick={()=>handleDelete(r.id)}><Ico n="trash" s={13}/></button>
+                      <button className="ab4" title="Excluir" onClick={()=>handleDelete(r.id)}><Ico n="trash" s={11}/></button>
                     </div>
                   </td>
                 </tr>
@@ -689,8 +765,8 @@ function App(){
         )}
       </div>
 
-      {showAceite&&<AceiteImportModal onClose={()=>setShowAceite(false)} onImport={handleImport}/>}
-      {modal!==null&&<FormModal row={modal} onClose={()=>setModal(null)} onSave={handleSave} loading={saving}/>}
+      {showAceite&&<AceiteModal onClose={()=>setShowAceite(false)} onImport={handleImport}/>}
+      {modal!==null&&<FormModal row={modal} onClose={()=>setModal(null)} onSave={handleSave} saving={saving}/>}
 
       <div className="tst">
         {ts.map(t=><div key={t.id} className={`toast ${t.type}`}><span>{t.type==="ok"?"✓":"✕"}</span><span>{t.msg}</span></div>)}
