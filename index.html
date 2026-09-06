@@ -6000,7 +6000,22 @@ function App() {
   }), /*#__PURE__*/React.createElement(NavBtn, {
     id: "timeline",
     label: "⏱ Linha do Tempo"
-  }), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
+  }), /*#__PURE__*/React.createElement("a", {
+    href: "remocao.html",
+    style: {
+      padding: "5px 14px",
+      borderRadius: 6,
+      border: "none",
+      fontSize: 12,
+      fontWeight: 400,
+      background: "transparent",
+      color: "#64748B",
+      cursor: "pointer",
+      textDecoration: "none",
+      display: "inline-flex",
+      alignItems: "center"
+    }
+  }, "🚑 Remoção"), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
     id: "usuarios",
     label: "👥 Profissionais"
   }), isAdmin && /*#__PURE__*/React.createElement(NavBtn, {
