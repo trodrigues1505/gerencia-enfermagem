@@ -315,7 +315,7 @@ function AceiteModal({onClose,onImport}){
   function toggleAll(){setSel(allSel?new Set():new Set(cards.map(c=>c.id)));}
   function toggle(id){setSel(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});}
   return(
-    <div className="mbk" onClick={e=>e.target===e.currentTarget&&onClose()}>
+    <div className="mbk">
       <div className="mdl" style={{maxWidth:520}}>
         <div className="mhd">
           <div><h2>📋 Importar do Kanban — Aceite</h2><p>Cards na coluna Aceite Confirmado</p></div>
@@ -370,7 +370,7 @@ function FormModal({row,onClose,onSave,saving}){
     <div className="fd"><label>{label}{r&&<span className="req">*</span>}</label>{ch||gc}</div>
   );
   return(
-    <div className="mbk" onClick={e=>e.target===e.currentTarget&&onClose()}>
+    <div className="mbk">
       <div className="mdl">
         <div className="mhd">
           <div><h2>{row?.id?"Editar Registro":"Novo Registro de Remoção"}</h2>
@@ -439,6 +439,75 @@ function FormModal({row,onClose,onSave,saving}){
           <button className="btn btn-g" onClick={onClose}>Cancelar</button>
           <button className="btn btn-p" disabled={saving||!form.nome_paciente} onClick={()=>onSave(form)}>
             {saving?"Salvando…":(row?.id?"Salvar":"Criar Registro")}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Normaliza texto p/ comparar cabeçalhos (sem acento, minúsculo, sem espaço extra)
+function normHdr(s){
+  return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();
+}
+
+// Modal: colar dados copiados do Excel (TSV) e importar como novos registros
+function PasteModal({onClose,onImport}){
+  const [txt,setTxt]=useState("");
+  const [busy,setBusy]=useState(false);
+  const HDR_MAP=useMemo(()=>{
+    const m={};
+    COLS.forEach(([f,planilha,xls])=>{ m[normHdr(planilha)]=f; m[normHdr(xls)]=f; });
+    return m;
+  },[]);
+  function parse(){
+    const lines=txt.replace(/\r/g,"").split("\n").filter(l=>l.trim()!=="");
+    if(lines.length===0)return [];
+    const firstCells=lines[0].split("\t").map(normHdr);
+    const matched=firstCells.filter(c=>HDR_MAP[c]).length;
+    const hasHeader = matched>=Math.max(2,Math.floor(firstCells.length*0.4));
+    let fieldOrder;
+    let dataLines;
+    if(hasHeader){
+      fieldOrder=firstCells.map(c=>HDR_MAP[c]||null);
+      dataLines=lines.slice(1);
+    }else{
+      // sem cabeçalho reconhecível: assume a mesma ordem das colunas da planilha
+      fieldOrder=COLS.map(([f])=>f);
+      dataLines=lines;
+    }
+    return dataLines.map(line=>{
+      const cells=line.split("\t");
+      const row={};
+      fieldOrder.forEach((f,i)=>{ if(f && cells[i]!==undefined && cells[i]!=="") row[f]=cells[i].trim(); });
+      return row;
+    }).filter(r=>Object.keys(r).length>0);
+  }
+  async function doImport(){
+    const rows=parse();
+    if(rows.length===0){alert("Nada reconhecível para importar. Cole os dados copiados do Excel (incluindo a linha de cabeçalho, se possível).");return;}
+    setBusy(true);
+    await onImport(rows);
+    setBusy(false);
+  }
+  const preview=txt.trim()?parse():[];
+  return(
+    <div className="mbk">
+      <div className="mdl" style={{maxWidth:640}}>
+        <div className="mhd">
+          <div><h2>Colar da planilha (Excel)</h2><p>Copie as células no Excel e cole aqui</p></div>
+          <button className="btn btn-g btn-sm" onClick={onClose}><Ico n="x" s={13}/></button>
+        </div>
+        <div className="mbd">
+          <div className="fsc">
+            <textarea rows={10} value={txt} onChange={e=>setTxt(e.target.value)}
+              placeholder="Cole aqui (Ctrl+V) as linhas copiadas do Excel. Se a primeira linha for o cabeçalho das colunas, ele será reconhecido automaticamente."
+              style={{width:"100%",padding:"8px 10px",border:"1px solid #E2E8F0",borderRadius:7,fontSize:12,fontFamily:"monospace",resize:"vertical",outline:"none"}}/>
+          </div>
+          {txt.trim()&&<div style={{fontSize:11,color:"#64748B"}}>{preview.length} linha{preview.length!==1?"s":""} reconhecida{preview.length!==1?"s":""} para importar.</div>}
+        </div>
+        <div className="mft">
+          <button className="btn btn-g" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-p" disabled={busy||!txt.trim()} onClick={doImport}>{busy?"Importando…":`Importar ${preview.length||""}`}</button>
         </div>
       </div>
     </div>
@@ -528,10 +597,34 @@ function App(){
   };
 
   const handleDelete=async(id)=>{
+    if(!id){push("Este registro não tem ID válido — recarregue a página e tente novamente.","err");return;}
     if(!confirm("Excluir este registro permanentemente?"))return;
-    try{await api({action:"delete",id});push("Excluído");setRows(r=>r.filter(x=>x.id!==id));}
-    catch(e){push(e.message||"Erro","err");}
+    try{
+      await api({action:"delete",id});
+      push("Excluído");
+      setRows(r=>r.filter(x=>x.id!==id));
+    }catch(e){
+      push("Erro ao excluir: "+(e.message||"desconhecido")+" — recarregando a lista.","err");
+      await load();
+    }
   };
+
+  const handleDeleteAll=async()=>{
+    if(rows.length===0)return;
+    const conf=prompt(`Isso vai excluir TODOS os ${rows.length} registros da planilha, permanentemente. Digite EXCLUIR para confirmar:`);
+    if(conf!=="EXCLUIR")return;
+    setSaving(true);
+    let ok=0,fail=0;
+    for(const r of rows){
+      try{await api({action:"delete",id:r.id});ok++;}
+      catch{fail++;}
+    }
+    setSaving(false);
+    push(`${ok} registro${ok!==1?"s":""} excluído${ok!==1?"s":""}${fail>0?` (${fail} falharam)`:""}`,fail>0?"err":"ok");
+    await load();
+  };
+
+  const [showPaste,setShowPaste]=useState(false);
 
   const handleImport=async(cards)=>{
     let ok=0,fail=0;
@@ -571,6 +664,17 @@ function App(){
       push(`${ok} registro${ok!==1?"s":""} importado${ok!==1?"s":""} do JSON${fail>0?` (${fail} erro${fail!==1?"s":""})`:""}`,fail>0?"err":"ok");
       await load();
     }catch(e){push("Erro ao ler arquivo JSON: "+e.message,"err");}
+  };
+
+  const handleImportPaste=async(pastedRows)=>{
+    let ok=0,fail=0;
+    for(const p of pastedRows){
+      try{await api({action:"create",...p});ok++;}
+      catch{fail++;}
+    }
+    push(`${ok} registro${ok!==1?"s":""} importado${ok!==1?"s":""} da planilha${fail>0?` (${fail} erro${fail!==1?"s":""})`:""}`,fail>0?"err":"ok");
+    setShowPaste(false);
+    await load();
   };
 
   function toggleSort(col){if(sc===col)setSd(d=>d==="asc"?"desc":"asc");else{setSc(col);setSd("asc");}}
@@ -675,7 +779,9 @@ function App(){
             <input type="file" accept=".json,application/json" ref={jsonFileRef} style={{display:"none"}}
               onChange={e=>{const f=e.target.files[0];e.target.value="";handleImportJSON(f);}}/>
             <button className="btn btn-blue" onClick={()=>jsonFileRef.current&&jsonFileRef.current.click()}><Ico n="import"/> Importar JSON</button>
+            <button className="btn btn-blue" onClick={()=>setShowPaste(true)}><Ico n="excel"/> Colar do Excel</button>
             <button className="btn btn-p" onClick={()=>setModal({})}><Ico n="plus"/> Novo</button>
+            <button className="btn btn-g" style={{color:"#DC2626",borderColor:"#FCA5A5"}} disabled={rows.length===0} onClick={handleDeleteAll}><Ico n="trash" s={13}/> Excluir todos</button>
           </div>
         </div>
       </div>
@@ -788,6 +894,7 @@ function App(){
       </div>
 
       {showAceite&&<AceiteModal onClose={()=>setShowAceite(false)} onImport={handleImport}/>}
+      {showPaste&&<PasteModal onClose={()=>setShowPaste(false)} onImport={handleImportPaste}/>}
       {modal!==null&&<FormModal row={modal} onClose={()=>setModal(null)} onSave={handleSave} saving={saving}/>}
       <div className="tst">
         {ts.map(t=><div key={t.id} className={`toast ${t.type}`}><span>{t.type==="ok"?"✓":"✕"}</span><span>{t.msg}</span></div>)}
