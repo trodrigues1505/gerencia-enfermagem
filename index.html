@@ -5668,7 +5668,7 @@ function App() {
       showT("Erro ao gerar PDF: " + e.message, "err");
     }
   }
-  function saveSnapshot() {
+  async function saveSnapshot() {
     const colsData = isAdmin ? cols : pubCols || cols;
     const cardsData = isAdmin ? cards : pubCards || [];
     const snap = {
@@ -5682,13 +5682,27 @@ function App() {
     const updated = [snap, ...list].slice(0, 20); // mantém últimos 20
     saveLS("ge_snapshots", updated);
     setSnapshots(updated);
-    const blob = new Blob([JSON.stringify(snap, null, 2)], { type: "application/json" });
+
+    // Busca também os dados da planilha de remoção (Supabase) para incluir no mesmo backup
+    let remocoesData = [];
+    let remocoesErro = false;
+    try {
+      remocoesData = await sbGet("remocoes", "select=*");
+    } catch (e) {
+      remocoesErro = true;
+      console.error("Erro ao buscar dados da planilha de remoção:", e);
+    }
+
+    const backup = { ...snap, remocoes: remocoesData };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "ge-backup-" + new Date().toISOString().slice(0,16).replace("T","-").replace(/:/g,"-") + ".json";
+    const dateFile = todayStr().replace(/\//g, "-");
+    const timeFile = nowStr().replace(/:/g, "-");
+    a.download = "kanban-" + dateFile + "-" + timeFile + ".json";
     a.click();
     URL.revokeObjectURL(a.href);
-    showT("💾 Snapshot salvo e baixado!");
+    showT(remocoesErro ? "💾 Kanban salvo (falha ao incluir planilha de remoção)." : "💾 Kanban e planilha de remoção salvos!");
   }
   function loadSnapshot(snap) {
     setCards(snap.cards || []);
