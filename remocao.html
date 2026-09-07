@@ -450,6 +450,41 @@ function normHdr(s){
   return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();
 }
 
+// Mapa reverso label -> chave interna de gravidade (para aceitar valores exportados/copiados do Excel,
+// que mostram o rótulo "MENOR GRAVIDADE" em vez da chave "menor_gravidade")
+const GRAV_LABEL_TO_KEY=(()=>{
+  const m={};
+  Object.entries(GRAV_MAP).forEach(([k,v])=>{ m[normHdr(v.label)]=k; m[normHdr(k)]=k; });
+  return m;
+})();
+function normalizeGravValue(v){
+  if(!v)return v;
+  const key=GRAV_LABEL_TO_KEY[normHdr(v)];
+  return key||v; // se não reconhecer, mantém como veio (deixa o backend validar)
+}
+
+// Converte data em vários formatos comuns (DD/MM/YYYY, DD/MM/YY, YYYY-MM-DD) para ISO YYYY-MM-DD
+function normalizeDateValue(v){
+  if(!v)return v;
+  v=String(v).trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v; // já é ISO
+  const br=v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(br){
+    let [,d,m,y]=br;
+    if(y.length===2)y="20"+y;
+    return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
+  }
+  return v; // formato não reconhecido, deixa como veio
+}
+
+const DATE_FIELDS=new Set(COLS.filter(([,,,,tipo])=>tipo==="date").map(([f])=>f));
+function normalizeRowValues(row){
+  const out={...row};
+  if(out.gravidade!==undefined)out.gravidade=normalizeGravValue(out.gravidade);
+  Object.keys(out).forEach(f=>{ if(DATE_FIELDS.has(f))out[f]=normalizeDateValue(out[f]); });
+  return out;
+}
+
 // Modal: colar dados copiados do Excel (TSV) e importar como novos registros
 function PasteModal({onClose,onImport}){
   const [txt,setTxt]=useState("");
@@ -479,7 +514,7 @@ function PasteModal({onClose,onImport}){
       const cells=line.split("\t");
       const row={};
       fieldOrder.forEach((f,i)=>{ if(f && cells[i]!==undefined && cells[i]!=="") row[f]=cells[i].trim(); });
-      return row;
+      return normalizeRowValues(row);
     }).filter(r=>Object.keys(r).length>0);
   }
   async function doImport(){
@@ -508,6 +543,31 @@ function PasteModal({onClose,onImport}){
         <div className="mft">
           <button className="btn btn-g" onClick={onClose}>Cancelar</button>
           <button className="btn btn-p" disabled={busy||!txt.trim()} onClick={doImport}>{busy?"Importando…":`Importar ${preview.length||""}`}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Modal: lista de erros de uma importação (Excel/JSON/Aceite), com nomes e motivo
+function ImportErrorsModal({data,onClose}){
+  return(
+    <div className="mbk">
+      <div className="mdl" style={{maxWidth:520}}>
+        <div className="mhd">
+          <div><h2>⚠ Erros na importação</h2><p>{data.tipo} — {data.itens.length} registro{data.itens.length!==1?"s":""} não importado{data.itens.length!==1?"s":""}</p></div>
+          <button className="btn btn-g btn-sm" onClick={onClose}><Ico n="x" s={13}/></button>
+        </div>
+        <div className="mbd">
+          {data.itens.map((it,i)=>(
+            <div key={i} style={{padding:"8px 10px",border:"1px solid #FCA5A5",background:"#FEF2F2",borderRadius:8,marginBottom:6}}>
+              <div style={{fontWeight:700,fontSize:12,color:"#0F172A"}}>{it.nome}</div>
+              <div style={{fontSize:11,color:"#991B1B",marginTop:2}}>{it.erro}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mft">
+          <button className="btn btn-p" onClick={onClose}>Entendi</button>
         </div>
       </div>
     </div>
@@ -626,17 +686,29 @@ function App(){
 
   const [showPaste,setShowPaste]=useState(false);
 
+  // O Kanban usa gravidades extras (andamento_cor, finalizado_cor) que não existem
+  // no enum de gravidade da planilha de remoções — isso causava erro 500 ao importar
+  // pelo Aceite. Mapeamos para o valor equivalente mais próximo aceito pela planilha.
+  const KANBAN_GRAV_FALLBACK={andamento_cor:"urgencia",finalizado_cor:"agendamento"};
+  function normalizeKanbanGrav(v){
+    if(!v)return "urgencia";
+    if(G_OPTS.includes(v))return v;
+    return KANBAN_GRAV_FALLBACK[v]||"urgencia";
+  }
+
   const handleImport=async(cards)=>{
-    let ok=0,fail=0;
+    let ok=0;
+    const fails=[];
     for(const c of cards){
       try{
         const hoje=new Date().toISOString().split("T")[0];
         const agora=new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
-        await api({action:"create",nome_paciente:c.nome||"",setor:c.setor||"",especialidade:c.rec||"",diagnostico:c.hd||"",instituicao_destino:c.hosp||c.unidade_receptora||"",tipo_ambulancia:AM[c.amb]||"",gravidade:c.grav||"urgencia",data_solicitacao:hoje,horario_solicitacao:c.hora_adm||agora,ficha_cross:c.ficha_cross||"",medico:c.medico_solic||"",horario_saida_ambulancia:c.saida||"",horario_retorno:c.retorno||"",data_resposta_cross:c.data_resolucao||"",horario_resposta_cross:c.hora_resolucao||"",status:"PACIENTE AGUARDANDO AMBULÂNCIA"});
+        await api({action:"create",nome_paciente:c.nome||"",setor:c.setor||"",especialidade:c.rec||"",diagnostico:c.hd||"",instituicao_destino:c.hosp||c.unidade_receptora||"",tipo_ambulancia:AM[c.amb]||"",gravidade:normalizeKanbanGrav(c.grav),data_solicitacao:hoje,horario_solicitacao:c.hora_adm||agora,ficha_cross:c.ficha_cross||"",medico:c.medico_solic||"",horario_saida_ambulancia:c.saida||"",horario_retorno:c.retorno||"",data_resposta_cross:c.data_resolucao||"",horario_resposta_cross:c.hora_resolucao||"",status:"PACIENTE AGUARDANDO AMBULÂNCIA"});
         ok++;
-      }catch{fail++;}
+      }catch(e){fails.push({nome:c.nome||"(sem nome)",erro:e.message||"erro desconhecido"});}
     }
-    push(`${ok} importado${ok!==1?"s":""}${fail>0?` (${fail} erro${fail!==1?"s":""})`:""}`,fail>0?"err":"ok");
+    push(`${ok} importado${ok!==1?"s":""}${fails.length>0?` (${fails.length} erro${fails.length!==1?"s":""})`:""}`,fails.length>0?"err":"ok");
+    if(fails.length>0)setImportErrors({tipo:"Aceite (Kanban)",itens:fails});
     await load();
   };
 
@@ -651,30 +723,66 @@ function App(){
       else if(Array.isArray(json.remocoes))items=json.remocoes;
       else{push("JSON inválido: nenhum dado de remoção encontrado no arquivo.","err");return;}
       if(items.length===0){push("Nenhum registro encontrado no arquivo.","err");return;}
-      let ok=0,fail=0;
+      let ok=0;
+      const fails=[];
       for(const item of items){
         try{
           const p={};
           FIELDS.forEach(f=>{if(item[f]!==undefined&&item[f]!==null&&item[f]!=="")p[f]=item[f];});
           if(Object.keys(p).length===0)continue;
-          await api({action:"create",...p});
+          await api({action:"create",...normalizeRowValues(p)});
           ok++;
-        }catch{fail++;}
+        }catch(e){fails.push({nome:item.nome_paciente||"(sem nome)",erro:e.message||"erro desconhecido"});}
       }
-      push(`${ok} registro${ok!==1?"s":""} importado${ok!==1?"s":""} do JSON${fail>0?` (${fail} erro${fail!==1?"s":""})`:""}`,fail>0?"err":"ok");
+      push(`${ok} registro${ok!==1?"s":""} importado${ok!==1?"s":""} do JSON${fails.length>0?` (${fails.length} erro${fails.length!==1?"s":""})`:""}`,fails.length>0?"err":"ok");
+      if(fails.length>0)setImportErrors({tipo:"Importar JSON",itens:fails});
       await load();
     }catch(e){push("Erro ao ler arquivo JSON: "+e.message,"err");}
   };
 
+  const [importErrors,setImportErrors]=useState(null); // {tipo, itens:[{nome,erro}]}
+
   const handleImportPaste=async(pastedRows)=>{
-    let ok=0,fail=0;
+    let ok=0;
+    const fails=[];
     for(const p of pastedRows){
       try{await api({action:"create",...p});ok++;}
-      catch{fail++;}
+      catch(e){fails.push({nome:p.nome_paciente||"(sem nome)",erro:e.message||"erro desconhecido"});}
     }
-    push(`${ok} registro${ok!==1?"s":""} importado${ok!==1?"s":""} da planilha${fail>0?` (${fail} erro${fail!==1?"s":""})`:""}`,fail>0?"err":"ok");
+    push(`${ok} registro${ok!==1?"s":""} importado${ok!==1?"s":""} da planilha${fails.length>0?` (${fails.length} erro${fails.length!==1?"s":""})`:""}`,fails.length>0?"err":"ok");
+    if(fails.length>0)setImportErrors({tipo:"Colar do Excel",itens:fails});
     setShowPaste(false);
     await load();
+  };
+
+  const [blankRowId,setBlankRowId]=useState(null);
+  const handleAddBlank=async()=>{
+    try{
+      await api({action:"create"});
+      const latest=await dbGet("remocoes?select=id&order=created_at.desc&limit=1");
+      const newId=Array.isArray(latest)&&latest[0]?latest[0].id:null;
+      push("Linha em branco criada — cole os dados copiados do Excel nela.");
+      setBlankRowId(newId);
+      await load();
+    }catch(e){push("Erro ao criar linha: "+(e.message||"desconhecido"),"err");}
+  };
+  const handlePasteIntoRow=async(rowId)=>{
+    try{
+      const text=await navigator.clipboard.readText();
+      if(!text||!text.trim()){push("Área de transferência vazia. Copie a linha no Excel primeiro (Ctrl+C).","err");return;}
+      const cells=text.replace(/\r/g,"").split("\n")[0].split("\t");
+      const fieldOrder=COLS.map(([f])=>f);
+      const p={};
+      fieldOrder.forEach((f,i)=>{ if(cells[i]!==undefined && cells[i]!=="") p[f]=cells[i].trim(); });
+      const norm=normalizeRowValues(p);
+      if(Object.keys(norm).length===0){push("Nada reconhecível na área de transferência.","err");return;}
+      await api({action:"update",id:rowId,...norm});
+      push("Linha preenchida a partir da área de transferência.");
+      setBlankRowId(null);
+      await load();
+    }catch(e){
+      push("Não foi possível ler a área de transferência automaticamente. Use o botão «Colar do Excel» no lugar.","err");
+    }
   };
 
   function toggleSort(col){if(sc===col)setSd(d=>d==="asc"?"desc":"asc");else{setSc(col);setSd("asc");}}
@@ -780,6 +888,7 @@ function App(){
               onChange={e=>{const f=e.target.files[0];e.target.value="";handleImportJSON(f);}}/>
             <button className="btn btn-blue" onClick={()=>jsonFileRef.current&&jsonFileRef.current.click()}><Ico n="import"/> Importar JSON</button>
             <button className="btn btn-blue" onClick={()=>setShowPaste(true)}><Ico n="excel"/> Colar do Excel</button>
+            <button className="btn btn-g" onClick={handleAddBlank}><Ico n="plus" s={13}/> Linha em branco</button>
             <button className="btn btn-p" onClick={()=>setModal({})}><Ico n="plus"/> Novo</button>
             <button className="btn btn-g" style={{color:"#DC2626",borderColor:"#FCA5A5"}} disabled={rows.length===0} onClick={handleDeleteAll}><Ico n="trash" s={13}/> Excluir todos</button>
           </div>
@@ -836,9 +945,14 @@ function App(){
             <tbody>
               {filtered.map((r,i)=>{
                 const gi=gravInfo(r.gravidade||"");
+                const isBlank=r.id===blankRowId;
                 return(
-                  <tr key={r.id}>
-                    <td style={{textAlign:"center",color:"#94A3B8",fontSize:10,fontWeight:700,borderRight:"2px solid #E2E8F0",padding:"0 4px"}}>{i+1}</td>
+                  <tr key={r.id} style={isBlank?{background:"#FEFCE8",outline:"2px solid #FDE047",outlineOffset:"-2px"}:undefined}>
+                    <td style={{textAlign:"center",color:"#94A3B8",fontSize:10,fontWeight:700,borderRight:"2px solid #E2E8F0",padding:"0 4px"}}>
+                      {isBlank
+                        ?<button className="btn btn-blue btn-sm" title="Colar linha copiada do Excel aqui" onClick={()=>handlePasteIntoRow(r.id)} style={{padding:"2px 6px"}}><Ico n="excel" s={11}/></button>
+                        :i+1}
+                    </td>
                     <td><div style={{padding:"2px 6px",fontSize:10,whiteSpace:"nowrap"}}>{fmtD(r.data_solicitacao)||"—"}</div></td>
                     <td><Cell rowId={r.id} field="horario_solicitacao" value={r.horario_solicitacao} tipo="time" onSave={handleCell}/></td>
                     <td><Cell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCell}/></td>
@@ -895,6 +1009,7 @@ function App(){
 
       {showAceite&&<AceiteModal onClose={()=>setShowAceite(false)} onImport={handleImport}/>}
       {showPaste&&<PasteModal onClose={()=>setShowPaste(false)} onImport={handleImportPaste}/>}
+      {importErrors&&<ImportErrorsModal data={importErrors} onClose={()=>setImportErrors(null)}/>}
       {modal!==null&&<FormModal row={modal} onClose={()=>setModal(null)} onSave={handleSave} saving={saving}/>}
       <div className="tst">
         {ts.map(t=><div key={t.id} className={`toast ${t.type}`}><span>{t.type==="ok"?"✓":"✕"}</span><span>{t.msg}</span></div>)}
