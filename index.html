@@ -219,7 +219,8 @@ function buildText(cards, cols, settings) {
       if (c.pr) lines.push(PR_EMOJI[c.pr] + " *PRIORIDADE " + String(c.pr).padStart(2, "0") + "*");
       const catL = {
         pediatria: "[Ped]",
-        psiquiatria: "[Psi]"
+        psiquiatria: "[Psi]",
+        obstetricia: "[Obs]"
       };
       const catT = c.categoria && c.categoria !== "normal" ? catL[c.categoria] : c.is_rn ? "[RN]" : "";
       lines.push(`[PAC]${catT ? " " + catT : ""} *${c.nome}*${c.idade ? ` - ${c.idade}` : ""}`);
@@ -439,7 +440,7 @@ function ModalShell({
       zIndex: 1000,
       padding: 16
     },
-    onClick: e => e.target === e.currentTarget && onClose()
+    onClick: undefined
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#fff",
@@ -731,23 +732,30 @@ function CardModal({
       const idadeStr = c.idade||"";
       const idM = idadeStr.match(/\d+/);
       const idadeAnos = idM ? idM[0]+" anos" : idadeStr;
-      setForm(f => ({ ...f,
-        nome:         c.nome          || f.nome,
-        idade:        idadeAnos       || f.idade,
-        hd:           c.hd            || f.hd,
-        setor:        c.setor         || f.setor,
-        rec:          c.rec           || f.rec,
-        adm:          c.adm           || f.adm,
-        hora_adm:     c.hora_adm      || f.hora_adm,
-        grav:         c.grav          || f.grav,
-        obs:          c.obs           || f.obs,
-        ficha_cross:  c.ficha_cross   || f.ficha_cross,
-        medico_solic: c.medico_solic  || f.medico_solic,
-        hosp:         c.hosp          || f.hosp,
-      }));
+      setForm(f => {
+        const novaCategoria = (idM && parseInt(idM[0],10) <= 11 && (!f.categoria || f.categoria === "normal"))
+          ? "pediatria" : f.categoria;
+        return { ...f,
+          nome:         c.nome          || f.nome,
+          idade:        idadeAnos       || f.idade,
+          hd:           c.hd            || f.hd,
+          setor:        c.setor         || f.setor,
+          rec:          c.rec           || f.rec,
+          adm:          c.adm           || f.adm,
+          hora_adm:     c.hora_adm      || f.hora_adm,
+          grav:         c.grav          || f.grav,
+          obs:          c.obs           || f.obs,
+          ficha_cross:  c.ficha_cross   || f.ficha_cross,
+          medico_solic: c.medico_solic  || f.medico_solic,
+          hosp:         c.hosp          || f.hosp,
+          categoria:    novaCategoria,
+        };
+      });
       setShowAiBox(false);
       setAiText("");
-      setAiStatus("✓ Campos preenchidos!");
+      setAiStatus(c.nome || c.idade || c.hd || c.ficha_cross || c.medico_solic || c.hora_adm
+        ? "✓ Campos preenchidos!"
+        : "⚠ A IA não retornou dados reconhecíveis deste texto. Confira o texto colado ou preencha manualmente.");
     } catch(e) {
       setAiStatus("Erro: " + e.message);
       setAiLoading(false);
@@ -842,6 +850,9 @@ function CardModal({
     }, {
       v: "psiquiatria",
       t: "🧠 Psiquiatria"
+    }, {
+      v: "obstetricia",
+      t: "🤰 Obstetrícia"
     }]
   }), /*#__PURE__*/React.createElement(Field, {
     label: "Recém-nascido?",
@@ -860,7 +871,13 @@ function CardModal({
     label: "Idade",
     fieldKey: "idade",
     value: form.idade,
-    onChange: upd,
+    onChange: (k, v) => {
+      upd(k, v);
+      const m = String(v || "").match(/\d+/);
+      if (m && parseInt(m[0], 10) <= 11 && (!form.categoria || form.categoria === "normal")) {
+        upd("categoria", "pediatria");
+      }
+    },
     disabled: !isAdmin,
     placeholder: "44 anos"
   }), /*#__PURE__*/React.createElement(Field, {
@@ -1999,6 +2016,10 @@ function KCard({
       psiquiatria: {
         e: "🧠",
         c: "#8B5CF6"
+      },
+      obstetricia: {
+        e: "🤰",
+        c: "#F97316"
       }
     };
     const b = c.categoria && c.categoria !== "normal" ? B[c.categoria] : c.is_rn ? B.pediatria : null;
@@ -2244,6 +2265,7 @@ function Dashboard({
   if (!isAdmin) {
     const peds = cards.filter(c => c.categoria === "pediatria" || c.is_rn).length;
     const psis = cards.filter(c => c.categoria === "psiquiatria").length;
+    const obst = cards.filter(c => c.categoria === "obstetricia").length;
     return /*#__PURE__*/React.createElement("div", null, lastPub && /*#__PURE__*/React.createElement("div", {
       style: {
         background: "#EFF6FF",
@@ -2351,7 +2373,7 @@ function Dashboard({
         color,
         marginTop: 4
       }
-    }, val)))), (peds > 0 || psis > 0) && /*#__PURE__*/React.createElement("div", {
+    }, val)))), (peds > 0 || psis > 0 || obst > 0) && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 8,
@@ -2411,7 +2433,34 @@ function Dashboard({
         fontWeight: 700,
         color: "#8B5CF6"
       }
-    }, psis)))));
+    }, psis))), obst > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#FFF7ED",
+        border: "1px solid #FDBA74",
+        borderRadius: 8,
+        padding: "8px 14px",
+        display: "flex",
+        gap: 8,
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 16
+      }
+    }, "🤰"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: "#7C2D12",
+        fontWeight: 600,
+        textTransform: "uppercase"
+      }
+    }, "Obstetrícia"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 20,
+        fontWeight: 700,
+        color: "#F97316"
+      }
+    }, obst)))));
   }
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -5324,7 +5373,7 @@ function App() {
       const colLabel = colsData.reduce((acc, c) => ({ ...acc, [c.id]: c.label }), {});
       const str = v => v === null || v === undefined || v === false ? "" : v === true ? "Sim" : String(v);
       const GRAV_LABEL = { emergencia:"Emergência", urgencia:"Urgência", andamento_cor:"Em andamento", menor_gravidade:"Menor gravidade", finalizado_cor:"Finalizado", agendamento:"Agendamento", retorno:"Retorno" };
-      const CAT_LABEL = { normal:"Normal", pediatria:"Pediatria", psiquiatria:"Psiquiatria" };
+      const CAT_LABEL = { normal:"Normal", pediatria:"Pediatria", psiquiatria:"Psiquiatria", obstetricia:"Obstetrícia" };
       const rows = cardsData.map(c => ({
         "Coluna": str(colLabel[c.col_id] || c.col_id),
         "Prioridade": str(c.pr),
@@ -5541,7 +5590,7 @@ function App() {
       status: "",
       nome: "",
       idade: "",
-      adm: new Date().toLocaleDateString("pt-BR", { day:"2-digit", month:"2-digit" }),
+      adm: "",
       hd: "",
       setor: "",
       rec: "",
