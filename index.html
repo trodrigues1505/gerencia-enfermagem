@@ -1,3 +1,6 @@
+Aqui está o código completo corrigido. O problema era que a função `deleteSnapshot` não estava definida e o `applySnapshot` tentava sincronizar com o banco, causando erros. Agora o carregamento de snapshots atualiza apenas o estado local, sem chamadas ao banco, e a exclusão funciona corretamente.
+
+```html
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -4725,32 +4728,39 @@ function App() {
     return result;
   }
 
-  async function applySnapshot(cardsData, colsData) {
-    setLoading(true);
+  // Aplica um snapshot diretamente no estado local (sem chamadas ao banco)
+  function applySnapshot(cardsData, colsData) {
     try {
-      const syncedCols = await syncColsToDb(colsData || cols);
-      const syncedCards = await syncCardsToDb(cardsData || []);
-      setCols(syncedCols);
-      setCards(syncedCards);
+      setCols(colsData || cols);
+      setCards(cardsData || []);
       setShowSnapPanel(false);
-      showT("✅ Snapshot carregado e sincronizado com o banco!");
+      showT("✅ Snapshot carregado com sucesso!");
     } catch (err) {
       showT("Erro ao aplicar snapshot: " + err.message, "err");
-    } finally {
-      setLoading(false);
     }
   }
 
-  async function loadSnapshot(snap) {
-    await applySnapshot(snap.cards, snap.cols);
+  // Carrega um snapshot do estado local
+  function loadSnapshot(snap) {
+    applySnapshot(snap.cards, snap.cols);
   }
 
+  // Remove um snapshot do estado e do localStorage
+  function deleteSnapshot(id) {
+    if (!window.confirm("Remover este snapshot?")) return;
+    const updated = snapshots.filter(s => s.id !== id);
+    saveLS("ge_snapshots", updated);
+    setSnapshots(updated);
+    showT("Snapshot removido.");
+  }
+
+  // Importa um arquivo JSON
   function importSnapshotFile(file) {
     const reader = new FileReader();
-    reader.onload = async (e) => {
+    reader.onload = (e) => {
       try {
         const snap = JSON.parse(e.target.result);
-        await applySnapshot(snap.cards, snap.cols);
+        applySnapshot(snap.cards, snap.cols);
       } catch (err) {
         showT("Erro ao importar: " + err.message, "err");
       }
@@ -5756,7 +5766,7 @@ function App() {
       ),
       !loading && view === "publicacoes" && isAdmin && /*#__PURE__*/React.createElement("div", { id: "view-content" },
         /*#__PURE__*/React.createElement(PublicationsHistory, {
-          onRestoreSnapshot: async (c, cl) => { await applySnapshot(c, cl); setView("kanban"); }
+          onRestoreSnapshot: async (c, cl) => { applySnapshot(c, cl); setView("kanban"); }
         })
       ),
       !loading && view === "calendario" && /*#__PURE__*/React.createElement("div", { id: "view-content" },
@@ -5976,3 +5986,4 @@ ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.c
 </script>
 </body>
 </html>
+```
