@@ -4725,15 +4725,23 @@ function App() {
     return result;
   }
 
-  // Aplica um snapshot diretamente no estado local (sem chamadas ao banco)
-  function applySnapshot(cardsData, colsData) {
+  // Aplica um snapshot criando as colunas e cards no Supabase
+  async function applySnapshot(cardsData, colsData) {
+    setLoading(true);
     try {
-      setCols(colsData || cols);
-      setCards(cardsData || []);
+      // 1. Sincroniza colunas
+      const syncedCols = await syncColsToDb(colsData || cols);
+      // 2. Sincroniza cards
+      const syncedCards = await syncCardsToDb(cardsData || []);
+      // 3. Atualiza o estado local
+      setCols(syncedCols);
+      setCards(syncedCards);
       setShowSnapPanel(false);
-      showT("✅ Snapshot carregado com sucesso!");
+      showT("✅ Snapshot carregado e sincronizado com o banco!");
     } catch (err) {
       showT("Erro ao aplicar snapshot: " + err.message, "err");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -5763,7 +5771,7 @@ function App() {
       ),
       !loading && view === "publicacoes" && isAdmin && /*#__PURE__*/React.createElement("div", { id: "view-content" },
         /*#__PURE__*/React.createElement(PublicationsHistory, {
-          onRestoreSnapshot: async (c, cl) => { applySnapshot(c, cl); setView("kanban"); }
+          onRestoreSnapshot: async (c, cl) => { await applySnapshot(c, cl); setView("kanban"); }
         })
       ),
       !loading && view === "calendario" && /*#__PURE__*/React.createElement("div", { id: "view-content" },
@@ -5983,4 +5991,3 @@ ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.c
 </script>
 </body>
 </html>
-```
