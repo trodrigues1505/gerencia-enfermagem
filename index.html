@@ -1,6 +1,3 @@
-Aqui está o código completo corrigido. O problema era que a função `deleteSnapshot` não estava definida e o `applySnapshot` tentava sincronizar com o banco, causando erros. Agora o carregamento de snapshots atualiza apenas o estado local, sem chamadas ao banco, e a exclusão funciona corretamente.
-
-```html
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
