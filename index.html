@@ -4545,13 +4545,36 @@ function InstallModal({
   }, "Após instalar, o app abre como aplicativo nativo, sem barra do browser.")));
 }
 
-/* ─── SNAPSHOT PANEL ─── */
-function SnapshotPanel({
-  snapshots,
-  onLoad,
-  onDelete,
-  onClose
-}) {
+/* ─── SNAPSHOT PANEL (MODIFICADO PARA IMPORTAR JSON) ─── */
+function SnapshotPanel({ snapshots, onLoad, onDelete, onClose }) {
+  const fileInputRef = React.useRef(null);
+
+  function handleImportClick() {
+    fileInputRef.current?.click();
+  }
+
+  function handleFileChange(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const importedSnap = JSON.parse(ev.target.result);
+        if (importedSnap && importedSnap.cards && importedSnap.cols) {
+          if (!importedSnap.id) importedSnap.id = Date.now();
+          if (!importedSnap.label) importedSnap.label = "Importado " + new Date().toLocaleString("pt-BR");
+          onLoad(importedSnap);
+        } else {
+          alert("Arquivo JSON inválido: deve conter 'cards' e 'cols'.");
+        }
+      } catch (err) {
+        alert("Erro ao ler o arquivo: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // Permite importar o mesmo arquivo novamente
+  }
+
   return /*#__PURE__*/React.createElement(ModalShell, {
     title: "Snapshots salvos",
     subtitle: "Carregar estado anterior",
@@ -4561,7 +4584,19 @@ function SnapshotPanel({
       variant: "ghost",
       onClick: onClose
     }, "Fechar")
-  }, snapshots.length === 0 && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 12, display: "flex", gap: 8 }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: handleImportClick,
+    style: { fontSize: 12, padding: "6px 12px" }
+  }, "📂 Importar JSON"), /*#__PURE__*/React.createElement("input", {
+    ref: fileInputRef,
+    type: "file",
+    accept: ".json,application/json",
+    style: { display: "none" },
+    onChange: handleFileChange
+  })), snapshots.length === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       padding: "32px",
@@ -5668,7 +5703,7 @@ function App() {
       showT("Erro ao gerar PDF: " + e.message, "err");
     }
   }
-  async function saveSnapshot() {
+  function saveSnapshot() {
     const colsData = isAdmin ? cols : pubCols || cols;
     const cardsData = isAdmin ? cards : pubCards || [];
     const snap = {
@@ -5682,27 +5717,13 @@ function App() {
     const updated = [snap, ...list].slice(0, 20); // mantém últimos 20
     saveLS("ge_snapshots", updated);
     setSnapshots(updated);
-
-    // Busca também os dados da planilha de remoção (Supabase) para incluir no mesmo backup
-    let remocoesData = [];
-    let remocoesErro = false;
-    try {
-      remocoesData = await sbGet("remocoes", "select=*");
-    } catch (e) {
-      remocoesErro = true;
-      console.error("Erro ao buscar dados da planilha de remoção:", e);
-    }
-
-    const backup = { ...snap, remocoes: remocoesData };
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(snap, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    const dateFile = todayStr().replace(/\//g, "-");
-    const timeFile = nowStr().replace(/:/g, "-");
-    a.download = "kanban-" + dateFile + "-" + timeFile + ".json";
+    a.download = "ge-backup-" + new Date().toISOString().slice(0,16).replace("T","-").replace(/:/g,"-") + ".json";
     a.click();
     URL.revokeObjectURL(a.href);
-    showT(remocoesErro ? "💾 Kanban salvo (falha ao incluir planilha de remoção)." : "💾 Kanban e planilha de remoção salvos!");
+    showT("💾 Snapshot salvo e baixado!");
   }
   function loadSnapshot(snap) {
     setCards(snap.cards || []);
