@@ -155,10 +155,10 @@ const GRAV_MAP = {
   urgencia:        {label:"URGÊNCIA",        bg:"#FEF9C3",fc:"#713F12",bd:"#FDE047"},
   menor_gravidade: {label:"MENOR GRAVIDADE", bg:"#DCFCE7",fc:"#14532D",bd:"#86EFAC"},
   agendamento:     {label:"AGENDAMENTO",     bg:"#F1F5F9",fc:"#475569",bd:"#E2E8F0"},
-  VERMELHO:        {label:"VERMELHO",        bg:"#FEE2E2",fc:"#991B1B",bd:"#FCA5A5"},
-  AMARELO:         {label:"AMARELO",         bg:"#FEF9C3",fc:"#713F12",bd:"#FDE047"},
-  VERDE:           {label:"VERDE",           bg:"#DCFCE7",fc:"#14532D",bd:"#86EFAC"},
-  CINZA:           {label:"CINZA",           bg:"#F1F5F9",fc:"#475569",bd:"#E2E8F0"},
+  VERMELHO:        {label:"EMERGÊNCIA",      bg:"#FEE2E2",fc:"#991B1B",bd:"#FCA5A5"},
+  AMARELO:         {label:"URGÊNCIA",        bg:"#FEF9C3",fc:"#713F12",bd:"#FDE047"},
+  VERDE:           {label:"MENOR GRAVIDADE", bg:"#DCFCE7",fc:"#14532D",bd:"#86EFAC"},
+  CINZA:           {label:"AGENDAMENTO",     bg:"#F1F5F9",fc:"#475569",bd:"#E2E8F0"},
 };
 function gravInfo(v) { return GRAV_MAP[v] || {label:v||"—",bg:"#F1F5F9",fc:"#475569",bd:"#E2E8F0"}; }
 
@@ -691,7 +691,7 @@ function App(){
                     <td><Cell rowId={r.id} field="diagnostico" value={r.diagnostico} onSave={handleCell}/></td>
                     <td>
                       {r.status
-                        ?<div style={{padding:"2px 6px"}}><span className={`sb ${S_CLS[r.status]||"se"}`} title={r.status} style={{cursor:"pointer"}} onClick={()=>handleCell(r.id,"status","")}>{r.status.length>22?r.status.slice(0,22)+"…":r.status}</span></div>
+                        ?<div style={{padding:"2px 6px"}}><span className={`sb ${S_CLS[r.status]||"se"}`} title={r.status} style={{cursor:"pointer"}} onClick={()=>handleCell(r.id,"status","")}>{r.status}</span></div>
                         :<Cell rowId={r.id} field="status" value={r.status} tipo="sel" optsKey="S_OPTS" onSave={handleCell}/>
                       }
                     </td>
