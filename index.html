@@ -753,9 +753,9 @@ function CardModal({
       });
       setShowAiBox(false);
       setAiText("");
-      setAiStatus(c.nome || c.idade || c.hd || c.ficha_cross || c.medico_solic || c.hora_adm
+      setAiStatus(c._aviso ? "⚠ " + c._aviso : (c.nome || c.idade || c.hd || c.ficha_cross || c.medico_solic || c.hora_adm
         ? "✓ Campos preenchidos!"
-        : "⚠ A IA não retornou dados reconhecíveis deste texto. Confira o texto colado ou preencha manualmente.");
+        : "⚠ A IA não retornou dados reconhecíveis deste texto. Confira o texto colado ou preencha manualmente."));
     } catch(e) {
       setAiStatus("Erro: " + e.message);
       setAiLoading(false);
@@ -5094,6 +5094,22 @@ function App() {
     }
   }
 
+  async function onDelAll() {
+    if (cards.length === 0) return;
+    const conf = window.prompt(`Isso vai excluir TODOS os ${cards.length} cards do Kanban, permanentemente. Digite EXCLUIR para confirmar:`);
+    if (conf !== "EXCLUIR") return;
+    let ok = 0, fail = 0;
+    for (const c of [...cards]) {
+      try {
+        await fn("cards-write", { action: "delete", id: c.id }, userId);
+        ok++;
+      } catch (ex) { fail++; }
+    }
+    setCards([]);
+    setSelected(null);
+    showT(`${ok} card(s) excluído(s)${fail > 0 ? ` — ${fail} falharam` : ""}.`, fail > 0 ? "err" : "ok");
+  }
+
   async function undoDelete(id) {
     const item = undoQueue.find(x => x.id === id);
     if (!item) return;
@@ -5576,7 +5592,10 @@ function App() {
     const blob = new Blob([JSON.stringify(snap, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "ge-backup-" + new Date().toISOString().slice(0,16).replace("T","-").replace(/:/g,"-") + ".json";
+    const now = new Date();
+    const pad = n => String(n).padStart(2, "0");
+    const fname = `kanban-${pad(now.getDate())}-${pad(now.getMonth()+1)}-${now.getFullYear()}-${pad(now.getHours())}-${pad(now.getMinutes())}.json`;
+    a.download = fname;
     a.click();
     URL.revokeObjectURL(a.href);
     showT("💾 Snapshot salvo e baixado!");
@@ -5746,7 +5765,8 @@ function App() {
       /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center" } },
         /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6 } },
           /*#__PURE__*/React.createElement("button", { onClick: saveSnapshot, style: { padding: "3px 10px", border: "1px solid #FDE68A", borderRadius: 5, background: "none", color: "#92400E", cursor: "pointer", fontSize: 11, fontWeight: 600 } }, "💾 Salvar"),
-          /*#__PURE__*/React.createElement("button", { onClick: () => setShowSnapPanel(true), style: { padding: "3px 10px", border: "1px solid #FDE68A", borderRadius: 5, background: "none", color: "#92400E", cursor: "pointer", fontSize: 11 } }, "📂 Carregar (", snapshots.length, ")")
+          /*#__PURE__*/React.createElement("button", { onClick: () => setShowSnapPanel(true), style: { padding: "3px 10px", border: "1px solid #FDE68A", borderRadius: 5, background: "none", color: "#92400E", cursor: "pointer", fontSize: 11 } }, "📂 Carregar (", snapshots.length, ")"),
+          /*#__PURE__*/React.createElement("button", { onClick: onDelAll, title: "Excluir todos os cards do Kanban", style: { padding: "3px 10px", border: "1px solid #FCA5A5", borderRadius: 5, background: "none", color: "#B91C1C", cursor: "pointer", fontSize: 11, fontWeight: 600 } }, "🗑 Limpar todos os cards")
         ),
         /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: "#92400E" } }, "Atalhos: ", /*#__PURE__*/React.createElement("kbd", { style: { background: "#FDE68A", padding: "1px 4px", borderRadius: 3, fontFamily: "monospace" } }, "N"), " novo paciente\u00A0", /*#__PURE__*/React.createElement("kbd", { style: { background: "#FDE68A", padding: "1px 4px", borderRadius: 3, fontFamily: "monospace" } }, "P"), " publicar\u00A0", /*#__PURE__*/React.createElement("kbd", { style: { background: "#FDE68A", padding: "1px 4px", borderRadius: 3, fontFamily: "monospace" } }, "Esc"), " fechar")
       )
