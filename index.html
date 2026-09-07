@@ -4545,36 +4545,15 @@ function InstallModal({
   }, "Após instalar, o app abre como aplicativo nativo, sem barra do browser.")));
 }
 
-/* ─── SNAPSHOT PANEL (MODIFICADO PARA IMPORTAR JSON) ─── */
-function SnapshotPanel({ snapshots, onLoad, onDelete, onClose }) {
+/* ─── SNAPSHOT PANEL ─── */
+function SnapshotPanel({
+  snapshots,
+  onLoad,
+  onDelete,
+  onClose,
+  onImportFile
+}) {
   const fileInputRef = React.useRef(null);
-
-  function handleImportClick() {
-    fileInputRef.current?.click();
-  }
-
-  function handleFileChange(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const importedSnap = JSON.parse(ev.target.result);
-        if (importedSnap && importedSnap.cards && importedSnap.cols) {
-          if (!importedSnap.id) importedSnap.id = Date.now();
-          if (!importedSnap.label) importedSnap.label = "Importado " + new Date().toLocaleString("pt-BR");
-          onLoad(importedSnap);
-        } else {
-          alert("Arquivo JSON inválido: deve conter 'cards' e 'cols'.");
-        }
-      } catch (err) {
-        alert("Erro ao ler o arquivo: " + err.message);
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = ''; // Permite importar o mesmo arquivo novamente
-  }
-
   return /*#__PURE__*/React.createElement(ModalShell, {
     title: "Snapshots salvos",
     subtitle: "Carregar estado anterior",
@@ -4585,18 +4564,39 @@ function SnapshotPanel({ snapshots, onLoad, onDelete, onClose }) {
       onClick: onClose
     }, "Fechar")
   }, /*#__PURE__*/React.createElement("div", {
-    style: { marginBottom: 12, display: "flex", gap: 8 }
-  }, /*#__PURE__*/React.createElement(Btn, {
-    variant: "ghost",
-    onClick: handleImportClick,
-    style: { fontSize: 12, padding: "6px 12px" }
-  }, "📂 Importar JSON"), /*#__PURE__*/React.createElement("input", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+      padding: "0 0 12px 0",
+      marginBottom: 12,
+      borderBottom: "1px solid #F1F5F9"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#94A3B8"
+    }
+  }, "Importar um arquivo .json baixado anteriormente"), /*#__PURE__*/React.createElement("input", {
     ref: fileInputRef,
     type: "file",
     accept: ".json,application/json",
     style: { display: "none" },
-    onChange: handleFileChange
-  })), snapshots.length === 0 && /*#__PURE__*/React.createElement("div", {
+    onChange: (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file && onImportFile) onImportFile(file);
+      e.target.value = "";
+    }
+  }), /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: () => fileInputRef.current && fileInputRef.current.click(),
+    style: {
+      fontSize: 11,
+      padding: "4px 12px",
+      flexShrink: 0
+    }
+  }, "📁 Importar JSON")), snapshots.length === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       padding: "32px",
@@ -5740,6 +5740,27 @@ function App() {
     const updated = snapshots.filter(s => s.id !== id);
     saveLS("ge_snapshots", updated);
     setSnapshots(updated);
+  }
+  function importSnapshotFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const snap = JSON.parse(e.target.result);
+        if (!snap || (!Array.isArray(snap.cards) && !Array.isArray(snap.cols))) {
+          showT("Arquivo JSON inválido: formato não reconhecido.", "err");
+          return;
+        }
+        setCards(snap.cards || []);
+        setCols(snap.cols || cols);
+        setShowSnapPanel(false);
+        showT("📁 Arquivo \"" + file.name + "\" importado com sucesso!");
+      } catch (err) {
+        showT("Erro ao ler o arquivo JSON: " + err.message, "err");
+      }
+    };
+    reader.onerror = () => showT("Erro ao ler o arquivo.", "err");
+    reader.readAsText(file);
   }
   function newCard(col = "pendente") {
     setSelected({
@@ -6920,7 +6941,8 @@ const NavBtn = ({
     snapshots: snapshots,
     onLoad: loadSnapshot,
     onDelete: deleteSnapshot,
-    onClose: () => setShowSnapPanel(false)
+    onClose: () => setShowSnapPanel(false),
+    onImportFile: importSnapshotFile
   }), /*#__PURE__*/React.createElement(Toast, {
     toast: toast
   }));
