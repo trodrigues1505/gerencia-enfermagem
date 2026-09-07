@@ -211,6 +211,7 @@ const Ico=(({n,s=14})=>{
     check:<polyline points="20 6 9 12 4 10"/>,
     excel:<><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></>,
     pulse:<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>,
+    download:<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
   };
   return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{d[n]}</svg>;
 });
@@ -472,6 +473,7 @@ function App(){
   const [saving,setSaving]=useState(false);
   const [modal,setModal]=useState(null);
   const [showAceite,setShowAceite]=useState(false);
+  const jsonFileRef=useRef(null);
   const [search,setSearch]=useState("");
   const [fG,setFG]=useState("");
   const [fS,setFS]=useState("");
@@ -545,6 +547,32 @@ function App(){
     await load();
   };
 
+  const FIELDS=COLS.map(([f])=>f);
+  const handleImportJSON=async(file)=>{
+    if(!file)return;
+    try{
+      const text=await file.text();
+      const json=JSON.parse(text);
+      let items=[];
+      if(Array.isArray(json))items=json;
+      else if(Array.isArray(json.remocoes))items=json.remocoes;
+      else{push("JSON inválido: nenhum dado de remoção encontrado no arquivo.","err");return;}
+      if(items.length===0){push("Nenhum registro encontrado no arquivo.","err");return;}
+      let ok=0,fail=0;
+      for(const item of items){
+        try{
+          const p={};
+          FIELDS.forEach(f=>{if(item[f]!==undefined&&item[f]!==null&&item[f]!=="")p[f]=item[f];});
+          if(Object.keys(p).length===0)continue;
+          await api({action:"create",...p});
+          ok++;
+        }catch{fail++;}
+      }
+      push(`${ok} registro${ok!==1?"s":""} importado${ok!==1?"s":""} do JSON${fail>0?` (${fail} erro${fail!==1?"s":""})`:""}`,fail>0?"err":"ok");
+      await load();
+    }catch(e){push("Erro ao ler arquivo JSON: "+e.message,"err");}
+  };
+
   function toggleSort(col){if(sc===col)setSd(d=>d==="asc"?"desc":"asc");else{setSc(col);setSd("asc");}}
 
   const filtered=useMemo(()=>{
@@ -591,6 +619,26 @@ function App(){
     }catch(e){push("Erro: "+e.message,"err");}
   }
 
+  function exportJSON(){
+    try{
+      const data=filtered.map(r=>{
+        const o={};
+        COLS.forEach(([f])=>{o[f]=r[f]||"";});
+        return o;
+      });
+      const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      a.href=url;
+      a.download=`remocoes_${new Date().toISOString().slice(0,10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      push("JSON exportado!");
+    }catch(e){push("Erro: "+e.message,"err");}
+  }
+
   return(
     <div className="app">
       <div className="topbar">
@@ -622,7 +670,11 @@ function App(){
           {(search||fG||fS||fM)&&<button className="btn btn-g btn-sm" onClick={()=>{setSearch("");setFG("");setFS("");setFM("");}}>✕</button>}
           <div style={{marginLeft:"auto",display:"flex",gap:6,flexShrink:0}}>
             <button className="btn btn-green" onClick={exportXLS}><Ico n="excel"/> Excel</button>
+            <button className="btn btn-green" onClick={exportJSON}><Ico n="download"/> Exportar JSON</button>
             <button className="btn btn-blue" onClick={()=>setShowAceite(true)}><Ico n="import"/> Aceite</button>
+            <input type="file" accept=".json,application/json" ref={jsonFileRef} style={{display:"none"}}
+              onChange={e=>{const f=e.target.files[0];e.target.value="";handleImportJSON(f);}}/>
+            <button className="btn btn-blue" onClick={()=>jsonFileRef.current&&jsonFileRef.current.click()}><Ico n="import"/> Importar JSON</button>
             <button className="btn btn-p" onClick={()=>setModal({})}><Ico n="plus"/> Novo</button>
           </div>
         </div>
