@@ -3396,7 +3396,7 @@ function CalendarView({
   cols
 }) {
   const today = new Date();
-  const [viewMode, setViewMode] = useState("month"); // month | range
+  const [viewMode, setViewMode] = useState("month");
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [selected, setSelected] = useState(null);
@@ -3408,7 +3408,6 @@ function CalendarView({
     saida: false,
     retorno: false
   });
-  // Range customizado
   const [rangeStart, setRangeStart] = useState(() => today.toISOString().split("T")[0]);
   const [rangeEnd, setRangeEnd] = useState(() => {
     const d = new Date(today);
@@ -4016,7 +4015,7 @@ function TimelineView({
   cols
 }) {
   const [filterCol, setFilterCol] = useState("all");
-  const [tlMode, setTlMode] = useState("paciente"); // 'paciente' | 'cronologico'
+  const [tlMode, setTlMode] = useState("paciente");
   const colLabel = cols.reduce((acc, c) => ({
     ...acc,
     [c.id]: c.label
@@ -4685,16 +4684,25 @@ function App() {
   const displayCards = isAdmin ? cards : pubCards || [];
   const displayCols = isAdmin ? cols : pubCols || cols;
 
+  // ===== Funções de login/logout =====
+  function handleLogin(user) {
+    setCurrentUser(user);
+    saveLS("ge_session", user);
+  }
+
+  function handleLogout() {
+    setCurrentUser(null);
+    localStorage.removeItem("ge_session");
+  }
+
   /* ── Funções de sincronização de snapshots ── */
   async function syncColsToDb(colsToSync) {
     const result = [];
     for (const col of colsToSync) {
       try {
-        // Tenta criar a coluna; se já existir, busca a existente
         const created = await fn("columns-write", { action: "create", body: col }, userId);
         result.push(created);
       } catch (e) {
-        // Se der erro (ex: coluna já existe), mantém a coluna local
         result.push(col);
       }
     }
@@ -4704,14 +4712,14 @@ function App() {
   async function syncCardsToDb(cardsToSync) {
     const result = [];
     for (const card of cardsToSync) {
-      const { id, ...body } = card; // remove ID antigo
+      const { id, ...body } = card;
       try {
         const created = await fn("cards-write", { action: "create", body }, userId);
         result.push(created);
       } catch (e) {
         console.error("Erro ao criar card:", e);
         showT("Erro ao sincronizar card: " + e.message, "err");
-        result.push(card); // fallback
+        result.push(card);
       }
     }
     return result;
@@ -4733,7 +4741,6 @@ function App() {
     }
   }
 
-  // Substitui as funções antigas
   async function loadSnapshot(snap) {
     await applySnapshot(snap.cards, snap.cols);
   }
@@ -5552,12 +5559,13 @@ function App() {
     return sortCol.dir === "asc" ? av.localeCompare(bv, "pt") : bv.localeCompare(av, "pt");
   }) : filtered;
 
-  /* ─── RENDER ─── */
+  // ===== Renderização =====
   if (!currentUser) return /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement(LoginScreen, { onLogin: handleLogin, showT: showT }),
     /*#__PURE__*/React.createElement(Toast, { toast: toast })
   );
 
+  // Funções de navegação
   const NavBtn = ({ id, label }) => /*#__PURE__*/React.createElement("button", {
     onClick: () => setView(id),
     style: {
