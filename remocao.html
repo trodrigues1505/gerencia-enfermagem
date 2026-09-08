@@ -513,31 +513,76 @@ const GRAV_LABEL_TO_KEY=(()=>{
   Object.entries(GRAV_MAP).forEach(([k,v])=>{ m[normHdr(v.label)]=k; m[normHdr(k)]=k; });
   return m;
 })();
+// Mapa final: qualquer representação -> valor aceito pelo banco (VERMELHO/AMARELO/VERDE/CINZA)
+const GRAV_TO_DB={
+  emergencia:"VERMELHO",urgencia:"AMARELO",menor_gravidade:"VERDE",agendamento:"CINZA",
+  VERMELHO:"VERMELHO",AMARELO:"AMARELO",VERDE:"VERDE",CINZA:"CINZA",
+};
 function normalizeGravValue(v){
-  if(!v)return v;
-  const key=GRAV_LABEL_TO_KEY[normHdr(v)];
-  return key||v; // se não reconhecer, mantém como veio (deixa o backend validar)
+  if(!v)return null;
+  // 1) tenta label em portugues (ex: "EMERGENCIA" -> "emergencia")
+  const intermediate=GRAV_LABEL_TO_KEY[normHdr(v)];
+  const key=intermediate||v;
+  // 2) converte para o valor aceito pelo banco
+  const dbVal=GRAV_TO_DB[key]||GRAV_TO_DB[normHdr(key)];
+  return dbVal||null;
 }
 
-// Converte data em vários formatos comuns (DD/MM/YYYY, DD/MM/YY, YYYY-MM-DD) para ISO YYYY-MM-DD
+// Converte data em varios formatos (DD/MM/YYYY, DD/MM/YY, YYYY-MM-DD) para ISO YYYY-MM-DD
+// Retorna null se o valor nao for reconhecivel como data valida
 function normalizeDateValue(v){
-  if(!v)return v;
+  if(!v)return null;
   v=String(v).trim();
-  if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v; // já é ISO
+  if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v; // ja e ISO
   const br=v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if(br){
     let [,d,m,y]=br;
     if(y.length===2)y="20"+y;
     return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
   }
-  return v; // formato não reconhecido, deixa como veio
+  return null; // nao reconhecido (ex: "N/A", texto livre) -> null para nao quebrar o banco
+}
+
+// Normaliza horario: aceita HH:MM ou HH:MM:SS, retorna HH:MM ou null
+function normalizeTimeValue(v){
+  if(!v)return null;
+  v=String(v).trim();
+  // HH:MM:SS -> HH:MM
+  const full=v.match(/^(\d{1,2}):(\d{2}):\d{2}$/);
+  if(full)return `${full[1].padStart(2,"0")}:${full[2]}`;
+  // HH:MM
+  if(/^\d{1,2}:\d{2}$/.test(v))return v;
+  return null; // nao e horario valido
+}
+
+// Normaliza tipo_ambulancia para os valores aceitos pelo banco
+function normalizeAmbValue(v){
+  if(!v)return null;
+  // remove acentos e compara
+  const u=String(v).trim().toUpperCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  if(u==="BASICA"||u==="BASICO")return "B\u00c1SICA";
+  if(u==="AVANCADA"||u==="AVANCADO")return "AVAN\u00c7ADA";
+  if(u==="UTI")return "UTI";
+  // ja veio com acento certo
+  const orig=String(v).trim().toUpperCase();
+  if(orig==="B\u00c1SICA")return "B\u00c1SICA";
+  if(orig==="AVAN\u00c7ADA")return "AVAN\u00c7ADA";
+  return null;
 }
 
 const DATE_FIELDS=new Set(COLS.filter(([,,,,tipo])=>tipo==="date").map(([f])=>f));
+const TIME_FIELDS=new Set(COLS.filter(([,,,,tipo])=>tipo==="time").map(([f])=>f));
 function normalizeRowValues(row){
   const out={...row};
   if(out.gravidade!==undefined)out.gravidade=normalizeGravValue(out.gravidade);
-  Object.keys(out).forEach(f=>{ if(DATE_FIELDS.has(f))out[f]=normalizeDateValue(out[f]); });
+  if(out.tipo_ambulancia!==undefined)out.tipo_ambulancia=normalizeAmbValue(out.tipo_ambulancia);
+  Object.keys(out).forEach(f=>{
+    if(DATE_FIELDS.has(f))out[f]=normalizeDateValue(out[f]);
+    if(TIME_FIELDS.has(f))out[f]=normalizeTimeValue(out[f]);
+  });
+  // remove campos null/undefined para nao mandar strings vazias ao banco
+  Object.keys(out).forEach(f=>{ if(out[f]===null||out[f]==="")delete out[f]; });
   return out;
 }
 
@@ -888,11 +933,16 @@ function App(){
   const handleSave=async(form)=>{
     setSaving(true);
     try{
-      const p={...form};
+      let p={...form};
       if(p.hora_solic_ambulancia&&p.horario_saida_ambulancia&&!p.tempo_espera)
         p.tempo_espera=calcTempo(p.hora_solic_ambulancia,p.horario_saida_ambulancia);
       if(p.horario_saida_ambulancia&&p.horario_retorno&&!p.duracao_remocao)
         p.duracao_remocao=calcTempo(p.horario_saida_ambulancia,p.horario_retorno);
+      // normaliza gravidade e tipo_ambulancia para os valores aceitos pelo banco
+      if(p.gravidade!==undefined&&p.gravidade!==null&&p.gravidade!=="")
+        p.gravidade=normalizeGravValue(p.gravidade)||null;
+      if(p.tipo_ambulancia!==undefined&&p.tipo_ambulancia!==null&&p.tipo_ambulancia!=="")
+        p.tipo_ambulancia=normalizeAmbValue(p.tipo_ambulancia)||null;
       Object.keys(p).forEach(k=>{if(p[k]==="")p[k]=null;});
       if(form.id){await api({action:"update",id:form.id,...p});push("Atualizado");}
       else{await api({action:"create",...p});push("Criado!");}
