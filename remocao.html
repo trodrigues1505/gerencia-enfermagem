@@ -117,7 +117,8 @@ select.fsel{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;color:
 .toast.err{background:#FEE2E2;border:1px solid #FCA5A5;color:#991B1B}
 @media(max-width:768px){.fg2,.fg3,.fg4{grid-template-columns:1fr}}
 /* Split button */
-.spb{display:inline-flex;align-items:stretch;border-radius:7px;overflow:visible;flex-shrink:0;position:relative}
+.spb{display:inline-flex;align-items:stretch;border-radius:7px;overflow:visible;flex-shrink:0;position:relative;z-index:10}
+.spb.open{z-index:600}
 .spb-main{border-radius:7px 0 0 7px;border-right:none!important;padding:5px 10px}
 .spb-arr{border-radius:0 7px 7px 0;border-left:1px solid rgba(0,0,0,.12)!important;padding:5px 7px;min-width:0}
 .spb-green .spb-main,.spb-green .spb-arr{background:#F0FDF4;color:#16A34A;border:1px solid #86EFAC}
