@@ -134,6 +134,31 @@ select.fsel{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;color:
 .spb-item svg{flex-shrink:0;color:#94A3B8}
 .spb-item:hover svg{color:#3B82F6}
 .spb-sep{height:1px;background:#F1F5F9;margin:2px 0}
+/* Dashboard Painel de Bordo */
+.dash{background:#F1F5F9;border-bottom:2px solid #E2E8F0;flex-shrink:0;overflow:hidden;transition:max-height .3s ease}
+.dash.closed{max-height:0;border-bottom:none}
+.dash.open{max-height:600px}
+.dash-inner{padding:12px 16px;display:flex;flex-direction:column;gap:10px}
+.dash-row{display:flex;gap:10px;flex-wrap:wrap}
+.dcard{background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:10px 14px;flex:1;min-width:140px}
+.dcard-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94A3B8;margin-bottom:6px}
+.dcard-val{font-size:22px;font-weight:800;color:#0F172A;line-height:1}
+.dcard-sub{font-size:10px;color:#64748B;margin-top:3px}
+.dcard-trend{font-size:10px;font-weight:600;margin-top:4px}
+.trend-up{color:#DC2626}.trend-dn{color:#16A34A}.trend-eq{color:#94A3B8}
+.dbars{background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:10px 14px;flex:2;min-width:220px}
+.dbar-row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.dbar-label{font-size:10px;color:#374151;min-width:90px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dbar-track{flex:1;height:6px;background:#F1F5F9;border-radius:99px;overflow:hidden}
+.dbar-fill{height:100%;border-radius:99px;transition:width .4s}
+.dbar-num{font-size:10px;font-weight:700;color:#374151;min-width:28px;text-align:right}
+.dgrav{display:flex;gap:8px;flex-wrap:wrap}
+.dgrav-chip{flex:1;min-width:80px;border-radius:8px;padding:8px 10px;text-align:center}
+.dgrav-chip .dv{font-size:20px;font-weight:800;line-height:1}
+.dgrav-chip .dl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:3px}
+.dmeses{display:flex;gap:4px;align-items:flex-end;height:48px}
+.dmeses-bar{flex:1;border-radius:3px 3px 0 0;min-width:10px;transition:height .3s;cursor:default}
+.dmeses-label{font-size:8px;color:#94A3B8;text-align:center;margin-top:2px}
 </style>
 </head>
 <body>
@@ -273,34 +298,71 @@ function SelOrFree({value,onChange,opts,isGrav}){
   );
 }
 
+// Navegacao por teclado entre celulas
+function navigateCell(currentTd, direction){
+  const td=currentTd.closest("td");
+  if(!td)return;
+  const tr=td.closest("tr");
+  const tbody=tr.closest("tbody");
+  const tds=[...tr.querySelectorAll("td")];
+  const colIdx=tds.indexOf(td);
+  const rows=[...tbody.querySelectorAll("tr")];
+  const rowIdx=rows.indexOf(tr);
+  let targetTd=null;
+  if(direction==="right"){targetTd=tds[colIdx+1];}
+  else if(direction==="left"){targetTd=tds[colIdx-1];}
+  else if(direction==="down"){const nr=rows[rowIdx+1];if(nr){const ntds=[...nr.querySelectorAll("td")];targetTd=ntds[colIdx];}}
+  else if(direction==="up"){const nr=rows[rowIdx-1];if(nr){const ntds=[...nr.querySelectorAll("td")];targetTd=ntds[colIdx];}}
+  if(targetTd){
+    // fecha a celula atual e abre a proxima
+    const clickable=targetTd.querySelector("[data-nav]")||targetTd.querySelector("div[title='Clique para editar']");
+    if(clickable)clickable.click();
+    targetTd.scrollIntoView({block:"nearest",inline:"nearest"});
+  }
+}
+
 // Célula editável — texto quebra na célula
 function Cell({rowId,field,value,tipo,optsKey,onSave}){
   const [ed,setEd]=useState(false);
   const [val,setVal]=useState(value||"");
   const [free,setFree]=useState(false);
   const ref=useRef();
+  const wrapRef=useRef();
   const OPTS_MAP={S_OPTS,G_OPTS,ST_OPTS,P_OPTS,A_OPTS};
   const opts=optsKey?OPTS_MAP[optsKey]:null;
   useEffect(()=>{setVal(value||"");},[value]);
   useEffect(()=>{if(ed&&ref.current)ref.current.focus();},[ed]);
   function commit(){setEd(false);setFree(false);if(val!==(value||""))onSave(rowId,field,val);}
+  function handleKeyNav(e){
+    const el=wrapRef.current;
+    if(e.key==="Tab"){e.preventDefault();commit();navigateCell(el,e.shiftKey?"left":"right");}
+    else if(e.key==="ArrowDown"&&!e.shiftKey){e.preventDefault();commit();navigateCell(el,"down");}
+    else if(e.key==="ArrowUp"&&!e.shiftKey){e.preventDefault();commit();navigateCell(el,"up");}
+    else if(e.key==="ArrowRight"&&e.ctrlKey){e.preventDefault();commit();navigateCell(el,"right");}
+    else if(e.key==="ArrowLeft"&&e.ctrlKey){e.preventDefault();commit();navigateCell(el,"left");}
+  }
   // Readonly (calculado)
   if(tipo==="ro") return(
     <div style={{padding:"2px 6px",fontSize:10,color:value?"#7C3AED":"#CBD5E1",fontWeight:value?700:400,whiteSpace:"nowrap"}}>{value||"—"}</div>
   );
   if(!ed) return(
-    <div style={{padding:"2px 6px",minHeight:24,display:"flex",alignItems:"center",cursor:"pointer",fontSize:11,
+    <div ref={wrapRef} data-nav="1" style={{padding:"2px 6px",minHeight:24,display:"flex",alignItems:"center",cursor:"pointer",fontSize:11,
       wordBreak:"break-word",whiteSpace:"normal",lineHeight:1.3,color:val?"#374151":"#CBD5E1",fontStyle:val?"normal":"italic"}}
       onClick={()=>setEd(true)} title="Clique para editar">
       {val||"—"}
     </div>
   );
   if(opts && !free) return(
+    <div ref={wrapRef}>
     <select ref={ref} style={{width:"100%",height:"100%",minHeight:24,padding:"2px 4px",border:"none",
       borderLeft:"2px solid #3B82F6",background:"#EFF6FF",fontSize:10,color:"#0F172A",outline:"none",appearance:"none",cursor:"pointer"}}
       value={val} onChange={e=>{if(e.target.value==="__free__"){setFree(true);setVal("");}else setVal(e.target.value);}}
       onBlur={commit}
-      onKeyDown={e=>e.key==="Escape"&&(setEd(false),setVal(value||""))}>
+      onKeyDown={e=>{
+        if(e.key==="Escape"){setEd(false);setVal(value||"");return;}
+        if(e.key==="Enter"){commit();return;}
+        handleKeyNav(e);
+      }}>
       <option value="">—</option>
       {opts.map(o=>{
         const g=field==="gravidade"?gravInfo(o):null;
@@ -308,14 +370,21 @@ function Cell({rowId,field,value,tipo,optsKey,onSave}){
       })}
       <option value="__free__">✏️ Digitar…</option>
     </select>
+    </div>
   );
   return(
+    <div ref={wrapRef}>
     <input ref={free?ref:null} style={{width:"100%",minHeight:24,padding:"2px 6px",border:"none",
       borderLeft:"2px solid #3B82F6",background:"#EFF6FF",fontSize:11,color:"#0F172A",outline:"none"}}
       type={tipo==="sel"?"text":tipo||"text"} value={val}
       placeholder={free?"Digite o valor...":""}
       onChange={e=>setVal(e.target.value)} onBlur={commit}
-      onKeyDown={e=>{if(e.key==="Enter")commit();if(e.key==="Escape"){setEd(false);setVal(value||"");setFree(false);}}}/>
+      onKeyDown={e=>{
+        if(e.key==="Enter"){commit();return;}
+        if(e.key==="Escape"){setEd(false);setVal(value||"");setFree(false);return;}
+        handleKeyNav(e);
+      }}/>
+    </div>
   );
 }
 
@@ -869,6 +938,197 @@ function useColResize(initW){
   return {ws,startDrag};
 }
 
+// Dados do Painel de Bordo — Regulação SCFM 2025
+const PAINEL_MESES=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+const PAINEL_DATA={
+  atendimentos:{media24:368,meses:[322,328,320,321,null,null,null,null,null,null,null,null]},
+  ps:{media24:219,meses:[162,184,155,172,null,null,null,null,null,null,null,null]},
+  cm:{media24:126,meses:[124,95,126,109,null,null,null,null,null,null,null,null]},
+  ped:{media24:16,meses:[24,12,13,5,null,null,null,null,null,null,null,null]},
+  mat:{media24:17,meses:[11,11,12,10,null,null,null,null,null,null,null,null]},
+  uti:{media24:0,meses:[0,0,3,18,null,null,null,null,null,null,null,null]},
+  basica:{media24:335,meses:[301,292,282,305,null,null,null,null,null,null,null,null]},
+  avancada:{media24:33,meses:[19,36,28,16,null,null,null,null,null,null,null,null]},
+  tomografia:{media24:153,meses:[127,137,114,138,null,null,null,null,null,null,null,null]},
+  verm:{media24:59,meses:[50,78,36,43,null,null,null,null,null,null,null,null]},
+  amar:{media24:235,meses:[206,222,221,224,null,null,null,null,null,null,null,null]},
+  verde:{media24:75.5,meses:[4,4,3,5,null,null,null,null,null,null,null,null]},
+  especialidades:{
+    "Ortopedia":{media24:68,meses:[45,61,75,58]},
+    "Cir. Geral":{media24:50,meses:[67,49,48,35]},
+    "Psiquiatria":{media24:11,meses:[16,16,11,17]},
+    "Neurologia":{media24:15,meses:[8,11,6,9]},
+    "Outros":{media24:13,meses:[25,14,23,20]},
+    "Tomografia":{media24:153,meses:[127,137,114,138]},
+    "Cardiologia":{media24:11,meses:[9,3,6,12]},
+    "Obstetr.":{media24:11,meses:[5,8,12,3]},
+    "Urologia":{media24:5,meses:[5,0,8,4]},
+    "Nefrologia":{media24:5,meses:[1,3,1,1]},
+  }
+};
+
+function MiniBarChart({meses,data,color}){
+  const vals=data.filter(v=>v!==null);
+  const max=Math.max(...vals,1);
+  return(
+    <div>
+      <div className="dmeses">
+        {meses.map((m,i)=>{
+          const v=data[i];
+          if(v===null)return <div key={i} style={{flex:1}}/>;
+          const h=Math.round((v/max)*44)+4;
+          return(
+            <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end"}}>
+              <div title={`${m}: ${v}`} className="dmeses-bar" style={{background:color||"#3B82F6",height:h,opacity:.85}}/>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{display:"flex",gap:4}}>
+        {meses.map((m,i)=>(
+          <div key={i} className="dmeses-label" style={{flex:1,opacity:PAINEL_DATA.atendimentos.meses[i]===null?.3:1}}>{m}</div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Trend({atual,media24}){
+  if(!atual||!media24)return null;
+  const pct=Math.round(((atual-media24)/media24)*100);
+  if(pct>5)return <span className="dcard-trend trend-up">▲ {Math.abs(pct)}% vs 2024</span>;
+  if(pct<-5)return <span className="dcard-trend trend-dn">▼ {Math.abs(pct)}% vs 2024</span>;
+  return <span className="dcard-trend trend-eq">≈ estável vs 2024</span>;
+}
+
+function Dashboard({open}){
+  const d=PAINEL_DATA;
+  // usa o ultimo mes disponivel
+  const lastIdx=d.atendimentos.meses.reduce((a,v,i)=>v!==null?i:a,-1);
+  const mes=PAINEL_MESES[lastIdx]||"—";
+  const atend=d.atendimentos.meses[lastIdx]||0;
+  const ps=d.ps.meses[lastIdx]||0;
+  const cm=d.cm.meses[lastIdx]||0;
+  const ped=d.ped.meses[lastIdx]||0;
+  const mat=d.mat.meses[lastIdx]||0;
+  const utiN=d.uti.meses[lastIdx]||0;
+  const bas=d.basica.meses[lastIdx]||0;
+  const ava=d.avancada.meses[lastIdx]||0;
+  const tomo=d.tomografia.meses[lastIdx]||0;
+  const verm=d.verm.meses[lastIdx]||0;
+  const amar=d.amar.meses[lastIdx]||0;
+  const verde=d.verde.meses[lastIdx]||0;
+  const totalGrav=verm+amar+verde||1;
+  const espec=d.especialidades;
+  const maxEspec=Math.max(...Object.values(espec).map(e=>e.meses[lastIdx]||0),1);
+
+  return(
+    <div className={`dash ${open?"open":"closed"}`}>
+      <div className="dash-inner">
+        {/* Linha 1: KPIs principais */}
+        <div className="dash-row">
+          <div className="dcard" style={{minWidth:120}}>
+            <div className="dcard-title">Atend. {mes}/2025</div>
+            <div className="dcard-val">{atend}</div>
+            <Trend atual={atend} media24={d.atendimentos.media24}/>
+          </div>
+          <div className="dcard" style={{minWidth:120}}>
+            <div className="dcard-title">Pronto Socorro</div>
+            <div className="dcard-val">{ps}</div>
+            <div className="dcard-sub">de {atend} atend.</div>
+          </div>
+          <div className="dcard" style={{minWidth:120}}>
+            <div className="dcard-title">Clínica Médica</div>
+            <div className="dcard-val">{cm}</div>
+            <Trend atual={cm} media24={d.cm.media24}/>
+          </div>
+          <div className="dcard" style={{minWidth:80}}>
+            <div className="dcard-title">Pediatria</div>
+            <div className="dcard-val">{ped}</div>
+            <Trend atual={ped} media24={d.ped.media24}/>
+          </div>
+          <div className="dcard" style={{minWidth:80}}>
+            <div className="dcard-title">Maternidade</div>
+            <div className="dcard-val">{mat}</div>
+            <Trend atual={mat} media24={d.mat.media24}/>
+          </div>
+          <div className="dcard" style={{minWidth:80,borderColor:utiN>0?"#FCA5A5":"#E2E8F0",background:utiN>0?"#FEF2F2":"#fff"}}>
+            <div className="dcard-title" style={{color:utiN>0?"#991B1B":"#94A3B8"}}>UTI</div>
+            <div className="dcard-val" style={{color:utiN>0?"#DC2626":"#CBD5E1"}}>{utiN}</div>
+          </div>
+          {/* Mini gráfico de atendimentos */}
+          <div className="dcard" style={{flex:2,minWidth:200}}>
+            <div className="dcard-title">Atendimentos 2025</div>
+            <MiniBarChart meses={PAINEL_MESES} data={d.atendimentos.meses} color="#3B82F6"/>
+          </div>
+        </div>
+
+        {/* Linha 2: Gravidade + Ambulância + Especialidades */}
+        <div className="dash-row">
+          {/* Gravidade */}
+          <div className="dcard" style={{minWidth:200}}>
+            <div className="dcard-title">Gravidade — {mes}</div>
+            <div className="dgrav">
+              <div className="dgrav-chip" style={{background:"#FEE2E2"}}>
+                <div className="dv" style={{color:"#991B1B"}}>{verm}</div>
+                <div className="dl" style={{color:"#991B1B"}}>🔴 Vermelho</div>
+                <div style={{fontSize:9,color:"#B91C1C",marginTop:2}}>{Math.round(verm/totalGrav*100)}%</div>
+              </div>
+              <div className="dgrav-chip" style={{background:"#FEF9C3"}}>
+                <div className="dv" style={{color:"#713F12"}}>{amar}</div>
+                <div className="dl" style={{color:"#713F12"}}>🟡 Amarelo</div>
+                <div style={{fontSize:9,color:"#92400E",marginTop:2}}>{Math.round(amar/totalGrav*100)}%</div>
+              </div>
+              <div className="dgrav-chip" style={{background:"#DCFCE7"}}>
+                <div className="dv" style={{color:"#14532D"}}>{verde}</div>
+                <div className="dl" style={{color:"#14532D"}}>🟢 Verde</div>
+                <div style={{fontSize:9,color:"#166534",marginTop:2}}>{Math.round(verde/totalGrav*100)}%</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Ambulância */}
+          <div className="dcard" style={{minWidth:160}}>
+            <div className="dcard-title">Tipo Ambulância — {mes}</div>
+            <div style={{marginTop:4}}>
+              <div className="dbar-row">
+                <span className="dbar-label">Básica (SBV)</span>
+                <div className="dbar-track"><div className="dbar-fill" style={{width:`${Math.round(bas/(bas+ava||1)*100)}%`,background:"#3B82F6"}}/></div>
+                <span className="dbar-num">{bas}</span>
+              </div>
+              <div className="dbar-row">
+                <span className="dbar-label">Avançada (SAV)</span>
+                <div className="dbar-track"><div className="dbar-fill" style={{width:`${Math.round(ava/(bas+ava||1)*100)}%`,background:"#EF4444"}}/></div>
+                <span className="dbar-num">{ava}</span>
+              </div>
+              <div className="dbar-row">
+                <span className="dbar-label">Tomografia</span>
+                <div className="dbar-track"><div className="dbar-fill" style={{width:`${Math.round(tomo/(atend||1)*100)}%`,background:"#8B5CF6"}}/></div>
+                <span className="dbar-num">{tomo}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Especialidades */}
+          <div className="dbars" style={{flex:3}}>
+            <div className="dcard-title">Especialidades — {mes}</div>
+            {Object.entries(espec).map(([label,dados])=>{
+              const v=dados.meses[lastIdx]||0;
+              return(
+                <div key={label} className="dbar-row">
+                  <span className="dbar-label" title={label}>{label}</span>
+                  <div className="dbar-track"><div className="dbar-fill" style={{width:`${Math.round(v/maxEspec*100)}%`,background:"#6366F1"}}/></div>
+                  <span className="dbar-num">{v}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SplitButton({label,icon,variant,items,onMain}){
   const [open,setOpen]=useState(false);
   const ref=useRef();
@@ -999,6 +1259,7 @@ function App(){
   };
 
   const [showPaste,setShowPaste]=useState(false);
+  const [showDash,setShowDash]=useState(false);
 
   // O Kanban usa gravidades extras (andamento_cor, finalizado_cor) que não existem
   // no enum de gravidade da planilha de remoções — isso causava erro 500 ao importar
@@ -1138,12 +1399,18 @@ function App(){
   function exportXLS(){
     if(!window.XLSX){push("XLSX não carregado","err");return;}
     try{
-      const hdr=["#",...COLS.map(([,pl])=>pl)];
-      const data=filtered.map((r,i)=>[i+1,...COLS.map(([f])=>{
-        const v=r[f]||"";
-        if(f==="data_solicitacao"&&v){try{return new Date(v+"T12:00:00").toLocaleDateString("pt-BR");}catch{return v;}}
-        if(f==="gravidade"&&v)return gravInfo(v).label;
+      const safe=v=>{
+        if(v===null||v===undefined)return "";
+        if(typeof v==="object")return String(v);
         return v;
+      };
+      const hdr=["#",...COLS.map(([,pl])=>String(pl||""))];
+      const snapshot=[...filtered]; // captura o array neste momento
+      const data=snapshot.map((r,i)=>[i+1,...COLS.map(([f])=>{
+        const v=safe(r[f]);
+        if(f==="data_solicitacao"&&v){try{return new Date(v+"T12:00:00").toLocaleDateString("pt-BR");}catch{return String(v);}}
+        if(f==="gravidade"&&v)return String(gravInfo(v).label||v);
+        return String(v);
       })]);
       const xlsSheet=window.XLSX.utils.aoa_to_sheet([hdr,...data]);
       const cw={data_solicitacao:12,horario_solicitacao:8,ficha_cross:18,nome_paciente:26,setor:18,procedimento:14,especialidade:18,diagnostico:24,status:28,gravidade:14,data_resposta_cross:12,horario_resposta_cross:8,instituicao_destino:20,tipo_ambulancia:12,data_saida_ambulancia:12,hora_solic_ambulancia:10,horario_saida_ambulancia:10,tempo_espera:10,observacao:28,enfermeiro:16,tecnico_auxiliar:16,medico:16,horario_retorno:10,duracao_remocao:12};
@@ -1208,6 +1475,10 @@ function App(){
           <div style={{marginLeft:"auto",display:"flex",gap:6,flexShrink:0,alignItems:"center"}}>
             <input type="file" accept=".json,application/json" ref={jsonFileRef} style={{display:"none"}}
               onChange={e=>{const f=e.target.files[0];e.target.value="";handleImportJSON(f);}}/>
+            <button className="btn btn-g" onClick={()=>setShowDash(d=>!d)} style={{gap:5}}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              {showDash?"Fechar Painel":"📊 Painel"}
+            </button>
             <SplitButton
               label="Exportar"
               icon="download"
@@ -1248,6 +1519,7 @@ function App(){
         <div className="chip"><span className="cl">⏱ Média espera</span><span className="cv" style={{color:"#7C3AED"}}>{stats.medStr}</span><span className="cl" style={{marginLeft:4}}>({stats.ct} reg.)</span></div>
       </div>
 
+      <Dashboard open={showDash}/>
       <div className="tw">
         {loading?(<div className="empty" style={{marginTop:60}}><Ico n="pulse" s={24}/><p>Carregando…</p></div>)
         :filtered.length===0?(<div className="empty" style={{marginTop:60}}><p>{rows.length===0?"Nenhum registro. Clique em «Novo» para começar.":"Nenhum resultado."}</p></div>)
