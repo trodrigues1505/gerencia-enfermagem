@@ -686,14 +686,23 @@ function App(){
 
   const [showPaste,setShowPaste]=useState(false);
 
-  // O Kanban usa gravidades extras (andamento_cor, finalizado_cor) que não existem
-  // no enum de gravidade da planilha de remoções — isso causava erro 500 ao importar
-  // pelo Aceite. Mapeamos para o valor equivalente mais próximo aceito pela planilha.
-  const KANBAN_GRAV_FALLBACK={andamento_cor:"urgencia",finalizado_cor:"agendamento"};
+  // O banco aceita APENAS os valores maiúsculos: VERMELHO, AMARELO, VERDE, CINZA.
+  // O Kanban usa chaves minúsculas (emergencia, urgencia, menor_gravidade, agendamento)
+  // e extras (andamento_cor, finalizado_cor) — tudo precisa ser convertido.
+  const KANBAN_TO_DB_GRAV={
+    emergencia:      "VERMELHO",
+    urgencia:        "AMARELO",
+    menor_gravidade: "VERDE",
+    agendamento:     "CINZA",
+    andamento_cor:   "AMARELO",
+    finalizado_cor:  "CINZA",
+    retorno:         "CINZA",
+    // valores já no formato do banco passam direto
+    VERMELHO:"VERMELHO", AMARELO:"AMARELO", VERDE:"VERDE", CINZA:"CINZA",
+  };
   function normalizeKanbanGrav(v){
-    if(!v)return "urgencia";
-    if(G_OPTS.includes(v))return v;
-    return KANBAN_GRAV_FALLBACK[v]||"urgencia";
+    if(!v)return "AMARELO";
+    return KANBAN_TO_DB_GRAV[v]||"AMARELO";
   }
 
   const handleImport=async(cards)=>{
