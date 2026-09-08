@@ -550,24 +550,195 @@ function PasteModal({onClose,onImport}){
 }
 
 // Modal: lista de erros de uma importação (Excel/JSON/Aceite), com nomes e motivo
-function ImportErrorsModal({data,onClose}){
+function ImportResultModal({data,onClose}){
+  // data = {tipo, ok, total, itens:[{nome,erro}]}
+  const hasErrors = data.itens && data.itens.length > 0;
   return(
     <div className="mbk">
-      <div className="mdl" style={{maxWidth:520}}>
+      <div className="mdl" style={{maxWidth:540}}>
         <div className="mhd">
-          <div><h2>⚠ Erros na importação</h2><p>{data.tipo} — {data.itens.length} registro{data.itens.length!==1?"s":""} não importado{data.itens.length!==1?"s":""}</p></div>
+          <div>
+            <h2>{hasErrors ? "⚠ Importação concluída com erros" : "✅ Importação concluída"}</h2>
+            <p style={{marginTop:4,fontSize:12,color:"#64748B"}}>{data.tipo}</p>
+          </div>
           <button className="btn btn-g btn-sm" onClick={onClose}><Ico n="x" s={13}/></button>
         </div>
         <div className="mbd">
-          {data.itens.map((it,i)=>(
-            <div key={i} style={{padding:"8px 10px",border:"1px solid #FCA5A5",background:"#FEF2F2",borderRadius:8,marginBottom:6}}>
-              <div style={{fontWeight:700,fontSize:12,color:"#0F172A"}}>{it.nome}</div>
-              <div style={{fontSize:11,color:"#991B1B",marginTop:2}}>{it.erro}</div>
+          {/* Resumo */}
+          <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+            <div style={{flex:1,minWidth:120,background:"#F0FDF4",border:"1px solid #86EFAC",borderRadius:8,padding:"10px 14px",textAlign:"center"}}>
+              <div style={{fontSize:22,fontWeight:800,color:"#16A34A"}}>{data.ok}</div>
+              <div style={{fontSize:11,color:"#166534",marginTop:2}}>importado{data.ok!==1?"s":""} com sucesso</div>
             </div>
-          ))}
+            {hasErrors&&(
+              <div style={{flex:1,minWidth:120,background:"#FEF2F2",border:"1px solid #FCA5A5",borderRadius:8,padding:"10px 14px",textAlign:"center"}}>
+                <div style={{fontSize:22,fontWeight:800,color:"#DC2626"}}>{data.itens.length}</div>
+                <div style={{fontSize:11,color:"#991B1B",marginTop:2}}>não importado{data.itens.length!==1?"s":""}</div>
+              </div>
+            )}
+            <div style={{flex:1,minWidth:120,background:"#F8FAFC",border:"1px solid #E2E8F0",borderRadius:8,padding:"10px 14px",textAlign:"center"}}>
+              <div style={{fontSize:22,fontWeight:800,color:"#475569"}}>{data.total||((data.ok||0)+(data.itens?.length||0))}</div>
+              <div style={{fontSize:11,color:"#64748B",marginTop:2}}>total processado{(data.total||0)!==1?"s":""}</div>
+            </div>
+          </div>
+          {/* Lista de erros */}
+          {hasErrors&&(
+            <>
+              <div style={{fontSize:11,fontWeight:700,color:"#991B1B",textTransform:"uppercase",letterSpacing:".05em",marginBottom:8}}>Registros não importados</div>
+              <div style={{maxHeight:260,overflowY:"auto",display:"flex",flexDirection:"column",gap:6}}>
+                {data.itens.map((it,i)=>(
+                  <div key={i} style={{padding:"8px 10px",border:"1px solid #FCA5A5",background:"#FEF2F2",borderRadius:8}}>
+                    <div style={{fontWeight:700,fontSize:12,color:"#0F172A"}}>{it.nome}</div>
+                    <div style={{fontSize:11,color:"#991B1B",marginTop:2,wordBreak:"break-word"}}>{it.erro}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
         <div className="mft">
           <button className="btn btn-p" onClick={onClose}>Entendi</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+// mantém alias antigo para compatibilidade
+function ImportErrorsModal({data,onClose}){ return <ImportResultModal data={data} onClose={onClose}/>; }
+
+function ExportResultModal({data,onClose}){
+  // data = {tipo, total, filename}
+  return(
+    <div className="mbk">
+      <div className="mdl" style={{maxWidth:400}}>
+        <div className="mhd">
+          <div><h2>✅ Exportação concluída</h2><p style={{marginTop:4,fontSize:12,color:"#64748B"}}>{data.tipo}</p></div>
+          <button className="btn btn-g btn-sm" onClick={onClose}><Ico n="x" s={13}/></button>
+        </div>
+        <div className="mbd">
+          <div style={{background:"#F0FDF4",border:"1px solid #86EFAC",borderRadius:10,padding:"16px",textAlign:"center"}}>
+            <div style={{fontSize:28,marginBottom:6}}>📄</div>
+            <div style={{fontSize:20,fontWeight:800,color:"#16A34A"}}>{data.total} registro{data.total!==1?"s":""}</div>
+            <div style={{fontSize:12,color:"#166534",marginTop:4}}>exportado{data.total!==1?"s":""} com sucesso</div>
+            {data.filename&&<div style={{fontSize:11,color:"#94A3B8",marginTop:8,wordBreak:"break-all"}}>{data.filename}</div>}
+          </div>
+        </div>
+        <div className="mft">
+          <button className="btn btn-p" onClick={onClose}>Fechar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DuplicatesModal({rows,onClose,onDelete}){
+  const [selected,setSelected]=React.useState(new Set());
+  const [deleted,setDeleted]=React.useState(new Set());
+  const [confirming,setConfirming]=React.useState(false);
+
+  // Agrupa por nome normalizado
+  const groups=React.useMemo(()=>{
+    const norm=s=>(s||"").trim().toUpperCase().replace(/\s+/g," ");
+    const map={};
+    rows.forEach(r=>{
+      const k=norm(r.nome_paciente);
+      if(!map[k])map[k]=[];
+      map[k].push(r);
+    });
+    return Object.values(map).filter(g=>g.length>1);
+  },[rows]);
+
+  if(groups.length===0) return(
+    <div className="mbk">
+      <div className="mdl" style={{maxWidth:420}}>
+        <div className="mhd"><div><h2>✅ Sem duplicatas</h2><p>Nenhum nome repetido encontrado.</p></div>
+          <button className="btn btn-g btn-sm" onClick={onClose}><Ico n="x" s={13}/></button></div>
+        <div className="mbd"><p style={{color:"#64748B",fontSize:13}}>Todos os registros têm nomes únicos.</p></div>
+        <div className="mft"><button className="btn btn-p" onClick={onClose}>Fechar</button></div>
+      </div>
+    </div>
+  );
+
+  function toggleSel(id){ setSelected(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;}); }
+  function selectDups(group){
+    // seleciona todos exceto o primeiro (mais antigo)
+    setSelected(p=>{const n=new Set(p);group.slice(1).forEach(r=>n.add(r.id));return n;});
+  }
+
+  async function handleDelete(){
+    setConfirming(true);
+    const ids=[...selected];
+    for(const id of ids){ try{ await onDelete(id); setDeleted(p=>new Set([...p,id])); }catch{} }
+    setSelected(new Set());
+    setConfirming(false);
+  }
+
+  const GravDot=({g})=>{
+    const colors={VERMELHO:"#EF4444",emergencia:"#EF4444",AMARELO:"#EAB308",urgencia:"#EAB308",VERDE:"#22C55E",menor_gravidade:"#22C55E",CINZA:"#94A3B8",agendamento:"#94A3B8"};
+    return <span style={{display:"inline-block",width:8,height:8,borderRadius:"50%",background:colors[g]||"#94A3B8",flexShrink:0,marginRight:4}}/>;
+  };
+
+  return(
+    <div className="mbk">
+      <div className="mdl" style={{maxWidth:700}}>
+        <div className="mhd">
+          <div>
+            <h2>🔍 Verificação de duplicatas</h2>
+            <p style={{marginTop:3,fontSize:12,color:"#64748B"}}>{groups.length} nome{groups.length!==1?"s":""} repetido{groups.length!==1?"s":""} · {groups.reduce((a,g)=>a+g.length,0)} registros envolvidos</p>
+          </div>
+          <button className="btn btn-g btn-sm" onClick={onClose}><Ico n="x" s={13}/></button>
+        </div>
+        <div className="mbd" style={{maxHeight:"65vh",overflowY:"auto"}}>
+          {groups.map((group,gi)=>{
+            const visibles=group.filter(r=>!deleted.has(r.id));
+            if(visibles.length<=1)return null;
+            return(
+              <div key={gi} style={{marginBottom:20,background:"#F8FAFC",borderRadius:10,border:"1px solid #E2E8F0",overflow:"hidden"}}>
+                {/* cabeçalho do grupo */}
+                <div style={{padding:"8px 12px",background:"#EFF6FF",borderBottom:"1px solid #DBEAFE",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+                  <div style={{fontWeight:700,fontSize:12,color:"#1E40AF"}}>{visibles[0].nome_paciente} <span style={{fontWeight:400,color:"#64748B"}}>({visibles.length} registros)</span></div>
+                  <button className="btn btn-g btn-sm" onClick={()=>selectDups(visibles)} title="Marcar duplicatas para excluir">Marcar duplicatas</button>
+                </div>
+                {/* cards lado a lado */}
+                <div style={{display:"flex",gap:10,padding:10,flexWrap:"wrap"}}>
+                  {visibles.map(r=>{
+                    const isSel=selected.has(r.id);
+                    return(
+                      <div key={r.id} onClick={()=>toggleSel(r.id)} style={{flex:"1 1 240px",minWidth:220,maxWidth:320,background:"#fff",border:`2px solid ${isSel?"#EF4444":"#E2E8F0"}`,borderRadius:8,padding:"10px 12px",cursor:"pointer",transition:"border-color .15s",position:"relative"}}>
+                        {/* checkbox visual */}
+                        <div style={{position:"absolute",top:8,right:8,width:18,height:18,borderRadius:4,border:`2px solid ${isSel?"#EF4444":"#CBD5E1"}`,background:isSel?"#EF4444":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                          {isSel&&<span style={{color:"#fff",fontSize:11,fontWeight:800,lineHeight:1}}>✓</span>}
+                        </div>
+                        <div style={{fontWeight:700,fontSize:12,color:"#0F172A",marginBottom:6,paddingRight:24}}>{r.nome_paciente}</div>
+                        <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                          {r.data_solicitacao&&<div style={{fontSize:11,color:"#64748B"}}><span style={{color:"#94A3B8"}}>Data: </span>{r.data_solicitacao}{r.horario_solicitacao?" "+r.horario_solicitacao:""}</div>}
+                          {r.ficha_cross&&<div style={{fontSize:11,color:"#64748B"}}><span style={{color:"#94A3B8"}}>Ficha: </span>{r.ficha_cross}</div>}
+                          {r.diagnostico&&<div style={{fontSize:11,color:"#374151"}}><span style={{color:"#94A3B8"}}>Diag: </span>{r.diagnostico}</div>}
+                          {r.especialidade&&<div style={{fontSize:11,color:"#374151"}}><span style={{color:"#94A3B8"}}>Espec: </span>{r.especialidade}</div>}
+                          {r.setor&&<div style={{fontSize:11,color:"#64748B"}}><span style={{color:"#94A3B8"}}>Setor: </span>{r.setor}</div>}
+                          {r.status&&<div style={{fontSize:11,color:"#64748B"}}><span style={{color:"#94A3B8"}}>Status: </span>{r.status}</div>}
+                          {r.gravidade&&<div style={{fontSize:11,display:"flex",alignItems:"center"}}><GravDot g={r.gravidade}/><span style={{color:"#64748B"}}>{r.gravidade}</span></div>}
+                        </div>
+                        {isSel&&<div style={{marginTop:8,fontSize:10,fontWeight:700,color:"#EF4444",textTransform:"uppercase",letterSpacing:".05em"}}>Marcado para excluir</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          }).filter(Boolean)}
+          {groups.every(g=>g.filter(r=>!deleted.has(r.id)).length<=1)&&(
+            <div style={{textAlign:"center",padding:"24px",color:"#16A34A",fontSize:13,fontWeight:600}}>✅ Todas as duplicatas foram resolvidas!</div>
+          )}
+        </div>
+        <div className="mft" style={{justifyContent:"space-between"}}>
+          <div style={{fontSize:12,color:"#64748B"}}>{selected.size>0?`${selected.size} selecionado${selected.size!==1?"s":""} para excluir`:"Clique nos cards para selecionar"}</div>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn btn-g" onClick={onClose}>Fechar</button>
+            <button className="btn" style={{background:"#DC2626",color:"#fff",opacity:selected.size===0||confirming?0.5:1}} disabled={selected.size===0||confirming} onClick={handleDelete}>
+              {confirming?"Excluindo…":`🗑 Excluir ${selected.size} selecionado${selected.size!==1?"s":""}`}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -686,19 +857,15 @@ function App(){
 
   const [showPaste,setShowPaste]=useState(false);
 
-  // O banco aceita APENAS os valores maiúsculos: VERMELHO, AMARELO, VERDE, CINZA.
-  // O Kanban usa chaves minúsculas (emergencia, urgencia, menor_gravidade, agendamento)
-  // e extras (andamento_cor, finalizado_cor) — tudo precisa ser convertido.
+  // O Kanban usa gravidades extras (andamento_cor, finalizado_cor) que não existem
+  // no enum de gravidade da planilha de remoções — isso causava erro 500 ao importar
+  // pelo Aceite. Mapeamos para o valor equivalente mais próximo aceito pela planilha.
+  // O banco aceita APENAS: VERMELHO, AMARELO, VERDE, CINZA.
+  // O kanban usa chaves minúsculas e extras — tudo mapeado aqui.
   const KANBAN_TO_DB_GRAV={
-    emergencia:      "VERMELHO",
-    urgencia:        "AMARELO",
-    menor_gravidade: "VERDE",
-    agendamento:     "CINZA",
-    andamento_cor:   "AMARELO",
-    finalizado_cor:  "CINZA",
-    retorno:         "CINZA",
-    // valores já no formato do banco passam direto
-    VERMELHO:"VERMELHO", AMARELO:"AMARELO", VERDE:"VERDE", CINZA:"CINZA",
+    emergencia:"VERMELHO",urgencia:"AMARELO",menor_gravidade:"VERDE",
+    agendamento:"CINZA",andamento_cor:"AMARELO",finalizado_cor:"CINZA",retorno:"CINZA",
+    VERMELHO:"VERMELHO",AMARELO:"AMARELO",VERDE:"VERDE",CINZA:"CINZA",
   };
   function normalizeKanbanGrav(v){
     if(!v)return "AMARELO";
@@ -716,8 +883,9 @@ function App(){
         ok++;
       }catch(e){fails.push({nome:c.nome||"(sem nome)",erro:e.message||"erro desconhecido"});}
     }
-    push(`${ok} importado${ok!==1?"s":""}${fails.length>0?` (${fails.length} erro${fails.length!==1?"s":""})`:""}`,fails.length>0?"err":"ok");
-    if(fails.length>0)setImportErrors({tipo:"Aceite (Kanban)",itens:fails});
+    const total=ok+fails.length;
+    push(`${ok}/${total} importado${ok!==1?"s":""}`,fails.length>0?"err":"ok");
+    setImportErrors({tipo:"Aceite (Kanban)",ok,total,itens:fails});
     await load();
   };
 
@@ -743,13 +911,16 @@ function App(){
           ok++;
         }catch(e){fails.push({nome:item.nome_paciente||"(sem nome)",erro:e.message||"erro desconhecido"});}
       }
-      push(`${ok} registro${ok!==1?"s":""} importado${ok!==1?"s":""} do JSON${fails.length>0?` (${fails.length} erro${fails.length!==1?"s":""})`:""}`,fails.length>0?"err":"ok");
-      if(fails.length>0)setImportErrors({tipo:"Importar JSON",itens:fails});
+      const total=ok+fails.length;
+      push(`${ok}/${total} importado${ok!==1?"s":""} do JSON`,fails.length>0?"err":"ok");
+      setImportErrors({tipo:"Importar JSON",ok,total,itens:fails});
       await load();
     }catch(e){push("Erro ao ler arquivo JSON: "+e.message,"err");}
   };
 
-  const [importErrors,setImportErrors]=useState(null); // {tipo, itens:[{nome,erro}]}
+  const [importErrors,setImportErrors]=useState(null); // {tipo, ok, total, itens:[{nome,erro}]}
+  const [exportResult,setExportResult]=useState(null); // {tipo, total, filename}
+  const [showDuplicates,setShowDuplicates]=useState(false);
 
   const handleImportPaste=async(pastedRows)=>{
     let ok=0;
@@ -758,8 +929,9 @@ function App(){
       try{await api({action:"create",...p});ok++;}
       catch(e){fails.push({nome:p.nome_paciente||"(sem nome)",erro:e.message||"erro desconhecido"});}
     }
-    push(`${ok} registro${ok!==1?"s":""} importado${ok!==1?"s":""} da planilha${fails.length>0?` (${fails.length} erro${fails.length!==1?"s":""})`:""}`,fails.length>0?"err":"ok");
-    if(fails.length>0)setImportErrors({tipo:"Colar do Excel",itens:fails});
+    const total=ok+fails.length;
+    push(`${ok}/${total} importado${ok!==1?"s":""} da planilha`,fails.length>0?"err":"ok");
+    setImportErrors({tipo:"Colar do Excel",ok,total,itens:fails});
     setShowPaste(false);
     await load();
   };
@@ -835,9 +1007,10 @@ function App(){
       ws["!cols"]=[{wch:4},...COLS.map(([f])=>({wch:cw[f]||14}))];
       const wb=window.XLSX.utils.book_new();
       window.XLSX.utils.book_append_sheet(wb,"Remoções",ws);
-      window.XLSX.writeFile(wb,`remocoes_${new Date().toISOString().slice(0,10)}.xlsx`);
-      push("Excel exportado!");
-    }catch(e){push("Erro: "+e.message,"err");}
+      const fname=`remocoes_${new Date().toISOString().slice(0,10)}.xlsx`;
+      window.XLSX.writeFile(wb,fname);
+      setExportResult({tipo:"Excel",total:data.length,filename:fname});
+    }catch(e){push("Erro ao exportar Excel: "+e.message,"err");}
   }
 
   function exportJSON(){
@@ -856,8 +1029,8 @@ function App(){
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      push("JSON exportado!");
-    }catch(e){push("Erro: "+e.message,"err");}
+      setExportResult({tipo:"JSON",total:data.length,filename:`remocoes_${new Date().toISOString().slice(0,10)}.json`});
+    }catch(e){push("Erro ao exportar JSON: "+e.message,"err");}
   }
 
   return(
@@ -899,6 +1072,7 @@ function App(){
             <button className="btn btn-blue" onClick={()=>setShowPaste(true)}><Ico n="excel"/> Colar do Excel</button>
             <button className="btn btn-g" onClick={handleAddBlank}><Ico n="plus" s={13}/> Linha em branco</button>
             <button className="btn btn-p" onClick={()=>setModal({})}><Ico n="plus"/> Novo</button>
+            <button className="btn btn-g" onClick={()=>setShowDuplicates(true)} title="Verificar registros com nomes repetidos">🔍 Duplicatas</button>
             <button className="btn btn-g" style={{color:"#DC2626",borderColor:"#FCA5A5"}} disabled={rows.length===0} onClick={handleDeleteAll}><Ico n="trash" s={13}/> Excluir todos</button>
           </div>
         </div>
@@ -1018,7 +1192,9 @@ function App(){
 
       {showAceite&&<AceiteModal onClose={()=>setShowAceite(false)} onImport={handleImport}/>}
       {showPaste&&<PasteModal onClose={()=>setShowPaste(false)} onImport={handleImportPaste}/>}
-      {importErrors&&<ImportErrorsModal data={importErrors} onClose={()=>setImportErrors(null)}/>}
+      {importErrors&&<ImportResultModal data={importErrors} onClose={()=>setImportErrors(null)}/>}
+      {exportResult&&<ExportResultModal data={exportResult} onClose={()=>setExportResult(null)}/>}
+      {showDuplicates&&<DuplicatesModal rows={rows} onClose={()=>setShowDuplicates(false)} onDelete={async(id)=>{await handleDelete(id);}}/>}
       {modal!==null&&<FormModal row={modal} onClose={()=>setModal(null)} onSave={handleSave} saving={saving}/>}
       <div className="tst">
         {ts.map(t=><div key={t.id} className={`toast ${t.type}`}><span>{t.type==="ok"?"✓":"✕"}</span><span>{t.msg}</span></div>)}
