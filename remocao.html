@@ -143,6 +143,26 @@ select.fsel{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;color:
 .toast.ok{background:#F0FDF4;border:1px solid #86EFAC;color:#166534}
 .toast.err{background:#FEE2E2;border:1px solid #FCA5A5;color:#991B1B}
 @media(max-width:768px){.fg2,.fg3,.fg4{grid-template-columns:1fr}}
+/* Drag de colunas */
+.th-dragging{opacity:.5;background:#1D3557!important}
+.th-drag-over{border-left:2px solid #60A5FA!important}
+.th-drag-handle{cursor:grab;color:#475569;display:flex;align-items:center;padding:0 2px;flex-shrink:0}
+.th-drag-handle:active{cursor:grabbing}
+/* Checkbox seleção múltipla */
+.row-checkbox{width:16px;height:16px;border-radius:3px;border:1.5px solid #CBD5E1;cursor:pointer;appearance:none;background:#fff;transition:all .12s;flex-shrink:0}
+.row-checkbox:checked{background:#3B82F6;border-color:#3B82F6;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6l3 3 5-5' stroke='%23fff' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:center}
+.row-checkbox:hover{border-color:#3B82F6}
+/* Barra de ações múltiplas */
+.bulk-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:500;
+  background:#0F172A;border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:12px;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);border:1px solid #334155;white-space:nowrap}
+.bulk-bar span{color:#94A3B8;font-size:12px}
+.bulk-bar strong{color:#fff;font-size:13px}
+/* Modal confirmar delete */
+.confirm-modal{background:#fff;border-radius:12px;padding:24px;max-width:360px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+/* Sort reset indicator */
+.sort-active{color:#FCD34D!important}
+
 /* Split button */
 .spb{display:inline-flex;align-items:stretch;border-radius:7px;overflow:visible;flex-shrink:0;position:relative;z-index:10}
 .spb.open{z-index:9100}
@@ -248,7 +268,7 @@ const COLS = [
 ];
 
 const EMPTY = Object.fromEntries(COLS.map(([f])=>[f,""]));
-const fmtD=v=>{if(!v)return"";try{return new Date(v+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"2-digit"})}catch{return v}};
+const fmtD=v=>{if(!v)return"";try{return new Date(v+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"})}catch{return v}};
 
 const Ico=(({n,s=14})=>{
   const d={
@@ -339,7 +359,7 @@ function navigateCell(currentTd, direction){
 }
 
 // Célula editável — texto quebra na célula
-function Cell({rowId,field,value,tipo,optsKey,onSave}){
+function Cell({rowId,field,value,tipo,optsKey,onSave,fmtDisplay,colorStyle}){
   const [ed,setEd]=useState(false);
   const [val,setVal]=useState(value||"");
   const [free,setFree]=useState(false);
@@ -364,9 +384,13 @@ function Cell({rowId,field,value,tipo,optsKey,onSave}){
   );
   if(!ed) return(
     <div ref={wrapRef} data-nav="1" style={{padding:"2px 6px",minHeight:24,display:"flex",alignItems:"center",cursor:"pointer",fontSize:11,
-      wordBreak:"break-word",whiteSpace:"normal",lineHeight:1.3,color:val?"#374151":"#CBD5E1",fontStyle:val?"normal":"italic"}}
-      onClick={()=>setEd(true)} title="Clique para editar">
-      {val||"—"}
+      wordBreak:"break-word",whiteSpace:"normal",lineHeight:1.3,
+      color:colorStyle?.color||(val?"#374151":"#CBD5E1"),
+      fontWeight:colorStyle?.fontWeight||(val?400:400),
+      fontStyle:val?"normal":"italic",whiteSpace:"nowrap",
+      ...(colorStyle||{})}}
+      onClick={()=>setEd(true)} title={colorStyle?"Clique para editar (calculado — limpe para recalcular automático)":"Clique para editar"}>
+      {fmtDisplay&&val ? fmtDisplay(val) : (val||"—")}
     </div>
   );
   if(opts && !free) return(
@@ -962,16 +986,24 @@ function DuplicatesModal({rows,onClose,onDelete}){
 // Hook resize de colunas — usa mousedown no header
 function useColResize(initW){
   const [ws,setWs]=useState(initW);
+  const wsRef=useRef(initW); // ref síncrona para leituras no drag
   const drag=useRef(null);
+  // mantém wsRef atualizado
+  useEffect(()=>{ wsRef.current=ws; },[ws]);
   function startDrag(idx,e){
     e.preventDefault();
     e.stopPropagation();
-    const sx=e.clientX, sw=ws[idx];
+    // Bug 2 fix: sw pode ser undefined se idx inválido
+    const sw=wsRef.current[idx];
+    if(sw===undefined||isNaN(sw))return; // guarda: idx inválido, ignorar
+    const sx=e.clientX;
     drag.current={idx,sx,sw};
-    function mv(e){
+    function mv(ev){
       if(!drag.current)return;
       const {idx,sx,sw}=drag.current;
-      const nw=Math.max(40,sw+(e.clientX-sx));
+      const delta=ev.clientX-sx;
+      const nw=Math.max(40,sw+delta);
+      if(isNaN(nw))return; // guarda extra
       setWs(w=>{const n=[...w];n[idx]=nw;return n;});
     }
     function up(){drag.current=null;window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);}
@@ -1024,6 +1056,37 @@ function SplitButton({label,icon,variant,items,onMain}){
   );
 }
 
+// ─── Drag para reordenar colunas ───────────────────────────────────────────
+function useColDragOrder(initialOrder){
+  const [order,setOrder]=useState(initialOrder);
+  const dragIdx=useRef(null);
+  const dragOverIdx=useRef(null);
+
+  function onDragStart(i,e){
+    dragIdx.current=i;
+    e.dataTransfer.effectAllowed="move";
+    e.dataTransfer.setData("text/plain",i);
+  }
+  function onDragOver(i,e){
+    e.preventDefault();
+    if(dragIdx.current===null||dragIdx.current===i)return;
+    dragOverIdx.current=i;
+    // Preview visual: reordena temporariamente
+    setOrder(prev=>{
+      const next=[...prev];
+      const item=next.splice(dragIdx.current,1)[0];
+      next.splice(i,0,item);
+      dragIdx.current=i; // atualiza origem
+      return next;
+    });
+  }
+  function onDragEnd(){
+    dragIdx.current=null;
+    dragOverIdx.current=null;
+  }
+  return {order,setOrder,onDragStart,onDragOver,onDragEnd};
+}
+
 function App(){
   const [rows,setRows]=useState([]);
   const [loading,setLoading]=useState(true);
@@ -1037,6 +1100,12 @@ function App(){
   const [fM,setFM]=useState("");
   const [sc,setSc]=useState("created_at");
   const [sd,setSd]=useState("desc");
+  // Feature 4: seleção múltipla de linhas
+  const [selectedRows,setSelectedRows]=useState(new Set());
+  const [showDeleteConfirm,setShowDeleteConfirm]=useState(false);
+  // Feature 1: ordem das colunas (indices em COLS)
+  const colIdxDefault=COLS.map((_,i)=>i);
+  const {order:colOrder,setOrder:setColOrder,onDragStart:colDragStart,onDragOver:colDragOver,onDragEnd:colDragEnd}=useColDragOrder(colIdxDefault);
   const {ts,push}=useToast();
 
   // Colunas arrastáveis: +1 para #, +1 para ações
@@ -1083,19 +1152,24 @@ function App(){
 
   const handleCell=async(rowId,field,value)=>{
     try{
-      const u={action:"update",id:rowId,[field]:value||null};
+      // Bug 8 fix: value||null destrói false booleano (false||null===null)
+      const safeVal = (value===false||value===true) ? value : (value||null);
+      const u={action:"update",id:rowId,[field]:safeVal};
       const row=rows.find(r=>r.id===rowId);
       if(row){
         const hs=field==="hora_solic_ambulancia"?value:row.hora_solic_ambulancia;
         const hsa=field==="horario_saida_ambulancia"?value:row.horario_saida_ambulancia;
         const hr=field==="horario_retorno"?value:row.horario_retorno;
-        const te=calcTempo(hs,hsa);
-        const dur=calcTempo(hsa,hr);
+        // Feature 3: se campo calculado foi limpo (value vazio), recalcula
+        const teManual=field==="tempo_espera"?value:null;
+        const durManual=field==="duracao_remocao"?value:null;
+        const te = teManual!==null ? (teManual||calcTempo(hs,hsa)) : calcTempo(hs,hsa);
+        const dur = durManual!==null ? (durManual||calcTempo(hsa,hr)) : calcTempo(hsa,hr);
         if(te)u.tempo_espera=te;
         if(dur)u.duracao_remocao=dur;
       }
       await api(u);
-      setRows(r=>r.map(x=>x.id===rowId?{...x,[field]:value,...(u.tempo_espera?{tempo_espera:u.tempo_espera}:{}),...(u.duracao_remocao?{duracao_remocao:u.duracao_remocao}:{})}:x));
+      setRows(r=>r.map(x=>x.id===rowId?{...x,[field]:safeVal,...(u.tempo_espera?{tempo_espera:u.tempo_espera}:{}),...(u.duracao_remocao?{duracao_remocao:u.duracao_remocao}:{})}:x));
     }catch(e){push(e.message,"err");}
   };
 
@@ -1110,6 +1184,23 @@ function App(){
       push("Erro ao excluir: "+(e.message||"desconhecido")+" — recarregando a lista.","err");
       await load();
     }
+  };
+
+  // Feature 4: deletar linhas selecionadas
+  const handleDeleteSelected=async()=>{
+    const ids=[...selectedRows];
+    if(ids.length===0)return;
+    setSaving(true);
+    let ok=0,fail=0;
+    for(const id of ids){
+      try{await api({action:"delete",id});ok++;}
+      catch{fail++;}
+    }
+    setSaving(false);
+    setSelectedRows(new Set());
+    setShowDeleteConfirm(false);
+    push(`${ok} registro${ok!==1?"s":""} excluído${ok!==1?"s":""}${fail>0?` (${fail} falharam)`:""}`,fail>0?"err":"ok");
+    await load();
   };
 
   const handleDeleteAll=async()=>{
@@ -1241,7 +1332,14 @@ function App(){
     }
   };
 
-  function toggleSort(col){if(sc===col)setSd(d=>d==="asc"?"desc":"asc");else{setSc(col);setSd("asc");}}
+  // Bug 5 fix: resetSort volta à ordem de inserção (created_at desc)
+  function resetSort(){setSc("created_at");setSd("desc");}
+  function toggleSort(col){
+    if(sc===col){
+      if(sd==="asc") setSd("desc");
+      else { setSc("created_at"); setSd("desc"); } // 3º clique: reset
+    } else { setSc(col); setSd("asc"); }
+  }
 
   const filtered=useMemo(()=>{
     let d=rows;
@@ -1250,9 +1348,20 @@ function App(){
     if(fS)d=d.filter(r=>(r.status||"").includes(fS));
     if(fM)d=d.filter(r=>(r.data_solicitacao||"").startsWith(fM));
     return [...d].sort((a,b)=>{
-      const av=(a[sc]||"").toString().toLowerCase();
-      const bv=(b[sc]||"").toString().toLowerCase();
-      return sd==="asc"?av.localeCompare(bv,"pt"):bv.localeCompare(av,"pt");
+      const av=a[sc];
+      const bv=b[sc];
+      // created_at e campos de data/hora: comparação cronológica correta
+      if(sc==="created_at"||COLS.find(([f])=>f===sc)?.[4]==="date"||COLS.find(([f])=>f===sc)?.[4]==="time"){
+        const as=String(av||"");
+        const bs=String(bv||"");
+        if(!as&&!bs)return 0;
+        if(!as)return 1;
+        if(!bs)return -1;
+        return sd==="asc"?as.localeCompare(bs):bs.localeCompare(as);
+      }
+      const avs=(av||"").toString().toLowerCase();
+      const bvs=(bv||"").toString().toLowerCase();
+      return sd==="asc"?avs.localeCompare(bvs,"pt"):bvs.localeCompare(avs,"pt");
     });
   },[rows,search,fG,fS,fM,sc,sd]);
 
@@ -1342,7 +1451,8 @@ function App(){
             <option value="ENCERRADA">Encerrada</option>
           </select>
           <input type="month" className="fsel" value={fM} onChange={e=>setFM(e.target.value)} style={{width:"auto"}}/>
-          {(search||fG||fS||fM)&&<button className="btn btn-g btn-sm" onClick={()=>{setSearch("");setFG("");setFS("");setFM("");}}>✕</button>}
+          {(search||fG||fS||fM)&&<button className="btn btn-g btn-sm" onClick={()=>{setSearch("");setFG("");setFS("");setFM("");}}>✕ Filtros</button>}
+          {sc!=="created_at"&&<button className="btn btn-g btn-sm" title="Voltar à ordem de inserção (mais recente primeiro)" onClick={resetSort} style={{color:"#F59E0B",borderColor:"#FCD34D"}}>⇅ Resetar ordem</button>}
           <div style={{marginLeft:"auto",display:"flex",gap:6,flexShrink:0,alignItems:"center"}}>
             <input type="file" accept=".json,application/json" ref={jsonFileRef} style={{display:"none"}}
               onChange={e=>{const f=e.target.files[0];e.target.value="";handleImportJSON(f);}}/>
@@ -1370,6 +1480,7 @@ function App(){
             />
             <button className="btn btn-p" onClick={()=>setModal({})}><Ico n="plus"/> Novo</button>
             <button className="btn btn-g" onClick={()=>setShowDuplicates(true)} title="Verificar registros com nomes repetidos">🔍 Duplicatas</button>
+            <button className="btn btn-g btn-sm" title="Restaurar ordem original das colunas" onClick={()=>setColOrder(COLS.map((_,i)=>i))} style={{fontSize:11,padding:"4px 8px"}}>⚏ Colunas</button>
             <button className="btn btn-g" style={{color:"#DC2626",borderColor:"#FCA5A5"}} disabled={rows.length===0} onClick={handleDeleteAll}><Ico n="trash" s={13}/> Excluir todos</button>
           </div>
         </div>
@@ -1394,30 +1505,64 @@ function App(){
           <table className="rt" ref={tableRef}>
             <colgroup>
               <col style={{width:ws[0]}}/>
-              {COLS.map(([f],i)=><col key={f} style={{width:ws[i+1]}}/>)}
+              {colOrder.map((colIdx,orderPos)=>{
+                const [f]=COLS[colIdx];
+                return <col key={f} style={{width:ws[orderPos+1]}}/>;
+              })}
               <col style={{width:ws[ws.length-1]}}/>
             </colgroup>
             <thead><tr>
-              <th className="stk stk-last" style={{textAlign:"center",cursor:"default",borderRight:"2px solid #475569",left:stkLefts[0]}}>#</th>
-              {COLS.map(([f,planilha,xls,kanban,,,tip],i)=>{
-                // colunas 0-3 (data, hora, ficha, nome) são fixas
-                const stkIdx=[0,1,2,3];
-                const isStk=stkIdx.includes(i);
-                const isLast=i===3;
-                // left acumulado: ws[0]=# + ws[1..i] = soma de ws[0..i]
-                const leftOff=isStk?stkLefts[i+1]:undefined;
+              {/* Coluna # com checkbox de seleção global */}
+              <th className="stk stk-last" style={{textAlign:"center",cursor:"default",borderRight:"2px solid #475569",left:stkLefts[0],minWidth:48}}>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                  <span style={{fontSize:9,color:"#94A3B8"}}>#</span>
+                  <input type="checkbox" className="row-checkbox"
+                    checked={filtered.length>0&&selectedRows.size===filtered.length}
+                    onChange={e=>{
+                      if(e.target.checked) setSelectedRows(new Set(filtered.map(r=>r.id)));
+                      else setSelectedRows(new Set());
+                    }}
+                    title="Selecionar todos"
+                  />
+                </div>
+              </th>
+              {colOrder.map((colIdx,orderPos)=>{
+                const [f,planilha,xls,kanban,,,tip]=COLS[colIdx];
+                // colunas originais 0-3 (data, hora, ficha, nome) permanecem fixas
+                const stkOrigIdx=[0,1,2,3];
+                const isStk=stkOrigIdx.includes(colIdx);
+                const isLast=colIdx===3;
+                const leftOff=isStk?stkLefts[colIdx+1]:undefined;
+                const isSorted=sc===f;
                 return(
-                <th key={f} style={{position:"relative",cursor:"pointer",overflow:"hidden",...(isStk?{left:leftOff}:{})}}
-                  className={`th-wrap${sc===f?" sorted":""}${isStk?" stk":""}${isLast?" stk-last":""}`}>
+                <th key={f}
+                  draggable={!isStk}
+                  onDragStart={isStk?undefined:(e)=>colDragStart(orderPos,e)}
+                  onDragOver={isStk?undefined:(e)=>colDragOver(orderPos,e)}
+                  onDragEnd={isStk?undefined:colDragEnd}
+                  style={{position:"relative",cursor:"pointer",overflow:"hidden",...(isStk?{left:leftOff}:{})}}
+                  className={`th-wrap${isSorted?" sorted":""}${isStk?" stk":""}${isLast?" stk-last":""}`}>
                   <div style={{display:"flex",alignItems:"flex-start",gap:2,paddingRight:10,userSelect:"none"}}
                     onClick={()=>toggleSort(f)}>
+                    {!isStk&&(
+                      <span className="th-drag-handle" title="Arraste para reordenar coluna"
+                        onMouseDown={e=>e.stopPropagation()}>
+                        <svg width="8" height="10" viewBox="0 0 8 10" fill="currentColor">
+                          <circle cx="2" cy="2" r="1.2"/><circle cx="6" cy="2" r="1.2"/>
+                          <circle cx="2" cy="5" r="1.2"/><circle cx="6" cy="5" r="1.2"/>
+                          <circle cx="2" cy="8" r="1.2"/><circle cx="6" cy="8" r="1.2"/>
+                        </svg>
+                      </span>
+                    )}
                     <span style={{fontSize:9,lineHeight:1.25,whiteSpace:"normal",wordBreak:"break-word",flexGrow:1}}>{xls}</span>
-                    <span className={`sarr${sc===f?" on":""}`} style={{flexShrink:0,marginTop:1}}>{sc===f?(sd==="asc"?"▲":"▼"):"⇅"}</span>
+                    <span className={`sarr${isSorted?" on":""}`} style={{flexShrink:0,marginTop:1}}>
+                      {isSorted?(sd==="asc"?"▲":"▼"):"⇅"}
+                    </span>
                   </div>
                   {/* Handle resize — área de 8px na borda direita */}
                   <div
                     style={{position:"absolute",right:0,top:0,width:8,height:"100%",cursor:"col-resize",zIndex:20,background:"transparent"}}
-                    onMouseDown={e=>{e.stopPropagation();startDrag(i+1,e);}}
+                    onMouseDown={e=>{e.stopPropagation();startDrag(orderPos+1,e);}}
                     title="Arrastar para redimensionar"
                   />
                   <div className="tipbox">
@@ -1434,63 +1579,69 @@ function App(){
                 const gi=gravInfo(r.gravidade||"");
                 const isBlank=r.id===blankRowId;
                 const isActive=activeRow===r.id;
-                // offsets das colunas fixas: #=0, data=ws[0], hora=ws[0]+ws[1], ficha=ws[0]+ws[1]+ws[2], nome=ws[0]+ws[1]+ws[2]+ws[3]
+                const isSelected=selectedRows.has(r.id);
                 const [L0,L1,L2,L3,L4]=stkLefts;
+
+                // Mapa de renderização das células por field (para colOrder)
+                const cellMap={
+                  "data_solicitacao":<td className="stk" style={{left:L1}}><div style={{padding:"2px 6px",fontSize:10,whiteSpace:"nowrap"}}>{fmtD(r.data_solicitacao)||"—"}</div></td>,
+                  "horario_solicitacao":<td className="stk" style={{left:L2}}><Cell rowId={r.id} field="horario_solicitacao" value={r.horario_solicitacao} tipo="time" onSave={handleCell}/></td>,
+                  "ficha_cross":<td className="stk" style={{left:L3}}><Cell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCell}/></td>,
+                  "nome_paciente":<td className="stk stk-last" style={{left:L4}}><Cell rowId={r.id} field="nome_paciente" value={r.nome_paciente} onSave={handleCell}/></td>,
+                  "setor":<td><Cell rowId={r.id} field="setor" value={r.setor} tipo="sel" optsKey="ST_OPTS" onSave={handleCell}/></td>,
+                  "procedimento":<td><Cell rowId={r.id} field="procedimento" value={r.procedimento} tipo="sel" optsKey="P_OPTS" onSave={handleCell}/></td>,
+                  "especialidade":<td><Cell rowId={r.id} field="especialidade" value={r.especialidade} onSave={handleCell}/></td>,
+                  "diagnostico":<td><Cell rowId={r.id} field="diagnostico" value={r.diagnostico} onSave={handleCell}/></td>,
+                  "status":<td>{r.status?<div style={{padding:"2px 6px"}}><span className={`sb ${S_CLS[r.status]||"se"}`} title={r.status} style={{cursor:"pointer"}} onClick={()=>handleCell(r.id,"status","")}>{r.status}</span></div>:<Cell rowId={r.id} field="status" value={r.status} tipo="sel" optsKey="S_OPTS" onSave={handleCell}/> }</td>,
+                  "gravidade":<td>{r.gravidade?<div style={{padding:"2px 6px",cursor:"pointer"}} onClick={()=>handleCell(r.id,"gravidade","")}><span style={{display:"inline-block",padding:"1px 7px",borderRadius:99,fontSize:9,fontWeight:700,background:gi.bg,color:gi.fc,border:`1px solid ${gi.bd}`,whiteSpace:"nowrap"}}>{gi.label}</span></div>:<Cell rowId={r.id} field="gravidade" value={r.gravidade} tipo="sel" optsKey="G_OPTS" onSave={handleCell}/> }</td>,
+                  "data_resposta_cross":<td><Cell rowId={r.id} field="data_resposta_cross" value={r.data_resposta_cross} tipo="date" onSave={handleCell} fmtDisplay={fmtD}/></td>,
+                  "horario_resposta_cross":<td><Cell rowId={r.id} field="horario_resposta_cross" value={r.horario_resposta_cross} tipo="time" onSave={handleCell}/></td>,
+                  "instituicao_destino":<td><Cell rowId={r.id} field="instituicao_destino" value={r.instituicao_destino} onSave={handleCell}/></td>,
+                  "tipo_ambulancia":<td>{r.tipo_ambulancia?<div style={{padding:"2px 6px",cursor:"pointer"}} onClick={()=>handleCell(r.id,"tipo_ambulancia","")}><span className={`ab ${r.tipo_ambulancia==="AVANÇADA"?"aba":"abb"}`}>{r.tipo_ambulancia}</span></div>:<Cell rowId={r.id} field="tipo_ambulancia" value={r.tipo_ambulancia} tipo="sel" optsKey="A_OPTS" onSave={handleCell}/> }</td>,
+                  "data_saida_ambulancia":<td><Cell rowId={r.id} field="data_saida_ambulancia" value={r.data_saida_ambulancia} tipo="date" onSave={handleCell} fmtDisplay={fmtD}/></td>,
+                  "hora_solic_ambulancia":<td><Cell rowId={r.id} field="hora_solic_ambulancia" value={r.hora_solic_ambulancia} tipo="time" onSave={handleCell}/></td>,
+                  "horario_saida_ambulancia":<td><Cell rowId={r.id} field="horario_saida_ambulancia" value={r.horario_saida_ambulancia} tipo="time" onSave={handleCell}/></td>,
+                  "tempo_espera":<td><Cell rowId={r.id} field="tempo_espera" value={r.tempo_espera||calcTempo(r.hora_solic_ambulancia,r.horario_saida_ambulancia)||""} tipo="time" onSave={handleCell} colorStyle={{color:r.tempo_espera?"#7C3AED":"#6D28D9",fontWeight:700}}/></td>,
+                  "observacao":<td><Cell rowId={r.id} field="observacao" value={r.observacao} onSave={handleCell}/></td>,
+                  "enfermeiro":<td><Cell rowId={r.id} field="enfermeiro" value={r.enfermeiro} onSave={handleCell}/></td>,
+                  "tecnico_auxiliar":<td><Cell rowId={r.id} field="tecnico_auxiliar" value={r.tecnico_auxiliar} onSave={handleCell}/></td>,
+                  "medico":<td><Cell rowId={r.id} field="medico" value={r.medico} onSave={handleCell}/></td>,
+                  "horario_retorno":<td><Cell rowId={r.id} field="horario_retorno" value={r.horario_retorno} tipo="time" onSave={handleCell}/></td>,
+                  "duracao_remocao":<td><Cell rowId={r.id} field="duracao_remocao" value={r.duracao_remocao||calcTempo(r.horario_saida_ambulancia,r.horario_retorno)||""} tipo="time" onSave={handleCell} colorStyle={{color:r.duracao_remocao?"#0369A1":"#0284C7",fontWeight:700}}/></td>,
+                  "finalizado":<td style={{textAlign:"center"}}><BoolCell rowId={r.id} field="finalizado" value={r.finalizado} onSave={handleCell}/></td>,
+                  "permaneceu":<td style={{textAlign:"center"}}><BoolCell rowId={r.id} field="permaneceu" value={r.permaneceu} onSave={handleCell}/></td>,
+                };
+
                 return(
                   <tr key={r.id}
                     className={isActive?"row-active":""}
-                    style={isBlank?{background:"#FEFCE8",outline:"2px solid #FDE047",outlineOffset:"-2px"}:undefined}
+                    style={{
+                      ...(isBlank?{background:"#FEFCE8",outline:"2px solid #FDE047",outlineOffset:"-2px"}:{}),
+                      ...(isSelected?{background:"#EFF6FF!important"}:{})
+                    }}
                     onClick={()=>setActiveRow(r.id)}>
-                    <td className="stk stk-last" style={{left:L0,textAlign:"center",color:"#94A3B8",fontSize:10,fontWeight:700,borderRight:"2px solid #E2E8F0",padding:"0 4px"}}>
-                      {isBlank
-                        ?<button className="btn btn-blue btn-sm" title="Colar linha copiada do Excel aqui" onClick={e=>{e.stopPropagation();handlePasteIntoRow(r.id);}} style={{padding:"2px 6px"}}><Ico n="excel" s={11}/></button>
-                        :i+1}
+                    {/* Coluna # com checkbox */}
+                    <td className="stk stk-last" style={{left:L0,textAlign:"center",color:"#94A3B8",fontSize:10,fontWeight:700,borderRight:"2px solid #E2E8F0",padding:"0 4px",minWidth:48}}>
+                      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                        <span style={{fontSize:10}}>{isBlank?<button className="btn btn-blue btn-sm" title="Colar linha copiada do Excel aqui" onClick={e=>{e.stopPropagation();handlePasteIntoRow(r.id);}} style={{padding:"2px 6px"}}><Ico n="excel" s={11}/></button>:i+1}</span>
+                        <input type="checkbox" className="row-checkbox"
+                          checked={isSelected}
+                          onClick={e=>e.stopPropagation()}
+                          onChange={e=>{
+                            setSelectedRows(prev=>{
+                              const next=new Set(prev);
+                              e.target.checked?next.add(r.id):next.delete(r.id);
+                              return next;
+                            });
+                          }}
+                        />
+                      </div>
                     </td>
-                    <td className="stk" style={{left:L1}}><div style={{padding:"2px 6px",fontSize:10,whiteSpace:"nowrap"}}>{fmtD(r.data_solicitacao)||"—"}</div></td>
-                    <td className="stk" style={{left:L2}}><Cell rowId={r.id} field="horario_solicitacao" value={r.horario_solicitacao} tipo="time" onSave={handleCell}/></td>
-                    <td className="stk" style={{left:L3}}><Cell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCell}/></td>
-                    <td className="stk stk-last" style={{left:L4}}><Cell rowId={r.id} field="nome_paciente" value={r.nome_paciente} onSave={handleCell}/></td>
-                    <td><Cell rowId={r.id} field="setor" value={r.setor} tipo="sel" optsKey="ST_OPTS" onSave={handleCell}/></td>
-                    <td><Cell rowId={r.id} field="procedimento" value={r.procedimento} tipo="sel" optsKey="P_OPTS" onSave={handleCell}/></td>
-                    <td><Cell rowId={r.id} field="especialidade" value={r.especialidade} onSave={handleCell}/></td>
-                    <td><Cell rowId={r.id} field="diagnostico" value={r.diagnostico} onSave={handleCell}/></td>
-                    <td>
-                      {r.status
-                        ?<div style={{padding:"2px 6px"}}><span className={`sb ${S_CLS[r.status]||"se"}`} title={r.status} style={{cursor:"pointer"}} onClick={()=>handleCell(r.id,"status","")}>{r.status}</span></div>
-                        :<Cell rowId={r.id} field="status" value={r.status} tipo="sel" optsKey="S_OPTS" onSave={handleCell}/>
-                      }
-                    </td>
-                    <td>
-                      {r.gravidade
-                        ?<div style={{padding:"2px 6px",cursor:"pointer"}} onClick={()=>handleCell(r.id,"gravidade","")}>
-                            <span style={{display:"inline-block",padding:"1px 7px",borderRadius:99,fontSize:9,fontWeight:700,background:gi.bg,color:gi.fc,border:`1px solid ${gi.bd}`,whiteSpace:"nowrap"}}>{gi.label}</span>
-                          </div>
-                        :<Cell rowId={r.id} field="gravidade" value={r.gravidade} tipo="sel" optsKey="G_OPTS" onSave={handleCell}/>
-                      }
-                    </td>
-                    <td><Cell rowId={r.id} field="data_resposta_cross" value={r.data_resposta_cross} tipo="date" onSave={handleCell}/></td>
-                    <td><Cell rowId={r.id} field="horario_resposta_cross" value={r.horario_resposta_cross} tipo="time" onSave={handleCell}/></td>
-                    <td><Cell rowId={r.id} field="instituicao_destino" value={r.instituicao_destino} onSave={handleCell}/></td>
-                    <td>
-                      {r.tipo_ambulancia
-                        ?<div style={{padding:"2px 6px",cursor:"pointer"}} onClick={()=>handleCell(r.id,"tipo_ambulancia","")}>
-                            <span className={`ab ${r.tipo_ambulancia==="AVANÇADA"?"aba":"abb"}`}>{r.tipo_ambulancia}</span>
-                          </div>
-                        :<Cell rowId={r.id} field="tipo_ambulancia" value={r.tipo_ambulancia} tipo="sel" optsKey="A_OPTS" onSave={handleCell}/>
-                      }
-                    </td>
-                    <td><Cell rowId={r.id} field="data_saida_ambulancia" value={r.data_saida_ambulancia} tipo="date" onSave={handleCell}/></td>
-                    <td><Cell rowId={r.id} field="hora_solic_ambulancia" value={r.hora_solic_ambulancia} tipo="time" onSave={handleCell}/></td>
-                    <td><Cell rowId={r.id} field="horario_saida_ambulancia" value={r.horario_saida_ambulancia} tipo="time" onSave={handleCell}/></td>
-                    <td><div style={{padding:"2px 6px",fontSize:10,color:r.tempo_espera?"#7C3AED":"#CBD5E1",fontWeight:r.tempo_espera?700:400,whiteSpace:"nowrap"}}>{r.tempo_espera||calcTempo(r.hora_solic_ambulancia,r.horario_saida_ambulancia)||"—"}</div></td>
-                    <td><Cell rowId={r.id} field="observacao" value={r.observacao} onSave={handleCell}/></td>
-                    <td><Cell rowId={r.id} field="enfermeiro" value={r.enfermeiro} onSave={handleCell}/></td>
-                    <td><Cell rowId={r.id} field="tecnico_auxiliar" value={r.tecnico_auxiliar} onSave={handleCell}/></td>
-                    <td><Cell rowId={r.id} field="medico" value={r.medico} onSave={handleCell}/></td>
-                    <td><Cell rowId={r.id} field="horario_retorno" value={r.horario_retorno} tipo="time" onSave={handleCell}/></td>
-                    <td><div style={{padding:"2px 6px",fontSize:10,color:r.duracao_remocao?"#0369A1":"#CBD5E1",fontWeight:r.duracao_remocao?700:400,whiteSpace:"nowrap"}}>{r.duracao_remocao||calcTempo(r.horario_saida_ambulancia,r.horario_retorno)||"—"}</div></td>
-                    <td style={{textAlign:"center"}}><BoolCell rowId={r.id} field="finalizado" value={r.finalizado} onSave={handleCell}/></td>
-                    <td style={{textAlign:"center"}}><BoolCell rowId={r.id} field="permaneceu" value={r.permaneceu} onSave={handleCell}/></td>
+                    {/* Células na ordem definida por colOrder */}
+                    {colOrder.map(colIdx=>{
+                      const [f]=COLS[colIdx];
+                      return React.cloneElement(cellMap[f],{key:f});
+                    })}
                     <td style={{textAlign:"center"}}>
                       <button className="delbtn" title="Excluir" onClick={()=>handleDelete(r.id)}><Ico n="trash" s={11}/></button>
                     </td>
@@ -1502,6 +1653,36 @@ function App(){
         )}
       </div>
 
+      {/* Feature 4: Barra de seleção múltipla */}
+      {selectedRows.size>0&&(
+        <div className="bulk-bar">
+          <strong>{selectedRows.size}</strong>
+          <span>linha{selectedRows.size!==1?"s":""} selecionada{selectedRows.size!==1?"s":""}</span>
+          <button className="btn btn-g btn-sm" onClick={()=>setSelectedRows(new Set())} style={{color:"#94A3B8"}}>Cancelar</button>
+          <button className="btn btn-sm" style={{background:"#DC2626",color:"#fff",border:"none"}}
+            onClick={()=>setShowDeleteConfirm(true)}>
+            <Ico n="trash" s={11}/> Excluir {selectedRows.size} selecionada{selectedRows.size!==1?"s":""}
+          </button>
+        </div>
+      )}
+      {/* Modal confirmação delete múltiplo */}
+      {showDeleteConfirm&&(
+        <div className="mbk">
+          <div className="confirm-modal">
+            <div style={{marginBottom:16}}>
+              <div style={{fontWeight:700,fontSize:15,color:"#0F172A",marginBottom:6}}>Excluir {selectedRows.size} registro{selectedRows.size!==1?"s":""}?</div>
+              <div style={{fontSize:13,color:"#64748B",lineHeight:1.5}}>Esta ação é permanente e não pode ser desfeita. Os registros selecionados serão removidos do banco de dados.</div>
+            </div>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+              <button className="btn btn-g" onClick={()=>setShowDeleteConfirm(false)} disabled={saving}>Cancelar</button>
+              <button className="btn btn-sm" style={{background:"#DC2626",color:"#fff",border:"none",padding:"6px 16px",fontSize:12}}
+                disabled={saving} onClick={handleDeleteSelected}>
+                {saving?"Excluindo…":"Confirmar exclusão"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showKanbanImport&&<KanbanImportModal onClose={()=>setShowKanbanImport(false)} onImport={handleImport}/>}
       {showPaste&&<PasteModal onClose={()=>setShowPaste(false)} onImport={handleImportPaste}/>}
       {importErrors&&<ImportResultModal data={importErrors} onClose={()=>setImportErrors(null)}/>}
