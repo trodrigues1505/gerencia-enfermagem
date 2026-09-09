@@ -1386,15 +1386,16 @@ function App(){
               <col style={{width:ws[ws.length-1]}}/>
             </colgroup>
             <thead><tr>
-              <th className="stk stk-last" style={{textAlign:"center",cursor:"default",borderRight:"2px solid #475569",left:0,minWidth:ws[0],maxWidth:ws[0]}}>#</th>
+              <th className="stk stk-last" style={{textAlign:"center",cursor:"default",borderRight:"2px solid #475569",left:0,width:ws[0],minWidth:ws[0]}}>#</th>
               {COLS.map(([f,planilha,xls,kanban,,,tip],i)=>{
                 // colunas 0-3 (data, hora, ficha, nome) são fixas
                 const stkIdx=[0,1,2,3];
                 const isStk=stkIdx.includes(i);
                 const isLast=i===3;
+                // left acumulado: ws[0]=# + ws[1..i] = soma de ws[0..i]
                 const leftOff=isStk?ws.slice(0,i+1).reduce((a,v)=>a+v,0):undefined;
                 return(
-                <th key={f} style={{position:"relative",cursor:"pointer",overflow:"hidden",...(isStk?{left:leftOff}:{})}}
+                <th key={f} style={{position:"relative",cursor:"pointer",overflow:"hidden",width:ws[i+1],minWidth:ws[i+1],...(isStk?{left:leftOff}:{})}}
                   className={`th-wrap${sc===f?" sorted":""}${isStk?" stk":""}${isLast?" stk-last":""}`}>
                   <div style={{display:"flex",alignItems:"flex-start",gap:2,paddingRight:10,userSelect:"none"}}
                     onClick={()=>toggleSort(f)}>
@@ -1428,15 +1429,15 @@ function App(){
                     className={isActive?"row-active":""}
                     style={isBlank?{background:"#FEFCE8",outline:"2px solid #FDE047",outlineOffset:"-2px"}:undefined}
                     onClick={()=>setActiveRow(r.id)}>
-                    <td className="stk stk-last" style={{left:L0,textAlign:"center",color:"#94A3B8",fontSize:10,fontWeight:700,borderRight:"2px solid #E2E8F0",padding:"0 4px"}}>
+                    <td className="stk stk-last" style={{left:L0,width:ws[0],minWidth:ws[0],textAlign:"center",color:"#94A3B8",fontSize:10,fontWeight:700,borderRight:"2px solid #E2E8F0",padding:"0 4px"}}>
                       {isBlank
                         ?<button className="btn btn-blue btn-sm" title="Colar linha copiada do Excel aqui" onClick={e=>{e.stopPropagation();handlePasteIntoRow(r.id);}} style={{padding:"2px 6px"}}><Ico n="excel" s={11}/></button>
                         :i+1}
                     </td>
-                    <td className="stk" style={{left:L1}}><div style={{padding:"2px 6px",fontSize:10,whiteSpace:"nowrap"}}>{fmtD(r.data_solicitacao)||"—"}</div></td>
-                    <td className="stk" style={{left:L2}}><Cell rowId={r.id} field="horario_solicitacao" value={r.horario_solicitacao} tipo="time" onSave={handleCell}/></td>
-                    <td className="stk" style={{left:L3}}><Cell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCell}/></td>
-                    <td className="stk stk-last" style={{left:L4}}><Cell rowId={r.id} field="nome_paciente" value={r.nome_paciente} onSave={handleCell}/></td>
+                    <td className="stk" style={{left:L1,width:ws[1],minWidth:ws[1]}}><div style={{padding:"2px 6px",fontSize:10,whiteSpace:"nowrap"}}>{fmtD(r.data_solicitacao)||"—"}</div></td>
+                    <td className="stk" style={{left:L2,width:ws[2],minWidth:ws[2]}}><Cell rowId={r.id} field="horario_solicitacao" value={r.horario_solicitacao} tipo="time" onSave={handleCell}/></td>
+                    <td className="stk" style={{left:L3,width:ws[3],minWidth:ws[3]}}><Cell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCell}/></td>
+                    <td className="stk stk-last" style={{left:L4,width:ws[4],minWidth:ws[4]}}><Cell rowId={r.id} field="nome_paciente" value={r.nome_paciente} onSave={handleCell}/></td>
                     <td><Cell rowId={r.id} field="setor" value={r.setor} tipo="sel" optsKey="ST_OPTS" onSave={handleCell}/></td>
                     <td><Cell rowId={r.id} field="procedimento" value={r.procedimento} tipo="sel" optsKey="P_OPTS" onSave={handleCell}/></td>
                     <td><Cell rowId={r.id} field="especialidade" value={r.especialidade} onSave={handleCell}/></td>
