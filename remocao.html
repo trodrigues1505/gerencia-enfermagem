@@ -1130,15 +1130,18 @@ function App(){
   COLS.forEach(([f,,,,,,,w])=>{ INIT_WMAP[f]=w||100; });
   const {wmap,startDrag}=useColResize(INIT_WMAP);
 
-  // stkLefts calculado a partir do wmap — determinístico, não depende do DOM
-  // Ordem fixa: # → data → hora → ficha → nome
-  const STK_FIELDS=['data_solicitacao','horario_solicitacao','ficha_cross','nome_paciente'];
-  const stkLefts=useMemo(()=>{
-    const lefts=[0]; // L0 = left do # = 0
-    let acc=wmap['#'];
-    STK_FIELDS.forEach(f=>{ lefts.push(acc); acc+=wmap[f]||0; });
-    return lefts; // [0, ws#, ws#+wsdata, ws#+wsdata+wshora, ws#+wsdata+wshora+wsficha]
-  },[wmap]);
+  // stkLefts: lê offsetLeft real dos td sticky do primeiro tbody tr
+  // É a única fonte confiável — o colgroup é quem define as larguras reais
+  const [stkLefts,setStkLefts]=useState([0,0,0,0,0]);
+  const tableRef=useRef(null);
+  useEffect(()=>{
+    if(!tableRef.current)return;
+    const firstRow=tableRef.current.querySelector("tbody tr");
+    if(!firstRow)return;
+    const tds=[...firstRow.querySelectorAll("td.stk")];
+    if(tds.length<5)return;
+    setStkLefts(tds.map(td=>td.offsetLeft));
+  },[wmap,loading]);
 
   const load=useCallback(async()=>{
     setLoading(true);
@@ -1246,7 +1249,6 @@ function App(){
 
   const [showPaste,setShowPaste]=useState(false);
   const [activeRow,setActiveRow]=useState(null);
-  const tableRef=useRef(null); // mantido para referência futura se necessário
 
   // O Kanban usa gravidades extras (andamento_cor, finalizado_cor) que não existem
   // no enum de gravidade da planilha de remoções — isso causava erro 500 ao importar
@@ -1544,7 +1546,7 @@ function App(){
             </colgroup>
             <thead><tr>
               {/* Coluna # */}
-              <th className="stk stk-last" style={{textAlign:"center",cursor:"default",borderRight:"2px solid #475569",left:stkLefts[0],width:wmap['#'],maxWidth:wmap['#'],overflow:"hidden",height:38,maxHeight:38}}>
+              <th className="stk stk-last" style={{textAlign:"center",cursor:"default",borderRight:"2px solid #475569",left:stkLefts[0],width:wmap['#'],maxWidth:wmap['#'],overflow:"hidden"}}>
                 <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,height:"100%"}}>
                   <span style={{fontSize:9,color:"#94A3B8",lineHeight:1}}>#</span>
                   <input type="checkbox" className="row-checkbox"
@@ -1561,13 +1563,12 @@ function App(){
               {STK_COLS.map((colIdx,si)=>{
                 const [f,planilha,xls,kanban,,,tip]=COLS[colIdx];
                 const isLast=colIdx===3;
-                const leftOff=stkLefts[si+1];
                 const isSorted=sc===f;
                 return(
                   <th key={f}
-                    style={{position:"relative",cursor:"pointer",left:leftOff,width:wmap[f],maxWidth:wmap[f],overflow:"hidden",height:38}}
+                    style={{position:"relative",cursor:"pointer",overflow:"hidden",left:stkLefts[si+1]}}
                     className={`th-wrap${isSorted?" sorted":""} stk${isLast?" stk-last":""}`}>
-                    <div style={{display:"flex",alignItems:"center",gap:2,paddingRight:10,userSelect:"none",height:"100%",overflow:"hidden"}}
+                    <div style={{display:"flex",alignItems:"center",gap:2,paddingRight:10,userSelect:"none",overflow:"hidden"}}
                       onClick={()=>toggleSort(f)}>
                       <span style={{fontSize:9,lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flexGrow:1}}>{xls}</span>
                       <span className={`sarr${isSorted?" on":""}`} style={{flexShrink:0}}>
