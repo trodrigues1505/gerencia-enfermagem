@@ -1566,7 +1566,7 @@ function App(){
                 const isSorted=sc===f;
                 return(
                   <th key={f}
-                    style={{position:"relative",cursor:"pointer",overflow:"hidden",left:stkLefts[si+1]}}
+                    style={{cursor:"pointer",overflow:"hidden",left:stkLefts[si+1]}}
                     className={`th-wrap${isSorted?" sorted":""} stk${isLast?" stk-last":""}`}>
                     <div style={{display:"flex",alignItems:"center",gap:2,paddingRight:10,userSelect:"none",overflow:"hidden"}}
                       onClick={()=>toggleSort(f)}>
