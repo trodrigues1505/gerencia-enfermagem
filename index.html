@@ -26,6 +26,39 @@ input,select,textarea,button{font-family:inherit}
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:99px}
 kbd{font-family:monospace;background:#F1F5F9;padding:1px 5px;border-radius:3px;border:1px solid #E2E8F0;font-size:10px}
+/* ── Livro de Saída ── */
+.ls-overlay{position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px}
+.ls-modal{background:#fff;border-radius:16px;width:100%;max-width:680px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.35)}
+.ls-hd{background:#0F172A;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.ls-hd h2{color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+.ls-hd-sub{color:#94A3B8;font-size:11px;margin-top:2px}
+.ls-body{flex:1;overflow-y:auto;padding:20px}
+.ls-ft{padding:14px 20px;border-top:1px solid #F1F5F9;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;gap:8px}
+.ls-section{margin-bottom:18px}
+.ls-section-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #F1F5F9}
+.ls-grid{display:grid;gap:10px}
+.ls-g2{grid-template-columns:1fr 1fr}
+.ls-g3{grid-template-columns:1fr 1fr 1fr}
+.ls-field{display:flex;flex-direction:column;gap:3px}
+.ls-field label{font-size:10px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em}
+.ls-field label .req{color:#EF4444;margin-left:2px}
+.ls-field input,.ls-field select,.ls-field textarea{border:1.5px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;color:#0F172A;outline:none;background:#fff;transition:border-color .15s}
+.ls-field input:focus,.ls-field select:focus,.ls-field textarea:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.ls-field input.err,.ls-field select.err{border-color:#EF4444;box-shadow:0 0 0 3px rgba(239,68,68,.1)}
+.ls-bool{display:flex;gap:16px;align-items:center;padding-top:4px}
+.ls-bool label{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#374151;font-weight:500}
+/* Pendentes */
+.ls-pending-card{background:#fff;border:1.5px solid #E2E8F0;border-radius:10px;padding:14px 16px;margin-bottom:8px;transition:border-color .15s}
+.ls-pending-card:hover{border-color:#3B82F6}
+/* Match */
+.ls-match-overlay{position:absolute;inset:0;background:rgba(15,23,42,.7);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10;border-radius:16px}
+.ls-match-box{background:#fff;border-radius:14px;padding:24px;max-width:540px;width:100%;box-shadow:0 16px 48px rgba(0,0,0,.3)}
+/* Toggle livro */
+.livro-btn{position:relative;display:inline-flex;align-items:center;gap:6px}
+.livro-badge{position:absolute;top:-6px;right:-6px;background:#EF4444;color:#fff;font-size:9px;font-weight:800;min-width:16px;height:16px;border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid #fff}
+/* Toggle can_livro no UsersPanel */
+.can-livro-toggle{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:6px;border:1px solid #E2E8F0;background:#F8FAFC;cursor:pointer;font-size:11px;font-weight:600;color:#64748B;transition:all .15s}
+.can-livro-toggle.on{background:#F0FDF4;border-color:#86EFAC;color:#16A34A}
 </style>
 </head>
 <body>
@@ -3374,7 +3407,11 @@ function UsersPanel({
       background: u.status === "aprovado" ? "#F0FDF4" : u.status === "pendente" ? "#FFFBEB" : "#FEF2F2",
       color: sC[u.status] || "#64748B"
     }
-  }, u.status), /*#__PURE__*/React.createElement("div", {
+  }, u.status), /*#__PURE__*/React.createElement("button", {
+    onClick: () => toggleCanLivro(u.id, u.can_livro, load),
+    className: "can-livro-toggle" + (u.can_livro ? " on" : ""),
+    title: u.can_livro ? "Revogar acesso ao Livro de Saída" : "Liberar acesso ao Livro de Saída"
+  }, u.can_livro ? "📒 Livro ✓" : "📒 Livro"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 6,
@@ -4837,6 +4874,272 @@ function KanbanDuplicatesModal({ cards, cols, onClose, onDel }) {
 }
 
 /* ════════════════════════════════════════════
+   LIVRO DE SAÍDA
+   ════════════════════════════════════════════ */
+
+// Similaridade de strings (Dice bigram)
+function strSim(a, b) {
+  if (!a || !b) return 0;
+  a = a.toUpperCase().trim(); b = b.toUpperCase().trim();
+  if (a === b) return 1;
+  if (a.length < 2 || b.length < 2) return 0;
+  const bg = s => { const m = new Map(); for (let i=0;i<s.length-1;i++){const k=s[i]+s[i+1];m.set(k,(m.get(k)||0)+1);} return m; };
+  const aB=bg(a),bB=bg(b); let inter=0;
+  for (const [k,v] of aB) inter+=Math.min(v,bB.get(k)||0);
+  return (2*inter)/(a.length+b.length-2);
+}
+
+const LS_EMPTY={data_saida:"",nome_paciente:"",idade:"",especialidade:"",destino:"",ambulancia:"",medico:"",enfermeiro:"",tecnico_auxiliar:"",hora_solic_ambulancia:"",hora_saida:"",hora_retorno:"",finalizado:false,permaneceu:false,observacao:""};
+const LS_REQUIRED=["data_saida","nome_paciente","idade","especialidade","destino","ambulancia","medico","enfermeiro","tecnico_auxiliar","hora_solic_ambulancia","hora_saida","hora_retorno"];
+const LS_H={"Content-Type":"application/json",apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`};
+
+function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
+  const [tab,setTab]=useState("novo");
+  const [form,setForm]=useState({...LS_EMPTY});
+  const [errors,setErrors]=useState({});
+  const [saving,setSaving]=useState(false);
+  const [pendentes,setPendentes]=useState([]);
+  const [loadingP,setLoadingP]=useState(false);
+  const [match,setMatch]=useState(null);
+  const [vinculando,setVinculando]=useState(false);
+  const [remocoes,setRemocoes]=useState([]);
+
+  useEffect(()=>{loadPendentes();loadRemocoes();},[]);
+
+  async function loadPendentes(){
+    setLoadingP(true);
+    try{const r=await fetch(`${SB_URL}/rest/v1/livro_saida?status_vinculo=eq.pendente&order=created_at.desc`,{headers:LS_H});const d=await r.json();setPendentes(Array.isArray(d)?d:[]);if(onPendentesChange)onPendentesChange(Array.isArray(d)?d.length:0);}catch(e){}
+    setLoadingP(false);
+  }
+  async function loadRemocoes(){
+    try{const r=await fetch(`${SB_URL}/rest/v1/remocoes?select=id,nome_paciente,data_solicitacao,ficha_cross&order=data_solicitacao.desc&limit=300`,{headers:LS_H});const d=await r.json();setRemocoes(Array.isArray(d)?d:[]);}catch(e){}
+  }
+
+  const set=(k,v)=>{setForm(p=>({...p,[k]:v}));setErrors(p=>({...p,[k]:false}));};
+
+  function validate(){
+    const errs={};
+    LS_REQUIRED.forEach(k=>{if(!form[k]||String(form[k]).trim()==="")errs[k]=true;});
+    setErrors(errs);
+    return Object.keys(errs).length===0;
+  }
+
+  function findMatches(nome,data){
+    if(!nome)return[];
+    return remocoes
+      .map(r=>({...r,sim:strSim(r.nome_paciente,nome)}))
+      .filter(r=>{const sd=data&&r.data_solicitacao&&r.data_solicitacao.startsWith(data);return r.sim>=0.75||(r.sim>=0.55&&sd);})
+      .sort((a,b)=>b.sim-a.sim).slice(0,5);
+  }
+
+  async function handleSalvar(){
+    if(!validate())return;
+    setSaving(true);
+    try{
+      const payload={...form,finalizado:Boolean(form.finalizado),permaneceu:Boolean(form.permaneceu),preenchido_por:userId||null,status_vinculo:"pendente"};
+      const r=await fetch(`${SB_URL}/rest/v1/livro_saida`,{method:"POST",headers:{...LS_H,Prefer:"return=representation"},body:JSON.stringify(payload)});
+      if(!r.ok)throw new Error(await r.text());
+      const [saved]=await r.json();
+      const candidates=findMatches(form.nome_paciente,form.data_saida);
+      if(candidates.length>0){setMatch({livroRow:saved,candidates});}
+      else{setForm({...LS_EMPTY});loadPendentes();alert("✅ Salvo! Nenhuma correspondência encontrada — ficará em pendentes.");}
+    }catch(e){alert("Erro: "+e.message);}
+    setSaving(false);
+  }
+
+  async function handleVincular(livroId,remocaoId){
+    setVinculando(true);
+    try{
+      await fetch(`${SB_URL}/rest/v1/livro_saida?id=eq.${livroId}`,{method:"PATCH",headers:{...LS_H,Prefer:"return=minimal"},body:JSON.stringify({remocao_id:remocaoId,status_vinculo:"vinculado"})});
+      const livroEntry=match?.livroRow||pendentes.find(p=>p.id===livroId);
+      if(livroEntry&&remocaoId){
+        const u={};
+        if(livroEntry.ambulancia)u.tipo_ambulancia=livroEntry.ambulancia;
+        if(livroEntry.hora_solic_ambulancia)u.hora_solic_ambulancia=livroEntry.hora_solic_ambulancia;
+        if(livroEntry.hora_saida)u.horario_saida_ambulancia=livroEntry.hora_saida;
+        if(livroEntry.hora_retorno)u.horario_retorno=livroEntry.hora_retorno;
+        if(livroEntry.medico)u.medico=livroEntry.medico;
+        if(livroEntry.enfermeiro)u.enfermeiro=livroEntry.enfermeiro;
+        if(livroEntry.tecnico_auxiliar)u.tecnico_auxiliar=livroEntry.tecnico_auxiliar;
+        if(livroEntry.destino)u.instituicao_destino=livroEntry.destino;
+        if(livroEntry.observacao)u.observacao=livroEntry.observacao;
+        u.finalizado=Boolean(livroEntry.finalizado);
+        u.permaneceu=Boolean(livroEntry.permaneceu);
+        if(Object.keys(u).length>0)await fetch(`${SB_URL}/rest/v1/remocoes?id=eq.${remocaoId}`,{method:"PATCH",headers:{...LS_H,Prefer:"return=minimal"},body:JSON.stringify(u)});
+      }
+      setMatch(null);setForm({...LS_EMPTY});loadPendentes();
+      alert("✅ Vinculado! Dados mesclados na planilha de remoção.");
+    }catch(e){alert("Erro: "+e.message);}
+    setVinculando(false);
+  }
+
+  async function handleIndependente(livroId){
+    await fetch(`${SB_URL}/rest/v1/livro_saida?id=eq.${livroId}`,{method:"PATCH",headers:{...LS_H,Prefer:"return=minimal"},body:JSON.stringify({status_vinculo:"independente"})});
+    setMatch(null);setForm({...LS_EMPTY});loadPendentes();
+  }
+
+  async function handleVincularPendente(livro){
+    const candidates=findMatches(livro.nome_paciente,livro.data_saida);
+    setMatch({livroRow:livro,candidates});setTab("novo");
+  }
+
+  const iS=k=>({border:`1.5px solid ${errors[k]?"#EF4444":"#E2E8F0"}`,borderRadius:8,padding:"8px 10px",fontSize:13,fontFamily:"inherit",color:"#0F172A",outline:"none",background:"#fff",width:"100%",boxShadow:errors[k]?"0 0 0 3px rgba(239,68,68,.1)":"none"});
+  const sS=k=>({...iS(k),appearance:"none",cursor:"pointer"});
+  const LBL=(t,r)=>React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"#374151",textTransform:"uppercase",letterSpacing:".04em",display:"block",marginBottom:3}},t,r&&React.createElement("span",{style:{color:"#EF4444",marginLeft:2}},"*"));
+  const FLD=(k,label,el)=>React.createElement("div",{key:k},LBL(label,LS_REQUIRED.includes(k)),el);
+  const fmtDate=d=>{try{return new Date(d+"T12:00:00").toLocaleDateString("pt-BR");}catch{return d;}};
+
+  return React.createElement("div",{className:"ls-overlay",onClick:e=>e.target===e.currentTarget&&onClose()},
+    React.createElement("div",{className:"ls-modal",style:{position:"relative"}},
+
+      // ── Match overlay ──
+      match&&React.createElement("div",{className:"ls-match-overlay"},
+        React.createElement("div",{className:"ls-match-box"},
+          React.createElement("div",{style:{fontWeight:700,fontSize:15,marginBottom:4}},"📋 Correspondência encontrada"),
+          React.createElement("div",{style:{fontSize:12,color:"#64748B",marginBottom:16}},`${match.candidates.length} registro(s) parecido(s) para "${match.livroRow.nome_paciente}". Selecione o correto ou salve sem vínculo.`),
+          match.candidates.map(c=>React.createElement("div",{key:c.id,style:{background:"#F8FAFC",border:"1.5px solid #E2E8F0",borderRadius:9,padding:"10px 14px",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}},
+            React.createElement("div",null,
+              React.createElement("div",{style:{fontWeight:600,fontSize:13}},c.nome_paciente),
+              React.createElement("div",{style:{fontSize:11,color:"#64748B",marginTop:2}},
+                c.data_solicitacao||"—",c.ficha_cross?` · ${c.ficha_cross}`:"",
+                React.createElement("span",{style:{marginLeft:8,background:"#EFF6FF",color:"#1D4ED8",borderRadius:99,padding:"1px 7px",fontSize:10,fontWeight:700}},Math.round(c.sim*100)+"% similar")
+              )
+            ),
+            React.createElement("button",{disabled:vinculando,onClick:()=>!vinculando&&handleVincular(match.livroRow.id,c.id),style:{background:"#16A34A",color:"#fff",border:"none",borderRadius:7,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}},vinculando?"…":"Vincular")
+          )),
+          React.createElement("div",{style:{display:"flex",gap:8,marginTop:16,justifyContent:"flex-end"}},
+            React.createElement("button",{onClick:()=>handleIndependente(match.livroRow.id),style:{background:"none",border:"1px solid #E2E8F0",borderRadius:7,padding:"7px 16px",fontSize:12,cursor:"pointer",color:"#64748B"}},"Salvar sem vínculo"),
+            React.createElement("button",{onClick:()=>setMatch(null),style:{background:"none",border:"1px solid #E2E8F0",borderRadius:7,padding:"7px 16px",fontSize:12,cursor:"pointer",color:"#374151"}},"Cancelar")
+          )
+        )
+      ),
+
+      // ── Header ──
+      React.createElement("div",{className:"ls-hd"},
+        React.createElement("div",null,
+          React.createElement("h2",null,"📒 Livro de Saída"),
+          React.createElement("div",{className:"ls-hd-sub"},"Preenchido por: "+(currentUser?.nome||"—"))
+        ),
+        React.createElement("button",{onClick:onClose,style:{background:"rgba(255,255,255,.1)",border:"none",color:"#fff",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:16}},"✕")
+      ),
+
+      // ── Tabs ──
+      React.createElement("div",{style:{display:"flex",borderBottom:"2px solid #F1F5F9",flexShrink:0,background:"#F8FAFC"}},
+        [["novo","📝 Novo Registro"],["pendentes",`⏳ Pendentes (${pendentes.length})`]].map(([id,label])=>
+          React.createElement("button",{key:id,onClick:()=>setTab(id),style:{flex:1,padding:"10px 16px",background:"none",border:"none",borderBottom:`3px solid ${tab===id?"#3B82F6":"transparent"}`,color:tab===id?"#1D4ED8":"#64748B",fontWeight:tab===id?700:500,fontSize:12,cursor:"pointer",transition:"all .15s"}},label)
+        )
+      ),
+
+      // ── Body ──
+      React.createElement("div",{className:"ls-body"},
+
+        // TAB NOVO
+        tab==="novo"&&React.createElement("div",null,
+          // Paciente
+          React.createElement("div",{className:"ls-section"},
+            React.createElement("div",{className:"ls-section-title"},"Dados do Paciente"),
+            React.createElement("div",{className:"ls-grid ls-g2"},
+              FLD("data_saida","Data",React.createElement("input",{type:"date",value:form.data_saida,onChange:e=>set("data_saida",e.target.value),style:iS("data_saida")})),
+              FLD("idade","Idade",React.createElement("input",{type:"text",placeholder:"ex: 3 anos",value:form.idade,onChange:e=>set("idade",e.target.value),style:iS("idade")}))
+            ),
+            React.createElement("div",{style:{marginTop:10}},
+              FLD("nome_paciente","Nome completo",React.createElement("input",{type:"text",placeholder:"NOME COMPLETO DO PACIENTE",value:form.nome_paciente,onChange:e=>set("nome_paciente",e.target.value.toUpperCase()),style:{...iS("nome_paciente"),textTransform:"uppercase"}}))
+            )
+          ),
+          // Remoção
+          React.createElement("div",{className:"ls-section"},
+            React.createElement("div",{className:"ls-section-title"},"Dados da Remoção"),
+            React.createElement("div",{className:"ls-grid ls-g2"},
+              FLD("especialidade","Especialidade / Recurso",React.createElement("input",{type:"text",placeholder:"ex: UTI PEDIÁTRICA, TOMOGRAFIA",value:form.especialidade,onChange:e=>set("especialidade",e.target.value),style:iS("especialidade")})),
+              FLD("destino","Destino",React.createElement("input",{type:"text",placeholder:"Hospital / Unidade receptora",value:form.destino,onChange:e=>set("destino",e.target.value),style:iS("destino")})),
+              FLD("ambulancia","Tipo de Ambulância",React.createElement("select",{value:form.ambulancia,onChange:e=>set("ambulancia",e.target.value),style:sS("ambulancia")},
+                React.createElement("option",{value:""},"— selecione —"),
+                React.createElement("option",{value:"BÁSICA"},"🚑 BÁSICA (SBV)"),
+                React.createElement("option",{value:"AVANÇADA"},"🚨 AVANÇADA (SAV)"),
+                React.createElement("option",{value:"UTI"},"🏥 UTI Móvel")
+              ))
+            )
+          ),
+          // Equipe
+          React.createElement("div",{className:"ls-section"},
+            React.createElement("div",{className:"ls-section-title"},"Equipe"),
+            React.createElement("div",{className:"ls-grid ls-g3"},
+              FLD("medico","Médico(a)",React.createElement("input",{type:"text",placeholder:"Dr. Nome",value:form.medico,onChange:e=>set("medico",e.target.value),style:iS("medico")})),
+              FLD("enfermeiro","Enfermeiro(a)",React.createElement("input",{type:"text",placeholder:"Nome",value:form.enfermeiro,onChange:e=>set("enfermeiro",e.target.value),style:iS("enfermeiro")})),
+              FLD("tecnico_auxiliar","Técnico / Auxiliar",React.createElement("input",{type:"text",placeholder:"Nome",value:form.tecnico_auxiliar,onChange:e=>set("tecnico_auxiliar",e.target.value),style:iS("tecnico_auxiliar")}))
+            )
+          ),
+          // Horários
+          React.createElement("div",{className:"ls-section"},
+            React.createElement("div",{className:"ls-section-title"},"Horários"),
+            React.createElement("div",{className:"ls-grid ls-g3"},
+              FLD("hora_solic_ambulancia","Solic. Ambulância",React.createElement("input",{type:"time",value:form.hora_solic_ambulancia,onChange:e=>set("hora_solic_ambulancia",e.target.value),style:iS("hora_solic_ambulancia")})),
+              FLD("hora_saida","Saída",React.createElement("input",{type:"time",value:form.hora_saida,onChange:e=>set("hora_saida",e.target.value),style:iS("hora_saida")})),
+              FLD("hora_retorno","Retorno",React.createElement("input",{type:"time",value:form.hora_retorno,onChange:e=>set("hora_retorno",e.target.value),style:iS("hora_retorno")}))
+            )
+          ),
+          // Encerramento
+          React.createElement("div",{className:"ls-section"},
+            React.createElement("div",{className:"ls-section-title"},"Encerramento"),
+            React.createElement("div",{className:"ls-grid ls-g2"},
+              React.createElement("div",null,LBL("Finalizado",true),React.createElement("div",{className:"ls-bool"},
+                React.createElement("label",null,React.createElement("input",{type:"radio",name:"ls_fin",checked:form.finalizado===true,onChange:()=>set("finalizado",true)})," Sim"),
+                React.createElement("label",null,React.createElement("input",{type:"radio",name:"ls_fin",checked:form.finalizado!==true,onChange:()=>set("finalizado",false)})," Não")
+              )),
+              React.createElement("div",null,LBL("Permaneceu na unidade",true),React.createElement("div",{className:"ls-bool"},
+                React.createElement("label",null,React.createElement("input",{type:"radio",name:"ls_per",checked:form.permaneceu===true,onChange:()=>set("permaneceu",true)})," Sim"),
+                React.createElement("label",null,React.createElement("input",{type:"radio",name:"ls_per",checked:form.permaneceu!==true,onChange:()=>set("permaneceu",false)})," Não")
+              ))
+            ),
+            React.createElement("div",{style:{marginTop:10}},
+              LBL("Observação",false),
+              React.createElement("textarea",{rows:2,value:form.observacao,onChange:e=>set("observacao",e.target.value),placeholder:"Observações adicionais…",style:{...iS("observacao"),resize:"vertical"}})
+            )
+          ),
+          Object.keys(errors).length>0&&React.createElement("div",{style:{background:"#FEF2F2",border:"1px solid #FCA5A5",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#DC2626",marginTop:8}},"⚠ Preencha todos os campos obrigatórios (*) antes de salvar.")
+        ),
+
+        // TAB PENDENTES
+        tab==="pendentes"&&React.createElement("div",null,
+          loadingP
+            ?React.createElement("div",{style:{textAlign:"center",padding:32,color:"#94A3B8"}},"Carregando…")
+            :pendentes.length===0
+              ?React.createElement("div",{style:{textAlign:"center",padding:48,color:"#94A3B8"}},
+                  React.createElement("div",{style:{fontSize:32,marginBottom:8}},"✅"),
+                  React.createElement("div",{style:{fontSize:14,fontWeight:600}},"Nenhum pendente"),
+                  React.createElement("div",{style:{fontSize:12,marginTop:4}},"Todos os registros já estão vinculados.")
+                )
+              :pendentes.map(p=>React.createElement("div",{key:p.id,className:"ls-pending-card"},
+                  React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}},
+                    React.createElement("div",null,
+                      React.createElement("div",{style:{fontWeight:700,fontSize:13}},p.nome_paciente),
+                      React.createElement("div",{style:{fontSize:11,color:"#64748B",marginTop:2}},fmtDate(p.data_saida)," · ",p.idade," · ",p.especialidade," → ",p.destino),
+                      React.createElement("div",{style:{fontSize:11,color:"#94A3B8",marginTop:2}},"🕐 Saída: ",p.hora_saida||"—"," · ",p.ambulancia," · Enf: ",p.enfermeiro)
+                    ),
+                    React.createElement("div",{style:{display:"flex",gap:6,flexShrink:0,marginLeft:12}},
+                      React.createElement("button",{onClick:()=>handleVincularPendente(p),style:{background:"#EFF6FF",border:"1px solid #BFDBFE",color:"#1D4ED8",borderRadius:7,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}},"🔗 Vincular"),
+                      React.createElement("button",{onClick:()=>handleIndependente(p.id),style:{background:"none",border:"1px solid #E2E8F0",color:"#94A3B8",borderRadius:7,padding:"5px 10px",fontSize:11,cursor:"pointer"}},"Ignorar")
+                    )
+                  )
+                ))
+        )
+      ),
+
+      // ── Footer ──
+      React.createElement("div",{className:"ls-ft"},
+        React.createElement("div",{style:{fontSize:11,color:"#94A3B8"}},tab==="novo"?"Campos com * são obrigatórios":`${pendentes.length} registro(s) aguardando vinculação`),
+        tab==="novo"&&React.createElement("button",{onClick:handleSalvar,disabled:saving,style:{background:"#0F172A",color:"#fff",border:"none",borderRadius:9,padding:"9px 24px",fontSize:13,fontWeight:700,cursor:saving?"not-allowed":"pointer",opacity:saving?.7:1}},saving?"Salvando…":"💾 Salvar Registro")
+      )
+    )
+  );
+}
+
+async function toggleCanLivro(uid,current,reload){
+  await fetch(`${SB_URL}/rest/v1/users?id=eq.${uid}`,{method:"PATCH",headers:{"Content-Type":"application/json",apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,Prefer:"return=minimal"},body:JSON.stringify({can_livro:!current})});
+  reload();
+}
+
+/* ════════════════════════════════════════════
    MAIN APP
    ════════════════════════════════════════════ */
 function App() {
@@ -4874,6 +5177,8 @@ function App() {
   const [showHistory, setShowHistory] = useState(false);
   const [showDuplicates, setShowDuplicates] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [showLivro, setShowLivro] = useState(false);
+  const [pendentesCount, setPendentesCount] = useState(0);
   const dragId = useRef(null);
   const dragOverCol = useRef(null);
   const newColRef = useRef(null);
@@ -5939,6 +6244,7 @@ function App() {
     },
       /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: "#1E40AF", fontWeight: 500 } }, "👁 Visualização somente leitura", lastPub ? ` · Publicado em: ${lastPub}` : "")
     ),
+    showLivro && /*#__PURE__*/React.createElement(LivroSaida, { currentUser: currentUser, userId: userId, onClose: () => setShowLivro(false), onPendentesChange: n => setPendentesCount(n) }),
     undoQueue.map(item => /*#__PURE__*/React.createElement("div", {
       key: item.id,
       style: { position: "fixed", bottom: 72, left: "50%", transform: "translateX(-50%)", background: "#0F172A", color: "#fff", padding: "10px 16px", borderRadius: 10, fontSize: 13, fontWeight: 500, boxShadow: "0 4px 20px rgba(0,0,0,.3)", zIndex: 9998, display: "flex", alignItems: "center", gap: 12, whiteSpace: "nowrap" }
@@ -5952,6 +6258,7 @@ function App() {
           /*#__PURE__*/React.createElement(NavBtn, { id: "dashboard", label: "📊 Dashboard" }),
           /*#__PURE__*/React.createElement(KanbanDropdown, { view: view, setView: setView }),
           /*#__PURE__*/React.createElement("a", { href: "remocao.html", style: { padding: "5px 14px", borderRadius: 6, border: "none", fontSize: 12, fontWeight: 400, background: "transparent", color: "#64748B", cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center" } }, "🚑 Remoção"),
+          (currentUser?.can_livro || isAdmin) && /*#__PURE__*/React.createElement("div", { className: "livro-btn" }, /*#__PURE__*/React.createElement("button", { onClick: () => setShowLivro(true), style: { padding: "5px 14px", borderRadius: 6, border: "none", fontSize: 12, fontWeight: 400, background: "transparent", color: "#64748B", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 } }, "📒 Livro de Saída"), pendentesCount > 0 && /*#__PURE__*/React.createElement("span", { className: "livro-badge" }, pendentesCount)),
           isAdmin && /*#__PURE__*/React.createElement(NavBtn, { id: "usuarios", label: "👥 Profissionais" }),
           isAdmin && /*#__PURE__*/React.createElement(NavBtn, { id: "historico", label: "📜 Histórico" }),
           isAdmin && /*#__PURE__*/React.createElement(NavBtn, { id: "publicacoes", label: "📰 Publicações" })
