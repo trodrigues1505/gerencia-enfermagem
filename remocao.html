@@ -1119,9 +1119,11 @@ function App(){
   // Feature 4: seleção múltipla de linhas
   const [selectedRows,setSelectedRows]=useState(new Set());
   const [showDeleteConfirm,setShowDeleteConfirm]=useState(false);
-  // Feature 1: ordem das colunas (indices em COLS)
-  const colIdxDefault=COLS.map((_,i)=>i);
-  const {order:colOrder,setOrder:setColOrder,onDragStart:colDragStart,onDragOver:colDragOver,onDragEnd:colDragEnd}=useColDragOrder(colIdxDefault);
+  // Feature 1: ordem das colunas — APENAS colunas não-sticky (índices >= 4 em COLS)
+  // Sticky cols (0-3: data, hora, ficha, nome) são sempre renderizadas primeiro, nunca reordenadas
+  const STK_COLS = [0,1,2,3]; // índices em COLS que são sticky
+  const MOV_COLS_DEFAULT = COLS.map((_,i)=>i).filter(i=>!STK_COLS.includes(i)); // [4,5,...,N-1]
+  const {order:movColOrder,setOrder:setMovColOrder,onDragStart:colDragStart,onDragOver:colDragOver,onDragEnd:colDragEnd}=useColDragOrder(MOV_COLS_DEFAULT);
   const {ts,push}=useToast();
 
   // Colunas arrastáveis: +1 para #, +1 para ações
@@ -1506,7 +1508,7 @@ function App(){
             />
             <button className="btn btn-p" onClick={()=>setModal({})}><Ico n="plus"/> Novo</button>
             <button className="btn btn-g" onClick={()=>setShowDuplicates(true)} title="Verificar registros com nomes repetidos">🔍 Duplicatas</button>
-            <button className="btn btn-g btn-sm" title="Restaurar ordem original das colunas" onClick={()=>setColOrder(COLS.map((_,i)=>i))} style={{fontSize:11,padding:"4px 8px"}}>⚏ Colunas</button>
+            <button className="btn btn-g btn-sm" title="Restaurar ordem original das colunas" onClick={()=>setMovColOrder(MOV_COLS_DEFAULT)} style={{fontSize:11,padding:"4px 8px"}}>⚏ Colunas</button>
             <button className="btn btn-g" style={{color:"#DC2626",borderColor:"#FCA5A5"}} disabled={rows.length===0} onClick={handleDeleteAll}><Ico n="trash" s={13}/> Excluir todos</button>
           </div>
         </div>
@@ -1530,15 +1532,23 @@ function App(){
         :(
           <table className="rt" ref={tableRef}>
             <colgroup>
+              {/* # */}
               <col style={{width:ws[0]}}/>
-              {colOrder.map((colIdx,orderPos)=>{
+              {/* 4 colunas sticky — sempre na mesma posição ws[1..4] */}
+              {STK_COLS.map((colIdx,si)=>{
                 const [f]=COLS[colIdx];
-                return <col key={f} style={{width:ws[orderPos+1]}}/>;
+                return <col key={f} style={{width:ws[si+1]}}/>;
               })}
+              {/* Colunas móveis — ws[5 + posição no movColOrder] */}
+              {movColOrder.map((colIdx,mPos)=>{
+                const [f]=COLS[colIdx];
+                return <col key={f} style={{width:ws[STK_COLS.length+1+mPos]}}/>;
+              })}
+              {/* Ações */}
               <col style={{width:ws[ws.length-1]}}/>
             </colgroup>
             <thead><tr>
-              {/* Coluna # com checkbox de seleção global */}
+              {/* Coluna # */}
               <th className="stk stk-last" style={{textAlign:"center",cursor:"default",borderRight:"2px solid #475569",left:stkLefts[0],width:ws[0],maxWidth:ws[0]}}>
                 <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"2px 0"}}>
                   <span style={{fontSize:9,color:"#94A3B8"}}>#</span>
@@ -1552,26 +1562,52 @@ function App(){
                   />
                 </div>
               </th>
-              {colOrder.map((colIdx,orderPos)=>{
+              {/* 4 Colunas sticky — renderizadas sempre primeiro, sem drag */}
+              {STK_COLS.map((colIdx,si)=>{
                 const [f,planilha,xls,kanban,,,tip]=COLS[colIdx];
-                // colunas originais 0-3 (data, hora, ficha, nome) permanecem fixas
-                const stkOrigIdx=[0,1,2,3];
-                const isStk=stkOrigIdx.includes(colIdx);
-                const isLast=colIdx===3;
-                const leftOff=isStk?stkLefts[colIdx+1]:undefined;
+                const isLast=colIdx===3; // nome_paciente é a última sticky
+                const leftOff=stkLefts[si+1];
                 const isSorted=sc===f;
                 return(
-                <th key={f}
-                  draggable={!isStk}
-                  onDragStart={isStk?undefined:(e)=>colDragStart(orderPos,e)}
-                  onDragOver={isStk?undefined:(e)=>colDragOver(orderPos,e)}
-                  onDragEnd={isStk?undefined:colDragEnd}
-                  style={{position:"relative",cursor:"pointer",overflow:"hidden",...(isStk?{left:leftOff}:{})}}
-                  className={`th-wrap${isSorted?" sorted":""}${isStk?" stk":""}${isLast?" stk-last":""}`}>
-                  <div style={{display:"flex",alignItems:"flex-start",gap:2,paddingRight:10,userSelect:"none"}}
-                    onClick={()=>toggleSort(f)}>
-                    {!isStk&&(
-                      <span className="th-drag-handle" title="Arraste para reordenar coluna"
+                  <th key={f}
+                    style={{position:"relative",cursor:"pointer",overflow:"hidden",left:leftOff}}
+                    className={`th-wrap${isSorted?" sorted":""} stk${isLast?" stk-last":""}`}>
+                    <div style={{display:"flex",alignItems:"flex-start",gap:2,paddingRight:10,userSelect:"none"}}
+                      onClick={()=>toggleSort(f)}>
+                      <span style={{fontSize:9,lineHeight:1.25,whiteSpace:"normal",wordBreak:"break-word",flexGrow:1}}>{xls}</span>
+                      <span className={`sarr${isSorted?" on":""}`} style={{flexShrink:0,marginTop:1}}>
+                        {isSorted?(sd==="asc"?"▲":"▼"):"⇅"}
+                      </span>
+                    </div>
+                    {/* Handle resize sticky */}
+                    <div
+                      style={{position:"absolute",right:0,top:0,width:8,height:"100%",cursor:"col-resize",zIndex:20,background:"transparent"}}
+                      onMouseDown={e=>{e.stopPropagation();startDrag(si+1,e);}}
+                      title="Arrastar para redimensionar"
+                    />
+                    <div className="tipbox">
+                      <strong>Planilha:</strong> {planilha}<br/>
+                      <strong>Kanban:</strong> {kanban||"—"}<br/>
+                      {tip}
+                    </div>
+                  </th>
+                );
+              })}
+              {/* Colunas móveis — reordenáveis via drag */}
+              {movColOrder.map((colIdx,mPos)=>{
+                const [f,planilha,xls,kanban,,,tip]=COLS[colIdx];
+                const isSorted=sc===f;
+                return(
+                  <th key={f}
+                    draggable
+                    onDragStart={(e)=>colDragStart(mPos,e)}
+                    onDragOver={(e)=>colDragOver(mPos,e)}
+                    onDragEnd={colDragEnd}
+                    style={{position:"relative",cursor:"pointer",overflow:"hidden"}}
+                    className={`th-wrap${isSorted?" sorted":""}`}>
+                    <div style={{display:"flex",alignItems:"flex-start",gap:2,paddingRight:10,userSelect:"none"}}
+                      onClick={()=>toggleSort(f)}>
+                      <span className="th-drag-handle" title="Arraste para reordenar"
                         onMouseDown={e=>e.stopPropagation()}>
                         <svg width="8" height="10" viewBox="0 0 8 10" fill="currentColor">
                           <circle cx="2" cy="2" r="1.2"/><circle cx="6" cy="2" r="1.2"/>
@@ -1579,25 +1615,25 @@ function App(){
                           <circle cx="2" cy="8" r="1.2"/><circle cx="6" cy="8" r="1.2"/>
                         </svg>
                       </span>
-                    )}
-                    <span style={{fontSize:9,lineHeight:1.25,whiteSpace:"normal",wordBreak:"break-word",flexGrow:1}}>{xls}</span>
-                    <span className={`sarr${isSorted?" on":""}`} style={{flexShrink:0,marginTop:1}}>
-                      {isSorted?(sd==="asc"?"▲":"▼"):"⇅"}
-                    </span>
-                  </div>
-                  {/* Handle resize — área de 8px na borda direita */}
-                  <div
-                    style={{position:"absolute",right:0,top:0,width:8,height:"100%",cursor:"col-resize",zIndex:20,background:"transparent"}}
-                    onMouseDown={e=>{e.stopPropagation();startDrag(orderPos+1,e);}}
-                    title="Arrastar para redimensionar"
-                  />
-                  <div className="tipbox">
-                    <strong>Planilha:</strong> {planilha}<br/>
-                    <strong>Kanban:</strong> {kanban||"—"}<br/>
-                    {tip}
-                  </div>
-                </th>
-              );})}
+                      <span style={{fontSize:9,lineHeight:1.25,whiteSpace:"normal",wordBreak:"break-word",flexGrow:1}}>{xls}</span>
+                      <span className={`sarr${isSorted?" on":""}`} style={{flexShrink:0,marginTop:1}}>
+                        {isSorted?(sd==="asc"?"▲":"▼"):"⇅"}
+                      </span>
+                    </div>
+                    {/* Handle resize móvel — ws começa em STK_COLS.length+1 */}
+                    <div
+                      style={{position:"absolute",right:0,top:0,width:8,height:"100%",cursor:"col-resize",zIndex:20,background:"transparent"}}
+                      onMouseDown={e=>{e.stopPropagation();startDrag(STK_COLS.length+1+mPos,e);}}
+                      title="Arrastar para redimensionar"
+                    />
+                    <div className="tipbox">
+                      <strong>Planilha:</strong> {planilha}<br/>
+                      <strong>Kanban:</strong> {kanban||"—"}<br/>
+                      {tip}
+                    </div>
+                  </th>
+                );
+              })}
               <th style={{cursor:"default",borderLeft:"1px solid #334155"}}></th>
             </tr></thead>
             <tbody>
@@ -1608,12 +1644,8 @@ function App(){
                 const isSelected=selectedRows.has(r.id);
                 const [L0,L1,L2,L3,L4]=stkLefts;
 
-                // Mapa de renderização das células por field (para colOrder)
-                const cellMap={
-                  "data_solicitacao":<td className="stk" style={{left:L1}}><div style={{padding:"2px 6px",fontSize:10,whiteSpace:"nowrap"}}>{fmtD(r.data_solicitacao)||"—"}</div></td>,
-                  "horario_solicitacao":<td className="stk" style={{left:L2}}><Cell rowId={r.id} field="horario_solicitacao" value={r.horario_solicitacao} tipo="time" onSave={handleCell}/></td>,
-                  "ficha_cross":<td className="stk" style={{left:L3}}><Cell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCell}/></td>,
-                  "nome_paciente":<td className="stk stk-last" style={{left:L4}}><Cell rowId={r.id} field="nome_paciente" value={r.nome_paciente} onSave={handleCell}/></td>,
+                // Mapa de células das colunas MÓVEIS (não-sticky)
+                const movCellMap={
                   "setor":<td><Cell rowId={r.id} field="setor" value={r.setor} tipo="sel" optsKey="ST_OPTS" onSave={handleCell}/></td>,
                   "procedimento":<td><Cell rowId={r.id} field="procedimento" value={r.procedimento} tipo="sel" optsKey="P_OPTS" onSave={handleCell}/></td>,
                   "especialidade":<td><Cell rowId={r.id} field="especialidade" value={r.especialidade} onSave={handleCell}/></td>,
@@ -1643,7 +1675,6 @@ function App(){
                     className={isActive?"row-active":""}
                     style={{
                       ...(isBlank?{background:"#FEFCE8",outline:"2px solid #FDE047",outlineOffset:"-2px"}:{}),
-                      ...(isSelected?{background:"#EFF6FF!important"}:{})
                     }}
                     onClick={()=>setActiveRow(r.id)}>
                     {/* Coluna # com checkbox */}
@@ -1663,10 +1694,15 @@ function App(){
                         />
                       </div>
                     </td>
-                    {/* Células na ordem definida por colOrder */}
-                    {colOrder.map(colIdx=>{
+                    {/* 4 Colunas sticky — sempre primeiro, na ordem fixa */}
+                    <td className="stk" style={{left:L1}}><div style={{padding:"2px 6px",fontSize:10,whiteSpace:"nowrap"}}>{fmtD(r.data_solicitacao)||"—"}</div></td>
+                    <td className="stk" style={{left:L2}}><Cell rowId={r.id} field="horario_solicitacao" value={r.horario_solicitacao} tipo="time" onSave={handleCell}/></td>
+                    <td className="stk" style={{left:L3}}><Cell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCell}/></td>
+                    <td className="stk stk-last" style={{left:L4}}><Cell rowId={r.id} field="nome_paciente" value={r.nome_paciente} onSave={handleCell}/></td>
+                    {/* Colunas móveis na ordem definida por movColOrder */}
+                    {movColOrder.map(colIdx=>{
                       const [f]=COLS[colIdx];
-                      return React.cloneElement(cellMap[f],{key:f});
+                      return React.cloneElement(movCellMap[f],{key:f});
                     })}
                     <td style={{textAlign:"center"}}>
                       <button className="delbtn" title="Excluir" onClick={()=>handleDelete(r.id)}><Ico n="trash" s={11}/></button>
