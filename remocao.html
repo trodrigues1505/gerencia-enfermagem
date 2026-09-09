@@ -200,6 +200,22 @@ async function api(body) {
   if(!r.ok) throw new Error(d.error||"Erro");
   return d;
 }
+
+// Para campos booleanos, usa PATCH direto na REST API do Supabase
+// A Edge Function pode filtrar/transformar valores boolean — REST API não tem essa limitação
+const BOOL_FIELDS = new Set(["finalizado","permaneceu"]);
+async function apiPatchBool(id, field, value) {
+  const url = `${SB_URL}/rest/v1/remocoes?id=eq.${encodeURIComponent(id)}`;
+  const r = await fetch(url, {
+    method: "PATCH",
+    headers: {...H, "Prefer": "return=minimal"},
+    body: JSON.stringify({[field]: value === true || value === "true" || value === "sim" || value === 1})
+  });
+  if(!r.ok) {
+    const txt = await r.text().catch(()=>"");
+    throw new Error(txt || `Erro ${r.status}`);
+  }
+}
 async function dbGet(path) {
   const r = await fetch(`${SB_URL}/rest/v1/${path}`,{headers:H});
   if(!r.ok) throw new Error(await r.text());
@@ -1109,17 +1125,21 @@ function App(){
   const {ts,push}=useToast();
 
   // Colunas arrastáveis: +1 para #, +1 para ações
-  const {ws,startDrag}=useColResize([32,...COLS.map(([,,,,,,,w])=>w||100),36]);
+  // IMPORTANTE: ws[0] é a coluna #. As 4 sticky seguem ws[1..4] em ORDEM FIXA (data,hora,ficha,nome)
+  // independente de colOrder — sticky cols nunca saem das primeiras posições do DOM.
+  const {ws,startDrag}=useColResize([48,...COLS.map(([,,,,,,,w])=>w||100),36]);
 
-  // Mede os offsetLeft reais das colunas sticky após cada mudança de largura
-  useEffect(()=>{
-    if(!tableRef.current)return;
-    const ths=tableRef.current.querySelectorAll("thead tr th");
-    if(!ths||ths.length<5)return;
-    // ths[0]=#, ths[1]=data, ths[2]=hora, ths[3]=ficha, ths[4]=nome
-    const lefts=[0,1,2,3,4].map(i=>ths[i]?ths[i].offsetLeft:0);
-    setStkLefts(lefts);
-  },[ws]);
+  // Calcula os left das sticky cols somando ws diretamente (não depende do DOM)
+  // ws[0]=#, ws[1]=data, ws[2]=hora, ws[3]=ficha, ws[4]=nome
+  // stkLefts[0]=left do #=0, stkLefts[1]=left da data=ws[0],
+  // stkLefts[2]=left da hora=ws[0]+ws[1], etc.
+  const stkLefts=useMemo(()=>[
+    0,
+    ws[0],
+    ws[0]+ws[1],
+    ws[0]+ws[1]+ws[2],
+    ws[0]+ws[1]+ws[2]+ws[3],
+  ],[ws]);
 
   const load=useCallback(async()=>{
     setLoading(true);
@@ -1152,6 +1172,13 @@ function App(){
 
   const handleCell=async(rowId,field,value)=>{
     try{
+      // Campos booleanos: usar PATCH direto na REST API (Edge Function pode filtrar boolean)
+      if(BOOL_FIELDS.has(field)){
+        const boolVal = value===true||value==="true"||value==="sim"||value===1;
+        await apiPatchBool(rowId,field,boolVal);
+        setRows(r=>r.map(x=>x.id===rowId?{...x,[field]:boolVal}:x));
+        return;
+      }
       // Bug 8 fix: value||null destrói false booleano (false||null===null)
       const safeVal = (value===false||value===true) ? value : (value||null);
       const u={action:"update",id:rowId,[field]:safeVal};
@@ -1220,8 +1247,7 @@ function App(){
 
   const [showPaste,setShowPaste]=useState(false);
   const [activeRow,setActiveRow]=useState(null);
-  const [stkLefts,setStkLefts]=useState([0,0,0,0,0]); // offsets reais das 5 colunas fixas
-  const tableRef=useRef(null);
+  const tableRef=useRef(null); // mantido para referência futura se necessário
 
   // O Kanban usa gravidades extras (andamento_cor, finalizado_cor) que não existem
   // no enum de gravidade da planilha de remoções — isso causava erro 500 ao importar
@@ -1513,8 +1539,8 @@ function App(){
             </colgroup>
             <thead><tr>
               {/* Coluna # com checkbox de seleção global */}
-              <th className="stk stk-last" style={{textAlign:"center",cursor:"default",borderRight:"2px solid #475569",left:stkLefts[0],minWidth:48}}>
-                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+              <th className="stk stk-last" style={{textAlign:"center",cursor:"default",borderRight:"2px solid #475569",left:stkLefts[0],width:ws[0],maxWidth:ws[0]}}>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"2px 0"}}>
                   <span style={{fontSize:9,color:"#94A3B8"}}>#</span>
                   <input type="checkbox" className="row-checkbox"
                     checked={filtered.length>0&&selectedRows.size===filtered.length}
@@ -1621,9 +1647,9 @@ function App(){
                     }}
                     onClick={()=>setActiveRow(r.id)}>
                     {/* Coluna # com checkbox */}
-                    <td className="stk stk-last" style={{left:L0,textAlign:"center",color:"#94A3B8",fontSize:10,fontWeight:700,borderRight:"2px solid #E2E8F0",padding:"0 4px",minWidth:48}}>
+                    <td className="stk stk-last" style={{left:L0,textAlign:"center",color:"#94A3B8",fontSize:10,fontWeight:700,borderRight:"2px solid #E2E8F0",padding:"0 4px",width:ws[0],maxWidth:ws[0]}}>
                       <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-                        <span style={{fontSize:10}}>{isBlank?<button className="btn btn-blue btn-sm" title="Colar linha copiada do Excel aqui" onClick={e=>{e.stopPropagation();handlePasteIntoRow(r.id);}} style={{padding:"2px 6px"}}><Ico n="excel" s={11}/></button>:i+1}</span>
+                        <span style={{fontSize:10,lineHeight:1}}>{isBlank?<button className="btn btn-blue btn-sm" title="Colar linha copiada do Excel aqui" onClick={e=>{e.stopPropagation();handlePasteIntoRow(r.id);}} style={{padding:"2px 6px"}}><Ico n="excel" s={11}/></button>:i+1}</span>
                         <input type="checkbox" className="row-checkbox"
                           checked={isSelected}
                           onClick={e=>e.stopPropagation()}
