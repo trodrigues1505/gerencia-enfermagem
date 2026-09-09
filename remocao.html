@@ -203,19 +203,6 @@ async function api(body) {
 
 // Para campos booleanos, usa PATCH direto na REST API do Supabase
 // A Edge Function pode filtrar/transformar valores boolean — REST API não tem essa limitação
-const BOOL_FIELDS = new Set(["finalizado","permaneceu"]);
-async function apiPatchBool(id, field, value) {
-  const url = `${SB_URL}/rest/v1/remocoes?id=eq.${encodeURIComponent(id)}`;
-  const r = await fetch(url, {
-    method: "PATCH",
-    headers: {...H, "Prefer": "return=minimal"},
-    body: JSON.stringify({[field]: value === true || value === "true" || value === "sim" || value === 1})
-  });
-  if(!r.ok) {
-    const txt = await r.text().catch(()=>"");
-    throw new Error(txt || `Erro ${r.status}`);
-  }
-}
 async function dbGet(path) {
   const r = await fetch(`${SB_URL}/rest/v1/${path}`,{headers:H});
   if(!r.ok) throw new Error(await r.text());
@@ -1174,15 +1161,9 @@ function App(){
 
   const handleCell=async(rowId,field,value)=>{
     try{
-      // Campos booleanos: usar PATCH direto na REST API (Edge Function pode filtrar boolean)
-      if(BOOL_FIELDS.has(field)){
-        const boolVal = value===true||value==="true"||value==="sim"||value===1;
-        await apiPatchBool(rowId,field,boolVal);
-        setRows(r=>r.map(x=>x.id===rowId?{...x,[field]:boolVal}:x));
-        return;
-      }
-      // Bug 8 fix: value||null destrói false booleano (false||null===null)
-      const safeVal = (value===false||value===true) ? value : (value||null);
+      // Booleanos: preservar true/false sem converter para null
+      const isBool = (value===true||value===false);
+      const safeVal = isBool ? value : (value||null);
       const u={action:"update",id:rowId,[field]:safeVal};
       const row=rows.find(r=>r.id===rowId);
       if(row){
