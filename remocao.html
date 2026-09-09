@@ -58,6 +58,18 @@ select.fsel{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;color:
 .rt thead tr th:hover{background:#334155;color:#E2E8F0}
 .rt thead tr th.sorted{color:#60A5FA;background:#1D3557}
 .rt thead tr th:last-child{border-right:none;cursor:default}
+/* Colunas fixas (sticky) — #, data, hora, ficha, nome */
+.rt thead th.stk,.rt tbody td.stk{position:sticky;z-index:30}
+.rt thead th.stk{z-index:55;background:#1E293B}
+.rt thead th.stk:hover{background:#334155}
+.rt tbody td.stk{background:#fff}
+.rt tbody tr:nth-child(even) td.stk{background:#EEF2FF}
+.rt tbody tr:hover td.stk,.rt tbody tr.row-active td.stk{background:#DBEAFE!important}
+/* Sombra separadora após a última coluna fixa */
+.rt thead th.stk-last,.rt tbody td.stk-last{box-shadow:2px 0 6px rgba(0,0,0,.12)}
+/* Linha ativa (clicada / em edição) */
+.rt tbody tr.row-active td{background:#EFF6FF!important;outline:none}
+.rt tbody tr.row-active td.stk{background:#DBEAFE!important}
 .sarr{font-size:8px;opacity:.4;flex-shrink:0}.sarr.on{opacity:1;color:#60A5FA}
 /* Tooltip */
 .th-wrap{position:relative}
@@ -1051,6 +1063,7 @@ function App(){
   };
 
   const [showPaste,setShowPaste]=useState(false);
+  const [activeRow,setActiveRow]=useState(null);
 
   // O Kanban usa gravidades extras (andamento_cor, finalizado_cor) que não existem
   // no enum de gravidade da planilha de remoções — isso causava erro 500 ao importar
@@ -1318,10 +1331,16 @@ function App(){
               <col style={{width:ws[ws.length-1]}}/>
             </colgroup>
             <thead><tr>
-              <th style={{textAlign:"center",cursor:"default",borderRight:"2px solid #475569"}}>#</th>
-              {COLS.map(([f,planilha,xls,kanban,,,tip],i)=>(
-                <th key={f} style={{position:"relative",cursor:"pointer",overflow:"hidden"}}
-                  className={`th-wrap${sc===f?" sorted":""}`}>
+              <th className="stk stk-last" style={{textAlign:"center",cursor:"default",borderRight:"2px solid #475569",left:0,minWidth:ws[0],maxWidth:ws[0]}}>#</th>
+              {COLS.map(([f,planilha,xls,kanban,,,tip],i)=>{
+                // colunas 0-3 (data, hora, ficha, nome) são fixas
+                const stkIdx=[0,1,2,3];
+                const isStk=stkIdx.includes(i);
+                const isLast=i===3;
+                const leftOff=isStk?ws.slice(0,i+1).reduce((a,v)=>a+v,0):undefined;
+                return(
+                <th key={f} style={{position:"relative",cursor:"pointer",overflow:"hidden",...(isStk?{left:leftOff}:{})}}
+                  className={`th-wrap${sc===f?" sorted":""}${isStk?" stk":""}${isLast?" stk-last":""}`}>
                   <div style={{display:"flex",alignItems:"flex-start",gap:2,paddingRight:10,userSelect:"none"}}
                     onClick={()=>toggleSort(f)}>
                     <span style={{fontSize:9,lineHeight:1.25,whiteSpace:"normal",wordBreak:"break-word",flexGrow:1}}>{xls}</span>
@@ -1339,24 +1358,30 @@ function App(){
                     {tip}
                   </div>
                 </th>
-              ))}
+              );})}
               <th style={{cursor:"default",borderLeft:"1px solid #334155"}}></th>
             </tr></thead>
             <tbody>
               {filtered.map((r,i)=>{
                 const gi=gravInfo(r.gravidade||"");
                 const isBlank=r.id===blankRowId;
+                const isActive=activeRow===r.id;
+                // offsets das colunas fixas: #=0, data=ws[0], hora=ws[0]+ws[1], ficha=ws[0]+ws[1]+ws[2], nome=ws[0]+ws[1]+ws[2]+ws[3]
+                const L0=0, L1=ws[0], L2=ws[0]+ws[1], L3=ws[0]+ws[1]+ws[2], L4=ws[0]+ws[1]+ws[2]+ws[3];
                 return(
-                  <tr key={r.id} style={isBlank?{background:"#FEFCE8",outline:"2px solid #FDE047",outlineOffset:"-2px"}:undefined}>
-                    <td style={{textAlign:"center",color:"#94A3B8",fontSize:10,fontWeight:700,borderRight:"2px solid #E2E8F0",padding:"0 4px"}}>
+                  <tr key={r.id}
+                    className={isActive?"row-active":""}
+                    style={isBlank?{background:"#FEFCE8",outline:"2px solid #FDE047",outlineOffset:"-2px"}:undefined}
+                    onClick={()=>setActiveRow(r.id)}>
+                    <td className="stk stk-last" style={{left:L0,textAlign:"center",color:"#94A3B8",fontSize:10,fontWeight:700,borderRight:"2px solid #E2E8F0",padding:"0 4px"}}>
                       {isBlank
-                        ?<button className="btn btn-blue btn-sm" title="Colar linha copiada do Excel aqui" onClick={()=>handlePasteIntoRow(r.id)} style={{padding:"2px 6px"}}><Ico n="excel" s={11}/></button>
+                        ?<button className="btn btn-blue btn-sm" title="Colar linha copiada do Excel aqui" onClick={e=>{e.stopPropagation();handlePasteIntoRow(r.id);}} style={{padding:"2px 6px"}}><Ico n="excel" s={11}/></button>
                         :i+1}
                     </td>
-                    <td><div style={{padding:"2px 6px",fontSize:10,whiteSpace:"nowrap"}}>{fmtD(r.data_solicitacao)||"—"}</div></td>
-                    <td><Cell rowId={r.id} field="horario_solicitacao" value={r.horario_solicitacao} tipo="time" onSave={handleCell}/></td>
-                    <td><Cell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCell}/></td>
-                    <td><Cell rowId={r.id} field="nome_paciente" value={r.nome_paciente} onSave={handleCell}/></td>
+                    <td className="stk" style={{left:L1}}><div style={{padding:"2px 6px",fontSize:10,whiteSpace:"nowrap"}}>{fmtD(r.data_solicitacao)||"—"}</div></td>
+                    <td className="stk" style={{left:L2}}><Cell rowId={r.id} field="horario_solicitacao" value={r.horario_solicitacao} tipo="time" onSave={handleCell}/></td>
+                    <td className="stk" style={{left:L3}}><Cell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCell}/></td>
+                    <td className="stk stk-last" style={{left:L4}}><Cell rowId={r.id} field="nome_paciente" value={r.nome_paciente} onSave={handleCell}/></td>
                     <td><Cell rowId={r.id} field="setor" value={r.setor} tipo="sel" optsKey="ST_OPTS" onSave={handleCell}/></td>
                     <td><Cell rowId={r.id} field="procedimento" value={r.procedimento} tipo="sel" optsKey="P_OPTS" onSave={handleCell}/></td>
                     <td><Cell rowId={r.id} field="especialidade" value={r.especialidade} onSave={handleCell}/></td>
