@@ -101,6 +101,18 @@ select.fsel{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;color:
 .delbtn:hover{background:#FEE2E2;color:#DC2626}
 .rt tbody tr .delbtn{opacity:0}
 .rt tbody tr:hover .delbtn{opacity:1}
+/* Toggle Sim/Não (bool) */
+.bool-toggle{display:inline-flex;align-items:center;gap:5px;padding:2px 6px;cursor:pointer;border-radius:5px;transition:background .12s;user-select:none}
+.bool-toggle:hover{background:#F1F5F9}
+.bool-toggle .bt-track{width:28px;height:15px;border-radius:99px;position:relative;transition:background .15s;flex-shrink:0}
+.bool-toggle .bt-thumb{position:absolute;top:2px;width:11px;height:11px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.bool-on .bt-track{background:#16A34A}
+.bool-on .bt-thumb{left:15px}
+.bool-off .bt-track{background:#CBD5E1}
+.bool-off .bt-thumb{left:2px}
+.bool-label{font-size:10px;font-weight:700;min-width:22px}
+.bool-on .bool-label{color:#16A34A}
+.bool-off .bool-label{color:#94A3B8}
 /* Modal */
 .mbk{position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:12px}
 .mdl{background:#fff;border-radius:14px;width:100%;max-width:860px;max-height:94vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)}
@@ -228,6 +240,8 @@ const COLS = [
   ["medico",                  "MÉDICO",                                 "MÉDICO",            "medico_solic","text","",       "Médico. Fonte: CROSS 'Médico Solicitante'",110],
   ["horario_retorno",         "HORARIO DO RETORNO DO PACIENTE",         "HORA RETORNO",      "retorno",     "time","",       "Retorno do paciente. Fonte: Kanban 'retorno'",60],
   ["duracao_remocao",         "DURAÇÃO DA REMOÇÃO",                     "DURAÇÃO",           "—",           "ro", "",        "Auto: Hora Retorno − Saída SCFM",60],
+  ["finalizado",              "FINALIZADO",                             "FINALIZADO",        "—",           "bool","",       "Remoção finalizada? Sim/Não",70],
+  ["permaneceu",              "PERMANECEU",                             "PERMANECEU",        "—",           "bool","",       "Paciente permaneceu na unidade? Sim/Não",80],
 ];
 
 const EMPTY = Object.fromEntries(COLS.map(([f])=>[f,""]));
@@ -283,6 +297,18 @@ function SelOrFree({value,onChange,opts,isGrav}){
       })}
       <option value="__free__">✏️ Digitar valor livre…</option>
     </select>
+  );
+}
+
+// Toggle Sim/Não para campos booleanos
+function BoolCell({rowId,field,value,onSave}){
+  const on=value===true||value==="true"||value==="sim"||value===1;
+  function toggle(e){e.stopPropagation();onSave(rowId,field,!on);}
+  return(
+    <div className={`bool-toggle ${on?"bool-on":"bool-off"}`} onClick={toggle} title={on?"Sim — clique para alternar":"Não — clique para alternar"}>
+      <div className="bt-track"><div className="bt-thumb"/></div>
+      <span className="bool-label">{on?"Sim":"Não"}</span>
+    </div>
   );
 }
 
@@ -545,8 +571,34 @@ function FormModal({row,onClose,onSave,saving}){
               <div className="fd"><label>Médico(a)</label><input type="text" placeholder="Nome" value={form.medico} onChange={e=>set("medico",e.target.value)}/></div>
             </div>
           </div>
-          <div className="fsc" style={{marginBottom:0}}><div className="fst">Observação</div>
+          <div className="fsc"><div className="fst">Observação</div>
             <div className="fd"><textarea rows={3} placeholder="Observações…" value={form.observacao} onChange={e=>set("observacao",e.target.value)}/></div>
+          </div>
+          <div className="fsc" style={{marginBottom:0}}><div className="fst">Encerramento</div>
+            <div className="fg fg2">
+              <div className="fd">
+                <label>Finalizado</label>
+                <div style={{display:"flex",alignItems:"center",gap:16,paddingTop:6}}>
+                  <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:12,fontWeight:500,color:"#374151"}}>
+                    <input type="radio" name="finalizado" checked={form.finalizado===true||form.finalizado==="true"} onChange={()=>set("finalizado",true)}/> Sim
+                  </label>
+                  <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:12,fontWeight:500,color:"#374151"}}>
+                    <input type="radio" name="finalizado" checked={!form.finalizado||form.finalizado===false||form.finalizado==="false"} onChange={()=>set("finalizado",false)}/> Não
+                  </label>
+                </div>
+              </div>
+              <div className="fd">
+                <label>Permaneceu na unidade</label>
+                <div style={{display:"flex",alignItems:"center",gap:16,paddingTop:6}}>
+                  <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:12,fontWeight:500,color:"#374151"}}>
+                    <input type="radio" name="permaneceu" checked={form.permaneceu===true||form.permaneceu==="true"} onChange={()=>set("permaneceu",true)}/> Sim
+                  </label>
+                  <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:12,fontWeight:500,color:"#374151"}}>
+                    <input type="radio" name="permaneceu" checked={!form.permaneceu||form.permaneceu===false||form.permaneceu==="false"} onChange={()=>set("permaneceu",false)}/> Não
+                  </label>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <div className="mft">
@@ -1421,6 +1473,8 @@ function App(){
                     <td><Cell rowId={r.id} field="medico" value={r.medico} onSave={handleCell}/></td>
                     <td><Cell rowId={r.id} field="horario_retorno" value={r.horario_retorno} tipo="time" onSave={handleCell}/></td>
                     <td><div style={{padding:"2px 6px",fontSize:10,color:r.duracao_remocao?"#0369A1":"#CBD5E1",fontWeight:r.duracao_remocao?700:400,whiteSpace:"nowrap"}}>{r.duracao_remocao||calcTempo(r.horario_saida_ambulancia,r.horario_retorno)||"—"}</div></td>
+                    <td style={{textAlign:"center"}}><BoolCell rowId={r.id} field="finalizado" value={r.finalizado} onSave={handleCell}/></td>
+                    <td style={{textAlign:"center"}}><BoolCell rowId={r.id} field="permaneceu" value={r.permaneceu} onSave={handleCell}/></td>
                     <td style={{textAlign:"center"}}>
                       <button className="delbtn" title="Excluir" onClick={()=>handleDelete(r.id)}><Ico n="trash" s={11}/></button>
                     </td>
