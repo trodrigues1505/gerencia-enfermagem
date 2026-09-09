@@ -59,16 +59,19 @@ select.fsel{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;color:
 .rt thead tr th.sorted{color:#60A5FA;background:#1D3557}
 .rt thead tr th:last-child{border-right:none;cursor:default}
 /* Colunas fixas (sticky) — #, data, hora, ficha, nome */
-.rt thead th.stk,.rt tbody td.stk{position:sticky;z-index:30}
-.rt thead th.stk{z-index:55;background:#1E293B}
+/* z-index escalonado: thead genérico=50, th.stk=80 (acima do thead), td.stk=20 */
+.rt thead th.stk,.rt tbody td.stk{position:sticky}
+.rt thead th.stk{z-index:80;background:#1E293B}
 .rt thead th.stk:hover{background:#334155}
-.rt tbody td.stk{background:#fff}
+.rt tbody td.stk{z-index:20;background:#fff}
 .rt tbody tr:nth-child(even) td.stk{background:#EEF2FF}
-.rt tbody tr:hover td.stk,.rt tbody tr.row-active td.stk{background:#DBEAFE!important}
+.rt tbody tr:hover td.stk{background:#DBEAFE!important}
+.rt tbody tr.row-active td.stk{background:#DBEAFE!important}
 /* Sombra separadora após a última coluna fixa */
-.rt thead th.stk-last,.rt tbody td.stk-last{box-shadow:2px 0 6px rgba(0,0,0,.12)}
-/* Linha ativa (clicada / em edição) */
-.rt tbody tr.row-active td{background:#EFF6FF!important;outline:none}
+.rt thead th.stk-last{box-shadow:3px 0 8px rgba(0,0,0,.18)}
+.rt tbody td.stk-last{box-shadow:3px 0 6px rgba(0,0,0,.08)}
+/* Linha ativa */
+.rt tbody tr.row-active td{background:#EFF6FF!important}
 .rt tbody tr.row-active td.stk{background:#DBEAFE!important}
 .sarr{font-size:8px;opacity:.4;flex-shrink:0}.sarr.on{opacity:1;color:#60A5FA}
 /* Tooltip */
