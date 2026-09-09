@@ -1042,6 +1042,16 @@ function App(){
   // Colunas arrastáveis: +1 para #, +1 para ações
   const {ws,startDrag}=useColResize([32,...COLS.map(([,,,,,,,w])=>w||100),36]);
 
+  // Mede os offsetLeft reais das colunas sticky após cada mudança de largura
+  useEffect(()=>{
+    if(!tableRef.current)return;
+    const ths=tableRef.current.querySelectorAll("thead tr th");
+    if(!ths||ths.length<5)return;
+    // ths[0]=#, ths[1]=data, ths[2]=hora, ths[3]=ficha, ths[4]=nome
+    const lefts=[0,1,2,3,4].map(i=>ths[i]?ths[i].offsetLeft:0);
+    setStkLefts(lefts);
+  },[ws]);
+
   const load=useCallback(async()=>{
     setLoading(true);
     try{const d=await dbGet("remocoes?select=*&order=created_at.desc");setRows(Array.isArray(d)?d:[]);}
@@ -1119,6 +1129,8 @@ function App(){
 
   const [showPaste,setShowPaste]=useState(false);
   const [activeRow,setActiveRow]=useState(null);
+  const [stkLefts,setStkLefts]=useState([0,0,0,0,0]); // offsets reais das 5 colunas fixas
+  const tableRef=useRef(null);
 
   // O Kanban usa gravidades extras (andamento_cor, finalizado_cor) que não existem
   // no enum de gravidade da planilha de remoções — isso causava erro 500 ao importar
@@ -1379,23 +1391,23 @@ function App(){
         {loading?(<div className="empty" style={{marginTop:60}}><Ico n="pulse" s={24}/><p>Carregando…</p></div>)
         :filtered.length===0?(<div className="empty" style={{marginTop:60}}><p>{rows.length===0?"Nenhum registro. Clique em «Novo» para começar.":"Nenhum resultado."}</p></div>)
         :(
-          <table className="rt">
+          <table className="rt" ref={tableRef}>
             <colgroup>
               <col style={{width:ws[0]}}/>
               {COLS.map(([f],i)=><col key={f} style={{width:ws[i+1]}}/>)}
               <col style={{width:ws[ws.length-1]}}/>
             </colgroup>
             <thead><tr>
-              <th className="stk stk-last" style={{textAlign:"center",cursor:"default",borderRight:"2px solid #475569",left:0,width:ws[0],minWidth:ws[0]}}>#</th>
+              <th className="stk stk-last" style={{textAlign:"center",cursor:"default",borderRight:"2px solid #475569",left:stkLefts[0]}}>#</th>
               {COLS.map(([f,planilha,xls,kanban,,,tip],i)=>{
                 // colunas 0-3 (data, hora, ficha, nome) são fixas
                 const stkIdx=[0,1,2,3];
                 const isStk=stkIdx.includes(i);
                 const isLast=i===3;
                 // left acumulado: ws[0]=# + ws[1..i] = soma de ws[0..i]
-                const leftOff=isStk?ws.slice(0,i+1).reduce((a,v)=>a+v,0):undefined;
+                const leftOff=isStk?stkLefts[i+1]:undefined;
                 return(
-                <th key={f} style={{position:"relative",cursor:"pointer",overflow:"hidden",width:ws[i+1],minWidth:ws[i+1],...(isStk?{left:leftOff}:{})}}
+                <th key={f} style={{position:"relative",cursor:"pointer",overflow:"hidden",...(isStk?{left:leftOff}:{})}}
                   className={`th-wrap${sc===f?" sorted":""}${isStk?" stk":""}${isLast?" stk-last":""}`}>
                   <div style={{display:"flex",alignItems:"flex-start",gap:2,paddingRight:10,userSelect:"none"}}
                     onClick={()=>toggleSort(f)}>
@@ -1423,21 +1435,21 @@ function App(){
                 const isBlank=r.id===blankRowId;
                 const isActive=activeRow===r.id;
                 // offsets das colunas fixas: #=0, data=ws[0], hora=ws[0]+ws[1], ficha=ws[0]+ws[1]+ws[2], nome=ws[0]+ws[1]+ws[2]+ws[3]
-                const L0=0, L1=ws[0], L2=ws[0]+ws[1], L3=ws[0]+ws[1]+ws[2], L4=ws[0]+ws[1]+ws[2]+ws[3];
+                const [L0,L1,L2,L3,L4]=stkLefts;
                 return(
                   <tr key={r.id}
                     className={isActive?"row-active":""}
                     style={isBlank?{background:"#FEFCE8",outline:"2px solid #FDE047",outlineOffset:"-2px"}:undefined}
                     onClick={()=>setActiveRow(r.id)}>
-                    <td className="stk stk-last" style={{left:L0,width:ws[0],minWidth:ws[0],textAlign:"center",color:"#94A3B8",fontSize:10,fontWeight:700,borderRight:"2px solid #E2E8F0",padding:"0 4px"}}>
+                    <td className="stk stk-last" style={{left:L0,textAlign:"center",color:"#94A3B8",fontSize:10,fontWeight:700,borderRight:"2px solid #E2E8F0",padding:"0 4px"}}>
                       {isBlank
                         ?<button className="btn btn-blue btn-sm" title="Colar linha copiada do Excel aqui" onClick={e=>{e.stopPropagation();handlePasteIntoRow(r.id);}} style={{padding:"2px 6px"}}><Ico n="excel" s={11}/></button>
                         :i+1}
                     </td>
-                    <td className="stk" style={{left:L1,width:ws[1],minWidth:ws[1]}}><div style={{padding:"2px 6px",fontSize:10,whiteSpace:"nowrap"}}>{fmtD(r.data_solicitacao)||"—"}</div></td>
-                    <td className="stk" style={{left:L2,width:ws[2],minWidth:ws[2]}}><Cell rowId={r.id} field="horario_solicitacao" value={r.horario_solicitacao} tipo="time" onSave={handleCell}/></td>
-                    <td className="stk" style={{left:L3,width:ws[3],minWidth:ws[3]}}><Cell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCell}/></td>
-                    <td className="stk stk-last" style={{left:L4,width:ws[4],minWidth:ws[4]}}><Cell rowId={r.id} field="nome_paciente" value={r.nome_paciente} onSave={handleCell}/></td>
+                    <td className="stk" style={{left:L1}}><div style={{padding:"2px 6px",fontSize:10,whiteSpace:"nowrap"}}>{fmtD(r.data_solicitacao)||"—"}</div></td>
+                    <td className="stk" style={{left:L2}}><Cell rowId={r.id} field="horario_solicitacao" value={r.horario_solicitacao} tipo="time" onSave={handleCell}/></td>
+                    <td className="stk" style={{left:L3}}><Cell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCell}/></td>
+                    <td className="stk stk-last" style={{left:L4}}><Cell rowId={r.id} field="nome_paciente" value={r.nome_paciente} onSave={handleCell}/></td>
                     <td><Cell rowId={r.id} field="setor" value={r.setor} tipo="sel" optsKey="ST_OPTS" onSave={handleCell}/></td>
                     <td><Cell rowId={r.id} field="procedimento" value={r.procedimento} tipo="sel" optsKey="P_OPTS" onSave={handleCell}/></td>
                     <td><Cell rowId={r.id} field="especialidade" value={r.especialidade} onSave={handleCell}/></td>
