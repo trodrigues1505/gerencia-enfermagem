@@ -1000,33 +1000,32 @@ function DuplicatesModal({rows,onClose,onDelete}){
 }
 
 // Hook resize de colunas — usa mousedown no header
-function useColResize(initW){
-  const [ws,setWs]=useState(initW);
-  const wsRef=useRef(initW); // ref síncrona para leituras no drag
+// Hook resize — mapa {field: width} em vez de array posicional
+// Elimina qualquer problema de índice ao reordenar colunas
+function useColResize(initMap){
+  const [wmap,setWmap]=useState(initMap);
+  const wmapRef=useRef(initMap);
   const drag=useRef(null);
-  // mantém wsRef atualizado
-  useEffect(()=>{ wsRef.current=ws; },[ws]);
-  function startDrag(idx,e){
+  useEffect(()=>{ wmapRef.current=wmap; },[wmap]);
+  function startDrag(field,e){
     e.preventDefault();
     e.stopPropagation();
-    // Bug 2 fix: sw pode ser undefined se idx inválido
-    const sw=wsRef.current[idx];
-    if(sw===undefined||isNaN(sw))return; // guarda: idx inválido, ignorar
+    const sw=wmapRef.current[field];
+    if(sw===undefined||isNaN(sw))return;
     const sx=e.clientX;
-    drag.current={idx,sx,sw};
+    drag.current={field,sx,sw};
     function mv(ev){
       if(!drag.current)return;
-      const {idx,sx,sw}=drag.current;
-      const delta=ev.clientX-sx;
-      const nw=Math.max(40,sw+delta);
-      if(isNaN(nw))return; // guarda extra
-      setWs(w=>{const n=[...w];n[idx]=nw;return n;});
+      const {field,sx,sw}=drag.current;
+      const nw=Math.max(40,sw+(ev.clientX-sx));
+      if(isNaN(nw))return;
+      setWmap(m=>({...m,[field]:nw}));
     }
     function up(){drag.current=null;window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);}
     window.addEventListener("mousemove",mv);
     window.addEventListener("mouseup",up);
   }
-  return {ws,startDrag};
+  return {wmap,startDrag};
 }
 
 function SplitButton({label,icon,variant,items,onMain}){
@@ -1126,22 +1125,20 @@ function App(){
   const {order:movColOrder,setOrder:setMovColOrder,onDragStart:colDragStart,onDragOver:colDragOver,onDragEnd:colDragEnd}=useColDragOrder(MOV_COLS_DEFAULT);
   const {ts,push}=useToast();
 
-  // Colunas arrastáveis: +1 para #, +1 para ações
-  // IMPORTANTE: ws[0] é a coluna #. As 4 sticky seguem ws[1..4] em ORDEM FIXA (data,hora,ficha,nome)
-  // independente de colOrder — sticky cols nunca saem das primeiras posições do DOM.
-  const {ws,startDrag}=useColResize([48,...COLS.map(([,,,,,,,w])=>w||100),36]);
+  // Mapa field→largura. '#' e 'actions' são chaves especiais.
+  const INIT_WMAP = {'#':48, actions:36};
+  COLS.forEach(([f,,,,,,,w])=>{ INIT_WMAP[f]=w||100; });
+  const {wmap,startDrag}=useColResize(INIT_WMAP);
 
-  // Calcula os left das sticky cols somando ws diretamente (não depende do DOM)
-  // ws[0]=#, ws[1]=data, ws[2]=hora, ws[3]=ficha, ws[4]=nome
-  // stkLefts[0]=left do #=0, stkLefts[1]=left da data=ws[0],
-  // stkLefts[2]=left da hora=ws[0]+ws[1], etc.
-  const stkLefts=useMemo(()=>[
-    0,
-    ws[0],
-    ws[0]+ws[1],
-    ws[0]+ws[1]+ws[2],
-    ws[0]+ws[1]+ws[2]+ws[3],
-  ],[ws]);
+  // stkLefts calculado a partir do wmap — determinístico, não depende do DOM
+  // Ordem fixa: # → data → hora → ficha → nome
+  const STK_FIELDS=['data_solicitacao','horario_solicitacao','ficha_cross','nome_paciente'];
+  const stkLefts=useMemo(()=>{
+    const lefts=[0]; // L0 = left do # = 0
+    let acc=wmap['#'];
+    STK_FIELDS.forEach(f=>{ lefts.push(acc); acc+=wmap[f]||0; });
+    return lefts; // [0, ws#, ws#+wsdata, ws#+wsdata+wshora, ws#+wsdata+wshora+wsficha]
+  },[wmap]);
 
   const load=useCallback(async()=>{
     setLoading(true);
@@ -1400,7 +1397,9 @@ function App(){
     const verm=filtered.filter(r=>r.gravidade==="emergencia"||r.gravidade==="VERMELHO").length;
     const tempos=filtered.filter(r=>r.tempo_espera).map(r=>{const[h,m]=r.tempo_espera.split(":").map(Number);return h*60+m;}).filter(n=>!isNaN(n));
     const med=tempos.length?Math.round(tempos.reduce((a,b)=>a+b,0)/tempos.length):0;
-    const medStr=tempos.length?`${String(Math.floor(med/60)).padStart(2,"0")}:${String(med%60).padStart(2,"0")}`:"—";
+    const medH=Math.floor(med/60);
+    const medM=med%60;
+    const medStr=tempos.length?(medH>0?`${medH}h ${String(medM).padStart(2,"0")}min`:`${medM}min`):"—";
     return {total,conc,nao,verm,medStr,ct:tempos.length};
   },[filtered]);
 
@@ -1532,26 +1531,22 @@ function App(){
         :(
           <table className="rt" ref={tableRef}>
             <colgroup>
-              {/* # */}
-              <col style={{width:ws[0]}}/>
-              {/* 4 colunas sticky — sempre na mesma posição ws[1..4] */}
-              {STK_COLS.map((colIdx,si)=>{
+              <col style={{width:wmap['#']}}/>
+              {STK_COLS.map((colIdx)=>{
                 const [f]=COLS[colIdx];
-                return <col key={f} style={{width:ws[si+1]}}/>;
+                return <col key={f} style={{width:wmap[f]}}/>;
               })}
-              {/* Colunas móveis — ws[5 + posição no movColOrder] */}
-              {movColOrder.map((colIdx,mPos)=>{
+              {movColOrder.map((colIdx)=>{
                 const [f]=COLS[colIdx];
-                return <col key={f} style={{width:ws[STK_COLS.length+1+mPos]}}/>;
+                return <col key={f} style={{width:wmap[f]}}/>;
               })}
-              {/* Ações */}
-              <col style={{width:ws[ws.length-1]}}/>
+              <col style={{width:wmap.actions}}/>
             </colgroup>
             <thead><tr>
               {/* Coluna # */}
-              <th className="stk stk-last" style={{textAlign:"center",cursor:"default",borderRight:"2px solid #475569",left:stkLefts[0],width:ws[0],maxWidth:ws[0]}}>
-                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"2px 0"}}>
-                  <span style={{fontSize:9,color:"#94A3B8"}}>#</span>
+              <th className="stk stk-last" style={{textAlign:"center",cursor:"default",borderRight:"2px solid #475569",left:stkLefts[0],width:wmap['#'],maxWidth:wmap['#'],overflow:"hidden",height:38,maxHeight:38}}>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,height:"100%"}}>
+                  <span style={{fontSize:9,color:"#94A3B8",lineHeight:1}}>#</span>
                   <input type="checkbox" className="row-checkbox"
                     checked={filtered.length>0&&selectedRows.size===filtered.length}
                     onChange={e=>{
@@ -1565,24 +1560,23 @@ function App(){
               {/* 4 Colunas sticky — renderizadas sempre primeiro, sem drag */}
               {STK_COLS.map((colIdx,si)=>{
                 const [f,planilha,xls,kanban,,,tip]=COLS[colIdx];
-                const isLast=colIdx===3; // nome_paciente é a última sticky
+                const isLast=colIdx===3;
                 const leftOff=stkLefts[si+1];
                 const isSorted=sc===f;
                 return(
                   <th key={f}
-                    style={{position:"relative",cursor:"pointer",overflow:"hidden",left:leftOff}}
+                    style={{position:"relative",cursor:"pointer",left:leftOff,overflow:"hidden",height:38,maxHeight:38}}
                     className={`th-wrap${isSorted?" sorted":""} stk${isLast?" stk-last":""}`}>
-                    <div style={{display:"flex",alignItems:"flex-start",gap:2,paddingRight:10,userSelect:"none"}}
+                    <div style={{display:"flex",alignItems:"center",gap:2,paddingRight:10,userSelect:"none",height:"100%"}}
                       onClick={()=>toggleSort(f)}>
-                      <span style={{fontSize:9,lineHeight:1.25,whiteSpace:"normal",wordBreak:"break-word",flexGrow:1}}>{xls}</span>
-                      <span className={`sarr${isSorted?" on":""}`} style={{flexShrink:0,marginTop:1}}>
+                      <span style={{fontSize:9,lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flexGrow:1}}>{xls}</span>
+                      <span className={`sarr${isSorted?" on":""}`} style={{flexShrink:0}}>
                         {isSorted?(sd==="asc"?"▲":"▼"):"⇅"}
                       </span>
                     </div>
-                    {/* Handle resize sticky */}
                     <div
                       style={{position:"absolute",right:0,top:0,width:8,height:"100%",cursor:"col-resize",zIndex:20,background:"transparent"}}
-                      onMouseDown={e=>{e.stopPropagation();startDrag(si+1,e);}}
+                      onMouseDown={e=>{e.stopPropagation();startDrag(f,e);}}
                       title="Arrastar para redimensionar"
                     />
                     <div className="tipbox">
@@ -1603,9 +1597,9 @@ function App(){
                     onDragStart={(e)=>colDragStart(mPos,e)}
                     onDragOver={(e)=>colDragOver(mPos,e)}
                     onDragEnd={colDragEnd}
-                    style={{position:"relative",cursor:"pointer",overflow:"hidden"}}
+                    style={{position:"relative",cursor:"pointer",overflow:"hidden",height:38,maxHeight:38}}
                     className={`th-wrap${isSorted?" sorted":""}`}>
-                    <div style={{display:"flex",alignItems:"flex-start",gap:2,paddingRight:10,userSelect:"none"}}
+                    <div style={{display:"flex",alignItems:"center",gap:2,paddingRight:10,userSelect:"none",height:"100%"}}
                       onClick={()=>toggleSort(f)}>
                       <span className="th-drag-handle" title="Arraste para reordenar"
                         onMouseDown={e=>e.stopPropagation()}>
@@ -1615,15 +1609,14 @@ function App(){
                           <circle cx="2" cy="8" r="1.2"/><circle cx="6" cy="8" r="1.2"/>
                         </svg>
                       </span>
-                      <span style={{fontSize:9,lineHeight:1.25,whiteSpace:"normal",wordBreak:"break-word",flexGrow:1}}>{xls}</span>
-                      <span className={`sarr${isSorted?" on":""}`} style={{flexShrink:0,marginTop:1}}>
+                      <span style={{fontSize:9,lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flexGrow:1}}>{xls}</span>
+                      <span className={`sarr${isSorted?" on":""}`} style={{flexShrink:0}}>
                         {isSorted?(sd==="asc"?"▲":"▼"):"⇅"}
                       </span>
                     </div>
-                    {/* Handle resize móvel — ws começa em STK_COLS.length+1 */}
                     <div
                       style={{position:"absolute",right:0,top:0,width:8,height:"100%",cursor:"col-resize",zIndex:20,background:"transparent"}}
-                      onMouseDown={e=>{e.stopPropagation();startDrag(STK_COLS.length+1+mPos,e);}}
+                      onMouseDown={e=>{e.stopPropagation();startDrag(f,e);}}
                       title="Arrastar para redimensionar"
                     />
                     <div className="tipbox">
@@ -1678,7 +1671,7 @@ function App(){
                     }}
                     onClick={()=>setActiveRow(r.id)}>
                     {/* Coluna # com checkbox */}
-                    <td className="stk stk-last" style={{left:L0,textAlign:"center",color:"#94A3B8",fontSize:10,fontWeight:700,borderRight:"2px solid #E2E8F0",padding:"0 4px",width:ws[0],maxWidth:ws[0]}}>
+                    <td className="stk stk-last" style={{left:L0,textAlign:"center",color:"#94A3B8",fontSize:10,fontWeight:700,borderRight:"2px solid #E2E8F0",padding:"0 4px",width:wmap['#'],maxWidth:wmap['#']}}>
                       <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
                         <span style={{fontSize:10,lineHeight:1}}>{isBlank?<button className="btn btn-blue btn-sm" title="Colar linha copiada do Excel aqui" onClick={e=>{e.stopPropagation();handlePasteIntoRow(r.id);}} style={{padding:"2px 6px"}}><Ico n="excel" s={11}/></button>:i+1}</span>
                         <input type="checkbox" className="row-checkbox"
