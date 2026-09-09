@@ -50,7 +50,8 @@ select.fsel{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;color:
 .tw::-webkit-scrollbar-thumb:hover{background:#475569}
 .tw::-webkit-scrollbar-corner{background:#E2E8F0}
 /* Tabela — largura controlada pelo JS (colgroup), não CSS fixo */
-.rt{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+.rt{min-width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+.rt td,.rt th{overflow:hidden;text-overflow:ellipsis}
 .rt thead{position:sticky;top:0;z-index:50}
 .rt thead tr th{background:#1E293B;padding:4px 8px 4px 6px;height:38px;text-align:left;
   font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;
@@ -1512,7 +1513,7 @@ function App(){
         {loading?(<div className="empty" style={{marginTop:60}}><Ico n="pulse" s={24}/><p>Carregando…</p></div>)
         :filtered.length===0?(<div className="empty" style={{marginTop:60}}><p>{rows.length===0?"Nenhum registro. Clique em «Novo» para começar.":"Nenhum resultado."}</p></div>)
         :(
-          <table className="rt" ref={tableRef}>
+          <table className="rt" ref={tableRef} style={{width:Object.values(wmap).reduce((a,b)=>a+b,0)}}>
             <colgroup>
               <col style={{width:wmap['#']}}/>
               {STK_COLS.map((colIdx)=>{
