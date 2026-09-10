@@ -1013,7 +1013,7 @@ function useColResize(initMap){
     window.addEventListener("mousemove",mv);
     window.addEventListener("mouseup",up);
   }
-  return {wmap,startDrag};
+  return {wmap,setWmap,startDrag};
 }
 
 function SplitButton({label,icon,variant,items,onMain}){
@@ -1106,30 +1106,67 @@ function App(){
   // Feature 4: seleção múltipla de linhas
   const [selectedRows,setSelectedRows]=useState(new Set());
   const [showDeleteConfirm,setShowDeleteConfirm]=useState(false);
+  // ── Persistência localStorage ──
+  const LS_WMAP='remocoes_col_widths';
+  const LS_ORDER='remocoes_col_order';
+  function loadLS(key,fallback){try{const v=localStorage.getItem(key);return v?JSON.parse(v):fallback;}catch{return fallback;}}
+  function saveLS(key,val){try{localStorage.setItem(key,JSON.stringify(val));}catch{}}
+
   // Feature 1: ordem das colunas — APENAS colunas não-sticky (índices >= 4 em COLS)
-  // Sticky cols (0-3: data, hora, ficha, nome) são sempre renderizadas primeiro, nunca reordenadas
-  const STK_COLS = [0,1,2,3]; // índices em COLS que são sticky
-  const MOV_COLS_DEFAULT = COLS.map((_,i)=>i).filter(i=>!STK_COLS.includes(i)); // [4,5,...,N-1]
-  const {order:movColOrder,setOrder:setMovColOrder,onDragStart:colDragStart,onDragOver:colDragOver,onDragEnd:colDragEnd}=useColDragOrder(MOV_COLS_DEFAULT);
+  const STK_COLS = [0,1,2,3];
+  const MOV_COLS_DEFAULT = COLS.map((_,i)=>i).filter(i=>!STK_COLS.includes(i));
+  const savedOrder=loadLS(LS_ORDER,null);
+  const {order:movColOrder,setOrder:setMovColOrder,onDragStart:colDragStart,onDragOver:colDragOver,onDragEnd:colDragEnd}=useColDragOrder(savedOrder||MOV_COLS_DEFAULT);
+  // Salvar ordem quando muda
+  const orderTimer=useRef(null);
+  useEffect(()=>{
+    clearTimeout(orderTimer.current);
+    orderTimer.current=setTimeout(()=>saveLS(LS_ORDER,movColOrder),300);
+  },[movColOrder]);
+
   const {ts,push}=useToast();
 
-  // Mapa field→largura. '#' e 'actions' são chaves especiais.
-  const INIT_WMAP = {'#':48, actions:36};
-  COLS.forEach(([f,,,,,,,w])=>{ INIT_WMAP[f]=w||100; });
-  const {wmap,startDrag}=useColResize(INIT_WMAP);
+  // Mapa field→largura
+  const INIT_WMAP = useMemo(()=>{
+    const base={'#':48, actions:36};
+    COLS.forEach(([f,,,,,,,w])=>{ base[f]=w||100; });
+    const saved=loadLS(LS_WMAP,null);
+    return saved?{...base,...saved}:base;
+  },[]);
+  const {wmap,setWmap,startDrag}=useColResize(INIT_WMAP);
 
-  // stkLefts: lê offsetLeft real dos td sticky do primeiro tbody tr
-  // É a única fonte confiável — o colgroup é quem define as larguras reais
-  const [stkLefts,setStkLefts]=useState([0,0,0,0,0]);
-  const tableRef=useRef(null);
+  // Salvar larguras no localStorage quando mudam
+  const wmapTimer=useRef(null);
   useEffect(()=>{
+    clearTimeout(wmapTimer.current);
+    wmapTimer.current=setTimeout(()=>saveLS(LS_WMAP,wmap),300);
+  },[wmap]);
+
+  // stkLefts calculado matematicamente — determinístico, nunca desalinha
+  const STK_FIELDS=['data_solicitacao','horario_solicitacao','ficha_cross','nome_paciente'];
+  const stkLefts=useMemo(()=>{
+    const lefts=[0]; // L0 = left do # = 0
+    let acc=wmap['#']||48;
+    STK_FIELDS.forEach(f=>{ lefts.push(acc); acc+=(wmap[f]||100); });
+    return lefts;
+  },[wmap]);
+  const tableRef=useRef(null);
+
+  // ── Double-click para auto-fit (Bug 3) ──
+  function autoFitCol(field){
     if(!tableRef.current)return;
-    const firstRow=tableRef.current.querySelector("tbody tr");
-    if(!firstRow)return;
-    const tds=[...firstRow.querySelectorAll("td.stk")];
-    if(tds.length<5)return;
-    setStkLefts(tds.map(td=>td.offsetLeft));
-  },[wmap,loading]);
+    const th=tableRef.current.querySelector(`th[data-field="${field}"]`);
+    if(!th)return;
+    const span=th.querySelector('.col-label');
+    if(!span)return;
+    // Medir largura natural sem quebra
+    const prev=span.style.whiteSpace;
+    span.style.whiteSpace='nowrap';
+    const needed=span.scrollWidth+28; // padding + seta sort + handle
+    span.style.whiteSpace=prev;
+    const newW=Math.max(50,Math.min(400,needed));
+    setWmap(m=>({...m,[field]:newW}));
+  }
 
   const load=useCallback(async()=>{
     setLoading(true);
@@ -1491,7 +1528,7 @@ function App(){
             />
             <button className="btn btn-p" onClick={()=>setModal({})}><Ico n="plus"/> Novo</button>
             <button className="btn btn-g" onClick={()=>setShowDuplicates(true)} title="Verificar registros com nomes repetidos">🔍 Duplicatas</button>
-            <button className="btn btn-g btn-sm" title="Restaurar ordem original das colunas" onClick={()=>setMovColOrder(MOV_COLS_DEFAULT)} style={{fontSize:11,padding:"4px 8px"}}>⚏ Colunas</button>
+            <button className="btn btn-g btn-sm" title="Restaurar ordem e largura original das colunas" onClick={()=>{setMovColOrder(MOV_COLS_DEFAULT);const base={'#':48,actions:36};COLS.forEach(([f,,,,,,,w])=>{base[f]=w||100;});setWmap(base);localStorage.removeItem(LS_WMAP);localStorage.removeItem(LS_ORDER);}} style={{fontSize:11,padding:"4px 8px"}}>⚏ Colunas</button>
             <button className="btn btn-g" style={{color:"#DC2626",borderColor:"#FCA5A5"}} disabled={rows.length===0} onClick={handleDeleteAll}><Ico n="trash" s={13}/> Excluir todos</button>
           </div>
         </div>
@@ -1547,20 +1584,21 @@ function App(){
                 const isLast=colIdx===3;
                 const isSorted=sc===f;
                 return(
-                  <th key={f}
+                  <th key={f} data-field={f}
                     style={{cursor:"pointer",overflow:"hidden",left:stkLefts[si+1]}}
                     className={`th-wrap${isSorted?" sorted":""} stk${isLast?" stk-last":""}`}>
-                    <div style={{display:"flex",alignItems:"center",gap:2,paddingRight:10,userSelect:"none",overflow:"hidden"}}
+                    <div style={{display:"flex",alignItems:"flex-start",gap:2,paddingRight:10,userSelect:"none"}}
                       onClick={()=>toggleSort(f)}>
-                      <span style={{fontSize:9,lineHeight:1.25,wordBreak:"break-word",flexGrow:1}}>{xls}</span>
-                      <span className={`sarr${isSorted?" on":""}`} style={{flexShrink:0}}>
+                      <span className="col-label" style={{fontSize:9,lineHeight:1.25,wordBreak:"break-word",flexGrow:1}}>{xls}</span>
+                      <span className={`sarr${isSorted?" on":""}`} style={{flexShrink:0,marginTop:1}}>
                         {isSorted?(sd==="asc"?"▲":"▼"):"⇅"}
                       </span>
                     </div>
                     <div
                       style={{position:"absolute",right:0,top:0,width:8,height:"100%",cursor:"col-resize",zIndex:20,background:"transparent"}}
                       onMouseDown={e=>{e.stopPropagation();startDrag(f,e);}}
-                      title="Arrastar para redimensionar"
+                      onDoubleClick={e=>{e.stopPropagation();autoFitCol(f);}}
+                      title="Arrastar para redimensionar / duplo-clique para ajustar"
                     />
                     <div className="tipbox">
                       <strong>Planilha:</strong> {planilha}<br/>
@@ -1575,7 +1613,7 @@ function App(){
                 const [f,planilha,xls,kanban,,,tip]=COLS[colIdx];
                 const isSorted=sc===f;
                 return(
-                  <th key={f}
+                  <th key={f} data-field={f}
                     draggable
                     onDragStart={(e)=>colDragStart(mPos,e)}
                     onDragOver={(e)=>colDragOver(mPos,e)}
@@ -1592,7 +1630,7 @@ function App(){
                           <circle cx="2" cy="8" r="1.2"/><circle cx="6" cy="8" r="1.2"/>
                         </svg>
                       </span>
-                      <span style={{fontSize:9,lineHeight:1.25,wordBreak:"break-word",flexGrow:1}}>{xls}</span>
+                      <span className="col-label" style={{fontSize:9,lineHeight:1.25,wordBreak:"break-word",flexGrow:1}}>{xls}</span>
                       <span className={`sarr${isSorted?" on":""}`} style={{flexShrink:0,marginTop:1}}>
                         {isSorted?(sd==="asc"?"▲":"▼"):"⇅"}
                       </span>
@@ -1600,7 +1638,8 @@ function App(){
                     <div
                       style={{position:"absolute",right:0,top:0,width:8,height:"100%",cursor:"col-resize",zIndex:20,background:"transparent"}}
                       onMouseDown={e=>{e.stopPropagation();startDrag(f,e);}}
-                      title="Arrastar para redimensionar"
+                      onDoubleClick={e=>{e.stopPropagation();autoFitCol(f);}}
+                      title="Arrastar para redimensionar / duplo-clique para ajustar"
                     />
                     <div className="tipbox">
                       <strong>Planilha:</strong> {planilha}<br/>
