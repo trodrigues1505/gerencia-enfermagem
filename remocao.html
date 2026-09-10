@@ -1190,6 +1190,10 @@ function App(){
       if(p.tipo_ambulancia!==undefined&&p.tipo_ambulancia!==null&&p.tipo_ambulancia!=="")
         p.tipo_ambulancia=normalizeAmbValue(p.tipo_ambulancia)||null;
       Object.keys(p).forEach(k=>{if(p[k]==="")p[k]=null;});
+      // Garantir defaults para campos NOT NULL do banco
+      if(p.finalizado===undefined||p.finalizado===null) p.finalizado=false;
+      if(p.permaneceu===undefined||p.permaneceu===null) p.permaneceu=false;
+      console.log("[handleSave] payload:", JSON.stringify({finalizado:p.finalizado,permaneceu:p.permaneceu}));
       if(form.id){await api({action:"update",id:form.id,...p});push("Atualizado");}
       else{await api({action:"create",...p});push("Criado!");}
       setModal(null);await load();
