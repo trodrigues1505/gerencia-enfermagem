@@ -1433,8 +1433,9 @@ function App(){
     try{
       const safe=v=>{
         if(v===null||v===undefined)return "";
+        if(typeof v==="boolean")return v?"Sim":"Não";
         if(typeof v==="object")return String(v);
-        return v;
+        return String(v);
       };
       const hdr=["#",...COLS.map(([,pl])=>String(pl||""))];
       const snapshot=[...filtered]; // captura o array neste momento
