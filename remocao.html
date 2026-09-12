@@ -645,7 +645,13 @@ function FormModal({row,onClose,onSave,saving}){
 
 // Normaliza texto p/ comparar cabeçalhos (sem acento, minúsculo, sem espaço extra)
 function normHdr(s){
-  return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();
+  // B2: remove pontuacao ANTES de colapsar espaco. Sem isto, cabecalhos reais
+  // do CROSS ("Nº DA FICHA CROSS", "LOCALIZACAO/SETOR") nao casam com o mapa,
+  // matched cai abaixo de 40% e o lote inteiro entra deslocado.
+  return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[\u00a0\u200b-\u200d\ufeff]/g," ")
+    .replace(/[.\-_/\\,;:\u00ba\u00b0\u00aa'"()\[\]]/g," ")
+    .toLowerCase().replace(/\s+/g," ").trim();
 }
 
 // Mapa reverso label -> chave interna de gravidade (para aceitar valores exportados/copiados do Excel,
@@ -703,8 +709,11 @@ function normalizeAmbValue(v){
   // remove acentos e compara
   const u=String(v).trim().toUpperCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g,"");
-  if(u==="BASICA"||u==="BASICO")return "B\u00c1SICA";
-  if(u==="AVANCADA"||u==="AVANCADO")return "AVAN\u00c7ADA";
+  // B5: SBV/SAV/USB/USA sao a nomenclatura corrente do CROSS e antes viravam
+  // null em silencio (normalizeRowValues deleta null) -> 56 registros, 44% da
+  // base, sem tipo de ambulancia.
+  if(u==="BASICA"||u==="BASICO"||u==="SBV"||u==="USB")return "B\u00c1SICA";
+  if(u==="AVANCADA"||u==="AVANCADO"||u==="SAV"||u==="USA")return "AVAN\u00c7ADA";
   if(u==="UTI")return "UTI";
   // ja veio com acento certo
   const orig=String(v).trim().toUpperCase();
@@ -749,9 +758,13 @@ function PasteModal({onClose,onImport}){
       fieldOrder=firstCells.map(c=>HDR_MAP[c]||null);
       dataLines=lines.slice(1);
     }else{
-      // sem cabeçalho reconhecível: assume a mesma ordem das colunas da planilha
-      fieldOrder=COLS.map(([f])=>f);
-      dataLines=lines;
+      // B3: SEM FALLBACK. Antes assumia a ordem das 24 colunas de COLS — se a
+      // copia do CROSS omitisse uma coluna (PROCEDIMENTO some com frequencia,
+      // posicao 6), TODO o lote entrava deslocado uma casa e sem aviso:
+      // especialidade recebia diagnostico, status recebia gravidade. Foi assim
+      // que "TOMOGRAFIA" foi parar em instituicao_destino e "HEMODIALISE" em
+      // status. Em import de lote, errar em silencio e pior que recusar.
+      throw new Error("CABECALHO_NAO_RECONHECIDO");
     }
     return dataLines.map(line=>{
       const cells=line.split("\t");
@@ -761,13 +774,33 @@ function PasteModal({onClose,onImport}){
     }).filter(r=>Object.keys(r).length>0);
   }
   async function doImport(){
-    const rows=parse();
-    if(rows.length===0){alert("Nada reconhecível para importar. Cole os dados copiados do Excel (incluindo a linha de cabeçalho, se possível).");return;}
+    let rows;
+    try{ rows=parse(); }
+    catch(e){
+      alert("Cabecalho nao reconhecido.\n\nCopie tambem a LINHA DE CABECALHO da planilha, junto com os dados.\n\nSem o cabecalho nao da para saber a que coluna cada valor pertence — e um import as cegas grava os valores nos campos errados.");
+      return;
+    }
+    if(rows.length===0){alert("Nada reconhecível para importar. Cole os dados copiados do Excel incluindo a linha de cabeçalho.");return;}
     setBusy(true);
     await onImport(rows);
     setBusy(false);
   }
-  const preview=txt.trim()?parse():[];
+  let erroParse=null;
+  let preview=[];
+  if(txt.trim()){
+    try{ preview=parse(); }
+    catch(e){ erroParse=e.message; preview=[]; }
+  }
+  // B4: valida cada linha contra o dicionario de dominio (canon.js).
+  // Pega valor que pertence a OUTRO campo — o sintoma do deslocamento — e
+  // valor simplesmente desconhecido. Avisa, nao bloqueia: quem digita decide.
+  const avisos=[];
+  if(!erroParse && typeof Canon!=="undefined"){
+    preview.forEach((row,i)=>{
+      const v=Canon.validarLinha(row);
+      v.problemas.forEach(pr=>avisos.push({linha:i+1,msg:pr.msg,tipo:pr.tipo}));
+    });
+  }
   return(
     <div className="mbk">
       <div className="mdl" style={{maxWidth:640}}>
@@ -781,7 +814,22 @@ function PasteModal({onClose,onImport}){
               placeholder="Cole aqui (Ctrl+V) as linhas copiadas do Excel. Se a primeira linha for o cabeçalho das colunas, ele será reconhecido automaticamente."
               style={{width:"100%",padding:"8px 10px",border:"1px solid #E2E8F0",borderRadius:7,fontSize:12,fontFamily:"monospace",resize:"vertical",outline:"none"}}/>
           </div>
-          {txt.trim()&&<div style={{fontSize:11,color:"#64748B"}}>{preview.length} linha{preview.length!==1?"s":""} reconhecida{preview.length!==1?"s":""} para importar.</div>}
+          {txt.trim()&&erroParse&&
+            <div style={{fontSize:12,color:"#991B1B",background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 12px",lineHeight:1.5}}>
+              <b>Cabeçalho não reconhecido.</b><br/>
+              Copie também a <b>linha de cabeçalho</b> da planilha, junto com os dados.
+              Sem ela não dá para saber a que coluna cada valor pertence, e o import gravaria os valores nos campos errados.
+            </div>}
+          {txt.trim()&&!erroParse&&<div style={{fontSize:11,color:"#64748B"}}>{preview.length} linha{preview.length!==1?"s":""} reconhecida{preview.length!==1?"s":""} para importar.</div>}
+          {txt.trim()&&!erroParse&&avisos.length>0&&
+            <div style={{fontSize:11,color:"#92400E",background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:8,padding:"10px 12px",marginTop:8,lineHeight:1.6}}>
+              <b>{avisos.length} valor{avisos.length!==1?"es":""} suspeito{avisos.length!==1?"s":""}:</b>
+              <ul style={{margin:"6px 0 0",paddingLeft:16}}>
+                {avisos.slice(0,8).map((a,i)=><li key={i}>Linha {a.linha}: {a.msg}</li>)}
+              </ul>
+              {avisos.length>8&&<div style={{marginTop:4}}>…e mais {avisos.length-8}.</div>}
+              <div style={{marginTop:6,color:"#78350F"}}>Pode importar assim mesmo — os valores ficam marcados como não classificados no painel.</div>
+            </div>}
         </div>
         <div className="mft">
           <button className="btn btn-g" onClick={onClose}>Cancelar</button>
