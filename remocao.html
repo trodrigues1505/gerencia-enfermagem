@@ -194,7 +194,37 @@ const { useState, useEffect, useCallback, useMemo, useRef } = React;
 const SB_URL = "https://ahcrscstdtfawoogsugi.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjk1MDgsImV4cCI6MjEwNDIwNTUwOH0.8ivWRA99AXXyBVFT3TQd5NuSod2eiowiI490Blt2zHM";
 const FN = `${SB_URL}/functions/v1/remocoes-write`;
+// H e um objeto mutavel de proposito: e passado por referencia como `headers`
+// em varios fetch, entao trocar Authorization aqui vale para todos. Com RLS
+// ligada, requisicao sem token de sessao nao le nada.
 const H = {"Content-Type":"application/json",apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`};
+
+// A sessao e a mesma do index.html (supabase-js persiste por origem), entao
+// quem ja entrou no Kanban chega aqui autenticado. Sem sessao, volta ao login.
+let _sbAuth = null;
+async function sbAuthClient(){
+  if(_sbAuth) return _sbAuth;
+  if(!window.supabase){
+    await new Promise((res,rej)=>{
+      const el=document.createElement("script");
+      el.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
+      el.onload=res; el.onerror=rej; document.head.appendChild(el);
+    });
+  }
+  _sbAuth = window.supabase.createClient(SB_URL, SB_KEY);
+  return _sbAuth;
+}
+async function aplicarSessao(){
+  const sb = await sbAuthClient();
+  const { data } = await sb.auth.getSession();
+  if(!data.session){ window.location.href = "index.html"; return null; }
+  H.Authorization = `Bearer ${data.session.access_token}`;
+  sb.auth.onAuthStateChange((_e,sess)=>{
+    H.Authorization = `Bearer ${sess?.access_token || SB_KEY}`;
+    if(!sess) window.location.href = "index.html";
+  });
+  return data.session;
+}
 
 async function api(body) {
   const r = await fetch(FN,{method:"POST",headers:H,body:JSON.stringify(body)});
@@ -1826,7 +1856,11 @@ function App(){
     </div>
   );
 }
-ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+// So monta o app depois de aplicar a sessao — evita a primeira rajada de
+// requisicoes sair anonima e voltar vazia, o que pareceria "banco sem dados".
+aplicarSessao().then(sess=>{
+  if(sess) ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+});
 
 </script>
 </body>
