@@ -83,11 +83,26 @@ const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const FN_URL = `${SB_URL}/functions/v1`;
 const ADMIN_COREN = "299283";
 
+/* ─── Sessão (Supabase Auth) ───────────────────────────────────────────────
+ * O token da sessao fica aqui, em modulo, para H() poder ler de forma
+ * sincrona. Sem isto, toda requisicao chega ao Postgres como anonima e
+ * auth.uid() e nulo — nenhuma policy de RLS consegue distinguir quem chama.
+ * Dominio do e-mail sintetico: o registro profissional vira <registro>@scfm.local
+ */
+const EMAIL_DOM = "@scfm.local";
+const emailDeRegistro = reg => String(reg||"").trim().toLowerCase() + EMAIL_DOM;
+
+let _accessToken = null;
+const setAccessToken = t => { _accessToken = t || null; };
+const getAccessToken = () => _accessToken;
+
 /* ─── API helpers ─── */
 const H = userId => ({
   "Content-Type": "application/json",
   "apikey": SB_KEY,
-  "Authorization": `Bearer ${SB_KEY}`,
+  // Com sessao ativa manda o JWT do usuario; sem sessao cai na anon key,
+  // que com RLS ligada nao le mais nada (que e o comportamento desejado).
+  "Authorization": `Bearer ${_accessToken || SB_KEY}`,
   ...(userId ? {
     "x-user-id": userId
   } : {})
@@ -116,6 +131,57 @@ async function getSbClient() {
   _sbClient = window.supabase.createClient(SB_URL, SB_KEY);
   return _sbClient;
 }
+/* ─── Autenticacao ─────────────────────────────────────────────────────────*/
+async function authLogin(registro, senha) {
+  const sb = await getSbClient();
+  const { data, error } = await sb.auth.signInWithPassword({
+    email: emailDeRegistro(registro), password: senha
+  });
+  if (error) throw new Error("Registro ou senha inválidos.");
+  setAccessToken(data.session.access_token);
+  return await carregarPerfil(data.session.user.id);
+}
+
+// Busca a linha de public.users correspondente. A policy users_ler_proprio
+// permite ler o proprio registro; se vier vazio, o cadastro nao foi aprovado.
+async function carregarPerfil(authUid) {
+  const rows = await sbGet("users", `auth_uid=eq.${authUid}&limit=1`);
+  if (!rows.length) {
+    await authLogout();
+    throw new Error("Cadastro não aprovado. Procure a administradora.");
+  }
+  return rows[0];
+}
+
+async function authLogout() {
+  try { const sb = await getSbClient(); await sb.auth.signOut(); } catch (e) {}
+  setAccessToken(null);
+}
+
+// Restaura sessao ao abrir o app (o supabase-js persiste em localStorage).
+async function authRestaurar() {
+  const sb = await getSbClient();
+  const { data } = await sb.auth.getSession();
+  if (!data.session) return null;
+  setAccessToken(data.session.access_token);
+  sb.auth.onAuthStateChange((_e, sess) => setAccessToken(sess?.access_token));
+  try { return await carregarPerfil(data.session.user.id); }
+  catch (e) { return null; }
+}
+
+async function authTrocarSenha(novaSenha, userRowId) {
+  const sb = await getSbClient();
+  const { error } = await sb.auth.updateUser({ password: novaSenha });
+  if (error) throw new Error(error.message);
+  const r = await fetch(`${SB_URL}/rest/v1/users?id=eq.${userRowId}`, {
+    method: "PATCH",
+    headers: { ...H(), Prefer: "return=representation" },
+    body: JSON.stringify({ senha_trocada: true })
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return (await r.json())[0];
+}
+
 async function fn(name, body, userId) {
   const r = await fetch(`${FN_URL}/${name}`, {
     method: "POST",
@@ -1527,6 +1593,58 @@ function ShareModal({
 }
 
 /* ─── LOGIN ─── */
+/* ─── Troca obrigatoria de senha ───────────────────────────────────────────
+ * A senha inicial e o proprio COREN/CRM, que e consultavel no site do
+ * Conselho. Enquanto senha_trocada for false, o app NAO abre: e isto que
+ * separa "tem senha" de "nao tem autenticacao".
+ */
+function TrocaSenhaScreen({ user, onPronto, onSair }) {
+  const [s1, setS1] = useState("");
+  const [s2, setS2] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+  const registro = (user.coren || user.crm || "").trim();
+
+  async function salvar(e) {
+    e.preventDefault();
+    setErr("");
+    if (s1.length < 8) return setErr("A senha precisa ter ao menos 8 caracteres.");
+    if (s1 !== s2)     return setErr("As senhas não conferem.");
+    if (s1.trim() === registro) return setErr("A nova senha não pode ser igual ao seu registro.");
+    setLoading(true);
+    try { onPronto(await authTrocarSenha(s1, user.id)); }
+    catch (ex) { setErr(ex.message); }
+    setLoading(false);
+  }
+  const inp2 = { ...inp_s, padding: "10px 12px", fontSize: 14 };
+  const campo = (label, val, set) => /*#__PURE__*/React.createElement("div", { style:{ marginBottom:12 } },
+    /*#__PURE__*/React.createElement("label", { style:{ display:"block", fontSize:12, fontWeight:600, color:"#475569", marginBottom:5 } }, label),
+    /*#__PURE__*/React.createElement("input", { type:"password", value:val, onChange:e=>set(e.target.value), style:inp2, autoComplete:"new-password" })
+  );
+  return /*#__PURE__*/React.createElement("div", {
+    style:{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#F1F5F9", padding:20 }
+  }, /*#__PURE__*/React.createElement("form", {
+    onSubmit: salvar,
+    style:{ background:"#fff", borderRadius:16, padding:"28px 30px", width:"100%", maxWidth:400, boxShadow:"0 4px 24px rgba(15,23,42,.08)" }
+  },
+    /*#__PURE__*/React.createElement("div", { style:{ fontSize:19, fontWeight:700, color:"#0F172A", marginBottom:6 } }, "Defina sua senha"),
+    /*#__PURE__*/React.createElement("div", { style:{ fontSize:13, color:"#64748B", lineHeight:1.5, marginBottom:20 } },
+      "Olá, ", user.nome || registro, ". Você ainda está usando o seu registro como senha. ",
+      "Como ele é uma informação pública, é preciso escolher uma senha própria antes de continuar."),
+    campo("Nova senha", s1, setS1),
+    campo("Repita a nova senha", s2, setS2),
+    err && /*#__PURE__*/React.createElement("div", { style:{ fontSize:12, color:"#B91C1C", background:"#FEF2F2", border:"1px solid #FECACA", borderRadius:8, padding:"8px 10px", marginBottom:12 } }, err),
+    /*#__PURE__*/React.createElement("button", {
+      type:"submit", disabled:loading,
+      style:{ width:"100%", padding:"11px 16px", border:"none", borderRadius:10, background:"#0F172A", color:"#fff", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"inherit", opacity:loading?.6:1 }
+    }, loading ? "Salvando…" : "Salvar e entrar"),
+    /*#__PURE__*/React.createElement("button", {
+      type:"button", onClick:onSair,
+      style:{ width:"100%", marginTop:8, padding:"9px 16px", border:"none", borderRadius:10, background:"transparent", color:"#64748B", fontSize:13, cursor:"pointer", fontFamily:"inherit" }
+    }, "Sair")
+  ));
+}
+
 function LoginScreen({
   onLogin,
   showT
@@ -1549,11 +1667,11 @@ function LoginScreen({
     setErr("");
     setLoading(true);
     try {
-      const data = await fn("auth-login", {
-        coren: coren.trim(),
-        senha
-      });
-      onLogin(data);
+      // Antes: Edge Function auth-login, que devolvia o usuario e o app
+      // guardava em localStorage — sessao so no navegador, invisivel para o
+      // Postgres. Agora passa pelo Supabase Auth e gera JWT de verdade.
+      const perfil = await authLogin(coren.trim(), senha);
+      onLogin(perfil);
     } catch (ex) {
       setErr(ex.message);
     }
@@ -1797,86 +1915,48 @@ function LoginScreen({
     }
   }, "Acesso restrito a profissionais autorizados")), /*#__PURE__*/React.createElement("form", {
     onSubmit: doLogin,
-    style: {
-      padding: "24px",
-      display: "flex",
-      flexDirection: "column",
-      gap: 14
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      ...lbl_s,
-      marginBottom: 4
-    }
-  }, "COREN / CRM"), /*#__PURE__*/React.createElement("input", {
-    value: coren,
-    onChange: e => setCoren(e.target.value),
-    style: inp2,
-    placeholder: "Número do seu registro",
-    autoComplete: "username"
-  })), coren.trim() === ADMIN_COREN && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      ...lbl_s,
-      marginBottom: 4
-    }
-  }, "Senha"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "relative"
-    }
-  }, /*#__PURE__*/React.createElement("input", {
-    type: showP ? "text" : "password",
-    value: senha,
-    onChange: e => setSenha(e.target.value),
-    style: {
-      ...inp2,
-      paddingRight: 44
-    },
-    placeholder: "••••••••",
-    autoComplete: "current-password"
-  }), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => setShowP(p => !p),
-    style: {
-      position: "absolute",
-      right: 12,
-      top: "50%",
-      transform: "translateY(-50%)",
-      background: "none",
-      border: "none",
-      cursor: "pointer",
-      color: "#94A3B8",
-      fontSize: 16
-    }
-  }, showP ? "🙈" : "👁"))), err && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#FEE2E2",
-      color: "#991B1B",
-      padding: "8px 12px",
-      borderRadius: 8,
-      fontSize: 12
-    }
-  }, err), /*#__PURE__*/React.createElement(Btn, {
-    type: "submit",
-    disabled: loading,
-    style: {
-      padding: "11px",
-      fontSize: 14
-    }
-  }, loading ? "Entrando…" : "Entrar"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => {
-      setMode("register");
-      setErr("");
-    },
-    style: {
-      padding: "8px",
-      border: "none",
-      background: "none",
-      color: "#64748B",
-      cursor: "pointer",
-      fontSize: 13
-    }
-  }, "Sou novo aqui — solicitar acesso"))));
+    style: { padding: "24px", display: "flex", flexDirection: "column", gap: 14 }
+  },
+    /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("label", { style: { ...lbl_s, marginBottom: 4 } }, "COREN / CRM"),
+      /*#__PURE__*/React.createElement("input", {
+        value: coren, onChange: e => setCoren(e.target.value), style: inp2,
+        placeholder: "Número do seu registro", autoComplete: "username",
+        inputMode: "numeric"
+      })),
+    /* O campo de senha antes so aparecia para o COREN do admin — os demais
+       entravam so com o registro. Com o Supabase Auth todos tem senha. */
+    /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("label", { style: { ...lbl_s, marginBottom: 4 } }, "Senha"),
+      /*#__PURE__*/React.createElement("div", { style: { position: "relative" } },
+        /*#__PURE__*/React.createElement("input", {
+          type: showP ? "text" : "password", value: senha,
+          onChange: e => setSenha(e.target.value),
+          style: { ...inp2, paddingRight: 44 },
+          placeholder: "••••••••", autoComplete: "current-password"
+        }),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: () => setShowP(p => !p),
+          "aria-label": showP ? "Ocultar senha" : "Mostrar senha",
+          style: { position:"absolute", right:12, top:"50%", transform:"translateY(-50%)",
+                   background:"none", border:"none", cursor:"pointer", color:"#94A3B8", fontSize:16 }
+        }, showP ? "🙈" : "👁")),
+      /*#__PURE__*/React.createElement("div", {
+        style: { fontSize: 11, color: "#94A3B8", marginTop: 6, lineHeight: 1.5 }
+      }, "Primeiro acesso? Use o seu próprio registro como senha — o sistema pede uma nova em seguida.")),
+    err && /*#__PURE__*/React.createElement("div", {
+      style: { background:"#FEF2F2", border:"1px solid #FECACA", color:"#991B1B",
+               padding:"9px 12px", borderRadius:8, fontSize:12, lineHeight:1.5 }
+    }, err),
+    /*#__PURE__*/React.createElement(Btn, {
+      type: "submit", disabled: loading || !coren.trim() || !senha,
+      style: { padding: "11px", fontSize: 14 }
+    }, loading ? "Entrando…" : "Entrar"),
+    /*#__PURE__*/React.createElement("button", {
+      type: "button", onClick: () => { setMode("register"); setErr(""); },
+      style: { padding:"8px", border:"none", background:"none", color:"#64748B",
+               cursor:"pointer", fontSize:13, fontFamily:"inherit" }
+    }, "Sou novo aqui — solicitar acesso"))));
 }
 
 /* ─── SETTINGS MODAL ─── */
@@ -3217,13 +3297,30 @@ function UsersPanel({
     } catch {}
     setLoading(false);
   }
+  // Aprovar deixou de ser so mudar status: sem conta no Auth a pessoa nao
+  // autentica. A Edge Function cria a conta com senha = registro e marca
+  // senha_trocada=false, para o gate de troca obrigatoria pegar no 1o acesso.
   async function action(act, id) {
-    await fn("users-write", {
-      action: act,
-      id
-    }, userId);
-    load();
-    showT(act === "approve" ? "Aprovado." : act === "delete" ? "Removido." : "Bloqueado/desbloqueado.", act === "delete" ? "err" : "ok");
+    const mapa = { approve: "aprovar", delete: "remover", block: "bloquear" };
+    try {
+      const r = await adminUsuarios(mapa[act] || act, id);
+      load();
+      if (act === "approve" && r?.senhaInicial)
+        showT(`Aprovado. Senha inicial: ${r.senhaInicial} (o próprio registro).`);
+      else
+        showT(act === "delete" ? "Removido." : act === "approve" ? "Aprovado." : "Bloqueado/desbloqueado.",
+              act === "delete" ? "err" : "ok");
+    } catch (ex) { showT(ex.message, "err"); }
+  }
+
+  async function resetarSenha(u) {
+    const reg = (u.coren || u.crm || "").trim();
+    if (!window.confirm(`Redefinir a senha de ${u.nome || reg} para o registro (${reg})?\n\nA pessoa terá que escolher uma nova senha no próximo acesso.`)) return;
+    try {
+      const r = await adminUsuarios("redefinir_senha", u.id);
+      load();
+      showT(`Senha redefinida para: ${r.senhaInicial}`);
+    } catch (ex) { showT(ex.message, "err"); }
   }
   function startEdit(u) {
     setEditing(u.id);
@@ -3552,10 +3649,30 @@ function UsersPanel({
       color: sC[u.status] || "#64748B"
     }
   }, u.status), /*#__PURE__*/React.createElement("button", {
-    onClick: () => toggleCanLivro(u.id, u.can_livro, load),
+    onClick: () => toggleFlag(u.id, "can_livro", u.can_livro, load),
     className: "can-livro-toggle" + (u.can_livro ? " on" : ""),
-    title: u.can_livro ? "Revogar acesso ao Livro de Saída" : "Liberar acesso ao Livro de Saída"
-  }, u.can_livro ? "📒 Livro ✓" : "📒 Livro"), /*#__PURE__*/React.createElement("div", {
+    title: u.can_livro ? "Revogar escrita no Livro de Saída" : "Liberar escrita no Livro de Saída"
+  }, u.can_livro ? "📒 Livro ✓" : "📒 Livro"),
+  /*#__PURE__*/React.createElement("button", {
+    onClick: () => toggleFlag(u.id, "can_kanban", u.can_kanban, load),
+    className: "can-livro-toggle" + (u.can_kanban ? " on" : ""),
+    title: u.can_kanban ? "Revogar escrita no Kanban" : "Liberar escrita no Kanban"
+  }, u.can_kanban ? "🗂 Kanban ✓" : "🗂 Kanban"),
+  /*#__PURE__*/React.createElement("button", {
+    onClick: () => toggleFlag(u.id, "can_planilha", u.can_planilha, load),
+    className: "can-livro-toggle" + (u.can_planilha ? " on" : ""),
+    title: u.can_planilha ? "Revogar escrita na Planilha de Remoções" : "Liberar escrita na Planilha de Remoções"
+  }, u.can_planilha ? "📋 Planilha ✓" : "📋 Planilha"),
+  /*#__PURE__*/React.createElement("button", {
+    onClick: () => resetarSenha(u),
+    className: "can-livro-toggle",
+    title: "Redefinir a senha para o registro profissional"
+  }, "🔑 Senha"),
+  u.senha_trocada === false && u.auth_uid && /*#__PURE__*/React.createElement("span", {
+    title: "Ainda não trocou a senha inicial",
+    style: { fontSize: 10, fontWeight: 700, color: "#92400E", background: "#FFFBEB",
+             border: "1px solid #FDE68A", borderRadius: 6, padding: "2px 6px" }
+  }, "senha inicial"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 6,
@@ -5278,8 +5395,19 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   );
 }
 
-async function toggleCanLivro(uid,current,reload){
-  await fetch(`${SB_URL}/rest/v1/users?id=eq.${uid}`,{method:"PATCH",headers:{"Content-Type":"application/json",apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,Prefer:"return=minimal"},body:JSON.stringify({can_livro:!current})});
+/* Administracao de usuarios. Criar conta no Auth e redefinir senha exigem a
+ * service_role key — por isso passam pela Edge Function users-admin, nunca
+ * pelo front. A propria funcao confere, a partir do JWT, se quem chama e
+ * admin aprovado; o front so desenha a tela. */
+async function adminUsuarios(action, id, extra) {
+  return await fn("users-admin", { action, id, ...(extra || {}) });
+}
+
+// Liga/desliga uma area de escrita (can_kanban | can_planilha | can_livro).
+// Antes era um PATCH direto no REST com a anon key — com RLS ligada isso
+// nao passa mais, e nem deveria: permissao se altera no servidor.
+async function toggleFlag(uid, campo, atual, reload) {
+  await adminUsuarios("flags", uid, { flags: { [campo]: !atual } });
   reload();
 }
 
@@ -5287,7 +5415,17 @@ async function toggleCanLivro(uid,current,reload){
    MAIN APP
    ════════════════════════════════════════════ */
 function App() {
-  const [currentUser, setCurrentUser] = useState(() => loadLS("ge_session", null));
+  const [currentUser, setCurrentUser] = useState(null);
+  const [bootAuth, setBootAuth] = useState(true);
+  // Restaura a sessao do Supabase Auth ao abrir. Antes o usuario vinha de
+  // localStorage ("ge_session"), que o servidor nunca via.
+  useEffect(() => {
+    let vivo = true;
+    authRestaurar()
+      .then(u => { if (vivo) setCurrentUser(u); })
+      .finally(() => { if (vivo) setBootAuth(false); });
+    return () => { vivo = false; };
+  }, []);
   const [cards, setCards] = useState([]);
   const [cols, setCols] = useState([]);
   const [comments, setComments] = useState({});
@@ -5327,6 +5465,11 @@ function App() {
   const dragOverCol = useRef(null);
   const newColRef = useRef(null);
   const isAdmin = currentUser?.role === "admin";
+  // Espelho no front das policies do banco. Se divergirem, o usuario ve um
+  // botao que o Postgres recusa — pior que nao ver botao nenhum.
+  const podeKanban   = isAdmin || !!currentUser?.can_kanban;
+  const podePlanilha = isAdmin || !!currentUser?.can_planilha;
+  const podeLivro    = isAdmin || !!currentUser?.can_livro;
   const userId = currentUser?.id || "";
 
   const displayCards = isAdmin ? cards : pubCards || [];
@@ -5335,13 +5478,13 @@ function App() {
   // ===== Funções de login/logout =====
   function handleLogin(user) {
     setCurrentUser(user);
-    saveLS("ge_session", user);
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    await authLogout();
     setCurrentUser(null);
-    localStorage.removeItem("ge_session");
   }
+
 
   /* ── Funções de sincronização de snapshots ── */
   async function syncColsToDb(colsToSync) {
@@ -6242,8 +6385,20 @@ function App() {
   }) : filtered;
 
   // ===== Renderização =====
+  if (bootAuth) return /*#__PURE__*/React.createElement("div", {
+    style: { minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#F1F5F9", color:"#94A3B8", fontSize:13 }
+  }, "Carregando…");
+
   if (!currentUser) return /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement(LoginScreen, { onLogin: handleLogin, showT: showT }),
+    /*#__PURE__*/React.createElement(Toast, { toast: toast })
+  );
+
+  // Gate da senha inicial: nada do app renderiza antes da troca.
+  if (currentUser.senha_trocada === false) return /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement(TrocaSenhaScreen, {
+      user: currentUser, onPronto: setCurrentUser, onSair: handleLogout
+    }),
     /*#__PURE__*/React.createElement(Toast, { toast: toast })
   );
 
@@ -6390,7 +6545,7 @@ function App() {
           /*#__PURE__*/React.createElement(NavBtn, { id: "dashboard", label: "📊 Dashboard" }),
           /*#__PURE__*/React.createElement(KanbanDropdown, { view: view, setView: setView }),
           /*#__PURE__*/React.createElement("a", { href: "remocao.html", style: { padding: "5px 14px", borderRadius: 6, border: "none", fontSize: 12, fontWeight: 400, background: "transparent", color: "#64748B", cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center" } }, "🚑 Remoção"),
-          (currentUser?.can_livro || isAdmin) && /*#__PURE__*/React.createElement("div", { className: "livro-btn" }, /*#__PURE__*/React.createElement("button", { onClick: () => setShowLivro(true), style: { padding: "5px 14px", borderRadius: 6, border: "none", fontSize: 12, fontWeight: 400, background: "transparent", color: "#64748B", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 } }, "📒 Livro de Saída"), pendentesCount > 0 && /*#__PURE__*/React.createElement("span", { className: "livro-badge" }, pendentesCount)),
+          podeLivro && /*#__PURE__*/React.createElement("div", { className: "livro-btn" }, /*#__PURE__*/React.createElement("button", { onClick: () => setShowLivro(true), style: { padding: "5px 14px", borderRadius: 6, border: "none", fontSize: 12, fontWeight: 400, background: "transparent", color: "#64748B", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 } }, "📒 Livro de Saída"), pendentesCount > 0 && /*#__PURE__*/React.createElement("span", { className: "livro-badge" }, pendentesCount)),
           isAdmin && /*#__PURE__*/React.createElement(NavBtn, { id: "usuarios", label: "👥 Profissionais" }),
           isAdmin && /*#__PURE__*/React.createElement(NavBtn, { id: "historico", label: "📜 Histórico" }),
           isAdmin && /*#__PURE__*/React.createElement(NavBtn, { id: "publicacoes", label: "📰 Publicações" })
