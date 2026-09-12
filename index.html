@@ -726,7 +726,13 @@ function AceiteModal({
 /* ─── CARD MODAL ─── */
 // Normaliza cabeçalho para comparação (remove acentos, minúsculas, espaços extras)
 function normKanbanHdr(s){
-  return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();
+  // B2: remove pontuacao ANTES de colapsar espaco. Sem isto, cabecalhos reais
+  // do CROSS ("Nº DA FICHA CROSS", "LOCALIZACAO/SETOR") nao casam com o mapa,
+  // matched cai abaixo de 40% e o lote inteiro entra deslocado.
+  return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[\u00a0\u200b-\u200d\ufeff]/g," ")
+    .replace(/[.\-_/\\,;:\u00ba\u00b0\u00aa'"()\[\]]/g," ")
+    .toLowerCase().replace(/\s+/g," ").trim();
 }
 
 // Mapa de cabeçalhos TSV -> campo interno do card
@@ -5734,18 +5740,6 @@ function App() {
       const data = await fn("cards-move", { card_id: cardId, new_col_id: newColId, aceite: aceiteData || null }, userId);
       setCards(p => p.map(c => c.id === cardId ? data : c));
       showT("Card movido.");
-      if (newColId === "aceite" || newColId === "andamento") {
-        try {
-          const hoje = new Date().toISOString().split("T")[0];
-          const agora = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
-          const gm={emergencia:"VERMELHO",urgencia:"AMARELO",andamento_cor:"AMARELO",menor_gravidade:"VERDE",finalizado_cor:"CINZA",agendamento:"CINZA",retorno:"CINZA"};
-          const am={Básica:"BÁSICA",Avançada:"AVANÇADA"};
-          await fetch("https://ahcrscstdtfawoogsugi.supabase.co/functions/v1/remocoes-write",{
-            method:"POST",
-            headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`},
-            body:JSON.stringify({action:"create",nome_paciente:data.nome||"",setor:data.setor||"",especialidade:data.rec||"",diagnostico:data.hd||"",instituicao_destino:data.hosp||data.unidade_receptora||"",tipo_ambulancia:am[data.amb]||"",gravidade:data.grav||"urgencia",data_solicitacao:hoje,horario_solicitacao:data.hora_adm||agora,ficha_cross:data.ficha_cross||"",medico:data.medico_solic||"",horario_saida_ambulancia:data.saida||"",horario_retorno:data.retorno||"",data_resposta_cross:data.data_resolucao||"",horario_resposta_cross:data.hora_resolucao||"",status:newColId==="aceite"?"PACIENTE AGUARDANDO AMBULÂNCIA":"PACIENTE EM REMOÇÃO"})});
-        } catch(e2) {}
-      }
     } catch (ex) { showT(ex.message, "err"); }
   }
 
