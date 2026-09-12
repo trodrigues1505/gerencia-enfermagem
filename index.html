@@ -742,11 +742,18 @@ const KANBAN_HDR_MAP = (()=>{
     ["data admissao cross","adm"],
     ["data admissao",      "adm"],
     ["data solicitacao",   "adm"],
+    ["data solic.",        "adm"],
+    ["data solic",         "adm"],
     ["data",               "adm"],
     ["hora admissao",      "hora_adm"],
     ["hora solicitacao",   "hora_adm"],
+    ["hora solic.",        "hora_adm"],
+    ["hora solic",         "hora_adm"],
     ["hora",               "hora_adm"],
     ["no ficha cross",     "ficha_cross"],
+    ["n\u00ba ficha cross","ficha_cross"],
+    ["nº ficha cross",     "ficha_cross"],
+    ["n ficha cross",      "ficha_cross"],
     ["ficha cross",        "ficha_cross"],
     ["ficha",              "ficha_cross"],
     ["ss",                 "ficha_cross"],
@@ -810,24 +817,30 @@ function normKanbanAmb(v){
   return v;
 }
 
-// Parseia um bloco TSV e retorna um objeto com os campos do card
-// Aceita: 1 linha de dados sem cabeçalho (assume ordem padrão)
-//         OU cabeçalho + dados (detecta automaticamente)
+// Parseia um bloco TSV e retorna { data, aviso? }
+// Aceita: 1 linha sem cabeçalho (assume ordem padrão)
+//         OU cabeçalho + 1 linha de dados (detecta automaticamente)
+// Problema conhecido: se a IA omitir uma célula sem deixar vazio (\t\t),
+// todas as colunas seguintes ficam deslocadas. Detectamos e avisamos.
 function parseTSVToCard(txt){
   const lines = txt.replace(/\r/g,"").split("\n").filter(l=>l.trim()!=="");
   if(lines.length===0) return null;
 
-  // Ordem padrão (quando não há cabeçalho)
   const DEFAULT_ORDER = ["nome","idade","adm","hora_adm","ficha_cross","medico_solic","hd","setor","rec","hosp","grav","obs"];
 
   const firstCells = lines[0].split("\t").map(normKanbanHdr);
   const matchedCount = firstCells.filter(c=>KANBAN_HDR_MAP[c]).length;
   const hasHeader = matchedCount >= Math.max(2, Math.floor(firstCells.length * 0.4));
 
-  let fieldOrder, dataLine;
+  let fieldOrder, dataLine, aviso = null;
   if(hasHeader && lines.length >= 2){
     fieldOrder = firstCells.map(c=>KANBAN_HDR_MAP[c]||null);
     dataLine = lines[1].split("\t");
+    // Detectar desalinhamento: dados têm menos colunas que cabeçalho
+    if(dataLine.length < fieldOrder.length){
+      const faltando = fieldOrder.length - dataLine.length;
+      aviso = `⚠ A IA gerou ${faltando} coluna${faltando>1?"s":""} a menos que o cabeçalho — verifique se os campos estão corretos. Peça à IA para deixar célula vazia (—) quando não houver valor.`;
+    }
   } else {
     fieldOrder = DEFAULT_ORDER;
     dataLine = lines[0].split("\t");
@@ -835,18 +848,24 @@ function parseTSVToCard(txt){
 
   const raw = {};
   fieldOrder.forEach((f,i)=>{
-    if(f && dataLine[i]!==undefined && dataLine[i].trim()!==""){
+    if(f && dataLine[i]!==undefined && dataLine[i].trim()!=="" && dataLine[i].trim()!=="—" && dataLine[i].trim()!=="-"){
       raw[f] = dataLine[i].trim();
     }
   });
 
   if(Object.keys(raw).length===0) return null;
 
-  // Normalizar gravidade
-  if(raw.grav) raw.grav = KANBAN_GRAV_NORM[normKanbanHdr(raw.grav)] || raw.grav;
+  // Normalizar gravidade — aceita VERMELHO/AMARELO/VERDE/CINZA e labels
+  if(raw.grav){
+    const gravNorm = KANBAN_GRAV_NORM[normKanbanHdr(raw.grav)];
+    if(gravNorm) raw.grav = gravNorm;
+    // Se o valor não parece gravidade (ex: texto longo), descarta
+    else if(raw.grav.length > 30) delete raw.grav;
+  }
   // Normalizar ambulância
   if(raw.amb) raw.amb = normKanbanAmb(raw.amb);
 
+  raw._aviso = aviso;
   return raw;
 }
 
@@ -901,12 +920,17 @@ function CardModal({
         categoria:    novaCategoria,
       };
     });
-    setShowTsvBox(false);
-    setTsvText("");
     const camposOk = [c.nome, c.hd, c.ficha_cross, c.medico_solic, c.hora_adm, c.setor].filter(Boolean);
-    setTsvStatus(camposOk.length > 0
-      ? `✓ ${camposOk.length} campo${camposOk.length>1?"s":""} preenchido${camposOk.length>1?"s":""}!`
-      : "⚠ Dados importados, mas poucos campos foram reconhecidos. Confira o formato.");
+    if(c._aviso){
+      setTsvStatus(c._aviso + (camposOk.length > 0 ? ` (${camposOk.length} campo${camposOk.length>1?"s":""} preenchido${camposOk.length>1?"s":""}.)` : ""));
+      // mantém o box aberto para o usuário poder corrigir
+    } else {
+      setShowTsvBox(false);
+      setTsvText("");
+      setTsvStatus(camposOk.length > 0
+        ? `✓ ${camposOk.length} campo${camposOk.length>1?"s":""} preenchido${camposOk.length>1?"s":""}!`
+        : "⚠ Dados importados, mas poucos campos foram reconhecidos. Confira o formato.");
+    }
   }
   const upd = useCallback((k, v) => setForm(p => ({
     ...p,
