@@ -723,15 +723,131 @@ function AceiteModal({
 }
 
 /* ─── CARD MODAL ─── */
-async function extractCROSS(texto) {
-  const r = await fetch("https://ahcrscstdtfawoogsugi.supabase.co/functions/v1/extract-cross", {
-    method:"POST",
-    headers:{"Content-Type":"application/json","apikey":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjk1MDgsImV4cCI6MjEwNDIwNTUwOH0.8ivWRA99AXXyBVFT3TQd5NuSod2eiowiI490Blt2zHM","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjk1MDgsImV4cCI6MjEwNDIwNTUwOH0.8ivWRA99AXXyBVFT3TQd5NuSod2eiowiI490Blt2zHM"},
-    body:JSON.stringify({texto})
+// Normaliza cabeçalho para comparação (remove acentos, minúsculas, espaços extras)
+function normKanbanHdr(s){
+  return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();
+}
+
+// Mapa de cabeçalhos TSV -> campo interno do card
+// Aceita tanto os nomes "amigáveis" para a IA externa quanto abreviações
+const KANBAN_HDR_MAP = (()=>{
+  const m = {};
+  const entries = [
+    // [cabeçalho normalizado, campo interno]
+    ["nome paciente",      "nome"],
+    ["nome do paciente",   "nome"],
+    ["paciente",           "nome"],
+    ["nome",               "nome"],
+    ["idade",              "idade"],
+    ["data admissao cross","adm"],
+    ["data admissao",      "adm"],
+    ["data solicitacao",   "adm"],
+    ["data",               "adm"],
+    ["hora admissao",      "hora_adm"],
+    ["hora solicitacao",   "hora_adm"],
+    ["hora",               "hora_adm"],
+    ["no ficha cross",     "ficha_cross"],
+    ["ficha cross",        "ficha_cross"],
+    ["ficha",              "ficha_cross"],
+    ["ss",                 "ficha_cross"],
+    ["hipotese diagnostica","hd"],
+    ["hipotese",           "hd"],
+    ["diagnostico",        "hd"],
+    ["hd",                 "hd"],
+    ["cid",                "hd"],
+    ["setor",              "setor"],
+    ["leito",              "setor"],
+    ["setor leito",        "setor"],
+    ["unidade solicitante","setor"],
+    ["recurso especialidade","rec"],
+    ["especialidade",      "rec"],
+    ["recurso",            "rec"],
+    ["1o recurso",         "rec"],
+    ["hospital receptor",  "hosp"],
+    ["hospital",           "hosp"],
+    ["destino",            "hosp"],
+    ["instituicao destino","hosp"],
+    ["gravidade",          "grav"],
+    ["prioridade",         "grav"],
+    ["medico solicitante", "medico_solic"],
+    ["medico",             "medico_solic"],
+    ["dr",                 "medico_solic"],
+    ["observacoes",        "obs"],
+    ["observacao",         "obs"],
+    ["resumo clinico",     "obs"],
+    ["obs",                "obs"],
+    ["ambulancia",         "amb"],
+    ["tipo ambulancia",    "amb"],
+    ["categoria",          "categoria"],
+  ];
+  entries.forEach(([h,f])=>{ m[normKanbanHdr(h)]=f; });
+  return m;
+})();
+
+// Normaliza valor de gravidade para chave interna do GC
+const KANBAN_GRAV_NORM = (()=>{
+  const m = {};
+  // por chave
+  Object.keys(GC).forEach(k=>{ m[normKanbanHdr(k)]=k; });
+  // por label
+  Object.entries(GC).forEach(([k,v])=>{ m[normKanbanHdr(v.label)]=k; });
+  // aliases comuns
+  const extra = {
+    "vermelho":"emergencia","amarelo":"urgencia","verde":"menor_gravidade","cinza":"agendamento",
+    "emergencia":"emergencia","urgencia":"urgencia","menor gravidade":"menor_gravidade","agendamento":"agendamento",
+    "0":"emergencia","1":"urgencia","2":"menor_gravidade",
+  };
+  Object.entries(extra).forEach(([k,v])=>{ m[normKanbanHdr(k)]=v; });
+  return m;
+})();
+
+// Normaliza ambulância para valor aceito pelo banco
+function normKanbanAmb(v){
+  if(!v)return "";
+  const u=String(v).trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  if(u==="BASICA"||u==="SBV"||u==="BASICO")return "Básica";
+  if(u==="AVANCADA"||u==="SAV"||u==="AVANCADO")return "Avançada";
+  return v;
+}
+
+// Parseia um bloco TSV e retorna um objeto com os campos do card
+// Aceita: 1 linha de dados sem cabeçalho (assume ordem padrão)
+//         OU cabeçalho + dados (detecta automaticamente)
+function parseTSVToCard(txt){
+  const lines = txt.replace(/\r/g,"").split("\n").filter(l=>l.trim()!=="");
+  if(lines.length===0) return null;
+
+  // Ordem padrão (quando não há cabeçalho)
+  const DEFAULT_ORDER = ["nome","idade","adm","hora_adm","ficha_cross","medico_solic","hd","setor","rec","hosp","grav","obs"];
+
+  const firstCells = lines[0].split("\t").map(normKanbanHdr);
+  const matchedCount = firstCells.filter(c=>KANBAN_HDR_MAP[c]).length;
+  const hasHeader = matchedCount >= Math.max(2, Math.floor(firstCells.length * 0.4));
+
+  let fieldOrder, dataLine;
+  if(hasHeader && lines.length >= 2){
+    fieldOrder = firstCells.map(c=>KANBAN_HDR_MAP[c]||null);
+    dataLine = lines[1].split("\t");
+  } else {
+    fieldOrder = DEFAULT_ORDER;
+    dataLine = lines[0].split("\t");
+  }
+
+  const raw = {};
+  fieldOrder.forEach((f,i)=>{
+    if(f && dataLine[i]!==undefined && dataLine[i].trim()!==""){
+      raw[f] = dataLine[i].trim();
+    }
   });
-  const d = await r.json();
-  if(!r.ok) throw new Error(d.error||"Erro na extração");
-  return d;
+
+  if(Object.keys(raw).length===0) return null;
+
+  // Normalizar gravidade
+  if(raw.grav) raw.grav = KANBAN_GRAV_NORM[normKanbanHdr(raw.grav)] || raw.grav;
+  // Normalizar ambulância
+  if(raw.amb) raw.amb = normKanbanAmb(raw.amb);
+
+  return raw;
 }
 
 function CardModal({
@@ -751,49 +867,46 @@ function CardModal({
   });
   const [tab, setTab] = useState("info");
   const [commentText, setCommentText] = useState("");
-  const [aiText, setAiText] = useState("");
-  const [showAiBox, setShowAiBox] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiStatus, setAiStatus] = useState("");
+  const [tsvText, setTsvText] = useState("");
+  const [showTsvBox, setShowTsvBox] = useState(false);
+  const [tsvStatus, setTsvStatus] = useState("");
 
-  async function runExtract() {
-    if (!aiText.trim()) return;
-    setAiLoading(true);
-    setAiStatus("Extraindo com IA…");
-    try {
-      const c = await extractCROSS(aiText);
-      const idadeStr = c.idade||"";
-      const idM = idadeStr.match(/\d+/);
-      const idadeAnos = idM ? idM[0]+" anos" : idadeStr;
-      setForm(f => {
-        const novaCategoria = (idM && parseInt(idM[0],10) <= 11 && (!f.categoria || f.categoria === "normal"))
-          ? "pediatria" : f.categoria;
-        return { ...f,
-          nome:         c.nome          || f.nome,
-          idade:        idadeAnos       || f.idade,
-          hd:           c.hd            || f.hd,
-          setor:        c.setor         || f.setor,
-          rec:          c.rec           || f.rec,
-          adm:          c.adm           || f.adm,
-          hora_adm:     c.hora_adm      || f.hora_adm,
-          grav:         c.grav          || f.grav,
-          obs:          c.obs           || f.obs,
-          ficha_cross:  c.ficha_cross   || f.ficha_cross,
-          medico_solic: c.medico_solic  || f.medico_solic,
-          hosp:         c.hosp          || f.hosp,
-          categoria:    novaCategoria,
-        };
-      });
-      setShowAiBox(false);
-      setAiText("");
-      setAiStatus(c._aviso ? "⚠ " + c._aviso : (c.nome || c.idade || c.hd || c.ficha_cross || c.medico_solic || c.hora_adm
-        ? "✓ Campos preenchidos!"
-        : "⚠ A IA não retornou dados reconhecíveis deste texto. Confira o texto colado ou preencha manualmente."));
-    } catch(e) {
-      setAiStatus("Erro: " + e.message);
-      setAiLoading(false);
+  function runTsvImport() {
+    if (!tsvText.trim()) return;
+    const c = parseTSVToCard(tsvText);
+    if(!c){
+      setTsvStatus("⚠ Nenhum dado reconhecível. Verifique se o arquivo tem os cabeçalhos corretos e cole pelo menos uma linha de dados.");
+      return;
     }
-    setAiLoading(false);
+    const idadeStr = c.idade||"";
+    const idM = idadeStr.match(/\d+/);
+    const idadeAnos = idM ? idM[0]+" anos" : idadeStr;
+    setForm(f => {
+      const novaCategoria = (idM && parseInt(idM[0],10) <= 11 && (!f.categoria || f.categoria === "normal"))
+        ? "pediatria" : (c.categoria || f.categoria);
+      return { ...f,
+        nome:         c.nome          || f.nome,
+        idade:        idadeAnos       || f.idade,
+        hd:           c.hd            || f.hd,
+        setor:        c.setor         || f.setor,
+        rec:          c.rec           || f.rec,
+        adm:          c.adm           || f.adm,
+        hora_adm:     c.hora_adm      || f.hora_adm,
+        grav:         c.grav          || f.grav,
+        obs:          c.obs           || f.obs,
+        ficha_cross:  c.ficha_cross   || f.ficha_cross,
+        medico_solic: c.medico_solic  || f.medico_solic,
+        hosp:         c.hosp          || f.hosp,
+        amb:          c.amb           || f.amb,
+        categoria:    novaCategoria,
+      };
+    });
+    setShowTsvBox(false);
+    setTsvText("");
+    const camposOk = [c.nome, c.hd, c.ficha_cross, c.medico_solic, c.hora_adm, c.setor].filter(Boolean);
+    setTsvStatus(camposOk.length > 0
+      ? `✓ ${camposOk.length} campo${camposOk.length>1?"s":""} preenchido${camposOk.length>1?"s":""}!`
+      : "⚠ Dados importados, mas poucos campos foram reconhecidos. Confira o formato.");
   }
   const upd = useCallback((k, v) => setForm(p => ({
     ...p,
@@ -829,7 +942,7 @@ function CardModal({
       onClick: () => onSave(form)
     }, "Salvar")))
   },
-  isAdmin && /*#__PURE__*/React.createElement("div", {style:{marginBottom:10}}, !showAiBox ? /*#__PURE__*/React.createElement("button", {onClick:function(){setShowAiBox(true);}, style:{width:"100%",padding:"7px 14px",border:"1px dashed #7C3AED",borderRadius:8,background:"#F5F3FF",color:"#6D28D9",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit"}}, "✨ Preencher com IA — colar ficha CROSS") : /*#__PURE__*/React.createElement("div",{style:{background:"#F5F3FF",border:"1px solid #DDD6FE",borderRadius:10,padding:12}},/*#__PURE__*/React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#6D28D9",marginBottom:6}},"Cole o texto da ficha CROSS:"),/*#__PURE__*/React.createElement("textarea",{value:aiText,onChange:function(e){setAiText(e.target.value);},placeholder:"Cole aqui o texto da ficha CROSS...",rows:6,style:{width:"100%",padding:"8px 10px",border:"1px solid #C4B5FD",borderRadius:7,fontSize:12,fontFamily:"inherit",resize:"vertical",outline:"none",background:"#fff",color:"#0F172A",lineHeight:1.6}}),aiStatus&&/*#__PURE__*/React.createElement("div",{style:{fontSize:11,color:"#6D28D9",marginTop:4}},aiStatus),/*#__PURE__*/React.createElement("div",{style:{display:"flex",gap:8,marginTop:8,justifyContent:"flex-end"}},/*#__PURE__*/React.createElement("button",{onClick:function(){setShowAiBox(false);setAiText("");setAiStatus("");},style:{padding:"5px 12px",border:"1px solid #E2E8F0",borderRadius:7,background:"none",color:"#64748B",cursor:"pointer",fontSize:12,fontFamily:"inherit"}},"Cancelar"),/*#__PURE__*/React.createElement("button",{onClick:runExtract,disabled:aiLoading||!aiText.trim(),style:{padding:"5px 14px",border:"none",borderRadius:7,background:"#6D28D9",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit",opacity:(aiLoading||!aiText.trim())?0.6:1}},aiLoading?"Extraindo…":"✨ Extrair com IA")))
+  isAdmin && /*#__PURE__*/React.createElement("div", {style:{marginBottom:10}}, !showTsvBox ? /*#__PURE__*/React.createElement("button", {onClick:function(){setShowTsvBox(true);setTsvStatus("");}, style:{width:"100%",padding:"7px 14px",border:"1px dashed #0369A1",borderRadius:8,background:"#F0F9FF",color:"#0369A1",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit"}}, "📋 Importar do Excel — colar dados da ficha CROSS") : /*#__PURE__*/React.createElement("div",{style:{background:"#F0F9FF",border:"1px solid #BAE6FD",borderRadius:10,padding:12}},/*#__PURE__*/React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#0369A1",marginBottom:4}},"Cole os dados copiados do Excel (com cabeçalho):"),/*#__PURE__*/React.createElement("div",{style:{fontSize:10,color:"#64748B",marginBottom:6}},/*#__PURE__*/React.createElement("span",{style:{fontFamily:"monospace",background:"#E0F2FE",borderRadius:4,padding:"1px 4px"}},"NOME PACIENTE"),"\xa0·\xa0",/*#__PURE__*/React.createElement("span",{style:{fontFamily:"monospace",background:"#E0F2FE",borderRadius:4,padding:"1px 4px"}},"DATA"),"\xa0·\xa0",/*#__PURE__*/React.createElement("span",{style:{fontFamily:"monospace",background:"#E0F2FE",borderRadius:4,padding:"1px 4px"}},"HORA"),"\xa0·\xa0",/*#__PURE__*/React.createElement("span",{style:{fontFamily:"monospace",background:"#E0F2FE",borderRadius:4,padding:"1px 4px"}},"FICHA CROSS"),"\xa0·\xa0","..."),/*#__PURE__*/React.createElement("textarea",{value:tsvText,onChange:function(e){setTsvText(e.target.value);},placeholder:"Cole aqui (Ctrl+V) as células copiadas do Excel. A primeira linha deve ser o cabeçalho das colunas.",rows:5,style:{width:"100%",padding:"8px 10px",border:"1px solid #BAE6FD",borderRadius:7,fontSize:12,fontFamily:"monospace",resize:"vertical",outline:"none",background:"#fff",color:"#0F172A",lineHeight:1.5}}),tsvStatus&&/*#__PURE__*/React.createElement("div",{style:{fontSize:11,color:tsvStatus.startsWith("✓")?"#15803D":"#B45309",marginTop:4,fontWeight:600}},tsvStatus),/*#__PURE__*/React.createElement("div",{style:{display:"flex",gap:8,marginTop:8,justifyContent:"flex-end"}},/*#__PURE__*/React.createElement("button",{onClick:function(){setShowTsvBox(false);setTsvText("");setTsvStatus("");},style:{padding:"5px 12px",border:"1px solid #E2E8F0",borderRadius:7,background:"none",color:"#64748B",cursor:"pointer",fontSize:12,fontFamily:"inherit"}},"Cancelar"),/*#__PURE__*/React.createElement("button",{onClick:runTsvImport,disabled:!tsvText.trim(),style:{padding:"5px 14px",border:"none",borderRadius:7,background:"#0369A1",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit",opacity:!tsvText.trim()?0.6:1}},"📋 Importar")))
   ), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
