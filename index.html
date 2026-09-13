@@ -52,6 +52,7 @@ kbd{font-family:monospace;background:#F1F5F9;padding:1px 5px;border-radius:3px;b
 .ls-pending-card{background:#fff;border:1.5px solid #E2E8F0;border-radius:10px;padding:14px 16px;margin-bottom:8px;transition:border-color .15s}
 .ls-pending-card:hover{border-color:#3B82F6}
 /* Match */
+@keyframes lsToastIn{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translate(-50%,0)}}
 .ls-match-overlay{position:absolute;inset:0;background:rgba(15,23,42,.7);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10;border-radius:16px}
 .ls-match-box{background:#fff;border-radius:14px;padding:24px;max-width:540px;width:100%;box-shadow:0 16px 48px rgba(0,0,0,.3)}
 /* Toggle livro */
@@ -130,6 +131,12 @@ async function getSbClient() {
     });
   }
   _sbClient = window.supabase.createClient(SB_URL, SB_KEY);
+  // Mantem _accessToken em sincronia com o refresh automatico do supabase-js.
+  // Fica aqui (e nao em authLogin/authRestaurar) para garantir UM unico ouvinte
+  // por cliente, cobrindo tanto login manual quanto sessao restaurada. Antes so
+  // authRestaurar registrava: quem entrava pelo formulario ficava com o token
+  // congelado e, ao expirar (1h), as escritas caiam na anon key -> erro 42501.
+  _sbClient.auth.onAuthStateChange((_e, sess) => setAccessToken(sess?.access_token));
   return _sbClient;
 }
 /* ─── Autenticacao ─────────────────────────────────────────────────────────*/
@@ -165,7 +172,6 @@ async function authRestaurar() {
   const { data } = await sb.auth.getSession();
   if (!data.session) return null;
   setAccessToken(data.session.access_token);
-  sb.auth.onAuthStateChange((_e, sess) => setAccessToken(sess?.access_token));
   try { return await carregarPerfil(data.session.user.id); }
   catch (e) { return null; }
 }
@@ -5153,6 +5159,25 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   const [match,setMatch]=useState(null);
   const [vinculando,setVinculando]=useState(false);
   const [remocoes,setRemocoes]=useState([]);
+  const [toast,setToast]=useState(null);
+  const [confirmClose,setConfirmClose]=useState(false);
+
+  const notify=(tipo,texto)=>setToast({tipo,texto});
+  useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(null),4500);return()=>clearTimeout(t);},[toast]);
+
+  // Traduz o erro cru do PostgREST numa mensagem util para quem esta no plantao.
+  function msgErro(e){
+    const t=String(e&&e.message||e||"");
+    if(t.includes("42501")||t.includes("row-level security"))
+      return "Sua sessao expirou ou voce nao tem permissao para lancar no Livro. Saia e entre novamente; se continuar, procure a coordenacao.";
+    if(t.includes("Failed to fetch")||t.includes("NetworkError"))
+      return "Sem conexao com o servidor. Os dados continuam na tela — tente salvar de novo.";
+    return "Nao foi possivel salvar. Detalhe tecnico no console.";
+  }
+
+  // Ha algo digitado que seria perdido ao fechar?
+  const dirty=Object.keys(LS_EMPTY).some(k=>form[k]!==LS_EMPTY[k]);
+  const pedirFechar=()=>{ if(dirty)setConfirmClose(true); else onClose(); };
 
   useEffect(()=>{loadPendentes();loadRemocoes();},[]);
 
@@ -5192,8 +5217,8 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
       const [saved]=await r.json();
       const candidates=findMatches(form.nome_paciente,form.data_saida);
       if(candidates.length>0){setMatch({livroRow:saved,candidates});}
-      else{setForm({...LS_EMPTY});loadPendentes();alert("✅ Salvo! Nenhuma correspondência encontrada — ficará em pendentes.");}
-    }catch(e){alert("Erro: "+e.message);}
+      else{setForm({...LS_EMPTY});loadPendentes();notify("ok","Registro salvo. Sem correspondência na planilha — ficou em Pendentes.");}
+    }catch(e){console.error("[LivroSaida] falha ao salvar:",e);notify("erro",msgErro(e));}
     setSaving(false);
   }
 
@@ -5218,14 +5243,18 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
         if(Object.keys(u).length>0)await fetch(`${SB_URL}/rest/v1/remocoes?id=eq.${remocaoId}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=minimal"},body:JSON.stringify(u)});
       }
       setMatch(null);setForm({...LS_EMPTY});loadPendentes();
-      alert("✅ Vinculado! Dados mesclados na planilha de remoção.");
-    }catch(e){alert("Erro: "+e.message);}
+      notify("ok","Vinculado. Dados mesclados na planilha de remoção.");
+    }catch(e){console.error("[LivroSaida] falha ao vincular:",e);notify("erro",msgErro(e));}
     setVinculando(false);
   }
 
   async function handleIndependente(livroId){
-    await fetch(`${SB_URL}/rest/v1/livro_saida?id=eq.${livroId}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=minimal"},body:JSON.stringify({status_vinculo:"independente"})});
-    setMatch(null);setForm({...LS_EMPTY});loadPendentes();
+    try{
+      const r=await fetch(`${SB_URL}/rest/v1/livro_saida?id=eq.${livroId}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=minimal"},body:JSON.stringify({status_vinculo:"independente"})});
+      if(!r.ok)throw new Error(await r.text());
+      setMatch(null);setForm({...LS_EMPTY});loadPendentes();
+      notify("ok","Registro mantido sem vínculo com a planilha.");
+    }catch(e){console.error("[LivroSaida] falha ao marcar independente:",e);notify("erro",msgErro(e));}
   }
 
   async function handleVincularPendente(livro){
@@ -5239,14 +5268,40 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   const FLD=(k,label,el)=>React.createElement("div",{key:k},LBL(label,LS_REQUIRED.includes(k)),el);
   const fmtDate=d=>{try{return new Date(d+"T12:00:00").toLocaleDateString("pt-BR");}catch{return d;}};
 
-  return React.createElement("div",{className:"ls-overlay",onClick:e=>e.target===e.currentTarget&&onClose()},
+  return React.createElement("div",{className:"ls-overlay",onClick:e=>{if(e.target!==e.currentTarget)return;if(match||confirmClose)return;pedirFechar();}},
     React.createElement("div",{className:"ls-modal",style:{position:"relative"}},
+
+      // ── Confirmacao de fechamento (so quando ha texto digitado) ──
+      confirmClose&&React.createElement("div",{className:"ls-match-overlay"},
+        React.createElement("div",{className:"ls-match-box",style:{maxWidth:400}},
+          React.createElement("div",{style:{fontWeight:700,fontSize:15,marginBottom:6}},"Descartar este registro?"),
+          React.createElement("div",{style:{fontSize:12,color:"#64748B",lineHeight:1.5,marginBottom:18}},"Os dados digitados ainda não foram salvos e serão perdidos."),
+          React.createElement("div",{style:{display:"flex",gap:8,justifyContent:"flex-end"}},
+            React.createElement("button",{onClick:()=>setConfirmClose(false),style:{background:"#0F172A",color:"#fff",border:"none",borderRadius:8,padding:"8px 18px",fontSize:12,fontWeight:700,cursor:"pointer"}},"Continuar preenchendo"),
+            React.createElement("button",{onClick:()=>{setConfirmClose(false);onClose();},style:{background:"none",border:"1px solid #FECACA",color:"#DC2626",borderRadius:8,padding:"8px 18px",fontSize:12,fontWeight:600,cursor:"pointer"}},"Descartar")
+          )
+        )
+      ),
+
+      // ── Toast ──
+      toast&&React.createElement("div",{onClick:()=>setToast(null),style:{position:"absolute",top:14,left:"50%",transform:"translateX(-50%)",zIndex:20,maxWidth:"90%",display:"flex",alignItems:"flex-start",gap:9,background:toast.tipo==="ok"?"#062B1B":"#3F1114",color:"#fff",borderRadius:10,padding:"11px 15px",fontSize:12,lineHeight:1.45,fontWeight:500,boxShadow:"0 10px 30px rgba(0,0,0,.3)",cursor:"pointer",animation:"lsToastIn .2s ease-out"}},
+        React.createElement("span",{style:{fontSize:13,lineHeight:1.2}},toast.tipo==="ok"?"✓":"!"),
+        React.createElement("span",null,toast.texto)
+      ),
 
       // ── Match overlay ──
       match&&React.createElement("div",{className:"ls-match-overlay"},
         React.createElement("div",{className:"ls-match-box"},
-          React.createElement("div",{style:{fontWeight:700,fontSize:15,marginBottom:4}},"📋 Correspondência encontrada"),
-          React.createElement("div",{style:{fontSize:12,color:"#64748B",marginBottom:16}},`${match.candidates.length} registro(s) parecido(s) para "${match.livroRow.nome_paciente}". Selecione o correto ou salve sem vínculo.`),
+          React.createElement("div",{style:{fontWeight:700,fontSize:15,marginBottom:4}},
+            match.candidates.length===0?"Sem correspondência na planilha":"Correspondência encontrada"),
+          React.createElement("div",{style:{fontSize:12,color:"#64748B",marginBottom:16}},
+            match.candidates.length===0
+              ?`Nenhuma remoção parecida com "${match.livroRow.nome_paciente}" foi localizada na planilha. Isso é normal quando a saída não passou pelo CROSS — mantenha o registro sem vínculo.`
+              :`${match.candidates.length} registro(s) parecido(s) para "${match.livroRow.nome_paciente}". Selecione o correto ou salve sem vínculo.`),
+          match.candidates.length===0&&React.createElement("div",{style:{background:"#F8FAFC",border:"1px dashed #CBD5E1",borderRadius:10,padding:"20px 16px",textAlign:"center",marginBottom:4}},
+            React.createElement("div",{style:{fontSize:24,marginBottom:6}},"🔍"),
+            React.createElement("div",{style:{fontSize:12,color:"#64748B",lineHeight:1.5}},"O registro já está salvo no Livro. Ele fica na aba Pendentes até ser vinculado ou marcado como independente.")
+          ),
           match.candidates.map(c=>React.createElement("div",{key:c.id,style:{background:"#F8FAFC",border:"1.5px solid #E2E8F0",borderRadius:9,padding:"10px 14px",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}},
             React.createElement("div",null,
               React.createElement("div",{style:{fontWeight:600,fontSize:13}},c.nome_paciente),
@@ -5258,8 +5313,8 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
             React.createElement("button",{disabled:vinculando,onClick:()=>!vinculando&&handleVincular(match.livroRow.id,c.id),style:{background:"#16A34A",color:"#fff",border:"none",borderRadius:7,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}},vinculando?"…":"Vincular")
           )),
           React.createElement("div",{style:{display:"flex",gap:8,marginTop:16,justifyContent:"flex-end"}},
-            React.createElement("button",{onClick:()=>handleIndependente(match.livroRow.id),style:{background:"none",border:"1px solid #E2E8F0",borderRadius:7,padding:"7px 16px",fontSize:12,cursor:"pointer",color:"#64748B"}},"Salvar sem vínculo"),
-            React.createElement("button",{onClick:()=>setMatch(null),style:{background:"none",border:"1px solid #E2E8F0",borderRadius:7,padding:"7px 16px",fontSize:12,cursor:"pointer",color:"#374151"}},"Cancelar")
+            React.createElement("button",{onClick:()=>setMatch(null),style:{background:"none",border:"1px solid #E2E8F0",borderRadius:7,padding:"7px 16px",fontSize:12,cursor:"pointer",color:"#64748B"}},match.candidates.length===0?"Decidir depois":"Cancelar"),
+            React.createElement("button",{onClick:()=>handleIndependente(match.livroRow.id),style:{background:match.candidates.length===0?"#0F172A":"none",color:match.candidates.length===0?"#fff":"#374151",border:match.candidates.length===0?"none":"1px solid #E2E8F0",borderRadius:7,padding:"7px 16px",fontSize:12,fontWeight:match.candidates.length===0?700:400,cursor:"pointer"}},"Manter sem vínculo")
           )
         )
       ),
@@ -5270,7 +5325,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
           React.createElement("h2",null,"📒 Livro de Saída"),
           React.createElement("div",{className:"ls-hd-sub"},"Preenchido por: "+(currentUser?.nome||"—"))
         ),
-        React.createElement("button",{onClick:onClose,style:{background:"rgba(255,255,255,.1)",border:"none",color:"#fff",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:16}},"✕")
+        React.createElement("button",{onClick:pedirFechar,style:{background:"rgba(255,255,255,.1)",border:"none",color:"#fff",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:16}},"✕")
       ),
 
       // ── Tabs ──
