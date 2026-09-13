@@ -196,6 +196,7 @@
   var ESPEC_META = {
     "Exames":               { grupo: "recurso" },
     "Vaga de UTI":          { grupo: "recurso" },
+    "Vaga de enfermaria":   { grupo: "recurso" },
     "Ortopedia":            { grupo: "clinica" },
     "Cirurgia":             { grupo: "clinica" },
     "Cirurgia Pediátrica":  { grupo: "clinica" },
@@ -217,6 +218,14 @@
     "Vaga de UTI": [
       "VAGA DE UTI", "UTI", "UTI PEDIATRICA", "UTI PEDIATRIA", "UTI ADULTO",
       "VAGA UTI", "LEITO DE UTI"
+    ],
+    // Pedido de leito de enfermaria. Nao e vazamento do campo setor: assim
+    // como "UTI Pediatrica", o que a ficha do CROSS registra e o RECURSO
+    // solicitado — e um leito de enfermaria e um recurso como qualquer outro.
+    "Vaga de enfermaria": [
+      "CLINICA MEDICA", "ENFERMARIA", "ENFERMARIA ADULTO",
+      "ENFERMARIA PEDIATRICA", "VAGA DE ENFERMARIA", "VAGA ENFERMARIA",
+      "LEITO DE ENFERMARIA", "CLINICA PEDIATRICA", "ENFERMARIA ADULTA"
     ],
     "Ortopedia":   ["ORTOPEDIA", "ORTOPEDISTA", "ORTO", "TRAUMATOLOGIA"],
     "Cirurgia": [
