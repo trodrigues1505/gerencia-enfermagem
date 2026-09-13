@@ -5138,7 +5138,10 @@ function strSim(a, b) {
 
 const LS_EMPTY={data_saida:"",nome_paciente:"",idade:"",especialidade:"",destino:"",ambulancia:"",medico:"",enfermeiro:"",tecnico_auxiliar:"",hora_solic_ambulancia:"",hora_saida:"",hora_retorno:"",finalizado:false,permaneceu:false,observacao:""};
 const LS_REQUIRED=["data_saida","nome_paciente","idade","especialidade","destino","ambulancia","medico","enfermeiro","tecnico_auxiliar","hora_solic_ambulancia","hora_saida","hora_retorno"];
-const LS_H={"Content-Type":"application/json",apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`};
+// Usa H() do app: resolve o JWT da sessao a cada chamada. Header fixo com a
+// anon key fazia o PostgREST tratar as requisicoes como "anon" e as policies
+// de livro_saida (todas {authenticated}) barravam o INSERT com 42501.
+const LS_H=()=>H();
 
 function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   const [tab,setTab]=useState("novo");
@@ -5155,11 +5158,11 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
 
   async function loadPendentes(){
     setLoadingP(true);
-    try{const r=await fetch(`${SB_URL}/rest/v1/livro_saida?status_vinculo=eq.pendente&order=created_at.desc`,{headers:LS_H});const d=await r.json();setPendentes(Array.isArray(d)?d:[]);if(onPendentesChange)onPendentesChange(Array.isArray(d)?d.length:0);}catch(e){}
+    try{const r=await fetch(`${SB_URL}/rest/v1/livro_saida?status_vinculo=eq.pendente&order=created_at.desc`,{headers:LS_H()});const d=await r.json();setPendentes(Array.isArray(d)?d:[]);if(onPendentesChange)onPendentesChange(Array.isArray(d)?d.length:0);}catch(e){console.error("[LivroSaida] falha ao carregar pendentes:",e);}
     setLoadingP(false);
   }
   async function loadRemocoes(){
-    try{const r=await fetch(`${SB_URL}/rest/v1/remocoes?select=id,nome_paciente,data_solicitacao,ficha_cross&order=data_solicitacao.desc&limit=300`,{headers:LS_H});const d=await r.json();setRemocoes(Array.isArray(d)?d:[]);}catch(e){}
+    try{const r=await fetch(`${SB_URL}/rest/v1/remocoes?select=id,nome_paciente,data_solicitacao,ficha_cross&order=data_solicitacao.desc&limit=300`,{headers:LS_H()});const d=await r.json();setRemocoes(Array.isArray(d)?d:[]);}catch(e){}
   }
 
   const set=(k,v)=>{setForm(p=>({...p,[k]:v}));setErrors(p=>({...p,[k]:false}));};
@@ -5184,7 +5187,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
     setSaving(true);
     try{
       const payload={...form,finalizado:Boolean(form.finalizado),permaneceu:Boolean(form.permaneceu),preenchido_por:userId||null,status_vinculo:"pendente"};
-      const r=await fetch(`${SB_URL}/rest/v1/livro_saida`,{method:"POST",headers:{...LS_H,Prefer:"return=representation"},body:JSON.stringify(payload)});
+      const r=await fetch(`${SB_URL}/rest/v1/livro_saida`,{method:"POST",headers:{...LS_H(),Prefer:"return=representation"},body:JSON.stringify(payload)});
       if(!r.ok)throw new Error(await r.text());
       const [saved]=await r.json();
       const candidates=findMatches(form.nome_paciente,form.data_saida);
@@ -5197,7 +5200,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   async function handleVincular(livroId,remocaoId){
     setVinculando(true);
     try{
-      await fetch(`${SB_URL}/rest/v1/livro_saida?id=eq.${livroId}`,{method:"PATCH",headers:{...LS_H,Prefer:"return=minimal"},body:JSON.stringify({remocao_id:remocaoId,status_vinculo:"vinculado"})});
+      await fetch(`${SB_URL}/rest/v1/livro_saida?id=eq.${livroId}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=minimal"},body:JSON.stringify({remocao_id:remocaoId,status_vinculo:"vinculado"})});
       const livroEntry=match?.livroRow||pendentes.find(p=>p.id===livroId);
       if(livroEntry&&remocaoId){
         const u={};
@@ -5212,7 +5215,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
         if(livroEntry.observacao)u.observacao=livroEntry.observacao;
         u.finalizado=Boolean(livroEntry.finalizado);
         u.permaneceu=Boolean(livroEntry.permaneceu);
-        if(Object.keys(u).length>0)await fetch(`${SB_URL}/rest/v1/remocoes?id=eq.${remocaoId}`,{method:"PATCH",headers:{...LS_H,Prefer:"return=minimal"},body:JSON.stringify(u)});
+        if(Object.keys(u).length>0)await fetch(`${SB_URL}/rest/v1/remocoes?id=eq.${remocaoId}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=minimal"},body:JSON.stringify(u)});
       }
       setMatch(null);setForm({...LS_EMPTY});loadPendentes();
       alert("✅ Vinculado! Dados mesclados na planilha de remoção.");
@@ -5221,7 +5224,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   }
 
   async function handleIndependente(livroId){
-    await fetch(`${SB_URL}/rest/v1/livro_saida?id=eq.${livroId}`,{method:"PATCH",headers:{...LS_H,Prefer:"return=minimal"},body:JSON.stringify({status_vinculo:"independente"})});
+    await fetch(`${SB_URL}/rest/v1/livro_saida?id=eq.${livroId}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=minimal"},body:JSON.stringify({status_vinculo:"independente"})});
     setMatch(null);setForm({...LS_EMPTY});loadPendentes();
   }
 
