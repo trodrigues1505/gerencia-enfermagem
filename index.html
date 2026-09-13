@@ -5156,6 +5156,11 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   const [saving,setSaving]=useState(false);
   const [pendentes,setPendentes]=useState([]);
   const [loadingP,setLoadingP]=useState(false);
+  const [erroP,setErroP]=useState(null);
+  const [todos,setTodos]=useState([]);
+  const [loadingT,setLoadingT]=useState(false);
+  const [erroT,setErroT]=useState(null);
+  const [confirmIgnorar,setConfirmIgnorar]=useState(null);
   const [match,setMatch]=useState(null);
   const [vinculando,setVinculando]=useState(false);
   const [remocoes,setRemocoes]=useState([]);
@@ -5180,11 +5185,44 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   const pedirFechar=()=>{ if(dirty)setConfirmClose(true); else onClose(); };
 
   useEffect(()=>{loadPendentes();loadRemocoes();},[]);
+  useEffect(()=>{if(tab==="todos")loadTodos();},[tab]);
 
+  // fetch NAO lanca em 401/403 — sem checar r.ok, o corpo de erro virava []
+  // e a tela dizia "Nenhum pendente", mascarando falha como sucesso.
   async function loadPendentes(){
-    setLoadingP(true);
-    try{const r=await fetch(`${SB_URL}/rest/v1/livro_saida?status_vinculo=eq.pendente&order=created_at.desc`,{headers:LS_H()});const d=await r.json();setPendentes(Array.isArray(d)?d:[]);if(onPendentesChange)onPendentesChange(Array.isArray(d)?d.length:0);}catch(e){console.error("[LivroSaida] falha ao carregar pendentes:",e);}
+    setLoadingP(true);setErroP(null);
+    try{
+      const r=await fetch(`${SB_URL}/rest/v1/livro_saida?status_vinculo=eq.pendente&order=created_at.desc`,{headers:LS_H()});
+      if(!r.ok)throw new Error(await r.text());
+      const d=await r.json();
+      if(!Array.isArray(d))throw new Error("Resposta inesperada do servidor.");
+      setPendentes(d);if(onPendentesChange)onPendentesChange(d.length);
+    }catch(e){console.error("[LivroSaida] falha ao carregar pendentes:",e);setErroP(msgErro(e));}
     setLoadingP(false);
+  }
+
+  // Aba "Todos": sem filtro de status. Antes, qualquer registro que saisse de
+  // "pendente" ficava inalcancavel pela interface.
+  async function loadTodos(){
+    setLoadingT(true);setErroT(null);
+    try{
+      const r=await fetch(`${SB_URL}/rest/v1/livro_saida?order=created_at.desc&limit=500`,{headers:LS_H()});
+      if(!r.ok)throw new Error(await r.text());
+      const d=await r.json();
+      if(!Array.isArray(d))throw new Error("Resposta inesperada do servidor.");
+      setTodos(d);
+    }catch(e){console.error("[LivroSaida] falha ao carregar histórico:",e);setErroT(msgErro(e));}
+    setLoadingT(false);
+  }
+
+  // Devolve um registro para a fila de pendentes (desfaz "sem vínculo").
+  async function handleReabrir(livroId){
+    try{
+      const r=await fetch(`${SB_URL}/rest/v1/livro_saida?id=eq.${livroId}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=minimal"},body:JSON.stringify({status_vinculo:"pendente",remocao_id:null})});
+      if(!r.ok)throw new Error(await r.text());
+      loadPendentes();loadTodos();
+      notify("ok","Registro devolvido para Pendentes.");
+    }catch(e){console.error("[LivroSaida] falha ao reabrir:",e);notify("erro",msgErro(e));}
   }
   async function loadRemocoes(){
     try{const r=await fetch(`${SB_URL}/rest/v1/remocoes?select=id,nome_paciente,data_solicitacao,ficha_cross&order=data_solicitacao.desc&limit=300`,{headers:LS_H()});const d=await r.json();setRemocoes(Array.isArray(d)?d:[]);}catch(e){}
@@ -5252,8 +5290,8 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
     try{
       const r=await fetch(`${SB_URL}/rest/v1/livro_saida?id=eq.${livroId}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=minimal"},body:JSON.stringify({status_vinculo:"independente"})});
       if(!r.ok)throw new Error(await r.text());
-      setMatch(null);setForm({...LS_EMPTY});loadPendentes();
-      notify("ok","Registro mantido sem vínculo com a planilha.");
+      setMatch(null);setForm({...LS_EMPTY});setConfirmIgnorar(null);loadPendentes();if(tab==="todos")loadTodos();
+      notify("ok","Registro mantido sem vínculo. Continua no histórico, na aba Todos.");
     }catch(e){console.error("[LivroSaida] falha ao marcar independente:",e);notify("erro",msgErro(e));}
   }
 
@@ -5266,9 +5304,15 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   const sS=k=>({...iS(k),appearance:"none",cursor:"pointer"});
   const LBL=(t,r)=>React.createElement("label",{style:{fontSize:10,fontWeight:600,color:"#374151",textTransform:"uppercase",letterSpacing:".04em",display:"block",marginBottom:3}},t,r&&React.createElement("span",{style:{color:"#EF4444",marginLeft:2}},"*"));
   const FLD=(k,label,el)=>React.createElement("div",{key:k},LBL(label,LS_REQUIRED.includes(k)),el);
+  const ERRO_BOX=(msg,retry)=>React.createElement("div",{style:{textAlign:"center",padding:"36px 24px"}},
+    React.createElement("div",{style:{fontSize:28,marginBottom:10}},"⚠️"),
+    React.createElement("div",{style:{fontSize:13,fontWeight:700,color:"#B91C1C",marginBottom:6}},"Não foi possível carregar"),
+    React.createElement("div",{style:{fontSize:12,color:"#64748B",lineHeight:1.5,maxWidth:380,margin:"0 auto 16px"}},msg),
+    React.createElement("button",{onClick:retry,style:{background:"#0F172A",color:"#fff",border:"none",borderRadius:8,padding:"8px 18px",fontSize:12,fontWeight:700,cursor:"pointer"}},"Tentar de novo")
+  );
   const fmtDate=d=>{try{return new Date(d+"T12:00:00").toLocaleDateString("pt-BR");}catch{return d;}};
 
-  return React.createElement("div",{className:"ls-overlay",onClick:e=>{if(e.target!==e.currentTarget)return;if(match||confirmClose)return;pedirFechar();}},
+  return React.createElement("div",{className:"ls-overlay",onClick:e=>{if(e.target!==e.currentTarget)return;if(match||confirmClose||confirmIgnorar)return;pedirFechar();}},
     React.createElement("div",{className:"ls-modal",style:{position:"relative"}},
 
       // ── Confirmacao de fechamento (so quando ha texto digitado) ──
@@ -5279,6 +5323,19 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
           React.createElement("div",{style:{display:"flex",gap:8,justifyContent:"flex-end"}},
             React.createElement("button",{onClick:()=>setConfirmClose(false),style:{background:"#0F172A",color:"#fff",border:"none",borderRadius:8,padding:"8px 18px",fontSize:12,fontWeight:700,cursor:"pointer"}},"Continuar preenchendo"),
             React.createElement("button",{onClick:()=>{setConfirmClose(false);onClose();},style:{background:"none",border:"1px solid #FECACA",color:"#DC2626",borderRadius:8,padding:"8px 18px",fontSize:12,fontWeight:600,cursor:"pointer"}},"Descartar")
+          )
+        )
+      ),
+
+      // ── Confirmacao de "Sem vinculo" ──
+      confirmIgnorar&&React.createElement("div",{className:"ls-match-overlay"},
+        React.createElement("div",{className:"ls-match-box",style:{maxWidth:420}},
+          React.createElement("div",{style:{fontWeight:700,fontSize:15,marginBottom:6}},"Marcar como sem vínculo?"),
+          React.createElement("div",{style:{fontSize:12,color:"#64748B",lineHeight:1.5,marginBottom:18}},
+            `"${confirmIgnorar.nome_paciente}" sai da fila de pendentes e deixa de ser cruzado com a planilha de remoção. O registro continua salvo e pode ser reaberto na aba Todos.`),
+          React.createElement("div",{style:{display:"flex",gap:8,justifyContent:"flex-end"}},
+            React.createElement("button",{onClick:()=>setConfirmIgnorar(null),style:{background:"none",border:"1px solid #E2E8F0",color:"#374151",borderRadius:8,padding:"8px 18px",fontSize:12,cursor:"pointer"}},"Cancelar"),
+            React.createElement("button",{onClick:()=>handleIndependente(confirmIgnorar.id),style:{background:"#0F172A",color:"#fff",border:"none",borderRadius:8,padding:"8px 18px",fontSize:12,fontWeight:700,cursor:"pointer"}},"Confirmar")
           )
         )
       ),
@@ -5330,7 +5387,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
 
       // ── Tabs ──
       React.createElement("div",{style:{display:"flex",borderBottom:"2px solid #F1F5F9",flexShrink:0,background:"#F8FAFC"}},
-        [["novo","📝 Novo Registro"],["pendentes",`⏳ Pendentes (${pendentes.length})`]].map(([id,label])=>
+        [["novo","📝 Novo Registro"],["pendentes",`⏳ Pendentes (${erroP?"!":pendentes.length})`],["todos","📚 Todos"]].map(([id,label])=>
           React.createElement("button",{key:id,onClick:()=>setTab(id),style:{flex:1,padding:"10px 16px",background:"none",border:"none",borderBottom:`3px solid ${tab===id?"#3B82F6":"transparent"}`,color:tab===id?"#1D4ED8":"#64748B",fontWeight:tab===id?700:500,fontSize:12,cursor:"pointer",transition:"all .15s"}},label)
         )
       ),
@@ -5405,10 +5462,39 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
         ),
 
         // TAB PENDENTES
+        tab==="todos"&&React.createElement("div",null,
+          loadingT
+            ?React.createElement("div",{style:{textAlign:"center",padding:32,color:"#94A3B8"}},"Carregando…")
+            :erroT
+              ?ERRO_BOX(erroT,loadTodos)
+              :todos.length===0
+                ?React.createElement("div",{style:{textAlign:"center",padding:48,color:"#94A3B8"}},
+                    React.createElement("div",{style:{fontSize:32,marginBottom:8}},"📚"),
+                    React.createElement("div",{style:{fontSize:14,fontWeight:600}},"Nenhum registro no Livro"))
+                :todos.map(p=>React.createElement("div",{key:p.id,className:"ls-pending-card"},
+                    React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}},
+                      React.createElement("div",{style:{minWidth:0}},
+                        React.createElement("div",{style:{display:"flex",alignItems:"center",gap:7,marginBottom:3}},
+                          React.createElement("span",{style:{fontWeight:700,fontSize:13}},p.nome_paciente),
+                          React.createElement("span",{style:{flexShrink:0,borderRadius:99,padding:"2px 8px",fontSize:10,fontWeight:700,
+                            background:p.status_vinculo==="vinculado"?"#DCFCE7":p.status_vinculo==="pendente"?"#FEF3C7":"#F1F5F9",
+                            color:p.status_vinculo==="vinculado"?"#15803D":p.status_vinculo==="pendente"?"#B45309":"#64748B"}},
+                            p.status_vinculo==="vinculado"?"Vinculado":p.status_vinculo==="pendente"?"Pendente":"Sem vínculo")
+                        ),
+                        React.createElement("div",{style:{fontSize:11,color:"#64748B"}},fmtDate(p.data_saida)," · ",p.idade," · ",p.especialidade," → ",p.destino),
+                        React.createElement("div",{style:{fontSize:11,color:"#94A3B8",marginTop:2}},"🕐 Saída: ",p.hora_saida||"—"," · ",p.ambulancia," · Enf: ",p.enfermeiro)
+                      ),
+                      p.status_vinculo==="independente"&&React.createElement("button",{onClick:()=>handleReabrir(p.id),style:{flexShrink:0,background:"none",border:"1px solid #E2E8F0",color:"#1D4ED8",borderRadius:7,padding:"5px 11px",fontSize:11,fontWeight:600,cursor:"pointer"}},"↩ Reabrir")
+                    )
+                  ))
+        ),
+
         tab==="pendentes"&&React.createElement("div",null,
           loadingP
             ?React.createElement("div",{style:{textAlign:"center",padding:32,color:"#94A3B8"}},"Carregando…")
-            :pendentes.length===0
+            :erroP
+              ?ERRO_BOX(erroP,loadPendentes)
+              :pendentes.length===0
               ?React.createElement("div",{style:{textAlign:"center",padding:48,color:"#94A3B8"}},
                   React.createElement("div",{style:{fontSize:32,marginBottom:8}},"✅"),
                   React.createElement("div",{style:{fontSize:14,fontWeight:600}},"Nenhum pendente"),
@@ -5423,7 +5509,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                     ),
                     React.createElement("div",{style:{display:"flex",gap:6,flexShrink:0,marginLeft:12}},
                       React.createElement("button",{onClick:()=>handleVincularPendente(p),style:{background:"#EFF6FF",border:"1px solid #BFDBFE",color:"#1D4ED8",borderRadius:7,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}},"🔗 Vincular"),
-                      React.createElement("button",{onClick:()=>handleIndependente(p.id),style:{background:"none",border:"1px solid #E2E8F0",color:"#94A3B8",borderRadius:7,padding:"5px 10px",fontSize:11,cursor:"pointer"}},"Ignorar")
+                      React.createElement("button",{onClick:()=>setConfirmIgnorar(p),style:{background:"none",border:"1px solid #E2E8F0",color:"#64748B",borderRadius:7,padding:"5px 10px",fontSize:11,cursor:"pointer"}},"Sem vínculo")
                     )
                   )
                 ))
@@ -5432,7 +5518,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
 
       // ── Footer ──
       React.createElement("div",{className:"ls-ft"},
-        React.createElement("div",{style:{fontSize:11,color:"#94A3B8"}},tab==="novo"?"Campos com * são obrigatórios":`${pendentes.length} registro(s) aguardando vinculação`),
+        React.createElement("div",{style:{fontSize:11,color:"#94A3B8"}},tab==="novo"?"Campos com * são obrigatórios":tab==="todos"?`${todos.length} registro(s) no Livro`:`${pendentes.length} registro(s) aguardando vinculação`),
         tab==="novo"&&React.createElement("button",{onClick:handleSalvar,disabled:saving,style:{background:"#0F172A",color:"#fff",border:"none",borderRadius:9,padding:"9px 24px",fontSize:13,fontWeight:700,cursor:saving?"not-allowed":"pointer",opacity:saving?.7:1}},saving?"Salvando…":"💾 Salvar Registro")
       )
     )
@@ -6871,4 +6957,3 @@ ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.c
 </script>
 </body>
 </html>
-  
