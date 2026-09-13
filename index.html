@@ -2526,14 +2526,23 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub }) {
     return { n: p, base: vinc.length, pct: vinc.length ? p / vinc.length * 100 : 0 };
   }, [dados]);
 
+  // Percorre os registros (nao os agregados) para levar o id junto: sem ele
+  // o aviso diz que existe um valor invalido mas nao onde corrigir.
   const pendencias = useMemo(() => {
+    if (!C) return [];
     const out = [];
-    [["especialidade", gEspec], ["instituicao_destino", gHosp],
-     ["setor", gSetor], ["status", gStatus]].forEach(([campo, g]) => {
-      [...new Set(g.naoClassificados)].forEach(v => out.push({ campo, valor: v }));
+    ["especialidade", "instituicao_destino", "setor", "status"].forEach(campo => {
+      dados.forEach(r => {
+        const res = C.classificar(campo, r[campo]);
+        if (res.canonico === C.NAO_CLASSIFICADO)
+          out.push({ id: r.id, campo, valor: r[campo],
+                     paciente: r.nome_paciente, ficha: r.ficha_cross,
+                     data: r.data_solicitacao,
+                     sugestao: res.vazamento ? res.vazamento.pertenceA.join(" ou ") : null });
+      });
     });
     return out;
-  }, [gEspec, gHosp, gSetor, gStatus]);
+  }, [dados]);
 
   /* ── Pulso operacional (Kanban) ───────────────────────────────────────── */
   const fila = useMemo(() => {
@@ -2543,6 +2552,48 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub }) {
     const emerg = cards.filter(c => c.grav === "emergencia").length;
     return { porCol, semHosp, emerg, total: cards.length };
   }, [cards, cols]);
+
+  /* ═══ Animação de entrada ═════════════════════════════════════════════
+   * Números sobem até o valor e barras preenchem ao montar. easeOutCubic:
+   * começa rápido e desacelera — dá a sensação de chegar ao número, em vez
+   * de contar mecanicamente. ~900ms, curto o bastante para não atrasar a
+   * leitura de quem só quer conferir um dado.
+   * Respeita prefers-reduced-motion: quem pediu menos movimento no sistema
+   * recebe o valor final direto, sem animação nenhuma.
+   */
+  const semMovimento = typeof window !== "undefined" && window.matchMedia
+    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function useContagem(alvo, dur = 900) {
+    const [v, setV] = useState(semMovimento ? alvo : 0);
+    useEffect(() => {
+      if (semMovimento || typeof alvo !== "number" || !isFinite(alvo)) { setV(alvo); return; }
+      let raf, t0 = null;
+      const passo = t => {
+        if (t0 === null) t0 = t;
+        const p = Math.min((t - t0) / dur, 1);
+        setV(alvo * (1 - Math.pow(1 - p, 3)));
+        if (p < 1) raf = requestAnimationFrame(passo);
+      };
+      raf = requestAnimationFrame(passo);
+      return () => cancelAnimationFrame(raf);
+    }, [alvo, dur]);
+    return v;
+  }
+
+  // Dispara uma vez, logo após a montagem: as barras saem de 0 e crescem.
+  const [entrou, setEntrou] = useState(semMovimento);
+  useEffect(() => {
+    if (semMovimento) return;
+    const t = setTimeout(() => setEntrou(true), 40);
+    return () => clearTimeout(t);
+  }, []);
+
+  const Num = ({ valor, sufixo = "", casas = 0 }) => {
+    const v = useContagem(typeof valor === "number" ? valor : null);
+    if (typeof valor !== "number") return valor;
+    return /*#__PURE__*/React.createElement(React.Fragment, null, v.toFixed(casas), sufixo);
+  };
 
   /* ═══ Primitivas visuais ══════════════════════════════════════════════ */
   const Card = ({ children, style }) => /*#__PURE__*/React.createElement("div", {
@@ -2585,11 +2636,14 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub }) {
         }, tag)),
       /*#__PURE__*/React.createElement("span", {
         style: { fontSize: 11.5, color: "#64748B", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }
-      }, n, /*#__PURE__*/React.createElement("span", { style: { color: "#CBD5E1" } }, "  ", pct.toFixed(0), "%"))),
-    /*#__PURE__*/React.createElement("div", { style: { height: 6, background: "#F1F5F9", borderRadius: 99 } },
+      }, /*#__PURE__*/React.createElement(Num, { valor: n }),
+         /*#__PURE__*/React.createElement("span", { style: { color: "#CBD5E1" } },
+           "  ", /*#__PURE__*/React.createElement(Num, { valor: pct, sufixo: "%" })))),
+    /*#__PURE__*/React.createElement("div", { style: { height: 6, background: "#F1F5F9", borderRadius: 99, overflow: "hidden" } },
       /*#__PURE__*/React.createElement("div", {
-        style: { height: "100%", width: `${max ? (n / max * 100) : 0}%`, background: cor,
-                 borderRadius: 99, transition: "width .25s ease" } }))
+        style: { height: "100%", width: entrou ? `${max ? (n / max * 100) : 0}%` : "0%",
+                 background: cor, borderRadius: 99,
+                 transition: "width .75s cubic-bezier(.22,.9,.3,1)" } }))
   );
 
   const Vazio = ({ children }) => /*#__PURE__*/React.createElement("div", {
@@ -2604,7 +2658,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub }) {
     }, label),
     /*#__PURE__*/React.createElement("div", {
       style: { fontSize: 27, fontWeight: 700, color: cor || "#0F172A", lineHeight: 1, fontVariantNumeric: "tabular-nums" }
-    }, valor),
+    }, typeof valor === "number" ? /*#__PURE__*/React.createElement(Num, { valor }) : valor),
     sub && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10.5, color: "#94A3B8", marginTop: 6 } }, sub)
   );
 
@@ -2692,14 +2746,15 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub }) {
           }, c.label),
           /*#__PURE__*/React.createElement("div", {
             style: { fontSize: 23, fontWeight: 700, color: c.accent || "#64748B", lineHeight: 1 }
-          }, fila.porCol[c.id] || 0))),
+          }, /*#__PURE__*/React.createElement(Num, { valor: fila.porCol[c.id] || 0 })))),
         fila.semHosp > 0 && /*#__PURE__*/React.createElement(Card, {
           key: "sh", style: { padding: "13px 15px", borderColor: "#FDE68A", background: "#FFFBEB" }
         },
           /*#__PURE__*/React.createElement("div", {
             style: { fontSize: 10, fontWeight: 600, color: "#B45309", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 }
           }, "Sem hospital"),
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: 23, fontWeight: 700, color: "#B45309", lineHeight: 1 } }, fila.semHosp)))
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 23, fontWeight: 700, color: "#B45309", lineHeight: 1 } },
+            /*#__PURE__*/React.createElement(Num, { valor: fila.semHosp }))))
     ),
 
     /* ══ KPIs do período (remocoes) ══ */
@@ -2739,8 +2794,9 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub }) {
       },
         /*#__PURE__*/React.createElement("div", { style: { fontSize: 9.5, color: "#94A3B8", fontVariantNumeric: "tabular-nums" } }, s.n),
         /*#__PURE__*/React.createElement("div", {
-          style: { width: "100%", height: `${s.n / maxSerie * 92}px`, minHeight: 3,
-                   background: "#3B82F6", borderRadius: "4px 4px 2px 2px", opacity: .85 } }),
+          style: { width: "100%", height: entrou ? `${s.n / maxSerie * 92}px` : "0px", minHeight: entrou ? 3 : 0,
+                   background: "#3B82F6", borderRadius: "4px 4px 2px 2px", opacity: .85,
+                   transition: "height .7s cubic-bezier(.22,.9,.3,1)" } }),
         /*#__PURE__*/React.createElement("div", {
           style: { fontSize: 8.5, color: "#CBD5E1", whiteSpace: "nowrap", overflow: "hidden" }
         }, rotuloSerie(s.k)))))
@@ -2762,7 +2818,8 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub }) {
             const it = gGrav.itens.find(i => i.canonico === g); if (!it) return null;
             return /*#__PURE__*/React.createElement("div", {
               key: g, title: `${g}: ${it.n} (${it.pct.toFixed(0)}%)`,
-              style: { width: `${it.pct}%`, background: C.GRAVIDADE_COR[g] } });
+              style: { width: entrou ? `${it.pct}%` : "0%", background: C.GRAVIDADE_COR[g],
+                       transition: "width .8s cubic-bezier(.22,.9,.3,1)" } });
           })),
           (C ? C.GRAVIDADE_ORDEM : []).map(g => {
             const it = gGrav.itens.find(i => i.canonico === g); if (!it) return null;
@@ -2840,19 +2897,38 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub }) {
         onClick: () => setVerPendencias(v => !v)
       },
         /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#92400E" } },
-          pendencias.length, " valor", pendencias.length !== 1 ? "es" : "", " não classificado", pendencias.length !== 1 ? "s" : ""),
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: "#B45309" } }, verPendencias ? "ocultar" : "ver")),
+          pendencias.length, " valor", pendencias.length !== 1 ? "es" : "", " a corrigir"),
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: "#B45309" } },
+          verPendencias ? "ocultar" : "ver e corrigir")),
       verPendencias && /*#__PURE__*/React.createElement("div", { style: { marginTop: 12 } },
         /*#__PURE__*/React.createElement("div", {
           style: { fontSize: 11, color: "#78350F", marginBottom: 10, lineHeight: 1.55 }
-        }, "Valores que não batem com nenhuma categoria conhecida. Alguns são digitação no campo errado — corrija na planilha de remoções para eles entrarem nos indicadores."),
-        pendencias.map((p, i) => /*#__PURE__*/React.createElement("div", {
-          key: i, style: { fontSize: 11.5, color: "#92400E", padding: "5px 0", borderTop: i ? "1px solid #FDE68A" : "none" }
+        }, "Cada item abre a planilha na linha exata. Enquanto não forem corrigidos, ficam de fora dos indicadores."),
+        pendencias.map((p, i) => /*#__PURE__*/React.createElement("a", {
+          key: i,
+          href: `remocao.html?foco=${encodeURIComponent(p.id)}&campo=${encodeURIComponent(p.campo)}`,
+          style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                   fontSize: 11.5, color: "#92400E", padding: "8px 10px", textDecoration: "none",
+                   borderTop: i ? "1px solid #FDE68A" : "none", borderRadius: 6,
+                   transition: "background .15s" },
+          onMouseEnter: e => e.currentTarget.style.background = "#FEF3C7",
+          onMouseLeave: e => e.currentTarget.style.background = "transparent"
         },
           /*#__PURE__*/React.createElement("code", {
-            style: { background: "#FEF3C7", borderRadius: 4, padding: "1px 5px", fontSize: 11 }
+            style: { background: "#FEF3C7", borderRadius: 4, padding: "2px 6px", fontSize: 11, fontWeight: 600 }
           }, p.valor),
-          /*#__PURE__*/React.createElement("span", { style: { color: "#B45309", marginLeft: 8 } }, "em ", p.campo))))),
+          /*#__PURE__*/React.createElement("span", { style: { color: "#B45309" } }, "em ", p.campo),
+          p.sugestao && /*#__PURE__*/React.createElement("span", {
+            style: { fontSize: 10.5, color: "#9A3412", background: "#FFEDD5",
+                     border: "1px solid #FED7AA", borderRadius: 5, padding: "1px 6px" }
+          }, "parece ser de ", p.sugestao),
+          /*#__PURE__*/React.createElement("span", {
+            style: { marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", color: "#A16207", fontSize: 10.5 }
+          },
+            p.paciente && /*#__PURE__*/React.createElement("span", null, p.paciente),
+            p.ficha && /*#__PURE__*/React.createElement("span", { style: { color: "#CA8A04" } }, p.ficha),
+            /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, color: "#B45309" } }, "corrigir →"))))))
+    ,
 
     /* Rodapé honesto sobre a base */
     /*#__PURE__*/React.createElement("div", {
@@ -6737,4 +6813,3 @@ ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.c
 </script>
 </body>
 </html>
-  
