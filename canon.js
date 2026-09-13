@@ -225,7 +225,10 @@
     "Vaga de enfermaria": [
       "CLINICA MEDICA", "ENFERMARIA", "ENFERMARIA ADULTO",
       "ENFERMARIA PEDIATRICA", "VAGA DE ENFERMARIA", "VAGA ENFERMARIA",
-      "LEITO DE ENFERMARIA", "CLINICA PEDIATRICA", "ENFERMARIA ADULTA"
+      "LEITO DE ENFERMARIA", "CLINICA PEDIATRICA", "ENFERMARIA ADULTA",
+      // "clinico geral" e sinonimo de "clinica medica" no preenchimento
+      "CLINICO GERAL", "CLINICA GERAL", "CLINICO", "MEDICO CLINICO",
+      "AVALIACAO CLINICA"
     ],
     "Ortopedia":   ["ORTOPEDIA", "ORTOPEDISTA", "ORTO", "TRAUMATOLOGIA"],
     "Cirurgia": [
@@ -249,6 +252,9 @@
       "AVALIACAO PRIMARIA PARA PACIENTE COM AVC", "AVC"
     ],
     "Nefrologia":  ["NEFROLOGIA", "NEFROLOGISTA", "HEMODIALISE", "DIALISE"],
+    // Avaliacao por clinico — especialidade medica, NAO pedido de leito.
+    // "CLINICA MEDICA" sozinho e vaga de enfermaria (ver acima); "CLINICO
+    // GERAL" e consulta. Pedidos diferentes, categorias diferentes.
     "Urologia":    ["UROLOGIA", "UROLOGISTA"],
     "Obstetrícia": [
       "OBSTETRICIA", "OBSTETRICIA ALTO RISCO", "GESTANTE ALTO RISCO",
