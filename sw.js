@@ -1,48 +1,85 @@
-const CACHE = 'ge-v2';
-const ASSETS = [
-  '/gerencia-enfermagem/',
-  '/gerencia-enfermagem/index.html',
-  '/gerencia-enfermagem/manifest.json',
-];
+// Gerência de Enfermagem — service worker
+// IMPORTANTE: incremente APP_VERSION a cada deploy.
+// O mesmo número deve estar no index.html (const APP_VERSION).
+const APP_VERSION = '2026.09.14-1';
+const CACHE = 'ge-' + APP_VERSION;
+
+// Caminhos relativos ao escopo do SW — funcionam em qualquer subpasta.
+const ASSETS = ['./', './index.html', './manifest.json', './canon.js'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE)
-      .then(c => c.addAll(ASSETS))
-      .then(() => self.skipWaiting())
-  );
+  e.waitUntil((async () => {
+    const c = await caches.open(CACHE);
+    // addAll é atômico: um 404 derruba o install inteiro.
+    // Individual + allSettled deixa o SW instalar mesmo se um asset faltar.
+    await Promise.allSettled(ASSETS.map(u => c.add(new Request(u, { cache: 'reload' }))));
+    // NÃO chamamos skipWaiting aqui: o app pergunta ao usuário antes de trocar.
+  })());
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
+  e.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)));
+    await self.clients.claim();
+  })());
+});
+
+// O app manda esta mensagem quando o usuário aceita atualizar.
+self.addEventListener('message', e => {
+  if (e.data === 'SKIP_WAITING' || (e.data && e.data.type === 'SKIP_WAITING')) {
+    self.skipWaiting();
+  }
+  if (e.data && e.data.type === 'GET_VERSION') {
+    e.source && e.source.postMessage({ type: 'VERSION', version: APP_VERSION });
+  }
 });
 
 self.addEventListener('fetch', e => {
-  const url = e.request.url;
+  const req = e.request;
+  const url = req.url;
 
-  // Ignora schemes não suportados pelo Cache API
   if (!url.startsWith('http://') && !url.startsWith('https://')) return;
+  if (req.method !== 'GET') return;
 
-  // Supabase sempre vai para a rede
+  // A página de reset nunca pode ser servida do cache.
+  if (new URL(url).pathname.endsWith('/reset.html')) return;
+
+  // Supabase sempre na rede.
   if (url.includes('supabase.co')) return;
 
-  // CDNs externos (React, html2canvas) — cache com fallback de rede
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      if (cached) return cached;
-      return fetch(e.request).then(res => {
-        if (res.ok && e.request.method === 'GET') {
+  const isNavigation =
+    req.mode === 'navigate' ||
+    req.destination === 'document' ||
+    new URL(url).pathname.endsWith('/index.html');
+
+  // O app inteiro vive no index.html: network-first, cache só como fallback offline.
+  if (isNavigation) {
+    e.respondWith((async () => {
+      try {
+        const res = await fetch(req);
+        if (res && res.ok) {
           const clone = res.clone();
-          caches.open(CACHE).then(c => {
-            try { c.put(e.request, clone); } catch(err) {}
-          });
+          caches.open(CACHE).then(c => c.put('./index.html', clone)).catch(() => {});
         }
         return res;
-      });
-    })
-  );
+      } catch (err) {
+        const cached = await caches.match('./index.html');
+        return cached || Response.error();
+      }
+    })());
+    return;
+  }
+
+  // Demais assets (CDNs, ícones): cache-first com atualização em segundo plano.
+  e.respondWith((async () => {
+    const cached = await caches.match(req);
+    if (cached) return cached;
+    const res = await fetch(req);
+    if (res && res.ok) {
+      const clone = res.clone();
+      caches.open(CACHE).then(c => { try { c.put(req, clone); } catch (err) {} });
+    }
+    return res;
+  })());
 });
