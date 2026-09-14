@@ -2,7 +2,7 @@
 // A fonte de verdade da versao e version.json. Este valor so nomeia o cache;
 // mantenha-o igual ao de version.json por clareza, mas quem dispara o aviso de
 // atualizacao no app e sempre o version.json.
-const APP_VERSION = '2026.09.14-2';
+const APP_VERSION = '2026.09.14-3';
 const CACHE = 'ge-' + APP_VERSION;
 
 // Caminhos relativos ao escopo do SW — funcionam em qualquer subpasta.
