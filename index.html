@@ -5311,6 +5311,44 @@ const LS_REQUIRED=["data_saida","nome_paciente","idade","especialidade","destino
 // de livro_saida (todas {authenticated}) barravam o INSERT com 42501.
 const LS_H=()=>H();
 
+// ─── Auditoria ───────────────────────────────────────────────────────────────
+// A autoria e carimbada por trigger no banco (auth.uid() -> public.users).
+// O cliente apenas exibe: nada aqui e fonte de verdade.
+const LS_ACOES={
+  criou:{txt:"Lancou o registro",ico:"\u270E",cor:"#0F172A"},
+  vinculou:{txt:"Vinculou a remocao",ico:"\u{1F517}",cor:"#1D4ED8"},
+  desvinculou:{txt:"Desfez o vinculo",ico:"\u21A9",cor:"#B45309"},
+  sem_vinculo:{txt:"Marcou como sem vinculo",ico:"\u2014",cor:"#64748B"},
+  reabriu:{txt:"Reabriu para pendentes",ico:"\u21A9",cor:"#B45309"},
+  editou:{txt:"Alterou o registro",ico:"\u270E",cor:"#64748B"}
+};
+function lsAutor(p){
+  if(!p)return null;
+  const nome=(p.preenchido_por_nome||"").trim();
+  if(!nome)return null;
+  const reg=[(p.preenchido_por_tipo||"").trim(),(p.preenchido_por_registro||"").trim()].filter(Boolean).join(" ");
+  return {nome,reg};
+}
+function lsQuando(iso){
+  if(!iso)return "";
+  try{
+    const d=new Date(iso);
+    return d.toLocaleDateString("pt-BR")+" "+d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+  }catch(e){return "";}
+}
+// Linha de assinatura exibida em cada card do livro.
+function LS_ASSINATURA(p){
+  const a=lsAutor(p);
+  return React.createElement("div",{style:{display:"flex",alignItems:"center",gap:6,marginTop:6,fontSize:11,color:a?"#475569":"#B91C1C",fontWeight:600}},
+    React.createElement("span",{style:{opacity:.7}},"\u{1F464}"),
+    a
+      ?React.createElement("span",null,a.nome,a.reg?React.createElement("span",{style:{fontWeight:500,color:"#64748B"}}," \u00B7 ",a.reg):null)
+      :React.createElement("span",null,"Autoria nao registrada"),
+    p.preenchido_em?React.createElement("span",{style:{fontWeight:500,color:"#94A3B8"}}," \u00B7 ",lsQuando(p.preenchido_em)):null
+  );
+}
+
+
 function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   const [tab,setTab]=useState("novo");
   const [form,setForm]=useState({...LS_EMPTY});
@@ -5328,6 +5366,8 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   const [remocoes,setRemocoes]=useState([]);
   const [toast,setToast]=useState(null);
   const [confirmClose,setConfirmClose]=useState(false);
+  const [auditoria,setAuditoria]=useState(null);   // {registro, linhas|null, erro|null}
+  const [loadingA,setLoadingA]=useState(false);
 
   const notify=(tipo,texto)=>setToast({tipo,texto});
   useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(null),4500);return()=>clearTimeout(t);},[toast]);
@@ -5386,6 +5426,24 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
       notify("ok","Registro devolvido para Pendentes.");
     }catch(e){console.error("[LivroSaida] falha ao reabrir:",e);notify("erro",msgErro(e));}
   }
+  // Historico completo de um registro. Somente leitura: a tabela de log nao
+  // aceita INSERT/UPDATE/DELETE de cliente nenhum (ver auditoria-livro.sql).
+  async function abrirAuditoria(registro){
+    setAuditoria({registro,linhas:null,erro:null});
+    setLoadingA(true);
+    try{
+      const r=await fetch(`${SB_URL}/rest/v1/livro_saida_log?livro_id=eq.${registro.id}&order=criado_em.asc`,{headers:LS_H()});
+      if(!r.ok)throw new Error(await r.text());
+      const d=await r.json();
+      if(!Array.isArray(d))throw new Error("Resposta inesperada do servidor.");
+      setAuditoria({registro,linhas:d,erro:null});
+    }catch(e){
+      console.error("[LivroSaida] falha ao carregar auditoria:",e);
+      setAuditoria({registro,linhas:null,erro:msgErro(e)});
+    }
+    setLoadingA(false);
+  }
+
   async function loadRemocoes(){
     try{const r=await fetch(`${SB_URL}/rest/v1/remocoes?select=id,nome_paciente,data_solicitacao,ficha_cross&order=data_solicitacao.desc&limit=300`,{headers:LS_H()});const d=await r.json();setRemocoes(Array.isArray(d)?d:[]);}catch(e){}
   }
@@ -5644,9 +5702,13 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                             p.status_vinculo==="vinculado"?"Vinculado":p.status_vinculo==="pendente"?"Pendente":"Sem vínculo")
                         ),
                         React.createElement("div",{style:{fontSize:11,color:"#64748B"}},fmtDate(p.data_saida)," · ",p.idade," · ",p.especialidade," → ",p.destino),
-                        React.createElement("div",{style:{fontSize:11,color:"#94A3B8",marginTop:2}},"🕐 Saída: ",p.hora_saida||"—"," · ",p.ambulancia," · Enf: ",p.enfermeiro)
+                        React.createElement("div",{style:{fontSize:11,color:"#94A3B8",marginTop:2}},"🕐 Saída: ",p.hora_saida||"—"," · ",p.ambulancia," · Enf: ",p.enfermeiro),
+                        LS_ASSINATURA(p)
                       ),
-                      p.status_vinculo==="independente"&&React.createElement("button",{onClick:()=>handleReabrir(p.id),style:{flexShrink:0,background:"none",border:"1px solid #E2E8F0",color:"#1D4ED8",borderRadius:7,padding:"5px 11px",fontSize:11,fontWeight:600,cursor:"pointer"}},"↩ Reabrir")
+                      React.createElement("div",{style:{display:"flex",gap:6,flexShrink:0,alignItems:"center"}},
+                        React.createElement("button",{onClick:()=>abrirAuditoria(p),title:"Ver historico de auditoria",style:{background:"none",border:"1px solid #E2E8F0",color:"#475569",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}},"\u{1F5D2} Auditoria"),
+                        p.status_vinculo==="independente"&&React.createElement("button",{onClick:()=>handleReabrir(p.id),style:{flexShrink:0,background:"none",border:"1px solid #E2E8F0",color:"#1D4ED8",borderRadius:7,padding:"5px 11px",fontSize:11,fontWeight:600,cursor:"pointer"}},"↩ Reabrir")
+                    )
                     )
                   ))
         ),
@@ -5667,14 +5729,63 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                     React.createElement("div",null,
                       React.createElement("div",{style:{fontWeight:700,fontSize:13}},p.nome_paciente),
                       React.createElement("div",{style:{fontSize:11,color:"#64748B",marginTop:2}},fmtDate(p.data_saida)," · ",p.idade," · ",p.especialidade," → ",p.destino),
-                      React.createElement("div",{style:{fontSize:11,color:"#94A3B8",marginTop:2}},"🕐 Saída: ",p.hora_saida||"—"," · ",p.ambulancia," · Enf: ",p.enfermeiro)
+                      React.createElement("div",{style:{fontSize:11,color:"#94A3B8",marginTop:2}},"🕐 Saída: ",p.hora_saida||"—"," · ",p.ambulancia," · Enf: ",p.enfermeiro),
+                      LS_ASSINATURA(p)
                     ),
-                    React.createElement("div",{style:{display:"flex",gap:6,flexShrink:0,marginLeft:12}},
+                    React.createElement("div",{style:{display:"flex",gap:6,flexShrink:0,marginLeft:12,alignItems:"center"}},
+                      React.createElement("button",{onClick:()=>abrirAuditoria(p),title:"Ver historico de auditoria",style:{background:"none",border:"1px solid #E2E8F0",color:"#475569",borderRadius:7,padding:"5px 10px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}},"\u{1F5D2}"),
                       React.createElement("button",{onClick:()=>handleVincularPendente(p),style:{background:"#EFF6FF",border:"1px solid #BFDBFE",color:"#1D4ED8",borderRadius:7,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}},"🔗 Vincular"),
                       React.createElement("button",{onClick:()=>setConfirmIgnorar(p),style:{background:"none",border:"1px solid #E2E8F0",color:"#64748B",borderRadius:7,padding:"5px 10px",fontSize:11,cursor:"pointer"}},"Sem vínculo")
                     )
                   )
                 ))
+        )
+      ),
+
+      // ── Modal de auditoria ──
+      auditoria&&React.createElement("div",{
+        onClick:e=>{if(e.target===e.currentTarget)setAuditoria(null);},
+        style:{position:"absolute",inset:0,background:"rgba(15,23,42,.45)",backdropFilter:"blur(2px)",display:"flex",alignItems:"center",justifyContent:"center",padding:20,zIndex:60}},
+        React.createElement("div",{style:{background:"#fff",borderRadius:16,width:"min(520px,100%)",maxHeight:"86%",display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 24px 60px -20px rgba(15,23,42,.5)"}},
+          React.createElement("div",{style:{padding:"20px 22px 16px",borderBottom:"1px solid #F1F5F9"}},
+            React.createElement("div",{style:{fontSize:11,fontWeight:700,letterSpacing:".06em",textTransform:"uppercase",color:"#94A3B8",marginBottom:6}},"Auditoria do registro"),
+            React.createElement("div",{style:{fontSize:16,fontWeight:700,color:"#0F172A"}},auditoria.registro.nome_paciente),
+            React.createElement("div",{style:{fontSize:12,color:"#64748B",marginTop:2}},fmtDate(auditoria.registro.data_saida)," \u00B7 ",auditoria.registro.destino||"\u2014")
+          ),
+          React.createElement("div",{style:{padding:"18px 22px",overflowY:"auto",flex:1}},
+            loadingA
+              ?React.createElement("div",{style:{textAlign:"center",padding:28,color:"#94A3B8",fontSize:13}},"Carregando hist\u00F3rico\u2026")
+              :auditoria.erro
+                ?React.createElement("div",{style:{background:"#FEF2F2",border:"1px solid #FCA5A5",borderRadius:10,padding:"12px 14px",fontSize:12,color:"#DC2626"}},auditoria.erro)
+                :(auditoria.linhas||[]).length===0
+                  ?React.createElement("div",{style:{textAlign:"center",padding:28,color:"#94A3B8"}},
+                      React.createElement("div",{style:{fontSize:26,marginBottom:6}},"\u{1F5D2}"),
+                      React.createElement("div",{style:{fontSize:13,fontWeight:600,color:"#64748B"}},"Sem hist\u00F3rico registrado"),
+                      React.createElement("div",{style:{fontSize:12,marginTop:4}},"Lan\u00E7amento anterior \u00E0 ativa\u00E7\u00E3o da auditoria."))
+                  :React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:0}},
+                      (auditoria.linhas||[]).map((l,i,arr)=>{
+                        const meta=LS_ACOES[l.acao]||LS_ACOES.editou;
+                        return React.createElement("div",{key:l.id,style:{display:"flex",gap:12,alignItems:"flex-start"}},
+                          React.createElement("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",flexShrink:0,alignSelf:"stretch"}},
+                            React.createElement("div",{style:{width:26,height:26,borderRadius:99,background:"#F8FAFC",border:"1px solid #E2E8F0",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12}},meta.ico),
+                            i<arr.length-1&&React.createElement("div",{style:{flex:1,width:2,background:"#F1F5F9",minHeight:14}})
+                          ),
+                          React.createElement("div",{style:{paddingBottom:i<arr.length-1?16:0,minWidth:0}},
+                            React.createElement("div",{style:{fontSize:13,fontWeight:700,color:meta.cor}},meta.txt),
+                            React.createElement("div",{style:{fontSize:12,color:"#334155",marginTop:2,fontWeight:600}},
+                              l.autor_nome||"Autor n\u00E3o identificado",
+                              (l.autor_tipo||l.autor_registro)?React.createElement("span",{style:{fontWeight:500,color:"#64748B"}}," \u00B7 ",[l.autor_tipo,l.autor_registro].filter(Boolean).join(" ")):null
+                            ),
+                            React.createElement("div",{style:{fontSize:11,color:"#94A3B8",marginTop:2}},lsQuando(l.criado_em))
+                          )
+                        );
+                      })
+                    )
+          ),
+          React.createElement("div",{style:{padding:"14px 22px",borderTop:"1px solid #F1F5F9",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}},
+            React.createElement("div",{style:{fontSize:11,color:"#94A3B8"}},"Registro imut\u00E1vel \u00B7 gerado pelo servidor"),
+            React.createElement("button",{onClick:()=>setAuditoria(null),style:{background:"#0F172A",color:"#fff",border:"none",borderRadius:9,padding:"8px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}},"Fechar")
+          )
         )
       ),
 
