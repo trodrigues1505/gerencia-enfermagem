@@ -135,99 +135,130 @@ kbd{font-family:monospace;background:#F1F5F9;padding:1px 5px;border-radius:3px;b
 
 <script>
 (function () {
-  // ↓↓↓ MESMO VALOR QUE ESTÁ EM sw.js ↓↓↓
-  var APP_VERSION = '2026.09.14-1';
+  // ==========================================================================
+  // ATUALIZAÇÃO — REGRA ÚNICA
+  // version.json é a ÚNICA fonte de verdade. Bump nele a cada deploy.
+  // Qualquer mudança (index.html, sw.js, canon.js, manifest) é anunciada pelo
+  // mesmo toast e aplicada pelo mesmo botão. F5 nunca é necessário.
+  // ==========================================================================
+  var APP_VERSION = '2026.09.14-2';   // deve bater com version.json
 
   var pill  = document.getElementById('ge-version');
   var label = document.getElementById('ge-version-label');
   var toast = document.getElementById('ge-update');
-  var waitingSW = null;
-  var reloading = false;
+  var novaVersao = null;
+  var aplicando = false;
 
   label.textContent = 'v' + APP_VERSION;
   pill.dataset.state = 'idle';
 
-  function showToast(sw) {
-    waitingSW = sw;
+  function anunciar(v) {
+    if (aplicando) return;
+    novaVersao = v || null;
     pill.dataset.state = 'stale';
     label.textContent = 'v' + APP_VERSION + ' · atualização';
     toast.classList.add('show');
     toast.setAttribute('aria-hidden', 'false');
   }
-  function hideToast() {
-    toast.classList.remove('show');
-    toast.setAttribute('aria-hidden', 'true');
+
+  // Aplica TUDO de uma vez: ativa o SW em espera, limpa caches e recarrega.
+  // Não importa se mudou o index, o sw ou um asset — o caminho é um só.
+  async function aplicar() {
+    aplicando = true;
+    try {
+      if ('serviceWorker' in navigator) {
+        var reg = await navigator.serviceWorker.getRegistration();
+        if (reg && reg.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          await new Promise(function (res) {
+            var t = setTimeout(res, 1500);
+            navigator.serviceWorker.addEventListener('controllerchange', function () {
+              clearTimeout(t); res();
+            }, { once: true });
+          });
+        }
+      }
+      if ('caches' in window) {
+        var keys = await caches.keys();
+        await Promise.all(keys.map(function (k) { return caches.delete(k); }));
+      }
+    } catch (e) { console.error('[update]', e); }
+    location.replace(location.pathname + '?v=' + Date.now());
   }
 
   document.getElementById('ge-update-now').addEventListener('click', function () {
-    if (!waitingSW) { location.reload(); return; }
     this.textContent = 'Atualizando';
     this.disabled = true;
-    waitingSW.postMessage({ type: 'SKIP_WAITING' });
-    // Rede de segurança: se o controllerchange não vier, recarrega mesmo assim.
-    setTimeout(function () { if (!reloading) location.reload(); }, 2500);
+    aplicar();
+  });
+  document.getElementById('ge-update-later').addEventListener('click', function () {
+    toast.classList.remove('show');
+    toast.setAttribute('aria-hidden', 'true');
   });
 
-  document.getElementById('ge-update-later').addEventListener('click', hideToast);
+  // Consulta a versão publicada. no-store: nunca pode vir do cache.
+  async function checar(porClique) {
+    if (aplicando) return;
+    if (porClique && pill.dataset.state !== 'stale') pill.dataset.state = 'checking';
+    var servidor = null;
+    try {
+      var r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+      if (r.ok) { var j = await r.json(); servidor = j && j.version; }
+    } catch (e) {}
 
-  if (!('serviceWorker' in navigator)) return;
+    // Em paralelo, deixa o navegador reavaliar o sw.js (cobre o caso de o
+    // version.json não ter sido bumpado por esquecimento).
+    try {
+      if ('serviceWorker' in navigator) {
+        var reg = await navigator.serviceWorker.getRegistration();
+        if (reg) { await reg.update(); if (reg.waiting) return anunciar(servidor); }
+      }
+    } catch (e) {}
 
-  var registration = null;
+    if (servidor && servidor !== APP_VERSION) return anunciar(servidor);
 
-  function watch(reg) {
-    if (reg.waiting && navigator.serviceWorker.controller) showToast(reg.waiting);
-    reg.addEventListener('updatefound', function () {
-      var sw = reg.installing;
-      if (!sw) return;
-      pill.dataset.state = 'checking';
-      sw.addEventListener('statechange', function () {
-        if (sw.state === 'installed' && navigator.serviceWorker.controller) showToast(sw);
-      });
-    });
-  }
-
-  navigator.serviceWorker.addEventListener('controllerchange', function () {
-    if (reloading) return;
-    reloading = true;
-    location.reload();
-  });
-
-  function check(fromUser) {
-    if (!registration) return;
-    if (fromUser && pill.dataset.state !== 'stale') pill.dataset.state = 'checking';
-    registration.update().then(function () {
-      if (!fromUser) return;
+    if (porClique) {
+      pill.dataset.state = 'current';
+      label.textContent = 'v' + APP_VERSION + ' · atualizado';
       setTimeout(function () {
         if (pill.dataset.state === 'stale') return;
-        pill.dataset.state = 'current';
-        label.textContent = 'v' + APP_VERSION + ' · atualizado';
-        setTimeout(function () {
-          if (pill.dataset.state === 'stale') return;
-          pill.dataset.state = 'idle';
-          label.textContent = 'v' + APP_VERSION;
-        }, 2600);
-      }, 600);
-    }).catch(function () {
-      if (fromUser) pill.dataset.state = 'idle';
-    });
+        pill.dataset.state = 'idle';
+        label.textContent = 'v' + APP_VERSION;
+      }, 2600);
+    }
   }
 
-  pill.addEventListener('click', function () { check(true); });
+  pill.addEventListener('click', function () { checar(true); });
   pill.addEventListener('keydown', function (ev) {
-    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); check(true); }
+    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); checar(true); }
   });
 
-  window.addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js').then(function (reg) {
-      registration = reg;
-      watch(reg);
-      check(false);
-      // Procura atualização a cada 20 min e quando a aba volta ao foco.
-      setInterval(function () { check(false); }, 20 * 60 * 1000);
-      document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState === 'visible') check(false);
-      });
-    }).catch(function () {});
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    });
+  }
+  // Verifica ao abrir, a cada 10 min e sempre que a aba volta ao foco.
+  checar(false);
+  setInterval(function () { checar(false); }, 10 * 60 * 1000);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') checar(false);
+  });
+
+  // ==========================================================================
+  // INSTALAÇÃO NATIVA
+  // beforeinstallprompt dispara MUITO cedo — precisa ser capturado aqui, antes
+  // do React montar, senão o evento se perde e o botão nunca funciona.
+  // ==========================================================================
+  window.__gePrompt = null;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    window.__gePrompt = e;
+    window.dispatchEvent(new CustomEvent('ge-instalavel'));
+  });
+  window.addEventListener('appinstalled', function () {
+    window.__gePrompt = null;
+    window.dispatchEvent(new CustomEvent('ge-instalado'));
   });
 })();
 </script>
@@ -4932,6 +4963,64 @@ function InstallModal({
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   const isAndroid = /Android/.test(navigator.userAgent);
   const isWindows = /Windows/.test(navigator.userAgent) && !isAndroid;
+  // O prompt nativo so existe em navegadores Chromium (Android, Windows,
+  // macOS). Safari/iOS nao implementa beforeinstallprompt: la o caminho
+  // continua sendo o passo a passo manual.
+  const [podeInstalar, setPodeInstalar] = useState(Boolean(window.__gePrompt));
+  const [instalando, setInstalando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+  const jaInstalado = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+
+  useEffect(() => {
+    const on = () => setPodeInstalar(true);
+    const off = () => { setPodeInstalar(false); setResultado("instalado"); };
+    window.addEventListener("ge-instalavel", on);
+    window.addEventListener("ge-instalado", off);
+    return () => { window.removeEventListener("ge-instalavel", on); window.removeEventListener("ge-instalado", off); };
+  }, []);
+
+  async function instalarAgora() {
+    const ev = window.__gePrompt;
+    if (!ev) return;
+    setInstalando(true);
+    try {
+      ev.prompt();
+      const { outcome } = await ev.userChoice;
+      // O evento e de uso unico: depois de prompt() ele nao serve mais.
+      window.__gePrompt = null;
+      setPodeInstalar(false);
+      setResultado(outcome === "accepted" ? "instalado" : "recusado");
+    } catch (e) {
+      console.error("[install]", e);
+      setResultado("erro");
+    }
+    setInstalando(false);
+  }
+
+  const BLOCO_ACAO = jaInstalado
+    ? React.createElement("div", { style: { background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", gap: 10 } },
+        React.createElement("span", { style: { fontSize: 18 } }, "\u2713"),
+        React.createElement("div", null,
+          React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: "#15803D" } }, "App j\u00E1 instalado"),
+          React.createElement("div", { style: { fontSize: 11, color: "#16A34A", marginTop: 1 } }, "Voc\u00EA est\u00E1 usando a vers\u00E3o instalada.")))
+    : podeInstalar
+      ? React.createElement("div", { style: { background: "#0F172A", borderRadius: 12, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14 } },
+          React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+            React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: "#F1F5F9" } }, "Instalar neste dispositivo"),
+            React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 2, lineHeight: 1.45 } }, "Abre como aplicativo, sem barra do navegador.")),
+          React.createElement("button", { onClick: instalarAgora, disabled: instalando,
+            style: { flexShrink: 0, background: "#38BDF8", color: "#06263A", border: "none", borderRadius: 9, padding: "10px 18px", fontSize: 13, fontWeight: 700, cursor: instalando ? "default" : "pointer", opacity: instalando ? .6 : 1 } },
+            instalando ? "Aguarde\u2026" : "Instalar"))
+      : resultado === "recusado"
+        ? React.createElement("div", { style: { background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12, padding: "12px 14px", fontSize: 12, color: "#92400E" } },
+            "Instala\u00E7\u00E3o cancelada. Feche e abra este aviso para tentar de novo, ou siga o passo a passo abaixo.")
+        : resultado === "instalado"
+          ? React.createElement("div", { style: { background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 12, padding: "12px 14px", fontSize: 12, color: "#15803D", fontWeight: 600 } },
+              "\u2713 Instalado. Procure o \u00EDcone na tela inicial.")
+          : React.createElement("div", { style: { background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: "12px 14px", fontSize: 11, color: "#64748B", lineHeight: 1.5 } },
+              isIOS
+                ? "No iPhone e iPad a Apple n\u00E3o permite instala\u00E7\u00E3o autom\u00E1tica. Siga o passo a passo do Safari abaixo."
+                : "Instala\u00E7\u00E3o autom\u00E1tica indispon\u00EDvel neste navegador. Use o passo a passo abaixo.");
   return /*#__PURE__*/React.createElement(ModalShell, {
     title: "Instalar o app",
     onClose: onClose,
@@ -4942,7 +5031,7 @@ function InstallModal({
       flexDirection: "column",
       gap: 12
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, BLOCO_ACAO, /*#__PURE__*/React.createElement("div", {
     style: {
       background: isAndroid ? "#F0FDF4" : "#F8FAFC",
       border: `1px solid ${isAndroid ? "#86EFAC" : "#E2E8F0"}`,
