@@ -65,11 +65,173 @@ kbd{font-family:monospace;background:#F1F5F9;padding:1px 5px;border-radius:3px;b
 </head>
 <body>
 <div id="root"></div>
+<style>
+  #ge-version{
+    position:fixed; left:10px; bottom:10px; z-index:9998;
+    display:inline-flex; align-items:center; gap:6px;
+    padding:5px 10px; border-radius:999px;
+    background:rgba(15,23,42,.055); border:1px solid rgba(15,23,42,.08);
+    color:#64748B; font:500 11px/1 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+    font-variant-numeric:tabular-nums; letter-spacing:.01em;
+    cursor:pointer; user-select:none;
+    transition:background .16s ease, color .16s ease, opacity .16s ease;
+    opacity:.65;
+  }
+  #ge-version:hover{opacity:1; background:rgba(15,23,42,.09); color:#334155}
+  #ge-version:focus-visible{outline:2px solid #0F172A; outline-offset:2px; opacity:1}
+  #ge-version .ge-pip{width:5px;height:5px;border-radius:999px;background:#94A3B8;flex:none}
+  #ge-version[data-state="checking"] .ge-pip{background:#0EA5E9;animation:ge-pulse 1s ease-in-out infinite}
+  #ge-version[data-state="current"] .ge-pip{background:#22C55E}
+  #ge-version[data-state="stale"]{opacity:1;background:#FEF3C7;border-color:#FDE68A;color:#92400E}
+  #ge-version[data-state="stale"] .ge-pip{background:#F59E0B}
+  @keyframes ge-pulse{50%{opacity:.3}}
+  @media (max-width:640px){ #ge-version{left:8px;bottom:8px;font-size:10px;padding:4px 8px} }
+
+  #ge-update{
+    position:fixed; z-index:9999; left:50%; bottom:24px; transform:translate(-50%,16px);
+    width:min(420px,calc(100vw - 32px));
+    display:flex; align-items:flex-start; gap:14px;
+    background:#0F172A; color:#F1F5F9; border-radius:14px; padding:16px 18px;
+    box-shadow:0 12px 32px -12px rgba(15,23,42,.55);
+    font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+    opacity:0; pointer-events:none;
+    transition:opacity .2s ease, transform .2s ease;
+  }
+  #ge-update.show{opacity:1; transform:translate(-50%,0); pointer-events:auto}
+  #ge-update .ge-txt{flex:1; min-width:0}
+  #ge-update b{display:block; font-size:14px; font-weight:600; margin-bottom:3px}
+  #ge-update span{display:block; font-size:13px; line-height:1.45; color:#94A3B8}
+  #ge-update .ge-acts{display:flex; flex-direction:column; gap:6px; flex:none}
+  #ge-update button{
+    font:600 13px/1 inherit; cursor:pointer; border:0; border-radius:8px;
+    padding:9px 14px; transition:background .16s ease, color .16s ease;
+  }
+  #ge-update .ge-now{background:#38BDF8; color:#06263A}
+  #ge-update .ge-now:hover{background:#7DD3FC}
+  #ge-update .ge-later{background:transparent; color:#94A3B8}
+  #ge-update .ge-later:hover{color:#F1F5F9}
+  #ge-update button:focus-visible{outline:2px solid #38BDF8; outline-offset:2px}
+  @media (max-width:520px){
+    #ge-update{flex-direction:column; gap:12px}
+    #ge-update .ge-acts{flex-direction:row-reverse; justify-content:flex-start; width:100%}
+  }
+  @media (prefers-reduced-motion:reduce){ #ge-version,#ge-update{transition:none} #ge-version .ge-pip{animation:none} }
+</style>
+
+<div id="ge-version" role="status" tabindex="0" title="Versão do app. Clique para procurar atualizações.">
+  <span class="ge-pip"></span><span id="ge-version-label">—</span>
+</div>
+
+<div id="ge-update" role="alertdialog" aria-live="polite" aria-hidden="true">
+  <div class="ge-txt">
+    <b>Nova versão disponível</b>
+    <span>Atualize para continuar com os dados e recursos mais recentes. A página vai recarregar.</span>
+  </div>
+  <div class="ge-acts">
+    <button class="ge-now" id="ge-update-now">Atualizar</button>
+    <button class="ge-later" id="ge-update-later">Depois</button>
+  </div>
+</div>
+
 <script>
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
-}
+(function () {
+  // ↓↓↓ MESMO VALOR QUE ESTÁ EM sw.js ↓↓↓
+  var APP_VERSION = '2026.09.14-1';
+
+  var pill  = document.getElementById('ge-version');
+  var label = document.getElementById('ge-version-label');
+  var toast = document.getElementById('ge-update');
+  var waitingSW = null;
+  var reloading = false;
+
+  label.textContent = 'v' + APP_VERSION;
+  pill.dataset.state = 'idle';
+
+  function showToast(sw) {
+    waitingSW = sw;
+    pill.dataset.state = 'stale';
+    label.textContent = 'v' + APP_VERSION + ' · atualização';
+    toast.classList.add('show');
+    toast.setAttribute('aria-hidden', 'false');
+  }
+  function hideToast() {
+    toast.classList.remove('show');
+    toast.setAttribute('aria-hidden', 'true');
+  }
+
+  document.getElementById('ge-update-now').addEventListener('click', function () {
+    if (!waitingSW) { location.reload(); return; }
+    this.textContent = 'Atualizando';
+    this.disabled = true;
+    waitingSW.postMessage({ type: 'SKIP_WAITING' });
+    // Rede de segurança: se o controllerchange não vier, recarrega mesmo assim.
+    setTimeout(function () { if (!reloading) location.reload(); }, 2500);
+  });
+
+  document.getElementById('ge-update-later').addEventListener('click', hideToast);
+
+  if (!('serviceWorker' in navigator)) return;
+
+  var registration = null;
+
+  function watch(reg) {
+    if (reg.waiting && navigator.serviceWorker.controller) showToast(reg.waiting);
+    reg.addEventListener('updatefound', function () {
+      var sw = reg.installing;
+      if (!sw) return;
+      pill.dataset.state = 'checking';
+      sw.addEventListener('statechange', function () {
+        if (sw.state === 'installed' && navigator.serviceWorker.controller) showToast(sw);
+      });
+    });
+  }
+
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    if (reloading) return;
+    reloading = true;
+    location.reload();
+  });
+
+  function check(fromUser) {
+    if (!registration) return;
+    if (fromUser && pill.dataset.state !== 'stale') pill.dataset.state = 'checking';
+    registration.update().then(function () {
+      if (!fromUser) return;
+      setTimeout(function () {
+        if (pill.dataset.state === 'stale') return;
+        pill.dataset.state = 'current';
+        label.textContent = 'v' + APP_VERSION + ' · atualizado';
+        setTimeout(function () {
+          if (pill.dataset.state === 'stale') return;
+          pill.dataset.state = 'idle';
+          label.textContent = 'v' + APP_VERSION;
+        }, 2600);
+      }, 600);
+    }).catch(function () {
+      if (fromUser) pill.dataset.state = 'idle';
+    });
+  }
+
+  pill.addEventListener('click', function () { check(true); });
+  pill.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); check(true); }
+  });
+
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').then(function (reg) {
+      registration = reg;
+      watch(reg);
+      check(false);
+      // Procura atualização a cada 20 min e quando a aba volta ao foco.
+      setInterval(function () { check(false); }, 20 * 60 * 1000);
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') check(false);
+      });
+    }).catch(function () {});
+  });
+})();
 </script>
+
 <script>
 const {
   useState,
