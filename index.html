@@ -1582,11 +1582,7 @@ function CardModal({
         ),
         /* Seletor de prioridade visível */
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 } },
-          [["1","🔴 P1
-Urgente"],["2","🟠 P2
-Alta"],["3","🟡 P3
-Média"],["4","⚪ P4
-Rotina"]].map(([v, lbl]) =>
+          [["1","🔴 P1 Urgente"],["2","🟠 P2 Alta"],["3","🟡 P3 Média"],["4","⚪ P4 Rotina"]].map(([v, lbl]) =>
             React.createElement("button", {
               key: v,
               disabled: !canEdit,
