@@ -1677,7 +1677,7 @@ Rotina"]].map(([v, lbl]) =>
         }),
         /* Enfermeiro */
         React.createElement(MembroSection, {
-          emoji: "👨‍⚕️", titulo: "Enfermeiro",
+          emoji: "🧑", titulo: "Enfermeiro",
           corBg: "#EFF6FF", corBorder: "#BFDBFE", corTexto: "#1D4ED8",
           fields: [
             ["Nome do enfermeiro", "enfermeiro_escalado", "Ex: Ana Paula", false],
@@ -1686,7 +1686,7 @@ Rotina"]].map(([v, lbl]) =>
         }),
         /* Técnico / Auxiliar */
         React.createElement(MembroSection, {
-          emoji: "🧑‍⚕️", titulo: "Técnico / Auxiliar",
+          emoji: "💊", titulo: "Técnico / Auxiliar",
           corBg: "#F5F3FF", corBorder: "#DDD6FE", corTexto: "#6D28D9",
           fields: [
             ["Nome do técnico/auxiliar", "tecnico_auxiliar_escala", "Ex: João Carlos", false],
@@ -2797,9 +2797,9 @@ function KCard({
       c.medico_escala && React.createElement("div", { style:{ fontSize:9, color:"#15803D", fontWeight:600 } },
         "🩺 ", c.medico_escala, c.setor_medico_escala ? " · " + c.setor_medico_escala : ""),
       c.enfermeiro_escalado && React.createElement("div", { style:{ fontSize:9, color:"#1D4ED8", fontWeight:600 } },
-        "👨‍⚕️ ", c.enfermeiro_escalado, c.setor_saida_enfermeiro ? " · " + c.setor_saida_enfermeiro : ""),
+        "🧑 ", c.enfermeiro_escalado, c.setor_saida_enfermeiro ? " · " + c.setor_saida_enfermeiro : ""),
       c.tecnico_auxiliar_escala && React.createElement("div", { style:{ fontSize:9, color:"#6D28D9", fontWeight:600 } },
-        "🧑‍⚕️ ", c.tecnico_auxiliar_escala, c.setor_tecnico_escala ? " · " + c.setor_tecnico_escala : "")
+        "💊 ", c.tecnico_auxiliar_escala, c.setor_tecnico_escala ? " · " + c.setor_tecnico_escala : "")
     )
   );
 }
