@@ -1249,7 +1249,15 @@ function CardModal({
       borderRadius: 8,
       padding: 2
     }
-  }, [["info", "📋 Informações"], ["aceite_info", "🟢 Aceite"], ["comments", "💬 Comentários" + (comments.length ? ` (${comments.length})` : "")]].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
+  }, (() => {
+    const tabs = [["info", "📋 Informações"], ["aceite_info", "🟢 Aceite"], ["comments", "💬 Comentários" + (comments.length ? ` (${comments.length})` : "")]];
+    const isAceiteCol = form.col_id === "aceite";
+    const canPrioridade = currentUser?.can_prioridade || currentUser?.role === "admin";
+    const canEscala = currentUser?.can_escala || currentUser?.role === "admin";
+    if (isAceiteCol && canPrioridade) tabs.push(["prioridade", "🔢 Prioridade"]);
+    if (isAceiteCol && canEscala) tabs.push(["equipe", "👥 Equipe"]);
+    return tabs;
+  })().map(([id, label]) => /*#__PURE__*/React.createElement("button", {
     key: id,
     type: "button",
     onClick: () => setTab(id),
@@ -1513,7 +1521,202 @@ function CardModal({
     onChange: upd,
     disabled: !isAdmin,
     placeholder: "Hospital Francisco Morato"
-  })), tab === "comments" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  })), tab === "prioridade" && React.createElement("div", null,
+    (() => {
+      const canEdit = (currentUser?.can_prioridade || currentUser?.role === "admin") && form.col_id === "aceite";
+      const cardCreatedAt = card.created_at;
+      const delta = calcDeltaMin(cardCreatedAt, form.hora_prioridade);
+      const [conflito, setConflito] = React.useState(null);
+
+      function handlePrioridade(v, allCards) {
+        if (!canEdit) return;
+        // Verifica se já existe outro card na coluna aceite com essa prioridade
+        const duplicata = (allCards || []).find(c =>
+          c.col_id === "aceite" &&
+          c.id !== card.id &&
+          c.prioridade_remocao === v
+        );
+        if (duplicata) {
+          setConflito({ valor: v, nomeConflito: duplicata.nome });
+        } else {
+          setConflito(null);
+          upd("prioridade_remocao", v);
+          if (!form.hora_prioridade) upd("hora_prioridade", nowStr());
+        }
+      }
+
+      return React.createElement(React.Fragment, null,
+        /* Cabeçalho informativo */
+        React.createElement("div", { style: { background: "#F5F3FF", border: "1px solid #DDD6FE", borderRadius: 10, padding: "12px 14px", marginBottom: 14 } },
+          React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#6D28D9", marginBottom: 4 } }, "🔢 Prioridade de Remoção"),
+          React.createElement("div", { style: { fontSize: 11, color: "#7C3AED" } }, "Definida pelo Dr. Victor Alfonso. Indica a ordem de saída entre os pacientes em aceite confirmado."),
+          cardCreatedAt && React.createElement("div", { style: { fontSize: 10, color: "#94A3B8", marginTop: 6 } },
+            "Card criado em: ", new Date(cardCreatedAt).toLocaleString("pt-BR", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" }),
+            form.hora_prioridade && delta !== null && React.createElement("span", { style: { marginLeft: 8, fontWeight: 700, color: "#7C3AED" } },
+              "· Prioridade definida ", fmtDelta(delta), " depois"
+            )
+          )
+        ),
+        /* Aviso de conflito */
+        conflito && React.createElement("div", { style: { background: "#FEF3C7", border: "1px solid #FDE68A", borderRadius: 8, padding: "10px 12px", marginBottom: 12, fontSize: 12 } },
+          React.createElement("div", { style: { fontWeight: 700, color: "#92400E", marginBottom: 6 } },
+            "⚠️ P" + conflito.valor + " já está atribuída a: " + conflito.nomeConflito
+          ),
+          React.createElement("div", { style: { color: "#78350F", marginBottom: 8 } },
+            "Se confirmar, este card fica com P" + conflito.valor + " e o card anterior perde a prioridade."
+          ),
+          React.createElement("div", { style: { display: "flex", gap: 8 } },
+            React.createElement("button", {
+              onClick: () => {
+                upd("prioridade_remocao", conflito.valor);
+                if (!form.hora_prioridade) upd("hora_prioridade", nowStr());
+                setConflito(null);
+              },
+              style: { padding: "5px 14px", border: "none", borderRadius: 7, background: "#D97706", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }
+            }, "✓ Confirmar mesmo assim"),
+            React.createElement("button", {
+              onClick: () => setConflito(null),
+              style: { padding: "5px 14px", border: "1px solid #FDE68A", borderRadius: 7, background: "none", color: "#92400E", fontSize: 12, cursor: "pointer" }
+            }, "Cancelar")
+          )
+        ),
+        /* Seletor de prioridade visível */
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 } },
+          [["1","🔴 P1
+Urgente"],["2","🟠 P2
+Alta"],["3","🟡 P3
+Média"],["4","⚪ P4
+Rotina"]].map(([v, lbl]) =>
+            React.createElement("button", {
+              key: v,
+              disabled: !canEdit,
+              onClick: () => handlePrioridade(v, window.__geCards),
+              style: {
+                padding: "10px 6px", borderRadius: 10, cursor: canEdit ? "pointer" : "default",
+                border: form.prioridade_remocao === v ? "2px solid #7C3AED" : "1.5px solid #E2E8F0",
+                background: form.prioridade_remocao === v ? "#EDE9FE" : "#F8FAFC",
+                color: form.prioridade_remocao === v ? "#6D28D9" : "#64748B",
+                fontWeight: form.prioridade_remocao === v ? 700 : 400, fontSize: 11, fontFamily: "inherit",
+                textAlign: "center", lineHeight: 1.4
+              }
+            }, lbl)
+          )
+        ),
+        /* Hora que o Victor definiu */
+        React.createElement(Field, {
+          label: "Hora em que a prioridade foi definida",
+          fieldKey: "hora_prioridade",
+          value: form.hora_prioridade,
+          onChange: upd,
+          disabled: !canEdit,
+          placeholder: "ex: 14:35"
+        }),
+        form.hora_prioridade && React.createElement("button", {
+          onClick: () => upd("hora_prioridade", nowStr()),
+          disabled: !canEdit,
+          style: { padding: "5px 12px", border: "1px solid #DDD6FE", borderRadius: 7, background: "none", color: "#7C3AED", cursor: "pointer", fontSize: 11, fontWeight: 600, marginBottom: 8 }
+        }, "⟳ Atualizar para agora — " + nowStr()),
+        !canEdit && React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", fontStyle: "italic", marginTop: 4 } }, "Somente o Dr. Victor ou a administradora podem definir a prioridade.")
+      );
+    })()
+  ),
+  tab === "equipe" && React.createElement("div", null,
+    (() => {
+      const canEdit = (currentUser?.can_escala || currentUser?.role === "admin") && form.col_id === "aceite";
+      const cardCreatedAt = card.created_at;
+      const delta = calcDeltaMin(cardCreatedAt, form.hora_escala_equipe);
+
+      /* Mini-seção de membro da equipe */
+      const MembroSection = ({ emoji, titulo, corBg, corBorder, corTexto, fields }) =>
+        React.createElement("div", {
+          style: { background: corBg, border: `1px solid ${corBorder}`, borderRadius: 10,
+            padding: "12px 14px", marginBottom: 12 }
+        },
+          React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: corTexto,
+            marginBottom: 10, display: "flex", alignItems: "center", gap: 6 } },
+            emoji, " ", titulo
+          ),
+          React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" } },
+            fields.map(([label, fieldKey, placeholder, full]) =>
+              React.createElement(Field, {
+                key: fieldKey, label, fieldKey,
+                value: form[fieldKey] || "",
+                onChange: upd, disabled: !canEdit,
+                placeholder, full: !!full
+              })
+            )
+          )
+        );
+
+      return React.createElement(React.Fragment, null,
+        /* Cabeçalho */
+        React.createElement("div", { style: { background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10, padding: "12px 14px", marginBottom: 14 } },
+          React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#1D4ED8", marginBottom: 4 } }, "👥 Escala da Equipe de Remoção"),
+          React.createElement("div", { style: { fontSize: 11, color: "#1E40AF" } }, "Definida por Carlos ou Santuza. Cada membro pode sair de um setor diferente."),
+          cardCreatedAt && React.createElement("div", { style: { fontSize: 10, color: "#94A3B8", marginTop: 6 } },
+            "Card criado em: ", new Date(cardCreatedAt).toLocaleString("pt-BR", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" }),
+            form.hora_escala_equipe && delta !== null && React.createElement("span", { style: { marginLeft: 8, fontWeight: 700, color: "#1D4ED8" } },
+              "· Equipe escalada ", fmtDelta(delta), " depois"
+            )
+          )
+        ),
+        /* Destino da remoção */
+        React.createElement(Field, {
+          label: "Remoção de destino *", fieldKey: "remocao_destino",
+          value: form.remocao_destino, onChange: upd, disabled: !canEdit,
+          placeholder: "Ex: SCSP — Cirurgia Torácica", full: true
+        }),
+        /* Médico */
+        React.createElement(MembroSection, {
+          emoji: "🩺", titulo: "Médico",
+          corBg: "#F0FDF4", corBorder: "#86EFAC", corTexto: "#15803D",
+          fields: [
+            ["Nome do médico", "medico_escala", "Ex: Dr. Victor", false],
+            ["Setor de origem", "setor_medico_escala", "Ex: PS", false],
+          ]
+        }),
+        /* Enfermeiro */
+        React.createElement(MembroSection, {
+          emoji: "👨‍⚕️", titulo: "Enfermeiro",
+          corBg: "#EFF6FF", corBorder: "#BFDBFE", corTexto: "#1D4ED8",
+          fields: [
+            ["Nome do enfermeiro", "enfermeiro_escalado", "Ex: Ana Paula", false],
+            ["Setor de origem", "setor_saida_enfermeiro", "Ex: CM / L3", false],
+          ]
+        }),
+        /* Técnico / Auxiliar */
+        React.createElement(MembroSection, {
+          emoji: "🧑‍⚕️", titulo: "Técnico / Auxiliar",
+          corBg: "#F5F3FF", corBorder: "#DDD6FE", corTexto: "#6D28D9",
+          fields: [
+            ["Nome do técnico/auxiliar", "tecnico_auxiliar_escala", "Ex: João Carlos", false],
+            ["Setor de origem", "setor_tecnico_escala", "Ex: UTI", false],
+          ]
+        }),
+        /* Hora */
+        React.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: 10, marginTop: 4 } },
+          React.createElement("div", { style: { flex: 1 } },
+            React.createElement(Field, {
+              label: "Hora em que a equipe foi escalada",
+              fieldKey: "hora_escala_equipe",
+              value: form.hora_escala_equipe, onChange: upd, disabled: !canEdit,
+              placeholder: "ex: 15:20"
+            })
+          ),
+          canEdit && React.createElement("button", {
+            onClick: () => upd("hora_escala_equipe", nowStr()),
+            style: { padding: "8px 12px", border: "1px solid #BFDBFE", borderRadius: 7,
+              background: "none", color: "#1D4ED8", cursor: "pointer", fontSize: 11,
+              fontWeight: 600, marginBottom: 10, whiteSpace: "nowrap" }
+          }, "⟳ Agora")
+        ),
+        !canEdit && React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", fontStyle: "italic", marginTop: 4 } },
+          "Somente Carlos, Santuza ou a administradora podem escalar a equipe."
+        )
+      );
+    })()
+  ),
+  tab === "comments" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       maxHeight: 300,
       overflowY: "auto",
@@ -2579,7 +2782,26 @@ function KCard({
       fontSize: 10,
       color: "#16A34A"
     }
-  }, "📥 ", c.receptor, c.hora_aceite ? " às " + c.hora_aceite : ""));
+  }, "📥 ", c.receptor, c.hora_aceite ? " às " + c.hora_aceite : ""),
+    c.prioridade_remocao && React.createElement("div", {
+      style: { marginTop:3, display:"flex", alignItems:"center", gap:4 }
+    },
+      React.createElement("span", {
+        style: { fontSize:9, fontWeight:700, padding:"2px 7px", borderRadius:99,
+          background:"#EDE9FE", color:"#6D28D9", border:"1px solid #DDD6FE" }
+      }, "🔢 P" + c.prioridade_remocao + (c.hora_prioridade ? " · " + c.hora_prioridade : ""))
+    ),
+    (c.medico_escala || c.enfermeiro_escalado || c.tecnico_auxiliar_escala) && React.createElement("div", {
+      style: { marginTop:3, borderTop:"1px solid #BFDBFE", paddingTop:3 }
+    },
+      c.medico_escala && React.createElement("div", { style:{ fontSize:9, color:"#15803D", fontWeight:600 } },
+        "🩺 ", c.medico_escala, c.setor_medico_escala ? " · " + c.setor_medico_escala : ""),
+      c.enfermeiro_escalado && React.createElement("div", { style:{ fontSize:9, color:"#1D4ED8", fontWeight:600 } },
+        "👨‍⚕️ ", c.enfermeiro_escalado, c.setor_saida_enfermeiro ? " · " + c.setor_saida_enfermeiro : ""),
+      c.tecnico_auxiliar_escala && React.createElement("div", { style:{ fontSize:9, color:"#6D28D9", fontWeight:600 } },
+        "🧑‍⚕️ ", c.tecnico_auxiliar_escala, c.setor_tecnico_escala ? " · " + c.setor_tecnico_escala : "")
+    )
+  );
 }
 
 /* ─── DASHBOARD ─── */
@@ -3347,50 +3569,160 @@ Isso vai substituir a visualização atual pelos dados desse snapshot.`)) return
   }));
 }
 
-/* ─── HISTORY PANEL ─── */
+/* ─── AUDIT / HISTORY PANEL ─── */
 function HistoryPanel() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filterUser, setFilterUser] = useState("");
+  const [filterDate, setFilterDate] = useState("");
+  const [users, setUsers] = useState([]);
+  const [exportado, setExportado] = useState(false);
+  const [zerando, setZerando] = useState(false);
+
+  /* Mês atual para label do backup */
+  const mesAtual = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const mesKey = new Date().toISOString().slice(0, 7); // "2026-09"
+
+  /* Verifica se já existe backup deste mês no localStorage */
+  const backupKey = "ge_audit_backup_" + mesKey;
+  const jaBackup = !!loadLS(backupKey, null);
+
   useEffect(() => {
-    sbGet("card_history", "order=created_at.desc&limit=100").then(rows => {
+    Promise.all([
+      sbGet("card_history", "order=created_at.desc&limit=2000"),
+      sbGet("users", "order=nome.asc")
+    ]).then(([rows, us]) => {
       setHistory(rows);
+      setUsers(us);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
+
+  /* Exporta o log atual como JSON e marca backup feito */
+  function exportarBackup() {
+    if (!history.length) return;
+    const blob = new Blob([JSON.stringify({ mes: mesKey, exportado_em: new Date().toISOString(), registros: history }, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `audit-log-${mesKey}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    saveLS(backupKey, { exportado_em: new Date().toISOString(), total: history.length });
+    setExportado(true);
+  }
+
+  /* Zera o log no Supabase — só permitido após exportar */
+  async function zerarLog() {
+    if (!exportado && !jaBackup) return;
+    if (!window.confirm(
+      `Isso vai apagar PERMANENTEMENTE os ${history.length} registros do log de auditoria.
+
+O backup JSON já foi salvo no seu computador.
+
+Digite CONFIRMAR para prosseguir:`
+    )) return;
+    const conf = window.prompt("Digite CONFIRMAR para apagar o log:");
+    if (conf !== "CONFIRMAR") return;
+    setZerando(true);
+    try {
+      /* Deleta em lotes de 50 para não estourar timeout */
+      const ids = history.map(h => h.id);
+      for (let i = 0; i < ids.length; i += 50) {
+        const lote = ids.slice(i, i + 50);
+        await fetch(`${SB_URL}/rest/v1/card_history?id=in.(${lote.join(",")})`, {
+          method: "DELETE",
+          headers: { ...H(), Prefer: "return=minimal" }
+        });
+      }
+      setHistory([]);
+      saveLS(backupKey, { ...loadLS(backupKey, {}), zerado_em: new Date().toISOString() });
+    } catch (e) {
+      alert("Erro ao zerar: " + e.message);
+    }
+    setZerando(false);
+  }
+
   const actionColor = {
     "criou card": "#16A34A",
     "editou card": "#3B82F6",
     "excluiu card": "#EF4444",
     "restaurou card": "#8B5CF6",
-    "moveu": "#F59E0B"
+    "moveu": "#F59E0B",
+    "definiu prioridade": "#7C3AED",
+    "escalou equipe": "#0369A1"
   };
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 700,
-      fontSize: 16,
-      color: "#0F172A",
-      marginBottom: 4
-    }
-  }, "Histórico de alterações"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#64748B",
-      marginBottom: 16
-    }
-  }, "Últimas 100 ações registradas"), loading && /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: "center",
-      padding: 32,
-      color: "#94A3B8"
-    }
-  }, "Carregando…"), !loading && history.length === 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: "center",
-      padding: 32,
-      color: "#CBD5E1",
-      fontSize: 13
-    }
-  }, "Nenhuma ação registrada ainda."), history.map(h => {
+
+  const filtered = history.filter(h => {
+    const matchUser = !filterUser || h.user_nome?.toLowerCase().includes(filterUser.toLowerCase());
+    const matchDate = !filterDate || h.created_at?.startsWith(filterDate);
+    return matchUser && matchDate;
+  });
+  return React.createElement("div", null,
+    /* ── Cabeçalho + controles ── */
+    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 12 } },
+      React.createElement("div", null,
+        React.createElement("div", { style: { fontWeight: 700, fontSize: 16, color: "#0F172A", marginBottom: 2 } }, "📜 Log de Auditoria"),
+        React.createElement("div", { style: { fontSize: 12, color: "#64748B" } }, filtered.length + " ação" + (filtered.length !== 1 ? "ões" : "") + " · últimas 2000 registradas")
+      ),
+      React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" } },
+        React.createElement("input", {
+          placeholder: "Filtrar por usuário…",
+          value: filterUser,
+          onChange: e => setFilterUser(e.target.value),
+          style: { padding: "6px 10px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, width: 170, fontFamily: "inherit", background: "#fff" }
+        }),
+        React.createElement("input", {
+          type: "date", value: filterDate,
+          onChange: e => setFilterDate(e.target.value),
+          style: { padding: "6px 10px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, fontFamily: "inherit", background: "#fff" }
+        }),
+        (filterUser || filterDate) && React.createElement("button", {
+          onClick: () => { setFilterUser(""); setFilterDate(""); },
+          style: { padding: "6px 10px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 11, background: "none", color: "#64748B", cursor: "pointer" }
+        }, "✕ Limpar")
+      )
+    ),
+    /* ── Banner de backup mensal ── */
+    history.length > 0 && React.createElement("div", {
+      style: { background: (exportado || jaBackup) ? "#F0FDF4" : "#FEF3C7",
+        border: `1px solid ${(exportado || jaBackup) ? "#86EFAC" : "#FDE68A"}`,
+        borderRadius: 10, padding: "12px 16px", marginBottom: 16,
+        display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }
+    },
+      React.createElement("div", null,
+        React.createElement("div", { style: { fontWeight: 700, fontSize: 13,
+          color: (exportado || jaBackup) ? "#15803D" : "#92400E" } },
+          (exportado || jaBackup)
+            ? "✅ Backup de " + mesAtual + " já realizado"
+            : "💾 Backup mensal — " + mesAtual
+        ),
+        React.createElement("div", { style: { fontSize: 11, color: "#64748B", marginTop: 2 } },
+          (exportado || jaBackup)
+            ? "Você pode zerar o log abaixo para liberar espaço."
+            : "Exporte o log antes de zerar. O backup fica salvo no seu computador."
+        )
+      ),
+      React.createElement("div", { style: { display: "flex", gap: 8 } },
+        React.createElement("button", {
+          onClick: exportarBackup,
+          style: { padding: "7px 14px", border: "none", borderRadius: 8,
+            background: "#0F172A", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }
+        }, "📥 Exportar backup"),
+        React.createElement("button", {
+          onClick: zerarLog,
+          disabled: (!exportado && !jaBackup) || zerando,
+          title: (!exportado && !jaBackup) ? "Exporte o backup primeiro" : "Apagar todos os registros do log",
+          style: { padding: "7px 14px", border: "1px solid #FCA5A5", borderRadius: 8,
+            background: (!exportado && !jaBackup) ? "#F1F5F9" : "none",
+            color: (!exportado && !jaBackup) ? "#CBD5E1" : "#DC2626",
+            fontWeight: 700, fontSize: 12,
+            cursor: (!exportado && !jaBackup) ? "not-allowed" : "pointer" }
+        }, zerando ? "Zerando…" : "🗑 Zerar log")
+      )
+    ),
+    loading && React.createElement("div", { style: { textAlign: "center", padding: 32, color: "#94A3B8" } }, "Carregando…"),
+    !loading && filtered.length === 0 && React.createElement("div", { style: { textAlign: "center", padding: 32, color: "#CBD5E1", fontSize: 13, border: "1.5px dashed #F1F5F9", borderRadius: 10 } }, "Nenhuma ação encontrada para os filtros selecionados."),
+    filtered.map(h => {
     const actionKey = Object.keys(actionColor).find(k => h.action.startsWith(k));
     const color = actionColor[actionKey] || "#64748B";
     return /*#__PURE__*/React.createElement("div", {
@@ -3459,7 +3791,8 @@ function HistoryPanel() {
 function UsersPanel({
   currentUser,
   userId,
-  showT
+  showT,
+  cards
 }) {
   const [users, setUsers] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
@@ -3472,6 +3805,31 @@ function UsersPanel({
     foto: null
   });
   const [loading, setLoading] = useState(true);
+
+  /* Calcula métricas de tempo por auth_uid para os cards da coluna aceite */
+  const aceiteCards = React.useMemo(() => (cards || []).filter(c => c.col_id === "aceite"), [cards]);
+
+  function calcMediaTempos(authUid, campo) {
+    /* campo: "hora_prioridade" (Victor) ou "hora_escala_equipe" (Carlos/Santuza) */
+    const deltas = aceiteCards
+      .filter(c => c[campo] && c.created_at)
+      .map(c => calcDeltaMin(c.created_at, c[campo]))
+      .filter(d => d !== null && d >= 0);
+    if (!deltas.length) return null;
+    return deltas.reduce((a, b) => a + b, 0) / deltas.length;
+  }
+
+  const tempoVictor  = calcMediaTempos(AUTH_UID_VICTOR,  "hora_prioridade");
+  const tempoCarlos  = calcMediaTempos(AUTH_UID_CARLOS,  "hora_escala_equipe");
+  const tempoSantuza = calcMediaTempos(AUTH_UID_SANTUZA, "hora_escala_equipe");
+
+  /* Mapa auth_uid → tempo médio da função especial */
+  const tempoEspecial = {
+    [AUTH_UID_VICTOR]:  tempoVictor  !== null ? { label: "Prioridade em " + fmtDelta(tempoVictor),  bg: "#F5F3FF", color: "#6D28D9" } : null,
+    [AUTH_UID_CARLOS]:  tempoCarlos  !== null ? { label: "Escala em "    + fmtDelta(tempoCarlos),   bg: "#EFF6FF", color: "#1D4ED8" } : null,
+    [AUTH_UID_SANTUZA]: tempoSantuza !== null ? { label: "Escala em "    + fmtDelta(tempoSantuza),  bg: "#EFF6FF", color: "#1D4ED8" } : null,
+  };
+
   useEffect(() => {
     load();
   }, []);
@@ -3849,6 +4207,16 @@ function UsersPanel({
     title: u.can_planilha ? "Revogar escrita na Planilha de Remoções" : "Liberar escrita na Planilha de Remoções"
   }, u.can_planilha ? "📋 Planilha ✓" : "📋 Planilha"),
   /*#__PURE__*/React.createElement("button", {
+    onClick: () => toggleFlag(u.id, "can_prioridade", u.can_prioridade, load),
+    className: "can-livro-toggle" + (u.can_prioridade ? " on" : ""),
+    title: u.can_prioridade ? "Revogar permissão de prioridade de remoção" : "Liberar: definir prioridade de remoção (Victor)"
+  }, u.can_prioridade ? "🔢 Prioridade ✓" : "🔢 Prioridade"),
+  /*#__PURE__*/React.createElement("button", {
+    onClick: () => toggleFlag(u.id, "can_escala", u.can_escala, load),
+    className: "can-livro-toggle" + (u.can_escala ? " on" : ""),
+    title: u.can_escala ? "Revogar permissão de escalar equipe" : "Liberar: escalar equipe de remoção (Carlos/Santuza)"
+  }, u.can_escala ? "👥 Escala ✓" : "👥 Escala"),
+  /*#__PURE__*/React.createElement("button", {
     onClick: () => resetarSenha(u),
     className: "can-livro-toggle",
     title: "Redefinir a senha para o registro profissional"
@@ -3857,7 +4225,9 @@ function UsersPanel({
     title: "Ainda não trocou a senha inicial",
     style: { fontSize: 10, fontWeight: 700, color: "#92400E", background: "#FFFBEB",
              border: "1px solid #FDE68A", borderRadius: 6, padding: "2px 6px" }
-  }, "senha inicial"), /*#__PURE__*/React.createElement("div", {
+  }, "senha inicial"),
+  u.auth_uid && tempoEspecial[u.auth_uid] && React.createElement(TempoTag, tempoEspecial[u.auth_uid]),
+  /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 6,
@@ -5915,6 +6285,39 @@ async function toggleFlag(uid, campo, atual, reload) {
   reload();
 }
 
+/* ─── IDs dos usuários com funções especiais ─── */
+const AUTH_UID_VICTOR  = "43b06664-2357-4e82-a1cf-218232e43603";
+const AUTH_UID_CARLOS  = "9514cb90-88d5-4f34-a638-5de3a44772e8";
+const AUTH_UID_SANTUZA = "164f7435-79f6-4aad-aae4-4eee27fad72c";
+
+function calcDeltaMin(createdAt, horaStr) {
+  if (!createdAt || !horaStr) return null;
+  try {
+    const base = new Date(createdAt);
+    const [h, m] = horaStr.split(":").map(Number);
+    if (isNaN(h) || isNaN(m)) return null;
+    const target = new Date(base);
+    target.setHours(h, m, 0, 0);
+    const diff = (target - base) / 60000;
+    return diff >= 0 ? diff : null;
+  } catch { return null; }
+}
+function fmtDelta(min) {
+  if (min === null || min === undefined) return null;
+  if (min < 60) return Math.round(min) + " min";
+  const h = Math.floor(min / 60);
+  const rm = Math.round(min % 60);
+  return h + "h" + (rm > 0 ? String(rm).padStart(2, "0") : "");
+}
+function TempoTag({ label, color, bg }) {
+  if (!label) return null;
+  return React.createElement("span", {
+    style: { fontSize:9, fontWeight:700, padding:"2px 7px", borderRadius:99,
+      background: bg||"#F0F9FF", color: color||"#0369A1",
+      border:`1px solid ${color||"#0369A1"}33`, whiteSpace:"nowrap" }
+  }, label);
+}
+
 /* ════════════════════════════════════════════
    MAIN APP
    ════════════════════════════════════════════ */
@@ -6272,6 +6675,7 @@ function App() {
         sbGet("publications", "order=created_at.desc&label=not.like.*automático*&limit=10")
       ]);
       setCards(c);
+      window.__geCards = c;
       setCols(cl);
       if (s.length) setSettings(s[0]);
       const manualPub = pub.find(p => !(p.label || "").includes("automático"));
@@ -6323,8 +6727,8 @@ function App() {
     try {
       const action = form.id === "new" ? "create" : "update";
       const data = await fn("cards-write", { action, id: form.id, body: form }, userId);
-      if (action === "create") setCards(p => [...p, data]);
-      else setCards(p => p.map(c => c.id === form.id ? data : c));
+      if (action === "create") setCards(p => { const next = [...p, data]; window.__geCards = next; return next; });
+      else setCards(p => { const next = p.map(c => c.id === form.id ? data : c); window.__geCards = next; return next; });
       showT("Salvo.");
     } catch (ex) {
       showT(ex.message, "err");
@@ -6385,7 +6789,7 @@ function App() {
   async function moveCard(cardId, newColId, aceiteData) {
     try {
       const data = await fn("cards-move", { card_id: cardId, new_col_id: newColId, aceite: aceiteData || null }, userId);
-      setCards(p => p.map(c => c.id === cardId ? data : c));
+      setCards(p => { const next = p.map(c => c.id === cardId ? data : c); window.__geCards = next; return next; });
       showT("Card movido.");
     } catch (ex) { showT(ex.message, "err"); }
   }
@@ -7095,7 +7499,7 @@ function App() {
       !loading && view === "dashboard" && /*#__PURE__*/React.createElement("div", { id: "view-content" },
         /*#__PURE__*/React.createElement(Dashboard, { cards: filtered, cols: displayCols, dashMode: dashMode, setDashMode: setDashMode, isAdmin: isAdmin, lastPub: lastPub })
       ),
-      !loading && view === "usuarios" && isAdmin && /*#__PURE__*/React.createElement(UsersPanel, { currentUser: currentUser, userId: userId, showT: showT }),
+      !loading && view === "usuarios" && isAdmin && /*#__PURE__*/React.createElement(UsersPanel, { currentUser: currentUser, userId: userId, showT: showT, cards: cards }),
       !loading && view === "historico" && isAdmin && /*#__PURE__*/React.createElement("div", { id: "view-content" },
         /*#__PURE__*/React.createElement(HistoryPanel, null)
       ),
