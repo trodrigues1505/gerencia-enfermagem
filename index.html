@@ -1162,6 +1162,7 @@ function CardModal({
   const [tsvText, setTsvText] = useState("");
   const [showTsvBox, setShowTsvBox] = useState(false);
   const [tsvStatus, setTsvStatus] = useState("");
+  const [conflito, setConflito] = useState(null);
 
   function runTsvImport() {
     if (!tsvText.trim()) return;
@@ -1526,7 +1527,6 @@ function CardModal({
       const canEdit = (currentUser?.can_prioridade || currentUser?.role === "admin") && form.col_id === "aceite";
       const cardCreatedAt = card.created_at;
       const delta = calcDeltaMin(cardCreatedAt, form.hora_prioridade);
-      const [conflito, setConflito] = React.useState(null);
 
       function handlePrioridade(v, allCards) {
         if (!canEdit) return;
