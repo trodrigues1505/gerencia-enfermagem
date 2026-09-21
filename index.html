@@ -141,7 +141,7 @@ kbd{font-family:monospace;background:#F1F5F9;padding:1px 5px;border-radius:3px;b
   // Qualquer mudança (index.html, sw.js, canon.js, manifest) é anunciada pelo
   // mesmo toast e aplicada pelo mesmo botão. F5 nunca é necessário.
   // ==========================================================================
-  var APP_VERSION = '2026.09.14-3';   // deve bater com version.json
+  var APP_VERSION = '2026.09.20-4';   // deve bater com version.json
 
   var pill  = document.getElementById('ge-version');
   var label = document.getElementById('ge-version-label');
@@ -1237,7 +1237,20 @@ function CardModal({
       variant: "ghost",
       onClick: onClose
     }, "Cancelar"), /*#__PURE__*/React.createElement(Btn, {
-      onClick: () => onSave(form)
+      onClick: () => {
+        // Captura automática de horários no momento do Salvar
+        const formFinal = { ...form };
+        // Hora da prioridade: captura se Victor definiu prioridade mas hora ainda não foi registrada
+        if (formFinal.prioridade_remocao && !formFinal.hora_prioridade) {
+          formFinal.hora_prioridade = nowStr();
+        }
+        // Hora da escala: captura se equipe foi preenchida mas hora ainda não foi registrada
+        const temEquipe = formFinal.enfermeiro_escalado || formFinal.medico_escala || formFinal.tecnico_auxiliar_escala;
+        if (temEquipe && !formFinal.hora_escala_equipe) {
+          formFinal.hora_escala_equipe = nowStr();
+        }
+        onSave(formFinal);
+      }
     }, "Salvar")))
   },
   isAdmin && /*#__PURE__*/React.createElement("div", {style:{marginBottom:10}}, !showTsvBox ? /*#__PURE__*/React.createElement("button", {onClick:function(){setShowTsvBox(true);setTsvStatus("");}, style:{width:"100%",padding:"7px 14px",border:"1px dashed #0369A1",borderRadius:8,background:"#F0F9FF",color:"#0369A1",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit"}}, "📋 Importar do Excel — colar dados da ficha CROSS") : /*#__PURE__*/React.createElement("div",{style:{background:"#F0F9FF",border:"1px solid #BAE6FD",borderRadius:10,padding:12}},/*#__PURE__*/React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#0369A1",marginBottom:4}},"Cole os dados copiados do Excel (com cabeçalho):"),/*#__PURE__*/React.createElement("div",{style:{fontSize:10,color:"#64748B",marginBottom:6}},/*#__PURE__*/React.createElement("span",{style:{fontFamily:"monospace",background:"#E0F2FE",borderRadius:4,padding:"1px 4px"}},"NOME PACIENTE"),"\xa0·\xa0",/*#__PURE__*/React.createElement("span",{style:{fontFamily:"monospace",background:"#E0F2FE",borderRadius:4,padding:"1px 4px"}},"DATA"),"\xa0·\xa0",/*#__PURE__*/React.createElement("span",{style:{fontFamily:"monospace",background:"#E0F2FE",borderRadius:4,padding:"1px 4px"}},"HORA"),"\xa0·\xa0",/*#__PURE__*/React.createElement("span",{style:{fontFamily:"monospace",background:"#E0F2FE",borderRadius:4,padding:"1px 4px"}},"FICHA CROSS"),"\xa0·\xa0","..."),/*#__PURE__*/React.createElement("textarea",{value:tsvText,onChange:function(e){setTsvText(e.target.value);},placeholder:"Cole aqui (Ctrl+V) as células copiadas do Excel. A primeira linha deve ser o cabeçalho das colunas.",rows:5,style:{width:"100%",padding:"8px 10px",border:"1px solid #BAE6FD",borderRadius:7,fontSize:12,fontFamily:"monospace",resize:"vertical",outline:"none",background:"#fff",color:"#0F172A",lineHeight:1.5}}),tsvStatus&&/*#__PURE__*/React.createElement("div",{style:{fontSize:11,color:tsvStatus.startsWith("✓")?"#15803D":"#B45309",marginTop:4,fontWeight:600}},tsvStatus),/*#__PURE__*/React.createElement("div",{style:{display:"flex",gap:8,marginTop:8,justifyContent:"flex-end"}},/*#__PURE__*/React.createElement("button",{onClick:function(){setShowTsvBox(false);setTsvText("");setTsvStatus("");},style:{padding:"5px 12px",border:"1px solid #E2E8F0",borderRadius:7,background:"none",color:"#64748B",cursor:"pointer",fontSize:12,fontFamily:"inherit"}},"Cancelar"),/*#__PURE__*/React.createElement("button",{onClick:runTsvImport,disabled:!tsvText.trim(),style:{padding:"5px 14px",border:"none",borderRadius:7,background:"#0369A1",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit",opacity:!tsvText.trim()?0.6:1}},"📋 Importar")))
@@ -1541,7 +1554,8 @@ function CardModal({
         } else {
           setConflito(null);
           upd("prioridade_remocao", v);
-          if (!form.hora_prioridade) upd("hora_prioridade", nowStr());
+          // Captura o horário no momento da seleção (pode ser sobrescrito pelo Salvar se necessário)
+          upd("hora_prioridade", nowStr());
         }
       }
 
@@ -1569,7 +1583,7 @@ function CardModal({
             React.createElement("button", {
               onClick: () => {
                 upd("prioridade_remocao", conflito.valor);
-                if (!form.hora_prioridade) upd("hora_prioridade", nowStr());
+                upd("hora_prioridade", nowStr());
                 setConflito(null);
               },
               style: { padding: "5px 14px", border: "none", borderRadius: 7, background: "#D97706", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }
@@ -1598,20 +1612,14 @@ function CardModal({
             }, lbl)
           )
         ),
-        /* Hora que o Victor definiu */
-        React.createElement(Field, {
-          label: "Hora em que a prioridade foi definida",
-          fieldKey: "hora_prioridade",
-          value: form.hora_prioridade,
-          onChange: upd,
-          disabled: !canEdit,
-          placeholder: "ex: 14:35"
-        }),
-        form.hora_prioridade && React.createElement("button", {
-          onClick: () => upd("hora_prioridade", nowStr()),
-          disabled: !canEdit,
-          style: { padding: "5px 12px", border: "1px solid #DDD6FE", borderRadius: 7, background: "none", color: "#7C3AED", cursor: "pointer", fontSize: 11, fontWeight: 600, marginBottom: 8 }
-        }, "⟳ Atualizar para agora — " + nowStr()),
+        /* Hora capturada automaticamente ao salvar */
+        form.hora_prioridade && React.createElement("div", {
+          style: { background: "#F5F3FF", border: "1px solid #DDD6FE", borderRadius: 8,
+            padding: "8px 12px", marginTop: 4, fontSize: 11, color: "#6D28D9", fontWeight: 600 }
+        }, "🕐 Prioridade registrada às ", form.hora_prioridade),
+        !form.hora_prioridade && canEdit && React.createElement("div", {
+          style: { fontSize: 11, color: "#94A3B8", fontStyle: "italic", marginTop: 4 }
+        }, "O horário será registrado automaticamente ao salvar."),
         !canEdit && React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", fontStyle: "italic", marginTop: 4 } }, "Somente o Dr. Victor ou a administradora podem definir a prioridade.")
       );
     })()
@@ -1689,23 +1697,14 @@ function CardModal({
             ["Setor de origem", "setor_tecnico_escala", "Ex: UTI", false],
           ]
         }),
-        /* Hora */
-        React.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: 10, marginTop: 4 } },
-          React.createElement("div", { style: { flex: 1 } },
-            React.createElement(Field, {
-              label: "Hora em que a equipe foi escalada",
-              fieldKey: "hora_escala_equipe",
-              value: form.hora_escala_equipe, onChange: upd, disabled: !canEdit,
-              placeholder: "ex: 15:20"
-            })
-          ),
-          canEdit && React.createElement("button", {
-            onClick: () => upd("hora_escala_equipe", nowStr()),
-            style: { padding: "8px 12px", border: "1px solid #BFDBFE", borderRadius: 7,
-              background: "none", color: "#1D4ED8", cursor: "pointer", fontSize: 11,
-              fontWeight: 600, marginBottom: 10, whiteSpace: "nowrap" }
-          }, "⟳ Agora")
-        ),
+        /* Hora capturada automaticamente ao salvar */
+        form.hora_escala_equipe && React.createElement("div", {
+          style: { background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8,
+            padding: "8px 12px", marginTop: 4, fontSize: 11, color: "#1D4ED8", fontWeight: 600 }
+        }, "🕐 Equipe escalada às ", form.hora_escala_equipe),
+        !form.hora_escala_equipe && canEdit && React.createElement("div", {
+          style: { fontSize: 11, color: "#94A3B8", fontStyle: "italic", marginTop: 4 }
+        }, "O horário será registrado automaticamente ao salvar."),
         !canEdit && React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", fontStyle: "italic", marginTop: 4 } },
           "Somente Carlos, Santuza ou a administradora podem escalar a equipe."
         )
