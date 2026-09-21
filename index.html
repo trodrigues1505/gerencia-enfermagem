@@ -141,7 +141,7 @@ kbd{font-family:monospace;background:#F1F5F9;padding:1px 5px;border-radius:3px;b
   // Qualquer mudança (index.html, sw.js, canon.js, manifest) é anunciada pelo
   // mesmo toast e aplicada pelo mesmo botão. F5 nunca é necessário.
   // ==========================================================================
-  var APP_VERSION = '2026.09.20-4';   // deve bater com version.json
+  var APP_VERSION = '2026.09.21-1';   // deve bater com version.json
 
   var pill  = document.getElementById('ge-version');
   var label = document.getElementById('ge-version-label');
@@ -1543,18 +1543,24 @@ function CardModal({
 
       function handlePrioridade(v, allCards) {
         if (!canEdit) return;
-        // Verifica se já existe outro card na coluna aceite com essa prioridade
+        // Limpar prioridade
+        if (!v || v === "") {
+          setConflito(null);
+          upd("prioridade_remocao", "");
+          upd("hora_prioridade", "");
+          return;
+        }
+        // Verifica se já existe outro card na coluna aceite com esse número
         const duplicata = (allCards || []).find(c =>
           c.col_id === "aceite" &&
           c.id !== card.id &&
-          c.prioridade_remocao === v
+          c.prioridade_remocao === String(v)
         );
         if (duplicata) {
           setConflito({ valor: v, nomeConflito: duplicata.nome });
         } else {
           setConflito(null);
-          upd("prioridade_remocao", v);
-          // Captura o horário no momento da seleção (pode ser sobrescrito pelo Salvar se necessário)
+          upd("prioridade_remocao", String(v));
           upd("hora_prioridade", nowStr());
         }
       }
@@ -1574,10 +1580,10 @@ function CardModal({
         /* Aviso de conflito */
         conflito && React.createElement("div", { style: { background: "#FEF3C7", border: "1px solid #FDE68A", borderRadius: 8, padding: "10px 12px", marginBottom: 12, fontSize: 12 } },
           React.createElement("div", { style: { fontWeight: 700, color: "#92400E", marginBottom: 6 } },
-            "⚠️ P" + conflito.valor + " já está atribuída a: " + conflito.nomeConflito
+            "⚠️ Prioridade " + conflito.valor + " já está com: " + conflito.nomeConflito
           ),
           React.createElement("div", { style: { color: "#78350F", marginBottom: 8 } },
-            "Se confirmar, este card fica com P" + conflito.valor + " e o card anterior perde a prioridade."
+            "Se confirmar, este card assume a posição " + conflito.valor + " e o card anterior perde a prioridade."
           ),
           React.createElement("div", { style: { display: "flex", gap: 8 } },
             React.createElement("button", {
@@ -1594,23 +1600,42 @@ function CardModal({
             }, "Cancelar")
           )
         ),
-        /* Seletor de prioridade visível */
-        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 } },
-          [["1","🔴 P1 Urgente"],["2","🟠 P2 Alta"],["3","🟡 P3 Média"],["4","⚪ P4 Rotina"]].map(([v, lbl]) =>
-            React.createElement("button", {
-              key: v,
+        /* Seletor numérico livre de prioridade */
+        React.createElement("div", { style: { marginBottom: 14 } },
+          React.createElement("div", { style: { fontSize: 11, color: "#64748B", marginBottom: 6, fontWeight: 600 } },
+            "Número de prioridade (1 = maior prioridade, sem limite máximo)"
+          ),
+          React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } },
+            React.createElement("input", {
+              type: "number",
+              min: 1,
+              step: 1,
               disabled: !canEdit,
-              onClick: () => handlePrioridade(v, window.__geCards),
+              value: form.prioridade_remocao || "",
+              onChange: e => {
+                const v = e.target.value;
+                if (v === "" || /^[0-9]+$/.test(v)) handlePrioridade(v, window.__geCards);
+              },
               style: {
-                padding: "10px 6px", borderRadius: 10, cursor: canEdit ? "pointer" : "default",
-                border: form.prioridade_remocao === v ? "2px solid #7C3AED" : "1.5px solid #E2E8F0",
-                background: form.prioridade_remocao === v ? "#EDE9FE" : "#F8FAFC",
-                color: form.prioridade_remocao === v ? "#6D28D9" : "#64748B",
-                fontWeight: form.prioridade_remocao === v ? 700 : 400, fontSize: 11, fontFamily: "inherit",
-                textAlign: "center", lineHeight: 1.4
+                width: 100, padding: "10px 14px", borderRadius: 10, fontFamily: "inherit",
+                border: form.prioridade_remocao ? "2px solid #7C3AED" : "1.5px solid #E2E8F0",
+                background: form.prioridade_remocao ? "#EDE9FE" : "#F8FAFC",
+                color: "#6D28D9", fontWeight: 700, fontSize: 22, textAlign: "center",
+                outline: "none"
               }
-            }, lbl)
-          )
+            }),
+            form.prioridade_remocao && React.createElement("div", { style: { fontSize: 13, color: "#6D28D9", fontWeight: 600 } },
+              "P", form.prioridade_remocao, " — posição ", form.prioridade_remocao, " na fila de saída"
+            ),
+            !form.prioridade_remocao && React.createElement("div", { style: { fontSize: 12, color: "#94A3B8" } },
+              "Digite um número para definir a posição na fila"
+            )
+          ),
+          canEdit && React.createElement("button", {
+            onClick: () => { upd("prioridade_remocao", ""); upd("hora_prioridade", ""); },
+            style: { marginTop: 8, padding: "3px 10px", border: "1px solid #E2E8F0", borderRadius: 6,
+              background: "none", color: "#94A3B8", fontSize: 11, cursor: "pointer" }
+          }, "✕ Limpar prioridade")
         ),
         /* Hora capturada automaticamente ao salvar */
         form.hora_prioridade && React.createElement("div", {
@@ -2784,7 +2809,7 @@ function KCard({
       React.createElement("span", {
         style: { fontSize:9, fontWeight:700, padding:"2px 7px", borderRadius:99,
           background:"#EDE9FE", color:"#6D28D9", border:"1px solid #DDD6FE" }
-      }, "🔢 P" + c.prioridade_remocao + (c.hora_prioridade ? " · " + c.hora_prioridade : ""))
+      }, "P" + c.prioridade_remocao)
     ),
     (c.medico_escala || c.enfermeiro_escalado || c.tecnico_auxiliar_escala) && React.createElement("div", {
       style: { marginTop:3, borderTop:"1px solid #BFDBFE", paddingTop:3 }
@@ -5158,7 +5183,16 @@ function TimelineView({
     key: c.id,
     value: c.id
   }, c.label))))), tlMode === "paciente" && /*#__PURE__*/React.createElement(React.Fragment, null, colsOrdered.map(col => {
-    const colCards = filtered.filter(c => c.col_id === col.id);
+    const colCards = (() => {
+      const arr = filtered.filter(c => c.col_id === col.id);
+      if (col.id !== "aceite") return arr;
+      // Ordenar por prioridade numérica: cards sem prioridade vão para o fim
+      return [...arr].sort((a, b) => {
+        const pa = a.prioridade_remocao ? parseInt(a.prioridade_remocao, 10) : 99999;
+        const pb = b.prioridade_remocao ? parseInt(b.prioridade_remocao, 10) : 99999;
+        return pa - pb;
+      });
+    })();
     const accent = col.accent || "#94A3B8";
     return /*#__PURE__*/React.createElement("div", {
       key: col.id,
