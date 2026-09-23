@@ -27,28 +27,31 @@ input,select,textarea,button{font-family:inherit}
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:99px}
 kbd{font-family:monospace;background:#F1F5F9;padding:1px 5px;border-radius:3px;border:1px solid #E2E8F0;font-size:10px}
-/* ── Mobile kanban accordion ── */
-@media (max-width:640px){
-  #kanban-board{flex-direction:column!important;gap:6px!important;overflow-x:visible!important;}
-  #kanban-board>div{min-width:100%!important;max-width:100%!important;flex:none!important;}
-}
-/* ── UsersPanel mobile ── */
-@media (max-width:640px){
-  .users-card{flex-wrap:wrap!important;}
-  .users-perms{display:grid!important;grid-template-columns:1fr 1fr!important;gap:4px!important;width:100%!important;}
-  .users-actions{width:100%!important;justify-content:flex-end!important;}
+/* ── Mobile: kanban accordion ── */
+@media(max-width:640px){
+  #kanban-board{flex-direction:column!important;gap:6px!important;overflow-x:visible!important}
+  #kanban-board>div{min-width:100%!important;max-width:100%!important;flex:none!important}
 }
 /* ── Tooltip ── */
-.tip{position:relative;display:inline-flex;align-items:center}
-.tip:hover .tip-box,.tip:focus-within .tip-box{opacity:1;pointer-events:auto;transform:translateY(0)}
-.tip-box{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%) translateY(4px);
-  background:#0F172A;color:#F1F5F9;font-size:11px;line-height:1.45;font-weight:400;
-  padding:7px 10px;border-radius:8px;width:220px;z-index:9000;
-  opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;white-space:normal;text-align:left}
-.tip-box::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);
+.tip{position:relative;display:inline-flex;align-items:center;cursor:help}
+.tip .tipbox{
+  position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%) translateY(4px);
+  background:#0F172A;color:#F8FAFC;font-size:11px;line-height:1.5;font-weight:400;
+  padding:8px 11px;border-radius:8px;width:230px;z-index:9000;pointer-events:none;
+  opacity:0;transition:opacity .15s,transform .15s;white-space:normal;text-align:left;box-shadow:0 4px 16px rgba(0,0,0,.3)
+}
+.tip .tipbox::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);
   border:5px solid transparent;border-top-color:#0F172A}
-/* ── Ações flutuantes ── */
-#acoes-flutuantes{position:fixed;bottom:56px;right:16px;z-index:8000;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.tip:hover .tipbox,.tip:focus-within .tipbox{opacity:1;transform:translateX(-50%) translateY(0)}
+/* ── Floating actions ── */
+#ge-fab{position:fixed;bottom:20px;right:16px;z-index:8000;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+@media(max-width:640px){#ge-fab{bottom:72px;right:12px}}
+/* ── Mobile modal fixes ── */
+@media(max-width:640px){
+  .modal-shell-inner{max-height:95vh!important;overflow-y:auto!important}
+  .ls-modal{max-height:95vh!important}
+  .ls-grid.ls-g2,.ls-grid.ls-g3{grid-template-columns:1fr!important}
+}
 /* ── Livro de Saída ── */
 .ls-overlay{position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px}
 .ls-modal{background:#fff;border-radius:16px;width:100%;max-width:680px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.35)}
@@ -771,7 +774,8 @@ function ModalShell({
       maxWidth,
       maxHeight: "92vh",
       overflowY: "auto",
-      boxShadow: "0 20px 60px rgba(0,0,0,.22)"
+      boxShadow: "0 20px 60px rgba(0,0,0,.22)",
+      WebkitOverflowScrolling: "touch"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2865,7 +2869,7 @@ function KCard({
       com as clínicas; ficam visualmente apartados.
    ══════════════════════════════════════════════════════════════════════════ */
 
-function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, currentUser }) {
+function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, currentUser, discrepancias }) {
   const [remocoes, setRemocoes] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
@@ -2874,28 +2878,11 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const [ini, setIni] = useState("");
   const [fim, setFim] = useState("");
   const [verPendencias, setVerPendencias] = useState(false);
-  const [discrepDash, setDiscrepDash] = useState([]);
   const [verDiscrep, setVerDiscrep] = useState(false);
   const [justModal, setJustModal] = useState(null);
   const [justTexto, setJustTexto] = useState("");
   const [justSaving, setJustSaving] = useState(false);
   const podeJustificar = isAdmin || !!(currentUser && currentUser.can_justificativa);
-  useEffect(function(){
-    var aceitados = cards.filter(function(c){ return c.col_id==="aceite" && c.rec && c.rec.trim() && !c.prioridade_remocao; });
-    var pendentes  = cards.filter(function(c){ return c.col_id==="pendente" && c.rec && c.rec.trim(); });
-    var PESO = { emergencia:1, urgencia:2, andamento_cor:3, menor_gravidade:4, agendamento:99, retorno:99, finalizado_cor:99 };
-    var out=[];
-    aceitados.forEach(function(a){
-      var pesoA=PESO[a.grav]||99;
-      pendentes.forEach(function(b){
-        if(a.id===b.id) return;
-        if(a.rec.trim().toUpperCase()!==b.rec.trim().toUpperCase()) return;
-        var pesoB=PESO[b.grav]||99;
-        if(pesoA>pesoB) out.push({id:a.id+"_"+b.id, aceitado:a, pendente:b});
-      });
-    });
-    setDiscrepDash(out);
-  }, [cards]);
 
   useEffect(() => {
     let vivo = true;
@@ -3086,10 +3073,10 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
              padding: "16px 18px", ...style }
   }, children);
 
-  const Titulo = ({ children, extra }) => /*#__PURE__*/React.createElement("div", {
+  const Titulo = ({ children, extra, tooltip }) => /*#__PURE__*/React.createElement("div", {
     style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }
   },
-    /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#0F172A", letterSpacing: ".01em" } }, children),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#0F172A", letterSpacing: ".01em", display:"flex", alignItems:"center", gap:3 } }, children, tooltip && React.createElement(TipIcon,{texto:tooltip})),
     extra && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10.5, color: "#94A3B8" } }, extra)
   );
 
@@ -3135,24 +3122,16 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     style: { fontSize: 11.5, color: "#CBD5E1", padding: "14px 0", textAlign: "center" }
   }, children);
 
-  var Tip = function(props){
-    return /*#__PURE__*/React.createElement("span",{className:"tip"},
-      props.children,
-      /*#__PURE__*/React.createElement("span",{className:"tip-box"},props.texto)
-    );
-  };
-  var TipIcon = function(props){
-    return /*#__PURE__*/React.createElement("span",{className:"tip",style:{cursor:"help",marginLeft:4,color:"#CBD5E1",fontSize:10}},
-      "?",
-      /*#__PURE__*/React.createElement("span",{className:"tip-box"},props.texto)
-    );
-  };
+  function TipIcon(props) {
+    return React.createElement("span", {className:"tip", style:{marginLeft:4,color:"#CBD5E1",fontSize:10,fontWeight:700,verticalAlign:"middle",userSelect:"none"}},
+      "?", React.createElement("span", {className:"tipbox"}, props.texto));
+  }
   const Kpi = ({ label, valor, sub, cor, alerta, tooltip }) => /*#__PURE__*/React.createElement(Card, {
     style: alerta ? { borderColor: "#FDE68A", background: "#FFFBEB" } : null
   },
     /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 10.5, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 8, display:"flex", alignItems:"center" }
-    }, label, tooltip && /*#__PURE__*/React.createElement(TipIcon, {texto: tooltip})),
+      style: { fontSize: 10.5, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 8, display:"flex", alignItems:"center", gap:2 }
+    }, label, tooltip && React.createElement(TipIcon, {texto: tooltip})),
     /*#__PURE__*/React.createElement("div", {
       style: { fontSize: 27, fontWeight: 700, color: cor || "#0F172A", lineHeight: 1, fontVariantNumeric: "tabular-nums" }
     }, typeof valor === "number" ? /*#__PURE__*/React.createElement(Num, { valor }) : valor),
@@ -3261,25 +3240,25 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Remoções", valor: dados.length,
         sub: amplitude.dias ? `${(dados.length / Math.max(amplitude.dias, 1)).toFixed(1)} por dia` : null,
-        tooltip: "Total de remoções registradas na planilha no período selecionado. Inclui todos os desfechos (finalizadas, canceladas, etc)." }),
+        tooltip: "Total de saídas registradas na planilha no período selecionado. Fonte: planilha de remoções." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Ambulância avançada",
         valor: gAmb.informados ? `${((gAmb.itens.find(i => i.canonico === "AVANÇADA")?.n || 0) / gAmb.informados * 100).toFixed(0)}%` : "—",
         sub: `${gAmb.informados} de ${gAmb.total} informados`,
         alerta: gAmb.cobertura < 80,
-        tooltip: "Percentual de remoções que usaram ambulância de Suporte Avançado de Vida (SAV). Calculado sobre registros com tipo de ambulância preenchido." }),
+        tooltip: "% de remoções que usaram SAV (Suporte Avançado de Vida). Calculado só sobre registros com tipo de ambulância preenchido — o denominador aparece abaixo." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Resposta da CROSS", valor: fmtMin(tempos.respCross.mediana),
         sub: `mediana · ${tempos.respCross.n} com horário`, cor: "#0369A1",
-        tooltip: "Tempo mediano entre a hora da solicitação e a hora da resposta da CROSS. Calculado apenas para registros com ambos os horários preenchidos. Mediana (não média) para evitar distorção por casos extremos." }),
+        tooltip: "Tempo mediano entre a hora da solicitação e a hora da resposta da CROSS. Usa mediana (não média) para não ser distorcido por esperas extremas. Calculado só para registros com ambos os horários." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Duração da remoção", valor: fmtMin(tempos.remocao.mediana),
         sub: `mediana · ${tempos.remocao.n} com horário`, cor: "#0369A1",
-        tooltip: "Tempo mediano entre a saída da ambulância e o horário de retorno. Calculado apenas para registros com saída e retorno preenchidos." }),
+        tooltip: "Tempo mediano que a ambulância ficou fora: da saída ao retorno à Santa Casa. Mediana para não ser distorcido por casos extremos." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Permaneceu", valor: perm.base ? `${perm.pct.toFixed(0)}%` : "—",
         sub: `${perm.n} de ${perm.base} com desfecho`, alerta: perm.base < dados.length * 0.8,
-        tooltip: "Percentual de pacientes que permaneceram na unidade de origem sem ser efetivamente removidos. Calculado sobre registros com campo 'Permaneceu' ou 'Finalizado' preenchido." })
+        tooltip: "% de pacientes que foram para a unidade de destino e ficaram lá — não retornaram à Santa Casa. Calculado só sobre registros com desfecho marcado." })
     ),
 
     /* ══ Série temporal ══ */
@@ -3311,7 +3290,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
       /* Gravidade — proporção importa mais que valor absoluto */
       /*#__PURE__*/React.createElement(Card, null,
-        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gGrav }) }, "Gravidade"),
+        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gGrav }), tooltip: "Distribuição por nível de urgência do paciente conforme registrado na planilha. VERMELHO=emergência, AMARELO=urgência, VERDE=menor gravidade." }, "Gravidade"),
         gGrav.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
         /*#__PURE__*/React.createElement(React.Fragment, null,
           /*#__PURE__*/React.createElement("div", {
@@ -3332,7 +3311,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
       /* Especialidades — recursos apartados das clínicas */
       /*#__PURE__*/React.createElement(Card, null,
-        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gEspec }) }, "Recursos solicitados"),
+        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gEspec }), tooltip: "Especialidades e exames solicitados à CROSS. Recursos (exames, procedimentos) ficam separados das especialidades clínicas pois não competem pelas mesmas vagas." }, "Recursos solicitados"),
         gEspec.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
         /*#__PURE__*/React.createElement(React.Fragment, null,
           recursos.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -3350,7 +3329,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
       /* Hospitais */
       /*#__PURE__*/React.createElement(Card, null,
-        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gHosp }) }, "Instituições de destino"),
+        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gHosp }), tooltip: "Hospitais e unidades que receberam os pacientes. Mostra para onde a Santa Casa mais encaminha." }, "Instituições de destino"),
         gHosp.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
         gHosp.itens.map(i => /*#__PURE__*/React.createElement(Barra, {
           key: i.canonico,
@@ -3360,7 +3339,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
       /* Setor — rótulo honesto: é o que a CROSS informa, não a unidade real */
       /*#__PURE__*/React.createElement(Card, null,
-        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gSetor }) }, "Setor informado na CROSS"),
+        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gSetor }), tooltip: "Setor/especialidade solicitante informado na ficha CROSS. Atencao: Clinica Medica indica quem fez o pedido, nao onde o paciente esta internado." }, "Setor informado na CROSS"),
         /*#__PURE__*/React.createElement("div", {
           style: { fontSize: 10.5, color: "#94A3B8", marginTop: -8, marginBottom: 12, lineHeight: 1.5 }
         }, '"Clínica Médica" na ficha indica a especialidade solicitante, não onde o paciente está.'),
@@ -3373,7 +3352,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
       /* Status */
       /*#__PURE__*/React.createElement(Card, null,
-        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gStatus }) }, "Desfecho"),
+        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gStatus }), tooltip: "O que aconteceu com cada remocao: paciente transferido, evadiu, resolvido localmente etc. Campo status da planilha." }, "Desfecho"),
         gStatus.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
         gStatus.itens.map(i => /*#__PURE__*/React.createElement(Barra, {
           key: i.canonico,
@@ -3383,7 +3362,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
       /* Ambulância */
       /*#__PURE__*/React.createElement(Card, null,
-        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gAmb }) }, "Tipo de ambulância"),
+        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gAmb }), tooltip: "Básica (SBV) = apenas técnico e motorista. Avançada (SAV) = médico a bordo, usada em casos críticos. O percentual de avançada é um indicador de gravidade da demanda." }, "Tipo de ambulância"),
         gAmb.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
         gAmb.itens.map(i => /*#__PURE__*/React.createElement(Barra, {
           key: i.canonico, label: i.canonico, n: i.n, pct: i.pct, max: gAmb.itens[0].n,
@@ -3433,48 +3412,48 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     ,
 
     /* ══ Discrepâncias de fila ══ */
-    discrepDash.length > 0 && /*#__PURE__*/React.createElement("div", {
-      style: { marginTop: 14, background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 12, overflow: "hidden" }
+    discrepancias && discrepancias.length > 0 && React.createElement("div", {
+      style:{marginTop:14,background:"#FEF2F2",border:"1px solid #FCA5A5",borderRadius:12,overflow:"hidden"}
     },
-      /*#__PURE__*/React.createElement("div", {
-        onClick: function(){ setVerDiscrep(function(v){return !v;}); },
-        style: { padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }
+      React.createElement("div", {
+        onClick:function(){setVerDiscrep(function(v){return !v;});},
+        style:{padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}
       },
-        /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
-          /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: "#B91C1C" } }, "⚠️ " + discrepDash.length + " discrepânci" + (discrepDash.length === 1 ? "a" : "as") + " de fila"),
-          /*#__PURE__*/React.createElement("span", { className: "tip", style: { cursor: "help" } },
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: "#EF4444", borderRadius: 99, border: "1px solid #FCA5A5", padding: "1px 6px" } }, "?"),
-            /*#__PURE__*/React.createElement("span", { className: "tip-box" }, "Paciente menos grave com aceite confirmado na mesma especialidade que um mais grave ainda pendente, sem prioridade médica definida. Indica possível inversão de fila.")
+        React.createElement("div", {style:{display:"flex",alignItems:"center",gap:8}},
+          React.createElement("span", {style:{fontSize:13,fontWeight:700,color:"#B91C1C"}},
+            "\u26A0\uFE0F " + discrepancias.length + " discrepânci" + (discrepancias.length===1?"a":"as") + " de fila"),
+          React.createElement("span", {className:"tip"},
+            React.createElement("span", {style:{fontSize:10,color:"#EF4444",border:"1px solid #FCA5A5",borderRadius:99,padding:"1px 6px"}},"?"),
+            React.createElement("span", {className:"tipbox"}, "Paciente menos grave com aceite confirmado, mesma especialidade que outro mais grave ainda pendente, sem avaliação médica registrada. Pode indicar inversão de fila.")
           )
         ),
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: "#94A3B8" } }, verDiscrep ? "ocultar" : "ver casos")
+        React.createElement("span", {style:{fontSize:11,color:"#94A3B8"}}, verDiscrep?"ocultar":"ver casos")
       ),
-      verDiscrep && /*#__PURE__*/React.createElement("div", { style: { padding: "0 16px 14px" } },
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#64748B", marginBottom: 10, lineHeight: 1.55 } },
-          "Cada caso: um paciente de menor gravidade teve aceite confirmado antes de um mais grave da mesma especialidade, sem avaliação médica registrada. ",
-          podeJustificar ? "Clique em Justificar para registrar a razão clínica." : "Peça ao coordenador para justificar."
+      verDiscrep && React.createElement("div", {style:{padding:"0 16px 14px"}},
+        React.createElement("div", {style:{fontSize:11,color:"#64748B",marginBottom:10,lineHeight:1.55}},
+          "Cada caso: paciente de menor gravidade teve aceite antes de um mais grave da mesma especialidade, sem prioridade médica definida. ",
+          podeJustificar?"Clique em Justificar para registrar a razão clínica.":"Peça ao coordenador médico para justificar."
         ),
-        discrepDash.map(function(disc, i){
+        (discrepancias||[]).map(function(disc,i){
           var a=disc.aceitado, b=disc.pendente;
           var gcA=GC[a.grav]||GC.urgencia, gcB=GC[b.grav]||GC.urgencia;
-          return /*#__PURE__*/React.createElement("div", {
-            key: disc.id,
-            style: { padding: "10px 0", borderTop: i ? "1px solid #FEE2E2" : "none", display: "flex", gap: 10, alignItems: "flex-start", flexWrap: "wrap" }
+          return React.createElement("div", {
+            key:disc.id,
+            style:{padding:"10px 0",borderTop:i?"1px solid #FEE2E2":"none",display:"flex",gap:10,alignItems:"flex-start",flexWrap:"wrap"}
           },
-            /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 200 } },
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#374151", marginBottom: 3 } },
-                /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, color: gcA.text, background: gcA.bg, border: "1px solid " + gcA.border, borderRadius: 4, padding: "1px 5px", fontSize: 10 } }, gcA.label),
-                " ", a.nome, /*#__PURE__*/React.createElement("span", { style: { color: "#94A3B8", marginLeft: 4, fontSize: 10 } }, "(aceito) " + (a.rec || ""))
+            React.createElement("div", {style:{flex:1,minWidth:180}},
+              React.createElement("div", {style:{fontSize:11,color:"#374151",marginBottom:3}},
+                React.createElement("span", {style:{fontWeight:700,color:gcA.text,background:gcA.bg,border:"1px solid "+gcA.border,borderRadius:4,padding:"1px 5px",fontSize:10}}, gcA.label),
+                " ", a.nome, React.createElement("span", {style:{color:"#94A3B8",marginLeft:4,fontSize:10}}, "(aceito \u2022 "+a.rec+")")
               ),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#374151" } },
-                "aguarda: ",
-                /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, color: gcB.text, background: gcB.bg, border: "1px solid " + gcB.border, borderRadius: 4, padding: "1px 5px", fontSize: 10 } }, gcB.label),
+              React.createElement("div", {style:{fontSize:11,color:"#374151"}},
+                "espera: ", React.createElement("span", {style:{fontWeight:700,color:gcB.text,background:gcB.bg,border:"1px solid "+gcB.border,borderRadius:4,padding:"1px 5px",fontSize:10}}, gcB.label),
                 " ", b.nome
               )
             ),
-            podeJustificar && /*#__PURE__*/React.createElement("button", {
-              onClick: function(){ setJustModal(disc); setJustTexto(""); },
-              style: { flexShrink: 0, padding: "5px 14px", border: "none", borderRadius: 7, background: "#0F172A", color: "#fff", fontWeight: 700, fontSize: 11, cursor: "pointer" }
+            podeJustificar && React.createElement("button", {
+              onClick:function(){setJustModal(disc);setJustTexto("");},
+              style:{flexShrink:0,padding:"5px 14px",border:"none",borderRadius:7,background:"#0F172A",color:"#fff",fontWeight:700,fontSize:11,cursor:"pointer"}
             }, "Justificar")
           );
         })
@@ -3482,54 +3461,46 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     ),
 
     /* ── Modal de justificativa ── */
-    justModal && /*#__PURE__*/React.createElement("div", {
-      onClick: function(e){ if(e.target===e.currentTarget){ setJustModal(null); } },
-      style: { position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 16 }
+    justModal && React.createElement("div", {
+      onClick:function(e){if(e.target===e.currentTarget)setJustModal(null);},
+      style:{position:"fixed",inset:0,background:"rgba(15,23,42,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:16}
     },
-      /*#__PURE__*/React.createElement("div", {
-        style: { background: "#fff", borderRadius: 16, width: "100%", maxWidth: 460, boxShadow: "0 20px 60px rgba(0,0,0,.25)", overflow: "hidden" }
-      },
-        /*#__PURE__*/React.createElement("div", { style: { padding: "14px 20px", borderBottom: "1px solid #F1F5F9", background: "#FEF2F2" } },
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#B91C1C", textTransform: "uppercase", letterSpacing: ".05em" } }, "Justificativa de discrepância"),
-          /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 14, color: "#0F172A", marginTop: 2 } }, "Por que este paciente tem prioridade?")
+      React.createElement("div", {style:{background:"#fff",borderRadius:16,width:"100%",maxWidth:460,boxShadow:"0 20px 60px rgba(0,0,0,.25)",overflow:"hidden"}},
+        React.createElement("div", {style:{padding:"14px 20px",borderBottom:"1px solid #F1F5F9",background:"#FEF2F2"}},
+          React.createElement("div", {style:{fontSize:10,fontWeight:700,color:"#B91C1C",textTransform:"uppercase",letterSpacing:".05em"}}, "Justificativa de discrepância"),
+          React.createElement("div", {style:{fontWeight:700,fontSize:14,color:"#0F172A",marginTop:2}}, "Por que este paciente tem prioridade?")
         ),
-        /*#__PURE__*/React.createElement("div", { style: { padding: "16px 20px" } },
-          /*#__PURE__*/React.createElement("div", { style: { background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, padding: "10px 12px", marginBottom: 14, fontSize: 12 } },
-            /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, marginBottom: 2 } }, justModal.aceitado.nome,
-              /*#__PURE__*/React.createElement("span", { style: { fontWeight: 400, color: "#94A3B8", marginLeft: 6, fontSize: 11 } }, "(" + (GC[justModal.aceitado.grav] && GC[justModal.aceitado.grav].label || "") + ") aceito")),
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#64748B" } }, "Especialidade: " + (justModal.aceitado.rec || "—")),
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#64748B", marginTop: 4 } }, "Aguarda: " + justModal.pendente.nome + " (" + ((GC[justModal.pendente.grav] && GC[justModal.pendente.grav].label) || "") + ")")
+        React.createElement("div", {style:{padding:"16px 20px"}},
+          React.createElement("div", {style:{background:"#F8FAFC",border:"1px solid #E2E8F0",borderRadius:8,padding:"10px 12px",marginBottom:14,fontSize:12}},
+            React.createElement("div", {style:{fontWeight:700,marginBottom:2}}, justModal.aceitado.nome,
+              React.createElement("span", {style:{fontWeight:400,color:"#94A3B8",marginLeft:6,fontSize:11}},
+                "(" + ((GC[justModal.aceitado.grav]&&GC[justModal.aceitado.grav].label)||"") + ") \u2022 " + (justModal.aceitado.rec||""))),
+            React.createElement("div", {style:{fontSize:11,color:"#64748B",marginTop:4}},
+              "Aguarda: ", justModal.pendente.nome, " (", (GC[justModal.pendente.grav]&&GC[justModal.pendente.grav].label)||"", ")")
           ),
-          /*#__PURE__*/React.createElement("label", { style: { fontSize: 11, fontWeight: 700, color: "#374151", display: "block", marginBottom: 6 } }, "Justificativa clínica *"),
-          /*#__PURE__*/React.createElement("textarea", {
-            rows: 4,
-            value: justTexto,
-            onChange: function(e){ setJustTexto(e.target.value); },
-            placeholder: "Ex: Paciente com protocolo de dor torácica, aguarda resultado de exame. Complicação aguda sobreposta justifica prioridade...",
-            style: { width: "100%", padding: "9px 11px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, fontFamily: "inherit", resize: "vertical", outline: "none", lineHeight: 1.5 }
+          React.createElement("label", {style:{fontSize:11,fontWeight:700,color:"#374151",display:"block",marginBottom:6}}, "Justificativa cl\xednica *"),
+          React.createElement("textarea", {
+            rows:4, value:justTexto,
+            onChange:function(e){setJustTexto(e.target.value);},
+            placeholder:"Ex: Protocolo de dor tor\xe1cica, aguarda exame. Complicação aguda justifica prioridade...",
+            style:{width:"100%",padding:"9px 11px",border:"1.5px solid #E2E8F0",borderRadius:8,fontSize:13,fontFamily:"inherit",resize:"vertical",outline:"none",lineHeight:1.5}
           })
         ),
-        /*#__PURE__*/React.createElement("div", { style: { padding: "10px 20px", borderTop: "1px solid #F1F5F9", display: "flex", gap: 8, justifyContent: "flex-end" } },
-          /*#__PURE__*/React.createElement("button", {
-            onClick: function(){ setJustModal(null); },
-            style: { padding: "7px 16px", borderRadius: 8, border: "1px solid #E2E8F0", background: "none", color: "#64748B", fontWeight: 600, fontSize: 13, cursor: "pointer" }
-          }, "Cancelar"),
-          /*#__PURE__*/React.createElement("button", {
-            disabled: !justTexto.trim() || justSaving,
-            onClick: async function(){
-              if(!justTexto.trim()) return;
-              setJustSaving(true);
-              var disc=justModal;
+        React.createElement("div", {style:{padding:"10px 20px",borderTop:"1px solid #F1F5F9",display:"flex",gap:8,justifyContent:"flex-end"}},
+          React.createElement("button", {onClick:function(){setJustModal(null);},style:{padding:"7px 16px",borderRadius:8,border:"1px solid #E2E8F0",background:"none",color:"#64748B",fontWeight:600,fontSize:13,cursor:"pointer"}}, "Cancelar"),
+          React.createElement("button", {
+            disabled:!justTexto.trim()||justSaving,
+            onClick:async function(){
+              if(!justTexto.trim())return; setJustSaving(true);
+              var d=justModal;
               try{
-                var payload={card_id:disc.aceitado.id,card_nome:disc.aceitado.nome,card_grav:disc.aceitado.grav,conflito_card_id:disc.pendente.id,conflito_card_nome:disc.pendente.nome,conflito_card_grav:disc.pendente.grav,justificativa:justTexto.trim(),justificado_por_nome:(currentUser&&currentUser.nome)||""};
-                await fetch(SB_URL+"/rest/v1/discrepancia_justificativas",{method:"POST",headers:Object.assign({},H(),{"Prefer":"return=minimal"}),body:JSON.stringify(payload)});
-                setDiscrepDash(function(p){return p.filter(function(d){return d.id!==disc.id;});});
-                setJustModal(null);
-              }catch(ex){}
+                await fetch(SB_URL+"/rest/v1/discrepancia_justificativas",{method:"POST",headers:Object.assign({},H(),{Prefer:"return=minimal"}),body:JSON.stringify({card_id:d.aceitado.id,card_nome:d.aceitado.nome,card_grav:d.aceitado.grav,conflito_card_id:d.pendente.id,conflito_card_nome:d.pendente.nome,conflito_card_grav:d.pendente.grav,justificativa:justTexto.trim(),justificado_por_nome:(currentUser&&currentUser.nome)||""})});
+                setJustModal(null); showT("Justificativa registrada.");
+              }catch(ex){showT("Erro ao salvar: "+ex.message,"err");}
               setJustSaving(false);
             },
-            style: { padding: "7px 20px", borderRadius: 8, border: "none", background: "#0F172A", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: !justTexto.trim()||justSaving ? 0.6 : 1 }
-          }, justSaving ? "Salvando…" : "Registrar")
+            style:{padding:"7px 20px",borderRadius:8,border:"none",background:"#0F172A",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",opacity:(!justTexto.trim()||justSaving)?0.6:1}
+          }, justSaving?"Salvando...":"Registrar")
         )
       )
     ),
@@ -3629,7 +3600,7 @@ Isso vai substituir a visualização atual pelos dados desse snapshot.`)) return
         fontWeight: 700,
         color: "#0F172A"
       }
-    }, isAuto ? (pub.label || "Snapshot automático") : ("Publicação " + new Date(pub.created_at).toLocaleString("pt-BR", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}))), isAuto && /*#__PURE__*/React.createElement("span", {
+    }, isAuto?(pub.label||"Snapshot automático"):("Publicação " + new Date(pub.created_at).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}))), isAuto && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 9,
         fontWeight: 700,
@@ -4310,7 +4281,6 @@ function UsersPanel({
     }
   }, "Admin")), !loading && users.filter(u => u.coren !== "299283").map(u => /*#__PURE__*/React.createElement("div", {
     key: u.id,
-    className: "users-card",
     style: {
       background: "#fff",
       border: "1px solid #E2E8F0",
@@ -4318,9 +4288,8 @@ function UsersPanel({
       padding: "12px 16px",
       marginBottom: 8,
       display: "flex",
-      alignItems: "flex-start",
-      flexWrap: "wrap",
-      gap: 10
+      alignItems: "center",
+      gap: 12
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -4405,11 +4374,11 @@ function UsersPanel({
     onClick: () => toggleFlag(u.id, "can_justificativa", u.can_justificativa, load),
     className: "can-livro-toggle" + (u.can_justificativa ? " on" : ""),
     title: u.can_justificativa ? "Revogar: justificar discrepâncias" : "Liberar: justificar discrepâncias no Dashboard"
-  }, u.can_justificativa ? "⚤ Justif. ✓" : "⚤ Justif."),
+  }, u.can_justificativa ? "⚖ Justif. ✓" : "⚖ Justif."),
   /*#__PURE__*/React.createElement("button", {
     onClick: () => resetarSenha(u),
     className: "can-livro-toggle",
-    title: "Redefinir a senha para o registro profissional (volta para o número do registro)"
+    title: "Redefinir a senha para o registro profissional"
   }, "🔑 Senha"),
   u.senha_trocada === false && u.auth_uid && /*#__PURE__*/React.createElement("span", {
     title: "Ainda não trocou a senha inicial",
@@ -6517,42 +6486,42 @@ function TempoTag({ label, color, bg }) {
   }, label);
 }
 
-/* ── FloatingActions: painel flutuante de alertas ── */
-function FloatingActions({ cards, discrepancias, setView, cols }) {
+/* ── FloatingActions: balão flutuante de alertas (admin only) ── */
+function FloatingActions({ cards, discrepancias, pendencias, setView }) {
   var [open, setOpen] = React.useState(false);
-  var pendenteSemHosp = cards.filter(function(c){ return !c.hosp && c.col_id !== "finalizado"; }).length;
-  var emergPendente = cards.filter(function(c){ return c.grav==="emergencia" && c.col_id==="pendente"; }).length;
-  var disc = discrepancias ? discrepancias.length : 0;
-  var total = pendenteSemHosp + emergPendente + disc;
+  var emergP  = (cards||[]).filter(function(c){return c.grav==="emergencia"&&c.col_id==="pendente";}).length;
+  var semHosp = (cards||[]).filter(function(c){return !c.hosp&&c.col_id!=="finalizado";}).length;
+  var disc    = (discrepancias||[]).length;
+  var pend    = (pendencias||0);
+  var total   = emergP + disc + pend + (semHosp > 0 ? 1 : 0);
   if(total === 0) return null;
   var items = [];
-  if(emergPendente > 0) items.push({ cor:"#EF4444", label: emergPendente + " emergência" + (emergPendente>1?"s":"") + " pendente" + (emergPendente>1?"s":""), acao: function(){ setView("kanban"); }, dica: "Clique para ir ao Kanban" });
-  if(disc > 0) items.push({ cor:"#F59E0B", label: disc + " discrepânci" + (disc===1?"a":"as") + " de fila", acao: function(){ setView("dashboard"); }, dica: "Clique para ver no Dashboard" });
-  if(pendenteSemHosp > 0) items.push({ cor:"#94A3B8", label: pendenteSemHosp + " card" + (pendenteSemHosp>1?"s":"") + " sem hospital", acao: function(){ setView("kanban"); }, dica: "Cards sem hospital receptor definido" });
-  return React.createElement("div", { id: "acoes-flutuantes" },
+  if(emergP>0)   items.push({cor:"#EF4444",label:emergP+" emergênci"+(emergP===1?"a":"as")+" pendente"+(emergP===1?"":"s"),acao:function(){setView("kanban");},dica:"Pacientes com emergência aguardando aceite"});
+  if(disc>0)     items.push({cor:"#F59E0B",label:disc+" discrepânci"+(disc===1?"a":"as")+" de fila",acao:function(){setView("dashboard");},dica:"Menor gravidade com aceite antes de mais grave na mesma especialidade"});
+  if(pend>0)     items.push({cor:"#B91C1C",label:pend+" valor"+(pend===1?"":"es")+" a corrigir",acao:function(){setView("dashboard");},dica:"Valores não classificados na planilha de remoções"});
+  if(semHosp>0)  items.push({cor:"#94A3B8",label:semHosp+" card"+(semHosp===1?"":"s")+" sem hospital",acao:function(){setView("kanban");},dica:"Cards ativos sem hospital receptor definido"});
+  return React.createElement("div", {id:"ge-fab"},
     open && React.createElement("div", {
-      style: { background: "#0F172A", borderRadius: 12, padding: "10px 14px", minWidth: 220, boxShadow: "0 8px 32px rgba(0,0,0,.3)", marginBottom: 6 }
+      style:{background:"#0F172A",borderRadius:12,padding:"10px 14px",minWidth:230,boxShadow:"0 8px 32px rgba(0,0,0,.3)",marginBottom:6}
     },
-      React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 } }, "Ações pendentes"),
-      items.map(function(item, i){
+      React.createElement("div", {style:{fontSize:10,fontWeight:700,color:"#475569",textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}, "A\u00E7\u00F5es pendentes"),
+      items.map(function(item,i){
         return React.createElement("div", {
-          key: i,
-          onClick: function(){ item.acao(); setOpen(false); },
-          title: item.dica,
-          style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: i ? "1px solid #1E293B" : "none", cursor: "pointer" }
+          key:i, onClick:function(){item.acao();setOpen(false);}, title:item.dica,
+          style:{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderTop:i?"1px solid #1E293B":"none",cursor:"pointer"}
         },
-          React.createElement("div", { style: { width: 8, height: 8, borderRadius: "50%", background: item.cor, flexShrink: 0 } }),
-          React.createElement("span", { style: { fontSize: 12, color: "#F1F5F9", flex: 1 } }, item.label),
-          React.createElement("span", { style: { fontSize: 10, color: "#475569" } }, "\u2192")
+          React.createElement("div", {style:{width:8,height:8,borderRadius:"50%",background:item.cor,flexShrink:0}}),
+          React.createElement("span", {style:{fontSize:12,color:"#F1F5F9",flex:1}}, item.label),
+          React.createElement("span", {style:{fontSize:11,color:"#475569"}}, "\u2192")
         );
       })
     ),
     React.createElement("button", {
-      onClick: function(){ setOpen(function(p){ return !p; }); },
-      style: { width: 44, height: 44, borderRadius: "50%", border: "none", background: "#EF4444", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 16px rgba(239,68,68,.5)", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }
+      onClick:function(){setOpen(function(p){return !p;});},
+      style:{width:46,height:46,borderRadius:"50%",border:"none",background:"#EF4444",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 16px rgba(239,68,68,.4)",display:"flex",alignItems:"center",justifyContent:"center",position:"relative",flexShrink:0}
     },
       React.createElement("span", null, total),
-      React.createElement("span", { style: { position: "absolute", top: -2, right: -2, width: 12, height: 12, borderRadius: "50%", background: "#F59E0B", border: "2px solid #fff" } })
+      React.createElement("span", {style:{position:"absolute",top:-2,right:-2,width:10,height:10,borderRadius:"50%",background:"#F59E0B",border:"2px solid #fff"}})
     )
   );
 }
@@ -7095,48 +7064,42 @@ function App() {
     if (dragOverCol.current === colId) dragOverCol.current = null;
   }
 
-  /* ── Reordenar colunas (drag de colunas inteiras) ── */
+  /* ── Reordenar colunas ── */
   function handleColDragStart(e, colId) {
     dragColId.current = colId;
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/col", colId);
     requestAnimationFrame(function(){ if(e.currentTarget) e.currentTarget.style.opacity=".45"; });
   }
-  function handleColDragEnd(e) {
-    dragColId.current = null;
-    if(e.currentTarget) e.currentTarget.style.opacity="1";
-  }
+  function handleColDragEnd(e) { dragColId.current=null; if(e.currentTarget) e.currentTarget.style.opacity="1"; }
   async function handleColDrop(e, targetColId) {
     e.preventDefault(); e.stopPropagation();
-    var srcId = dragColId.current || e.dataTransfer.getData("text/col");
-    if(!srcId || srcId===targetColId) return;
-    var arr = cols.slice();
-    var si=arr.findIndex(function(c){return c.id===srcId;}), ti=arr.findIndex(function(c){return c.id===targetColId;});
+    var srcId=dragColId.current||e.dataTransfer.getData("text/col");
+    if(!srcId||srcId===targetColId) return;
+    var arr=cols.slice(), si=arr.findIndex(function(c){return c.id===srcId;}), ti=arr.findIndex(function(c){return c.id===targetColId;});
     if(si<0||ti<0) return;
-    var moved=arr.splice(si,1)[0]; arr.splice(ti,0,moved);
-    setCols(arr);
-    showT("Colunas reordenadas. (A ordem será salva quando publicar.)");
+    var moved=arr.splice(si,1)[0]; arr.splice(ti,0,moved); setCols(arr);
+    showT("Colunas reordenadas. A ordem será salva ao publicar.");
   }
 
-  /* ── Discrepâncias (Caso A): aceite com menor gravidade, mesma especialidade, sem prioridade médica ── */
-  const GRAV_PESO_D = { emergencia:1, urgencia:2, andamento_cor:3, menor_gravidade:4, agendamento:99, retorno:99, finalizado_cor:99 };
+  /* ── Discrepâncias (Caso A): menor grav com aceite, mesma especialidade, sem prioridade médica ── */
+  const GRAV_PESO_D = {emergencia:1,urgencia:2,andamento_cor:3,menor_gravidade:4,agendamento:99,retorno:99,finalizado_cor:99};
   const discrepancias = useMemo(function(){
     if(!isAdmin) return [];
-    var aceitados = cards.filter(function(c){ return c.col_id==="aceite" && c.rec && c.rec.trim() && !c.prioridade_remocao; });
-    var pendentes  = cards.filter(function(c){ return c.col_id==="pendente" && c.rec && c.rec.trim(); });
-    var out = [];
-    aceitados.forEach(function(a){
-      var pesoA = GRAV_PESO_D[a.grav]||99;
-      pendentes.forEach(function(b){
+    var ac=cards.filter(function(c){return c.col_id==="aceite"&&c.rec&&c.rec.trim()&&!c.prioridade_remocao;});
+    var pe=cards.filter(function(c){return c.col_id==="pendente"&&c.rec&&c.rec.trim();});
+    var out=[];
+    ac.forEach(function(a){
+      var pA=GRAV_PESO_D[a.grav]||99;
+      pe.forEach(function(b){
         if(a.id===b.id) return;
-        var recA=a.rec.trim().toUpperCase(), recB=b.rec.trim().toUpperCase();
-        if(recA!==recB) return;
-        var pesoB=GRAV_PESO_D[b.grav]||99;
-        if(pesoA>pesoB) out.push({id:a.id+"_"+b.id, aceitado:a, pendente:b});
+        if(a.rec.trim().toUpperCase()!==b.rec.trim().toUpperCase()) return;
+        var pB=GRAV_PESO_D[b.grav]||99;
+        if(pA>pB) out.push({id:a.id+"_"+b.id,aceitado:a,pendente:b});
       });
     });
     return out;
-  }, [cards, isAdmin]);
+  },[cards,isAdmin]);
 
   /* ── Comments ── */
   async function onAddComment(cardId, texto) {
@@ -7733,8 +7696,8 @@ function App() {
     /* Conteúdo principal */
     /*#__PURE__*/React.createElement("div", { style: { maxWidth: 1600, margin: "0 auto", padding: "16px 20px" } },
       /* Barra de navegação e filtros */
-      /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 14, alignItems: "center", flexWrap: "wrap" } },
-        /*#__PURE__*/React.createElement("div", { style: { background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, padding: "2px", display: "flex", gap: 1 } },
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 14, alignItems: "center", flexWrap: "nowrap", overflowX: "auto", paddingBottom: 4 } },
+        /*#__PURE__*/React.createElement("div", { style: { background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, padding: "2px", display: "flex", gap: 1, flexShrink: 0 } },
           /*#__PURE__*/React.createElement(NavBtn, { id: "dashboard", label: "📊 Dashboard" }),
           /*#__PURE__*/React.createElement(KanbanDropdown, { view: view, setView: setView }),
           /*#__PURE__*/React.createElement("a", { href: "remocao.html", style: { padding: "5px 14px", borderRadius: 6, border: "none", fontSize: 12, fontWeight: 400, background: "transparent", color: "#64748B", cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center" } }, "🚑 Remoção"),
@@ -7782,7 +7745,7 @@ function App() {
       loading && /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", padding: 48, color: "#94A3B8", fontSize: 14 } }, "Carregando dados…"),
 
       !loading && view === "dashboard" && /*#__PURE__*/React.createElement("div", { id: "view-content" },
-        /*#__PURE__*/React.createElement(Dashboard, { cards: filtered, cols: displayCols, dashMode: dashMode, setDashMode: setDashMode, isAdmin: isAdmin, lastPub: lastPub, currentUser: currentUser })
+        /*#__PURE__*/React.createElement(Dashboard, { cards: filtered, cols: displayCols, dashMode: dashMode, setDashMode: setDashMode, isAdmin: isAdmin, lastPub: lastPub, currentUser: currentUser, discrepancias: discrepancias })
       ),
       !loading && view === "usuarios" && isAdmin && /*#__PURE__*/React.createElement(UsersPanel, { currentUser: currentUser, userId: userId, showT: showT, cards: cards }),
       !loading && view === "historico" && isAdmin && /*#__PURE__*/React.createElement("div", { id: "view-content" },
@@ -7816,8 +7779,8 @@ function App() {
                 return ha.localeCompare(hb);
               }
               if (col.id === "aceite") {
-                const pa = a.pr ? parseInt(a.pr) : 9999;
-                const pb = b.pr ? parseInt(b.pr) : 9999;
+                const pa = a.prioridade_remocao ? parseInt(a.prioridade_remocao,10) : 9999;
+                const pb = b.prioridade_remocao ? parseInt(b.prioridade_remocao,10) : 9999;
                 if (pa !== pb) return pa - pb;
                 const ha = a.hora_aceite || "99:99";
                 const hb = b.hora_aceite || "99:99";
@@ -7831,67 +7794,71 @@ function App() {
               "data-dropzone": col.id,
               onDragOver: function(e){
                 e.preventDefault();
-                if(e.dataTransfer.types && Array.prototype.includes.call(e.dataTransfer.types,"text/col")) return;
-                if(isAdmin) handleDragOver(e, col.id);
+                if(e.dataTransfer.types&&Array.prototype.indexOf.call(e.dataTransfer.types,"text/col")>=0) return;
+                if(isAdmin) handleDragOver(e,col.id);
               },
               onDragLeave: e => isAdmin && handleDragLeave(e, col.id),
               onDrop: function(e){
-                if(e.dataTransfer.types && Array.prototype.includes.call(e.dataTransfer.types,"text/col")){ handleColDrop(e, col.id); }
-                else if(isAdmin){ handleDrop(e, col.id); }
+                if(e.dataTransfer.types&&Array.prototype.indexOf.call(e.dataTransfer.types,"text/col")>=0){handleColDrop(e,col.id);}
+                else if(isAdmin){handleDrop(e,col.id);}
               },
               style: {
                 background: "#fff",
                 borderRadius: 12,
                 border: "1.5px solid #E2E8F0",
                 overflow: "hidden",
-                minWidth: isMin ? (isMobile ? "100%" : 48) : 220,
-                flex: isMin ? (isMobile ? "none" : "0 0 48px") : singleCol === col.id ? "1 1 100%" : "1 1 200px",
-                maxWidth: isMin ? (isMobile ? "100%" : 48) : singleCol === col.id ? "100%" : 340,
+                minWidth: isMin ? (isMobile?"100%":48) : 220,
+                flex: isMin ? (isMobile?"none":"0 0 48px") : singleCol === col.id ? "1 1 100%" : "1 1 200px",
+                maxWidth: isMin ? (isMobile?"100%":48) : singleCol === col.id ? "100%" : 340,
                 transition: "all .2s"
               }
             },
               /*#__PURE__*/React.createElement("div", { style: { padding: "10px 12px", borderBottom: isMin ? "none" : "1px solid #F1F5F9", borderTop: `3px solid ${col.accent || "#94A3B8"}` } },
                 isMin ? (
                   isMobile
-                    ? /*#__PURE__*/React.createElement("div", {
-                        onClick: function(){ setMobileOpen(function(p){ return p===col.id ? null : col.id; }); },
-                        style: { display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none", padding: "2px 0" }
+                    ? React.createElement("div", {
+                        onClick:function(){setMobileOpen(function(p){return p===col.id?null:col.id;});},
+                        style:{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",userSelect:"none",padding:"2px 0"}
                       },
-                        /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
-                          /*#__PURE__*/React.createElement("span", { style: { fontSize: 16 } }, col.emoji),
-                          /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 13, color: "#0F172A" } }, col.label),
-                          /*#__PURE__*/React.createElement("span", { style: { background: col.accent ? col.accent+"22" : "#F1F5F9", color: col.accent||"#475569", borderRadius: 99, padding: "2px 9px", fontSize: 11, fontWeight: 700 } }, colCards.length)
+                        React.createElement("div", {style:{display:"flex",alignItems:"center",gap:8}},
+                          React.createElement("span", {style:{fontSize:16}}, col.emoji),
+                          React.createElement("span", {style:{fontWeight:700,fontSize:13,color:"#0F172A"}}, col.label),
+                          React.createElement("span", {style:{background:col.accent?col.accent+"22":"#F1F5F9",color:col.accent||"#475569",borderRadius:99,padding:"2px 9px",fontSize:11,fontWeight:700}}, colCards.length)
                         ),
-                        /*#__PURE__*/React.createElement("span", { style: { color: "#94A3B8", fontSize: 14 } }, "▼")
+                        React.createElement("span", {style:{color:"#94A3B8",fontSize:14}}, "\u25B2")
                       )
-                    : /*#__PURE__*/React.createElement("div", {
-                        style: { writingMode: "vertical-rl", fontWeight: 700, fontSize: 11, color: "#64748B", padding: "4px 0", cursor: "pointer", userSelect: "none", display: "flex", alignItems: "center", gap: 4 },
-                        onClick: function(){ setMinimized(function(p){ var n=new Set(p); n.delete(col.id); return n; }); }
+                    : React.createElement("div", {
+                        style:{writingMode:"vertical-rl",fontWeight:700,fontSize:11,color:"#64748B",padding:"4px 0",cursor:"pointer",userSelect:"none",display:"flex",alignItems:"center",gap:4},
+                        onClick:function(){setMinimized(function(p){var n=new Set(p);n.delete(col.id);return n;});}
                       },
-                        /*#__PURE__*/React.createElement("span", null, col.emoji),
-                        /*#__PURE__*/React.createElement("span", null, col.label),
-                        /*#__PURE__*/React.createElement("span", { style: { background: "#F1F5F9", borderRadius: 99, padding: "2px 4px", fontSize: 9, fontWeight: 700, writingMode: "horizontal-tb" } }, colCards.length)
+                        React.createElement("span", null, col.emoji),
+                        React.createElement("span", null, col.label),
+                        React.createElement("span", {style:{background:"#F1F5F9",borderRadius:99,padding:"2px 4px",fontSize:9,fontWeight:700,writingMode:"horizontal-tb"}}, colCards.length)
                       )
                 ) :
                   /*#__PURE__*/React.createElement(React.Fragment, null,
                     /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } },
-                      /*#__PURE__*/React.createElement("div", {
-                        draggable: isAdmin && !isMobile,
-                        onDragStart: function(e){ e.stopPropagation(); handleColDragStart(e, col.id); },
-                        onDragEnd: handleColDragEnd,
-                        style: { flex: 1, minWidth: 0, cursor: isAdmin && !isMobile ? "grab" : "default" }
-                      },
-                        /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 12, color: "#0F172A", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: 4 } },
-                          isAdmin && !isMobile && /*#__PURE__*/React.createElement("span", { style: { color: "#CBD5E1", fontSize: 10 } }, "☰"),
-                          col.emoji, " ", col.label
+                      React.createElement("div", {
+                          draggable: isAdmin&&!isMobile,
+                          onDragStart:function(e){e.stopPropagation();handleColDragStart(e,col.id);},
+                          onDragEnd:handleColDragEnd,
+                          style:{flex:1,minWidth:0,cursor:isAdmin&&!isMobile?"grab":"default"}
+                        },
+                          React.createElement("div", {style:{fontWeight:700,fontSize:12,color:"#0F172A",lineHeight:1.2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",display:"flex",alignItems:"center",gap:4}},
+                            isAdmin&&!isMobile&&React.createElement("span",{style:{color:"#CBD5E1",fontSize:11}},"\u2630"),
+                            col.emoji," ",col.label),
+                          col.sub&&React.createElement("div",{style:{fontSize:9,color:"#94A3B8",marginTop:1}},col.sub)
                         ),
-                        col.sub && /*#__PURE__*/React.createElement("div", { style: { fontSize: 9, color: "#94A3B8", marginTop: 1 } }, col.sub)
-                      ),
-                      !isMobile && /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 3, flexShrink: 0, marginLeft: 4 } },
-                        /*#__PURE__*/React.createElement("button", { onClick: () => setSingleCol(p => p === col.id ? null : col.id), style: { background: "none", border: "none", cursor: "pointer", color: singleCol === col.id ? "#3B82F6" : "#CBD5E1", fontSize: 12, padding: "2px 3px" } }, singleCol === col.id ? "⊞" : "⊟"),
-                        /*#__PURE__*/React.createElement("button", { onClick: function(){ setMinimized(function(p){ var n=new Set(p); n.add(col.id); return n; }); }, style: { background: "none", border: "none", cursor: "pointer", color: "#CBD5E1", fontSize: 12, padding: "2px 3px" } }, "−"),
-                        !col.fixed && isAdmin && /*#__PURE__*/React.createElement("button", { onClick: () => removeColumn(col.id), style: { background: "none", border: "none", cursor: "pointer", color: "#CBD5E1", fontSize: 12, padding: "2px 3px" } }, "✕")
-                      )
+                        isMobile
+                          ? React.createElement("button", {
+                              onClick:function(){setMobileOpen(function(p){return p===col.id?null:col.id;});},
+                              style:{background:"none",border:"none",cursor:"pointer",color:"#94A3B8",fontSize:16,padding:"2px 6px",flexShrink:0}
+                            }, "\u25B2")
+                          : React.createElement("div", {style:{display:"flex",gap:3,flexShrink:0,marginLeft:4}},
+                              React.createElement("button", {onClick:()=>setSingleCol(p=>p===col.id?null:col.id),style:{background:"none",border:"none",cursor:"pointer",color:singleCol===col.id?"#3B82F6":"#CBD5E1",fontSize:12,padding:"2px 3px"}}, singleCol===col.id?"\u229E":"\u229F"),
+                              React.createElement("button", {onClick:function(){setMinimized(function(p){var n=new Set(p);n.add(col.id);return n;});},style:{background:"none",border:"none",cursor:"pointer",color:"#CBD5E1",fontSize:12,padding:"2px 3px"}}, "\u2212"),
+                              !col.fixed&&isAdmin&&React.createElement("button", {onClick:()=>removeColumn(col.id),style:{background:"none",border:"none",cursor:"pointer",color:"#CBD5E1",fontSize:12,padding:"2px 3px"}}, "\u2715")
+                            )
                     ),
                     /*#__PURE__*/React.createElement("span", { style: { marginTop: 5, display: "inline-flex", background: "#F1F5F9", padding: "2px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700, color: "#475569" } }, colCards.length)
                   )
@@ -8043,13 +8010,11 @@ function App() {
       onClose: () => setShowDuplicates(false),
       onDel: onDelSilent
     }),
-    /* ── Painel flutuante de ações pendentes ── */
-    isAdmin && /*#__PURE__*/React.createElement(FloatingActions, {
+    isAdmin && React.createElement(FloatingActions, {
       cards: cards,
       discrepancias: discrepancias,
-      pendencias: [],
-      setView: setView,
-      cols: cols
+      pendencias: 0,
+      setView: setView
     }),
     /*#__PURE__*/React.createElement(Toast, { toast: toast })
   );
