@@ -38,19 +38,25 @@ kbd{font-family:monospace;background:#F1F5F9;padding:1px 5px;border-radius:3px;b
   position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%) translateY(4px);
   background:#0F172A;color:#F8FAFC;font-size:11px;line-height:1.5;font-weight:400;
   padding:8px 11px;border-radius:8px;width:230px;z-index:9000;pointer-events:none;
-  opacity:0;transition:opacity .15s,transform .15s;white-space:normal;text-align:left;box-shadow:0 4px 16px rgba(0,0,0,.3)
+  opacity:0;transition:opacity .15s,transform .15s;white-space:normal;text-align:left;box-shadow:0 4px 16px rgba(0,0,0,.3);text-transform:none;letter-spacing:0;font-size:11px
 }
 .tip .tipbox::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);
   border:5px solid transparent;border-top-color:#0F172A}
 .tip:hover .tipbox,.tip:focus-within .tipbox{opacity:1;transform:translateX(-50%) translateY(0)}
 /* ── Floating actions ── */
 #ge-fab{position:fixed;bottom:20px;right:16px;z-index:8000;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
-@media(max-width:640px){#ge-fab{bottom:72px;right:12px}}
+@media(max-width:640px){#ge-fab{bottom:80px;right:12px}}
 /* ── Mobile modal fixes ── */
 @media(max-width:640px){
-  .modal-shell-inner{max-height:95vh!important;overflow-y:auto!important}
-  .ls-modal{max-height:95vh!important}
+  .modal-shell-inner{max-height:90vh!important;overflow-y:auto!important}
+  .ls-modal{max-height:90vh!important;margin:8px!important;border-radius:12px!important}
   .ls-grid.ls-g2,.ls-grid.ls-g3{grid-template-columns:1fr!important}
+  .ls-body{padding:14px!important}
+  .ls-section{margin-bottom:12px!important}
+}
+@media(max-width:640px){
+  /* Card modal full height on mobile */
+  [data-modal-shell]{max-height:90vh!important;margin:8px!important;border-radius:12px!important}
 }
 /* ── Livro de Saída ── */
 .ls-overlay{position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px}
@@ -1446,10 +1452,10 @@ function CardModal({
   }), /*#__PURE__*/React.createElement(Field, {
     label: "Prioridade (nº)",
     fieldKey: "pr",
-    value: form.pr,
-    onChange: upd,
-    disabled: !isAdmin,
-    placeholder: "01"
+    value: form.prioridade_remocao || form.pr || "",
+    onChange: function(){},
+    disabled: true,
+    placeholder: "Definida na aba Prioridade"
   }), /*#__PURE__*/React.createElement(Field, {
     label: "Status",
     fieldKey: "status",
@@ -1583,7 +1589,7 @@ function CardModal({
           c.prioridade_remocao === String(v)
         );
         if (duplicata) {
-          setConflito({ valor: v, nomeConflito: duplicata.nome });
+          setConflito({ valor: v, nomeConflito: duplicata.nome, idConflito: duplicata.id, confirmado: false, novaPrioridade: '' });
         } else {
           setConflito(null);
           upd("prioridade_remocao", String(v));
@@ -1611,19 +1617,48 @@ function CardModal({
           React.createElement("div", { style: { color: "#78350F", marginBottom: 8 } },
             "Se confirmar, este card assume a posição " + conflito.valor + " e o card anterior perde a prioridade."
           ),
-          React.createElement("div", { style: { display: "flex", gap: 8 } },
+          !conflito.confirmado && React.createElement("div", { style: { display: "flex", gap: 8 } },
             React.createElement("button", {
               onClick: () => {
                 upd("prioridade_remocao", conflito.valor);
                 upd("hora_prioridade", nowStr());
-                setConflito(null);
+                setConflito({ ...conflito, confirmado: true, novaPrioridade: "" });
               },
               style: { padding: "5px 14px", border: "none", borderRadius: 7, background: "#D97706", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }
-            }, "✓ Confirmar mesmo assim"),
+            }, "✓ Confirmar e reatribuir"),
             React.createElement("button", {
               onClick: () => setConflito(null),
               style: { padding: "5px 14px", border: "1px solid #FDE68A", borderRadius: 7, background: "none", color: "#92400E", fontSize: 12, cursor: "pointer" }
             }, "Cancelar")
+          ),
+          conflito.confirmado && React.createElement("div", { style: { marginTop: 8 } },
+            React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#92400E", marginBottom: 6 } },
+              "Qual prioridade dar para " + conflito.nomeConflito + "?"),
+            React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center" } },
+              React.createElement("input", {
+                type: "number", min: 1, step: 1,
+                value: conflito.novaPrioridade || "",
+                onChange: function(e){ setConflito(function(c){ return {...c, novaPrioridade: e.target.value}; }); },
+                placeholder: "Ex: 2",
+                style: { width: 80, padding: "6px 10px", border: "1.5px solid #FDE68A", borderRadius: 7, fontFamily: "inherit", fontSize: 14, fontWeight: 700, textAlign: "center", outline: "none" }
+              }),
+              React.createElement("button", {
+                onClick: function(){
+                  var nova = conflito.novaPrioridade ? String(conflito.novaPrioridade) : "";
+                  // Update the other card in window.__geCards optimistically
+                  if(window.__geCards && conflito.idConflito) {
+                    window.__geCards = window.__geCards.map(function(c){
+                      if(c.id === conflito.idConflito) return {...c, prioridade_remocao: nova, hora_prioridade: nova ? nowStr() : ""};
+                      return c;
+                    });
+                  }
+                  setConflito(null);
+                },
+                style: { padding: "6px 14px", border: "none", borderRadius: 7, background: "#0F172A", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }
+              }, nova ? "Salvar P" + conflito.novaPrioridade : "Deixar sem prioridade")
+            ),
+            React.createElement("div", { style: { fontSize: 10, color: "#94A3B8", marginTop: 4 } },
+              "Deixe em branco para remover a prioridade de " + conflito.nomeConflito)
           )
         ),
         /* Seletor numérico livre de prioridade */
@@ -2869,7 +2904,7 @@ function KCard({
       com as clínicas; ficam visualmente apartados.
    ══════════════════════════════════════════════════════════════════════════ */
 
-function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, currentUser, discrepancias }) {
+function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, currentUser, discrepancias, onPendenciasChange }) {
   const [remocoes, setRemocoes] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
@@ -3015,6 +3050,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     });
     return out;
   }, [dados]);
+  useEffect(function(){ if(onPendenciasChange) onPendenciasChange(pendencias.length); }, [pendencias.length]);
 
   /* ── Pulso operacional (Kanban) ───────────────────────────────────────── */
   const fila = useMemo(() => {
@@ -3258,7 +3294,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Permaneceu", valor: perm.base ? `${perm.pct.toFixed(0)}%` : "—",
         sub: `${perm.n} de ${perm.base} com desfecho`, alerta: perm.base < dados.length * 0.8,
-        tooltip: "% de pacientes que foram para a unidade de destino e ficaram lá — não retornaram à Santa Casa. Calculado só sobre registros com desfecho marcado." })
+        tooltip: "% de pacientes que foram removidos para a unidade de destino e permaneceram lá — não retornaram à Santa Casa. Calculado somente sobre registros com campo Permaneceu ou Finalizado preenchido." })
     ),
 
     /* ══ Série temporal ══ */
@@ -6578,6 +6614,7 @@ function App() {
   const [importResult, setImportResult] = useState(null);
   const [showLivro, setShowLivro] = useState(false);
   const [pendentesCount, setPendentesCount] = useState(0);
+  const [pendenciasCount, setPendenciasCount] = useState(0);
   const dragId = useRef(null);
   const dragOverCol = useRef(null);
   const dragColId = useRef(null);
@@ -7559,7 +7596,9 @@ function App() {
   );
 
   // Funções de navegação
+  const NAVBTN_TIPS = {dashboard:"Indicadores e métricas de remoções",usuarios:"Gerenciar profissionais, permissões e senhas",historico:"Log completo de todas as ações realizadas no sistema",publicacoes:"Histórico de versões publicadas do Kanban"};
   const NavBtn = ({ id, label }) => /*#__PURE__*/React.createElement("button", {
+    title: NAVBTN_TIPS[id]||"",
     onClick: () => setView(id),
     style: {
       padding: "5px 14px",
@@ -7696,7 +7735,7 @@ function App() {
     /* Conteúdo principal */
     /*#__PURE__*/React.createElement("div", { style: { maxWidth: 1600, margin: "0 auto", padding: "16px 20px" } },
       /* Barra de navegação e filtros */
-      /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 14, alignItems: "center", flexWrap: "nowrap", overflowX: "auto", paddingBottom: 4 } },
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 10, alignItems: "center", flexWrap: "nowrap", overflowX: "auto", paddingBottom: 2, WebkitOverflowScrolling: "touch", msOverflowStyle: "none", scrollbarWidth: "none" } },
         /*#__PURE__*/React.createElement("div", { style: { background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, padding: "2px", display: "flex", gap: 1, flexShrink: 0 } },
           /*#__PURE__*/React.createElement(NavBtn, { id: "dashboard", label: "📊 Dashboard" }),
           /*#__PURE__*/React.createElement(KanbanDropdown, { view: view, setView: setView }),
@@ -7745,7 +7784,7 @@ function App() {
       loading && /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", padding: 48, color: "#94A3B8", fontSize: 14 } }, "Carregando dados…"),
 
       !loading && view === "dashboard" && /*#__PURE__*/React.createElement("div", { id: "view-content" },
-        /*#__PURE__*/React.createElement(Dashboard, { cards: filtered, cols: displayCols, dashMode: dashMode, setDashMode: setDashMode, isAdmin: isAdmin, lastPub: lastPub, currentUser: currentUser, discrepancias: discrepancias })
+        /*#__PURE__*/React.createElement(Dashboard, { cards: filtered, cols: displayCols, dashMode: dashMode, setDashMode: setDashMode, isAdmin: isAdmin, lastPub: lastPub, currentUser: currentUser, discrepancias: discrepancias, onPendenciasChange: setPendenciasCount })
       ),
       !loading && view === "usuarios" && isAdmin && /*#__PURE__*/React.createElement(UsersPanel, { currentUser: currentUser, userId: userId, showT: showT, cards: cards }),
       !loading && view === "historico" && isAdmin && /*#__PURE__*/React.createElement("div", { id: "view-content" },
@@ -7825,7 +7864,7 @@ function App() {
                           React.createElement("span", {style:{fontWeight:700,fontSize:13,color:"#0F172A"}}, col.label),
                           React.createElement("span", {style:{background:col.accent?col.accent+"22":"#F1F5F9",color:col.accent||"#475569",borderRadius:99,padding:"2px 9px",fontSize:11,fontWeight:700}}, colCards.length)
                         ),
-                        React.createElement("span", {style:{color:"#94A3B8",fontSize:14}}, "\u25B2")
+                        React.createElement("span", {style:{color:"#94A3B8",fontSize:14}}, "\u25BC")
                       )
                     : React.createElement("div", {
                         style:{writingMode:"vertical-rl",fontWeight:700,fontSize:11,color:"#64748B",padding:"4px 0",cursor:"pointer",userSelect:"none",display:"flex",alignItems:"center",gap:4},
@@ -8013,7 +8052,7 @@ function App() {
     isAdmin && React.createElement(FloatingActions, {
       cards: cards,
       discrepancias: discrepancias,
-      pendencias: 0,
+      pendencias: pendenciasCount,
       setView: setView
     }),
     /*#__PURE__*/React.createElement(Toast, { toast: toast })
