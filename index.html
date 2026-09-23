@@ -32,6 +32,23 @@ kbd{font-family:monospace;background:#F1F5F9;padding:1px 5px;border-radius:3px;b
   #kanban-board{flex-direction:column!important;gap:6px!important;overflow-x:visible!important;}
   #kanban-board>div{min-width:100%!important;max-width:100%!important;flex:none!important;}
 }
+/* ── UsersPanel mobile ── */
+@media (max-width:640px){
+  .users-card{flex-wrap:wrap!important;}
+  .users-perms{display:grid!important;grid-template-columns:1fr 1fr!important;gap:4px!important;width:100%!important;}
+  .users-actions{width:100%!important;justify-content:flex-end!important;}
+}
+/* ── Tooltip ── */
+.tip{position:relative;display:inline-flex;align-items:center}
+.tip:hover .tip-box,.tip:focus-within .tip-box{opacity:1;pointer-events:auto;transform:translateY(0)}
+.tip-box{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%) translateY(4px);
+  background:#0F172A;color:#F1F5F9;font-size:11px;line-height:1.45;font-weight:400;
+  padding:7px 10px;border-radius:8px;width:220px;z-index:9000;
+  opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;white-space:normal;text-align:left}
+.tip-box::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  border:5px solid transparent;border-top-color:#0F172A}
+/* ── Ações flutuantes ── */
+#acoes-flutuantes{position:fixed;bottom:56px;right:16px;z-index:8000;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 /* ── Livro de Saída ── */
 .ls-overlay{position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px}
 .ls-modal{background:#fff;border-radius:16px;width:100%;max-width:680px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.35)}
@@ -2857,11 +2874,28 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const [ini, setIni] = useState("");
   const [fim, setFim] = useState("");
   const [verPendencias, setVerPendencias] = useState(false);
-  const [discrepancias, setDiscrepancias] = useState([]);
+  const [discrepDash, setDiscrepDash] = useState([]);
   const [verDiscrep, setVerDiscrep] = useState(false);
-  const [loadingDiscrep, setLoadingDiscrep] = useState(false);
-  const [justModal, setJustModal] = useState(null); // { disc, saving, texto }
-  const podeJustificar = isAdmin || !!currentUser?.can_justificativa;
+  const [justModal, setJustModal] = useState(null);
+  const [justTexto, setJustTexto] = useState("");
+  const [justSaving, setJustSaving] = useState(false);
+  const podeJustificar = isAdmin || !!(currentUser && currentUser.can_justificativa);
+  useEffect(function(){
+    var aceitados = cards.filter(function(c){ return c.col_id==="aceite" && c.rec && c.rec.trim() && !c.prioridade_remocao; });
+    var pendentes  = cards.filter(function(c){ return c.col_id==="pendente" && c.rec && c.rec.trim(); });
+    var PESO = { emergencia:1, urgencia:2, andamento_cor:3, menor_gravidade:4, agendamento:99, retorno:99, finalizado_cor:99 };
+    var out=[];
+    aceitados.forEach(function(a){
+      var pesoA=PESO[a.grav]||99;
+      pendentes.forEach(function(b){
+        if(a.id===b.id) return;
+        if(a.rec.trim().toUpperCase()!==b.rec.trim().toUpperCase()) return;
+        var pesoB=PESO[b.grav]||99;
+        if(pesoA>pesoB) out.push({id:a.id+"_"+b.id, aceitado:a, pendente:b});
+      });
+    });
+    setDiscrepDash(out);
+  }, [cards]);
 
   useEffect(() => {
     let vivo = true;
@@ -2874,52 +2908,6 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     })();
     return () => { vivo = false; };
   }, []);
-
-  /* ── Discrepâncias: cruza created_at + grav dos cards do kanban ─────────
-   * Detecta quando um card de MENOR gravidade entrou no sistema ANTES de um
-   * de MAIOR gravidade, mas está à frente na fila (por aceite ou posição).
-   * Lê também as justificativas já registradas para ocultar as que foram tratadas.
-   */
-  const GRAV_PESO = { emergencia: 1, urgencia: 2, andamento_cor: 3, menor_gravidade: 4, agendamento: 5, retorno: 5, finalizado_cor: 6 };
-  useEffect(() => {
-    let vivo = true;
-    (async () => {
-      setLoadingDiscrep(true);
-      try {
-        // Justificativas já registradas
-        let justIds = new Set();
-        try {
-          const j = await sbGet("discrepancia_justificativas", "select=card_id,conflito_card_id&limit=2000");
-          j.forEach(r => justIds.add(r.card_id + "_" + r.conflito_card_id));
-        } catch {}
-
-        // Analisa cards do kanban nas colunas ativas (não finalizado)
-        const ativos = cards.filter(c => c.col_id !== "finalizado" && c.created_at && c.grav);
-        const discs = [];
-        for (let i = 0; i < ativos.length; i++) {
-          for (let j = i + 1; j < ativos.length; j++) {
-            const a = ativos[i], b = ativos[j];
-            const pesoA = GRAV_PESO[a.grav] || 5;
-            const pesoB = GRAV_PESO[b.grav] || 5;
-            // Se gravidades iguais: sem discrepância
-            if (pesoA === pesoB) continue;
-            // Quem é mais grave e quem é menos grave?
-            const [maisGrave, menosGrave] = pesoA < pesoB ? [a, b] : [b, a];
-            // Discrepância: o MENOS grave entrou no sistema ANTES do mais grave
-            if (new Date(menosGrave.created_at) < new Date(maisGrave.created_at)) {
-              const chave = menosGrave.id + "_" + maisGrave.id;
-              if (!justIds.has(chave)) {
-                discs.push({ id: chave, menosGrave, maisGrave });
-              }
-            }
-          }
-        }
-        if (vivo) setDiscrepancias(discs);
-      } catch {}
-      if (vivo) setLoadingDiscrep(false);
-    })();
-    return () => { vivo = false; };
-  }, [cards]);
 
   /* ── Recorte temporal ─────────────────────────────────────────────────── */
   const hoje = new Date();
@@ -3147,12 +3135,24 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     style: { fontSize: 11.5, color: "#CBD5E1", padding: "14px 0", textAlign: "center" }
   }, children);
 
-  const Kpi = ({ label, valor, sub, cor, alerta }) => /*#__PURE__*/React.createElement(Card, {
+  var Tip = function(props){
+    return /*#__PURE__*/React.createElement("span",{className:"tip"},
+      props.children,
+      /*#__PURE__*/React.createElement("span",{className:"tip-box"},props.texto)
+    );
+  };
+  var TipIcon = function(props){
+    return /*#__PURE__*/React.createElement("span",{className:"tip",style:{cursor:"help",marginLeft:4,color:"#CBD5E1",fontSize:10}},
+      "?",
+      /*#__PURE__*/React.createElement("span",{className:"tip-box"},props.texto)
+    );
+  };
+  const Kpi = ({ label, valor, sub, cor, alerta, tooltip }) => /*#__PURE__*/React.createElement(Card, {
     style: alerta ? { borderColor: "#FDE68A", background: "#FFFBEB" } : null
   },
     /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 10.5, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 8 }
-    }, label),
+      style: { fontSize: 10.5, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 8, display:"flex", alignItems:"center" }
+    }, label, tooltip && /*#__PURE__*/React.createElement(TipIcon, {texto: tooltip})),
     /*#__PURE__*/React.createElement("div", {
       style: { fontSize: 27, fontWeight: 700, color: cor || "#0F172A", lineHeight: 1, fontVariantNumeric: "tabular-nums" }
     }, typeof valor === "number" ? /*#__PURE__*/React.createElement(Num, { valor }) : valor),
@@ -3260,21 +3260,26 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     },
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Remoções", valor: dados.length,
-        sub: amplitude.dias ? `${(dados.length / Math.max(amplitude.dias, 1)).toFixed(1)} por dia` : null }),
+        sub: amplitude.dias ? `${(dados.length / Math.max(amplitude.dias, 1)).toFixed(1)} por dia` : null,
+        tooltip: "Total de remoções registradas na planilha no período selecionado. Inclui todos os desfechos (finalizadas, canceladas, etc)." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Ambulância avançada",
         valor: gAmb.informados ? `${((gAmb.itens.find(i => i.canonico === "AVANÇADA")?.n || 0) / gAmb.informados * 100).toFixed(0)}%` : "—",
         sub: `${gAmb.informados} de ${gAmb.total} informados`,
-        alerta: gAmb.cobertura < 80 }),
+        alerta: gAmb.cobertura < 80,
+        tooltip: "Percentual de remoções que usaram ambulância de Suporte Avançado de Vida (SAV). Calculado sobre registros com tipo de ambulância preenchido." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Resposta da CROSS", valor: fmtMin(tempos.respCross.mediana),
-        sub: `mediana · ${tempos.respCross.n} com horário`, cor: "#0369A1" }),
+        sub: `mediana · ${tempos.respCross.n} com horário`, cor: "#0369A1",
+        tooltip: "Tempo mediano entre a hora da solicitação e a hora da resposta da CROSS. Calculado apenas para registros com ambos os horários preenchidos. Mediana (não média) para evitar distorção por casos extremos." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Duração da remoção", valor: fmtMin(tempos.remocao.mediana),
-        sub: `mediana · ${tempos.remocao.n} com horário`, cor: "#0369A1" }),
+        sub: `mediana · ${tempos.remocao.n} com horário`, cor: "#0369A1",
+        tooltip: "Tempo mediano entre a saída da ambulância e o horário de retorno. Calculado apenas para registros com saída e retorno preenchidos." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Permaneceu", valor: perm.base ? `${perm.pct.toFixed(0)}%` : "—",
-        sub: `${perm.n} de ${perm.base} com desfecho`, alerta: perm.base < dados.length * 0.8 })
+        sub: `${perm.n} de ${perm.base} com desfecho`, alerta: perm.base < dados.length * 0.8,
+        tooltip: "Percentual de pacientes que permaneceram na unidade de origem sem ser efetivamente removidos. Calculado sobre registros com campo 'Permaneceu' ou 'Finalizado' preenchido." })
     ),
 
     /* ══ Série temporal ══ */
@@ -3428,61 +3433,49 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     ,
 
     /* ══ Discrepâncias de fila ══ */
-    (loadingDiscrep || discrepancias.length > 0) && /*#__PURE__*/React.createElement(Card, {
-      style: { marginTop: 14, borderColor: discrepancias.length > 0 ? "#FCA5A5" : "#E2E8F0", background: discrepancias.length > 0 ? "#FEF2F2" : "#fff" }
+    discrepDash.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: 14, background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 12, overflow: "hidden" }
     },
       /*#__PURE__*/React.createElement("div", {
-        style: { display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" },
-        onClick: () => setVerDiscrep(v => !v)
+        onClick: function(){ setVerDiscrep(function(v){return !v;}); },
+        style: { padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }
       },
         /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: discrepancias.length > 0 ? "#B91C1C" : "#64748B" } },
-            "⚖ Discrepâncias de fila", loadingDiscrep ? " …" : ` (${discrepancias.length})`
-          ),
-          discrepancias.length > 0 && /*#__PURE__*/React.createElement("span", {
-            style: { fontSize: 10, background: "#FEE2E2", color: "#B91C1C", border: "1px solid #FCA5A5", borderRadius: 99, padding: "1px 8px", fontWeight: 700 }
-          }, discrepancias.length, " sem justificativa")
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: "#B91C1C" } }, "⚠️ " + discrepDash.length + " discrepânci" + (discrepDash.length === 1 ? "a" : "as") + " de fila"),
+          /*#__PURE__*/React.createElement("span", { className: "tip", style: { cursor: "help" } },
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: "#EF4444", borderRadius: 99, border: "1px solid #FCA5A5", padding: "1px 6px" } }, "?"),
+            /*#__PURE__*/React.createElement("span", { className: "tip-box" }, "Paciente menos grave com aceite confirmado na mesma especialidade que um mais grave ainda pendente, sem prioridade médica definida. Indica possível inversão de fila.")
+          )
         ),
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: "#94A3B8" } }, verDiscrep ? "ocultar" : "ver")
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: "#94A3B8" } }, verDiscrep ? "ocultar" : "ver casos")
       ),
-      verDiscrep && /*#__PURE__*/React.createElement("div", { style: { marginTop: 12 } },
+      verDiscrep && /*#__PURE__*/React.createElement("div", { style: { padding: "0 16px 14px" } },
         /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#64748B", marginBottom: 10, lineHeight: 1.55 } },
-          "Pacientes que entraram no sistema antes de outros mais graves. ",
-          podeJustificar ? "Clique em \"Justificar\" para registrar a razão clínica." : "Solicite ao coordenador que justifique se necessário."
+          "Cada caso: um paciente de menor gravidade teve aceite confirmado antes de um mais grave da mesma especialidade, sem avaliação médica registrada. ",
+          podeJustificar ? "Clique em Justificar para registrar a razão clínica." : "Peça ao coordenador para justificar."
         ),
-        discrepancias.length === 0 && !loadingDiscrep && /*#__PURE__*/React.createElement("div", {
-          style: { textAlign: "center", padding: "20px", color: "#16A34A", fontSize: 12, fontWeight: 600 }
-        }, "✅ Nenhuma discrepância pendente de justificativa."),
-        discrepancias.map((disc, i) => {
-          const menosG = disc.menosGrave, maisG = disc.maisGrave;
-          const gcM = GC[maisG.grav] || GC.urgencia;
-          const gcL = GC[menosG.grav] || GC.urgencia;
-          const dtMenos = new Date(menosG.created_at);
-          const dtMais = new Date(maisG.created_at);
-          const diffMin = Math.round((dtMais - dtMenos) / 60000);
-          const diffStr = diffMin < 60 ? diffMin + " min antes" : Math.floor(diffMin/60) + "h" + String(diffMin%60).padStart(2,"0") + " antes";
+        discrepDash.map(function(disc, i){
+          var a=disc.aceitado, b=disc.pendente;
+          var gcA=GC[a.grav]||GC.urgencia, gcB=GC[b.grav]||GC.urgencia;
           return /*#__PURE__*/React.createElement("div", {
             key: disc.id,
-            style: { padding: "10px 12px", borderTop: i ? "1px solid #FCA5A5" : "none", borderRadius: 6, transition: "background .15s" }
+            style: { padding: "10px 0", borderTop: i ? "1px solid #FEE2E2" : "none", display: "flex", gap: 10, alignItems: "flex-start", flexWrap: "wrap" }
           },
-            /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 10, alignItems: "flex-start", flexWrap: "wrap" } },
-              /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 200 } },
-                /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#374151", marginBottom: 4 } },
-                  /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, color: gcL.text, background: gcL.bg, border: `1px solid ${gcL.border}`, borderRadius: 4, padding: "1px 6px", fontSize: 10 } }, gcL.label),
-                  " ", menosG.nome,
-                  /*#__PURE__*/React.createElement("span", { style: { color: "#94A3B8", fontSize: 10, marginLeft: 6 } }, "entrou " + diffStr)
-                ),
-                /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#374151" } },
-                  "antes de ",
-                  /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, color: gcM.text, background: gcM.bg, border: `1px solid ${gcM.border}`, borderRadius: 4, padding: "1px 6px", fontSize: 10 } }, gcM.label),
-                  " ", maisG.nome
-                )
+            /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 200 } },
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#374151", marginBottom: 3 } },
+                /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, color: gcA.text, background: gcA.bg, border: "1px solid " + gcA.border, borderRadius: 4, padding: "1px 5px", fontSize: 10 } }, gcA.label),
+                " ", a.nome, /*#__PURE__*/React.createElement("span", { style: { color: "#94A3B8", marginLeft: 4, fontSize: 10 } }, "(aceito) " + (a.rec || ""))
               ),
-              podeJustificar && /*#__PURE__*/React.createElement("button", {
-                onClick: () => setJustModal({ disc, saving: false, texto: "" }),
-                style: { flexShrink: 0, padding: "5px 14px", border: "none", borderRadius: 7, background: "#0F172A", color: "#fff", fontWeight: 700, fontSize: 11, cursor: "pointer" }
-              }, "Justificar →")
-            )
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#374151" } },
+                "aguarda: ",
+                /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, color: gcB.text, background: gcB.bg, border: "1px solid " + gcB.border, borderRadius: 4, padding: "1px 5px", fontSize: 10 } }, gcB.label),
+                " ", b.nome
+              )
+            ),
+            podeJustificar && /*#__PURE__*/React.createElement("button", {
+              onClick: function(){ setJustModal(disc); setJustTexto(""); },
+              style: { flexShrink: 0, padding: "5px 14px", border: "none", borderRadius: 7, background: "#0F172A", color: "#fff", fontWeight: 700, fontSize: 11, cursor: "pointer" }
+            }, "Justificar")
           );
         })
       )
@@ -3490,71 +3483,53 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
     /* ── Modal de justificativa ── */
     justModal && /*#__PURE__*/React.createElement("div", {
+      onClick: function(e){ if(e.target===e.currentTarget){ setJustModal(null); } },
       style: { position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 16 }
     },
       /*#__PURE__*/React.createElement("div", {
-        style: { background: "#fff", borderRadius: 16, width: "100%", maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,.25)", overflow: "hidden" }
+        style: { background: "#fff", borderRadius: 16, width: "100%", maxWidth: 460, boxShadow: "0 20px 60px rgba(0,0,0,.25)", overflow: "hidden" }
       },
         /*#__PURE__*/React.createElement("div", { style: { padding: "14px 20px", borderBottom: "1px solid #F1F5F9", background: "#FEF2F2" } },
           /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#B91C1C", textTransform: "uppercase", letterSpacing: ".05em" } }, "Justificativa de discrepância"),
           /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 14, color: "#0F172A", marginTop: 2 } }, "Por que este paciente tem prioridade?")
         ),
         /*#__PURE__*/React.createElement("div", { style: { padding: "16px 20px" } },
-          /*#__PURE__*/React.createElement("div", { style: { background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, padding: "10px 12px", marginBottom: 14, fontSize: 12, color: "#374151" } },
-            /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, justModal.disc.menosGrave.nome,
-              /*#__PURE__*/React.createElement("span", { style: { fontWeight: 400, color: "#94A3B8", marginLeft: 6 } },
-                "(" + (GC[justModal.disc.menosGrave.grav]?.label || "") + ")")),
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#64748B" } },
-              "Entrou antes de ", justModal.disc.maisGrave.nome,
-              " (" + (GC[justModal.disc.maisGrave.grav]?.label || "") + ")"
-            )
+          /*#__PURE__*/React.createElement("div", { style: { background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, padding: "10px 12px", marginBottom: 14, fontSize: 12 } },
+            /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, marginBottom: 2 } }, justModal.aceitado.nome,
+              /*#__PURE__*/React.createElement("span", { style: { fontWeight: 400, color: "#94A3B8", marginLeft: 6, fontSize: 11 } }, "(" + (GC[justModal.aceitado.grav] && GC[justModal.aceitado.grav].label || "") + ") aceito")),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#64748B" } }, "Especialidade: " + (justModal.aceitado.rec || "—")),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#64748B", marginTop: 4 } }, "Aguarda: " + justModal.pendente.nome + " (" + ((GC[justModal.pendente.grav] && GC[justModal.pendente.grav].label) || "") + ")")
           ),
           /*#__PURE__*/React.createElement("label", { style: { fontSize: 11, fontWeight: 700, color: "#374151", display: "block", marginBottom: 6 } }, "Justificativa clínica *"),
           /*#__PURE__*/React.createElement("textarea", {
             rows: 4,
-            value: justModal.texto,
-            onChange: e => setJustModal(p => ({ ...p, texto: e.target.value })),
-            placeholder: "Ex: Paciente admitido em triagem prévia com protocolo de dor torácica. Aguarda resultado de exame antes de reclassificação…",
+            value: justTexto,
+            onChange: function(e){ setJustTexto(e.target.value); },
+            placeholder: "Ex: Paciente com protocolo de dor torácica, aguarda resultado de exame. Complicação aguda sobreposta justifica prioridade...",
             style: { width: "100%", padding: "9px 11px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, fontFamily: "inherit", resize: "vertical", outline: "none", lineHeight: 1.5 }
           })
         ),
-        /*#__PURE__*/React.createElement("div", {
-          style: { padding: "10px 20px", borderTop: "1px solid #F1F5F9", display: "flex", gap: 8, justifyContent: "flex-end" }
-        },
+        /*#__PURE__*/React.createElement("div", { style: { padding: "10px 20px", borderTop: "1px solid #F1F5F9", display: "flex", gap: 8, justifyContent: "flex-end" } },
           /*#__PURE__*/React.createElement("button", {
-            onClick: () => setJustModal(null),
+            onClick: function(){ setJustModal(null); },
             style: { padding: "7px 16px", borderRadius: 8, border: "1px solid #E2E8F0", background: "none", color: "#64748B", fontWeight: 600, fontSize: 13, cursor: "pointer" }
           }, "Cancelar"),
           /*#__PURE__*/React.createElement("button", {
-            disabled: !justModal.texto.trim() || justModal.saving,
-            onClick: async () => {
-              if (!justModal.texto.trim()) return;
-              setJustModal(p => ({ ...p, saving: true }));
-              const disc = justModal.disc;
-              try {
-                const payload = {
-                  card_id: disc.menosGrave.id,
-                  card_nome: disc.menosGrave.nome,
-                  card_grav: disc.menosGrave.grav,
-                  conflito_card_id: disc.maisGrave.id,
-                  conflito_card_nome: disc.maisGrave.nome,
-                  conflito_card_grav: disc.maisGrave.grav,
-                  justificativa: justModal.texto.trim(),
-                  justificado_por_nome: currentUser?.nome || ""
-                };
-                await fetch(`${SB_URL}/rest/v1/discrepancia_justificativas`, {
-                  method: "POST",
-                  headers: { ...H(), Prefer: "return=minimal" },
-                  body: JSON.stringify(payload)
-                });
-                setDiscrepancias(p => p.filter(d => d.id !== disc.id));
+            disabled: !justTexto.trim() || justSaving,
+            onClick: async function(){
+              if(!justTexto.trim()) return;
+              setJustSaving(true);
+              var disc=justModal;
+              try{
+                var payload={card_id:disc.aceitado.id,card_nome:disc.aceitado.nome,card_grav:disc.aceitado.grav,conflito_card_id:disc.pendente.id,conflito_card_nome:disc.pendente.nome,conflito_card_grav:disc.pendente.grav,justificativa:justTexto.trim(),justificado_por_nome:(currentUser&&currentUser.nome)||""};
+                await fetch(SB_URL+"/rest/v1/discrepancia_justificativas",{method:"POST",headers:Object.assign({},H(),{"Prefer":"return=minimal"}),body:JSON.stringify(payload)});
+                setDiscrepDash(function(p){return p.filter(function(d){return d.id!==disc.id;});});
                 setJustModal(null);
-              } catch (ex) {
-                setJustModal(p => ({ ...p, saving: false }));
-              }
+              }catch(ex){}
+              setJustSaving(false);
             },
-            style: { padding: "7px 20px", borderRadius: 8, border: "none", background: "#0F172A", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: !justModal.texto.trim() || justModal.saving ? 0.6 : 1 }
-          }, justModal.saving ? "Salvando…" : "Registrar justificativa")
+            style: { padding: "7px 20px", borderRadius: 8, border: "none", background: "#0F172A", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: !justTexto.trim()||justSaving ? 0.6 : 1 }
+          }, justSaving ? "Salvando…" : "Registrar")
         )
       )
     ),
@@ -4335,6 +4310,7 @@ function UsersPanel({
     }
   }, "Admin")), !loading && users.filter(u => u.coren !== "299283").map(u => /*#__PURE__*/React.createElement("div", {
     key: u.id,
+    className: "users-card",
     style: {
       background: "#fff",
       border: "1px solid #E2E8F0",
@@ -4342,8 +4318,9 @@ function UsersPanel({
       padding: "12px 16px",
       marginBottom: 8,
       display: "flex",
-      alignItems: "center",
-      gap: 12
+      alignItems: "flex-start",
+      flexWrap: "wrap",
+      gap: 10
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -4427,12 +4404,12 @@ function UsersPanel({
   /*#__PURE__*/React.createElement("button", {
     onClick: () => toggleFlag(u.id, "can_justificativa", u.can_justificativa, load),
     className: "can-livro-toggle" + (u.can_justificativa ? " on" : ""),
-    title: u.can_justificativa ? "Revogar permissão de justificar discrepâncias" : "Liberar: justificar discrepâncias de fila no Dashboard"
-  }, u.can_justificativa ? "⚖ Justific. ✓" : "⚖ Justific."),
+    title: u.can_justificativa ? "Revogar: justificar discrepâncias" : "Liberar: justificar discrepâncias no Dashboard"
+  }, u.can_justificativa ? "⚤ Justif. ✓" : "⚤ Justif."),
   /*#__PURE__*/React.createElement("button", {
     onClick: () => resetarSenha(u),
     className: "can-livro-toggle",
-    title: "Redefinir a senha para o registro profissional"
+    title: "Redefinir a senha para o registro profissional (volta para o número do registro)"
   }, "🔑 Senha"),
   u.senha_trocada === false && u.auth_uid && /*#__PURE__*/React.createElement("span", {
     title: "Ainda não trocou a senha inicial",
@@ -6540,6 +6517,46 @@ function TempoTag({ label, color, bg }) {
   }, label);
 }
 
+/* ── FloatingActions: painel flutuante de alertas ── */
+function FloatingActions({ cards, discrepancias, setView, cols }) {
+  var [open, setOpen] = React.useState(false);
+  var pendenteSemHosp = cards.filter(function(c){ return !c.hosp && c.col_id !== "finalizado"; }).length;
+  var emergPendente = cards.filter(function(c){ return c.grav==="emergencia" && c.col_id==="pendente"; }).length;
+  var disc = discrepancias ? discrepancias.length : 0;
+  var total = pendenteSemHosp + emergPendente + disc;
+  if(total === 0) return null;
+  var items = [];
+  if(emergPendente > 0) items.push({ cor:"#EF4444", label: emergPendente + " emergência" + (emergPendente>1?"s":"") + " pendente" + (emergPendente>1?"s":""), acao: function(){ setView("kanban"); }, dica: "Clique para ir ao Kanban" });
+  if(disc > 0) items.push({ cor:"#F59E0B", label: disc + " discrepânci" + (disc===1?"a":"as") + " de fila", acao: function(){ setView("dashboard"); }, dica: "Clique para ver no Dashboard" });
+  if(pendenteSemHosp > 0) items.push({ cor:"#94A3B8", label: pendenteSemHosp + " card" + (pendenteSemHosp>1?"s":"") + " sem hospital", acao: function(){ setView("kanban"); }, dica: "Cards sem hospital receptor definido" });
+  return React.createElement("div", { id: "acoes-flutuantes" },
+    open && React.createElement("div", {
+      style: { background: "#0F172A", borderRadius: 12, padding: "10px 14px", minWidth: 220, boxShadow: "0 8px 32px rgba(0,0,0,.3)", marginBottom: 6 }
+    },
+      React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 } }, "Ações pendentes"),
+      items.map(function(item, i){
+        return React.createElement("div", {
+          key: i,
+          onClick: function(){ item.acao(); setOpen(false); },
+          title: item.dica,
+          style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: i ? "1px solid #1E293B" : "none", cursor: "pointer" }
+        },
+          React.createElement("div", { style: { width: 8, height: 8, borderRadius: "50%", background: item.cor, flexShrink: 0 } }),
+          React.createElement("span", { style: { fontSize: 12, color: "#F1F5F9", flex: 1 } }, item.label),
+          React.createElement("span", { style: { fontSize: 10, color: "#475569" } }, "\u2192")
+        );
+      })
+    ),
+    React.createElement("button", {
+      onClick: function(){ setOpen(function(p){ return !p; }); },
+      style: { width: 44, height: 44, borderRadius: "50%", border: "none", background: "#EF4444", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 16px rgba(239,68,68,.5)", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }
+    },
+      React.createElement("span", null, total),
+      React.createElement("span", { style: { position: "absolute", top: -2, right: -2, width: 12, height: 12, borderRadius: "50%", background: "#F59E0B", border: "2px solid #fff" } })
+    )
+  );
+}
+
 /* ════════════════════════════════════════════
    MAIN APP
    ════════════════════════════════════════════ */
@@ -6575,9 +6592,8 @@ function App() {
   const [newColName, setNewColName] = useState("");
   const [minimized, setMinimized] = useState(new Set());
   const [singleCol, setSingleCol] = useState(null);
-  /* ── Mobile: detecta largura e controla accordion de colunas ── */
   const isMobile = typeof window !== "undefined" && window.innerWidth <= 640;
-  const [mobileOpen, setMobileOpen] = useState(null); // coluna aberta no accordion mobile
+  const [mobileOpen, setMobileOpen] = useState(null);
   const [sortCol, setSortCol] = useState(null);
   const [sortByPriority, setSortByPriority] = useState(false);
   const [toast, setToast] = useState(null);
@@ -6595,7 +6611,7 @@ function App() {
   const [pendentesCount, setPendentesCount] = useState(0);
   const dragId = useRef(null);
   const dragOverCol = useRef(null);
-  const dragColId = useRef(null); /* para drag de colunas inteiras */
+  const dragColId = useRef(null);
   const newColRef = useRef(null);
   const isAdmin = currentUser?.role === "admin";
   // Espelho no front das policies do banco. Se divergirem, o usuario ve um
@@ -7084,33 +7100,43 @@ function App() {
     dragColId.current = colId;
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/col", colId);
-    requestAnimationFrame(() => { if (e.currentTarget) e.currentTarget.style.opacity = ".45"; });
+    requestAnimationFrame(function(){ if(e.currentTarget) e.currentTarget.style.opacity=".45"; });
   }
   function handleColDragEnd(e) {
     dragColId.current = null;
-    if (e.currentTarget) e.currentTarget.style.opacity = "1";
+    if(e.currentTarget) e.currentTarget.style.opacity="1";
   }
   async function handleColDrop(e, targetColId) {
-    e.preventDefault();
-    e.stopPropagation();
-    const srcId = dragColId.current || e.dataTransfer.getData("text/col");
-    if (!srcId || srcId === targetColId) return;
-    const arr = [...cols];
-    const srcIdx = arr.findIndex(c => c.id === srcId);
-    const tgtIdx = arr.findIndex(c => c.id === targetColId);
-    if (srcIdx < 0 || tgtIdx < 0) return;
-    const [moved] = arr.splice(srcIdx, 1);
-    arr.splice(tgtIdx, 0, moved);
-    setCols(arr); // otimista: atualiza UI imediatamente
-    try {
-      for (let i = 0; i < arr.length; i++) {
-        await fn("columns-write", { action: "update", id: arr[i].id, body: { col_order: i + 1 } }, userId);
-      }
-      showT("Colunas reordenadas.");
-    } catch (ex) {
-      showT("Erro ao salvar ordem: " + ex.message, "err");
-    }
+    e.preventDefault(); e.stopPropagation();
+    var srcId = dragColId.current || e.dataTransfer.getData("text/col");
+    if(!srcId || srcId===targetColId) return;
+    var arr = cols.slice();
+    var si=arr.findIndex(function(c){return c.id===srcId;}), ti=arr.findIndex(function(c){return c.id===targetColId;});
+    if(si<0||ti<0) return;
+    var moved=arr.splice(si,1)[0]; arr.splice(ti,0,moved);
+    setCols(arr);
+    showT("Colunas reordenadas. (A ordem será salva quando publicar.)");
   }
+
+  /* ── Discrepâncias (Caso A): aceite com menor gravidade, mesma especialidade, sem prioridade médica ── */
+  const GRAV_PESO_D = { emergencia:1, urgencia:2, andamento_cor:3, menor_gravidade:4, agendamento:99, retorno:99, finalizado_cor:99 };
+  const discrepancias = useMemo(function(){
+    if(!isAdmin) return [];
+    var aceitados = cards.filter(function(c){ return c.col_id==="aceite" && c.rec && c.rec.trim() && !c.prioridade_remocao; });
+    var pendentes  = cards.filter(function(c){ return c.col_id==="pendente" && c.rec && c.rec.trim(); });
+    var out = [];
+    aceitados.forEach(function(a){
+      var pesoA = GRAV_PESO_D[a.grav]||99;
+      pendentes.forEach(function(b){
+        if(a.id===b.id) return;
+        var recA=a.rec.trim().toUpperCase(), recB=b.rec.trim().toUpperCase();
+        if(recA!==recB) return;
+        var pesoB=GRAV_PESO_D[b.grav]||99;
+        if(pesoA>pesoB) out.push({id:a.id+"_"+b.id, aceitado:a, pendente:b});
+      });
+    });
+    return out;
+  }, [cards, isAdmin]);
 
   /* ── Comments ── */
   async function onAddComment(cardId, texto) {
@@ -7799,25 +7825,19 @@ function App() {
               }
               return 0;
             });
-            /* Mobile accordion: todas fechadas por padrão, uma abre por vez */
-            const isMin = isMobile
-              ? (mobileOpen !== null ? mobileOpen !== col.id : true)
-              : minimized.has(col.id);
+            var isMin = isMobile ? (mobileOpen !== null ? mobileOpen !== col.id : true) : minimized.has(col.id);
             return /*#__PURE__*/React.createElement("div", {
               key: col.id,
               "data-dropzone": col.id,
-              onDragOver: e => {
+              onDragOver: function(e){
                 e.preventDefault();
-                if (e.dataTransfer.types && e.dataTransfer.types.includes("text/col")) return; // é drag de coluna, não de card
-                if (isAdmin) handleDragOver(e, col.id);
+                if(e.dataTransfer.types && Array.prototype.includes.call(e.dataTransfer.types,"text/col")) return;
+                if(isAdmin) handleDragOver(e, col.id);
               },
               onDragLeave: e => isAdmin && handleDragLeave(e, col.id),
-              onDrop: e => {
-                if (e.dataTransfer.types && e.dataTransfer.types.includes("text/col")) {
-                  handleColDrop(e, col.id);
-                } else if (isAdmin) {
-                  handleDrop(e, col.id);
-                }
+              onDrop: function(e){
+                if(e.dataTransfer.types && Array.prototype.includes.call(e.dataTransfer.types,"text/col")){ handleColDrop(e, col.id); }
+                else if(isAdmin){ handleDrop(e, col.id); }
               },
               style: {
                 background: "#fff",
@@ -7831,46 +7851,46 @@ function App() {
               }
             },
               /*#__PURE__*/React.createElement("div", { style: { padding: "10px 12px", borderBottom: isMin ? "none" : "1px solid #F1F5F9", borderTop: `3px solid ${col.accent || "#94A3B8"}` } },
-                isMin ?
-                  /* ── Coluna minimizada: clicável para expandir (mobile ou desktop) ── */
+                isMin ? (
                   isMobile
                     ? /*#__PURE__*/React.createElement("div", {
-                        onClick: () => setMobileOpen(p => p === col.id ? null : col.id),
+                        onClick: function(){ setMobileOpen(function(p){ return p===col.id ? null : col.id; }); },
                         style: { display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none", padding: "2px 0" }
                       },
-                        /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
-                          /*#__PURE__*/React.createElement("span", { style: { fontSize: 14 } }, col.emoji),
+                        /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
+                          /*#__PURE__*/React.createElement("span", { style: { fontSize: 16 } }, col.emoji),
                           /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 13, color: "#0F172A" } }, col.label),
-                          /*#__PURE__*/React.createElement("span", { style: { background: col.accent ? col.accent + "22" : "#F1F5F9", color: col.accent || "#475569", borderRadius: 99, padding: "2px 8px", fontSize: 11, fontWeight: 700 } }, colCards.length)
+                          /*#__PURE__*/React.createElement("span", { style: { background: col.accent ? col.accent+"22" : "#F1F5F9", color: col.accent||"#475569", borderRadius: 99, padding: "2px 9px", fontSize: 11, fontWeight: 700 } }, colCards.length)
                         ),
-                        /*#__PURE__*/React.createElement("span", { style: { color: "#94A3B8", fontSize: 13 } }, "▼")
+                        /*#__PURE__*/React.createElement("span", { style: { color: "#94A3B8", fontSize: 14 } }, "▼")
                       )
                     : /*#__PURE__*/React.createElement("div", {
                         style: { writingMode: "vertical-rl", fontWeight: 700, fontSize: 11, color: "#64748B", padding: "4px 0", cursor: "pointer", userSelect: "none", display: "flex", alignItems: "center", gap: 4 },
-                        onClick: () => setMinimized(p => { const n = new Set(p); n.delete(col.id); return n; })
+                        onClick: function(){ setMinimized(function(p){ var n=new Set(p); n.delete(col.id); return n; }); }
                       },
                         /*#__PURE__*/React.createElement("span", null, col.emoji),
                         /*#__PURE__*/React.createElement("span", null, col.label),
                         /*#__PURE__*/React.createElement("span", { style: { background: "#F1F5F9", borderRadius: 99, padding: "2px 4px", fontSize: 9, fontWeight: 700, writingMode: "horizontal-tb" } }, colCards.length)
-                      ) :
+                      )
+                ) :
                   /*#__PURE__*/React.createElement(React.Fragment, null,
                     /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } },
                       /*#__PURE__*/React.createElement("div", {
                         draggable: isAdmin && !isMobile,
-                        onDragStart: e => { e.stopPropagation(); handleColDragStart(e, col.id); },
+                        onDragStart: function(e){ e.stopPropagation(); handleColDragStart(e, col.id); },
                         onDragEnd: handleColDragEnd,
                         style: { flex: 1, minWidth: 0, cursor: isAdmin && !isMobile ? "grab" : "default" }
                       },
-                        /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 12, color: "#0F172A", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: 5 } },
-                          isAdmin && !isMobile && /*#__PURE__*/React.createElement("span", { style: { color: "#CBD5E1", fontSize: 10, flexShrink: 0 } }, "\u283F"),
+                        /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 12, color: "#0F172A", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: 4 } },
+                          isAdmin && !isMobile && /*#__PURE__*/React.createElement("span", { style: { color: "#CBD5E1", fontSize: 10 } }, "☰"),
                           col.emoji, " ", col.label
                         ),
                         col.sub && /*#__PURE__*/React.createElement("div", { style: { fontSize: 9, color: "#94A3B8", marginTop: 1 } }, col.sub)
                       ),
                       !isMobile && /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 3, flexShrink: 0, marginLeft: 4 } },
-                        /*#__PURE__*/React.createElement("button", { onClick: () => setSingleCol(p => p === col.id ? null : col.id), style: { background: "none", border: "none", cursor: "pointer", color: singleCol === col.id ? "#3B82F6" : "#CBD5E1", fontSize: 12, padding: "2px 3px" } }, singleCol === col.id ? "\u229E" : "\u229F"),
-                        /*#__PURE__*/React.createElement("button", { onClick: () => setMinimized(p => { const n = new Set(p); n.add(col.id); return n; }), style: { background: "none", border: "none", cursor: "pointer", color: "#CBD5E1", fontSize: 12, padding: "2px 3px" } }, "\u2212"),
-                        !col.fixed && isAdmin && /*#__PURE__*/React.createElement("button", { onClick: () => removeColumn(col.id), style: { background: "none", border: "none", cursor: "pointer", color: "#CBD5E1", fontSize: 12, padding: "2px 3px" } }, "\u2715")
+                        /*#__PURE__*/React.createElement("button", { onClick: () => setSingleCol(p => p === col.id ? null : col.id), style: { background: "none", border: "none", cursor: "pointer", color: singleCol === col.id ? "#3B82F6" : "#CBD5E1", fontSize: 12, padding: "2px 3px" } }, singleCol === col.id ? "⊞" : "⊟"),
+                        /*#__PURE__*/React.createElement("button", { onClick: function(){ setMinimized(function(p){ var n=new Set(p); n.add(col.id); return n; }); }, style: { background: "none", border: "none", cursor: "pointer", color: "#CBD5E1", fontSize: 12, padding: "2px 3px" } }, "−"),
+                        !col.fixed && isAdmin && /*#__PURE__*/React.createElement("button", { onClick: () => removeColumn(col.id), style: { background: "none", border: "none", cursor: "pointer", color: "#CBD5E1", fontSize: 12, padding: "2px 3px" } }, "✕")
                       )
                     ),
                     /*#__PURE__*/React.createElement("span", { style: { marginTop: 5, display: "inline-flex", background: "#F1F5F9", padding: "2px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700, color: "#475569" } }, colCards.length)
@@ -8022,6 +8042,14 @@ function App() {
       cols: cols,
       onClose: () => setShowDuplicates(false),
       onDel: onDelSilent
+    }),
+    /* ── Painel flutuante de ações pendentes ── */
+    isAdmin && /*#__PURE__*/React.createElement(FloatingActions, {
+      cards: cards,
+      discrepancias: discrepancias,
+      pendencias: [],
+      setView: setView,
+      cols: cols
     }),
     /*#__PURE__*/React.createElement(Toast, { toast: toast })
   );
