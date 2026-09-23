@@ -3654,14 +3654,7 @@ Isso vai substituir a visualização atual pelos dados desse snapshot.`)) return
         fontWeight: 700,
         color: "#0F172A"
       }
-    , (() => {
-      /* Título SEMPRE deriva de created_at para eliminar discrepância UTC vs BRT.
-         O label antigo vinha formatado pelo servidor em UTC, o subtítulo usava
-         toLocaleString no cliente (BRT) — resultado: 3h de diferença visível. */
-      const dt = new Date(pub.created_at);
-      const fmt = dt.toLocaleString("pt-BR", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
-      return isAuto ? (pub.label || "Snapshot automático") : `Publicação ${fmt}`;
-    })()), isAuto && /*#__PURE__*/React.createElement("span", {
+    }, isAuto ? (pub.label || "Snapshot automático") : ("Publicação " + new Date(pub.created_at).toLocaleString("pt-BR", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}))), isAuto && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 9,
         fontWeight: 700,
@@ -7863,22 +7856,21 @@ function App() {
                   /*#__PURE__*/React.createElement(React.Fragment, null,
                     /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } },
                       /*#__PURE__*/React.createElement("div", {
-                        /* Handle de drag de coluna: segura aqui e arrasta */
                         draggable: isAdmin && !isMobile,
                         onDragStart: e => { e.stopPropagation(); handleColDragStart(e, col.id); },
                         onDragEnd: handleColDragEnd,
                         style: { flex: 1, minWidth: 0, cursor: isAdmin && !isMobile ? "grab" : "default" }
                       },
                         /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 12, color: "#0F172A", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: 5 } },
-                          isAdmin && !isMobile && /*#__PURE__*/React.createElement("span", { style: { color: "#CBD5E1", fontSize: 10, flexShrink: 0 } }, "⠿"), /* grip icon */
+                          isAdmin && !isMobile && /*#__PURE__*/React.createElement("span", { style: { color: "#CBD5E1", fontSize: 10, flexShrink: 0 } }, "\u283F"),
                           col.emoji, " ", col.label
                         ),
                         col.sub && /*#__PURE__*/React.createElement("div", { style: { fontSize: 9, color: "#94A3B8", marginTop: 1 } }, col.sub)
                       ),
                       !isMobile && /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 3, flexShrink: 0, marginLeft: 4 } },
-                        /*#__PURE__*/React.createElement("button", { onClick: () => setSingleCol(p => p === col.id ? null : col.id), style: { background: "none", border: "none", cursor: "pointer", color: singleCol === col.id ? "#3B82F6" : "#CBD5E1", fontSize: 12, padding: "2px 3px" } }, singleCol === col.id ? "⊠" : "⊡"),
-                        /*#__PURE__*/React.createElement("button", { onClick: () => setMinimized(p => { const n = new Set(p); n.add(col.id); return n; }), style: { background: "none", border: "none", cursor: "pointer", color: "#CBD5E1", fontSize: 12, padding: "2px 3px" } }, "−"),
-                        !col.fixed && isAdmin && /*#__PURE__*/React.createElement("button", { onClick: () => removeColumn(col.id), style: { background: "none", border: "none", cursor: "pointer", color: "#CBD5E1", fontSize: 12, padding: "2px 3px" } }, "✕")
+                        /*#__PURE__*/React.createElement("button", { onClick: () => setSingleCol(p => p === col.id ? null : col.id), style: { background: "none", border: "none", cursor: "pointer", color: singleCol === col.id ? "#3B82F6" : "#CBD5E1", fontSize: 12, padding: "2px 3px" } }, singleCol === col.id ? "\u229E" : "\u229F"),
+                        /*#__PURE__*/React.createElement("button", { onClick: () => setMinimized(p => { const n = new Set(p); n.add(col.id); return n; }), style: { background: "none", border: "none", cursor: "pointer", color: "#CBD5E1", fontSize: 12, padding: "2px 3px" } }, "\u2212"),
+                        !col.fixed && isAdmin && /*#__PURE__*/React.createElement("button", { onClick: () => removeColumn(col.id), style: { background: "none", border: "none", cursor: "pointer", color: "#CBD5E1", fontSize: 12, padding: "2px 3px" } }, "\u2715")
                       )
                     ),
                     /*#__PURE__*/React.createElement("span", { style: { marginTop: 5, display: "inline-flex", background: "#F1F5F9", padding: "2px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700, color: "#475569" } }, colCards.length)
