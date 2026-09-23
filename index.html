@@ -38,25 +38,34 @@ kbd{font-family:monospace;background:#F1F5F9;padding:1px 5px;border-radius:3px;b
   position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%) translateY(4px);
   background:#0F172A;color:#F8FAFC;font-size:11px;line-height:1.5;font-weight:400;
   padding:8px 11px;border-radius:8px;width:230px;z-index:9000;pointer-events:none;
-  opacity:0;transition:opacity .15s,transform .15s;white-space:normal;text-align:left;box-shadow:0 4px 16px rgba(0,0,0,.3);text-transform:none;letter-spacing:0;font-size:11px
+  opacity:0;transition:opacity .15s,transform .15s;white-space:normal;text-align:left;box-shadow:0 4px 16px rgba(0,0,0,.3);
+  text-transform:none!important;letter-spacing:0!important
 }
 .tip .tipbox::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);
   border:5px solid transparent;border-top-color:#0F172A}
 .tip:hover .tipbox,.tip:focus-within .tipbox{opacity:1;transform:translateX(-50%) translateY(0)}
+/* ── Mobile nav ── */
+@media(max-width:640px){
+  .ge-nav-bar{overflow-x:auto!important;flex-wrap:nowrap!important;-webkit-overflow-scrolling:touch!important;scrollbar-width:none!important;padding-bottom:2px!important}
+  .ge-nav-bar::-webkit-scrollbar{display:none}
+  .ge-nav-bar .ge-nav-inner{flex-shrink:0}
+  /* Card modal full height */
+  .ge-modal-inner{max-height:88vh!important;margin:0 8px!important;border-radius:12px!important;overflow-y:auto!important}
+  /* Livro modal */
+  .ls-modal{margin:0 4px!important;border-radius:12px!important;max-height:92vh!important}
+  .ls-grid.ls-g2,.ls-grid.ls-g3{grid-template-columns:1fr!important}
+  /* Users panel */
+  .ge-user-card{flex-wrap:wrap!important}
+  .ge-user-perms{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;gap:4px!important;width:100%!important;margin-top:6px!important}
+}
 /* ── Floating actions ── */
 #ge-fab{position:fixed;bottom:20px;right:16px;z-index:8000;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
-@media(max-width:640px){#ge-fab{bottom:80px;right:12px}}
+@media(max-width:640px){#ge-fab{bottom:90px;right:12px}}
 /* ── Mobile modal fixes ── */
 @media(max-width:640px){
-  .modal-shell-inner{max-height:90vh!important;overflow-y:auto!important}
-  .ls-modal{max-height:90vh!important;margin:8px!important;border-radius:12px!important}
+  .modal-shell-inner{max-height:95vh!important;overflow-y:auto!important}
+  .ls-modal{max-height:95vh!important}
   .ls-grid.ls-g2,.ls-grid.ls-g3{grid-template-columns:1fr!important}
-  .ls-body{padding:14px!important}
-  .ls-section{margin-bottom:12px!important}
-}
-@media(max-width:640px){
-  /* Card modal full height on mobile */
-  [data-modal-shell]{max-height:90vh!important;margin:8px!important;border-radius:12px!important}
 }
 /* ── Livro de Saída ── */
 .ls-overlay{position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px}
@@ -773,7 +782,7 @@ function ModalShell({
     },
     onClick: undefined
   }, /*#__PURE__*/React.createElement("div", {
-    style: {
+    className: "ge-modal-inner", style: {
       background: "#fff",
       borderRadius: 16,
       width: "100%",
@@ -1452,7 +1461,7 @@ function CardModal({
   }), /*#__PURE__*/React.createElement(Field, {
     label: "Prioridade (nº)",
     fieldKey: "pr",
-    value: form.prioridade_remocao || form.pr || "",
+    value: form.prioridade_remocao ? "P" + form.prioridade_remocao + " (via aba Prioridade)" : (form.pr || ""),
     onChange: function(){},
     disabled: true,
     placeholder: "Definida na aba Prioridade"
@@ -1619,13 +1628,9 @@ function CardModal({
           ),
           !conflito.confirmado && React.createElement("div", { style: { display: "flex", gap: 8 } },
             React.createElement("button", {
-              onClick: () => {
-                upd("prioridade_remocao", conflito.valor);
-                upd("hora_prioridade", nowStr());
-                setConflito({ ...conflito, confirmado: true, novaPrioridade: "" });
-              },
+              onClick: () => setConflito(function(c){ return {...c, confirmado:true, novaPrioridade:""}; }),
               style: { padding: "5px 14px", border: "none", borderRadius: 7, background: "#D97706", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }
-            }, "✓ Confirmar e reatribuir"),
+            }, "✓ Confirmar — reatribuir P" + conflito.valor),
             React.createElement("button", {
               onClick: () => setConflito(null),
               style: { padding: "5px 14px", border: "1px solid #FDE68A", borderRadius: 7, background: "none", color: "#92400E", fontSize: 12, cursor: "pointer" }
@@ -1633,10 +1638,10 @@ function CardModal({
           ),
           conflito.confirmado && React.createElement("div", { style: { marginTop: 8 } },
             React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#92400E", marginBottom: 6 } },
-              "Qual prioridade dar para " + conflito.nomeConflito + "?"),
+              "Defina a nova prioridade de " + conflito.nomeConflito + " (ou deixe em branco para remover):"),
             React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center" } },
               React.createElement("input", {
-                type: "number", min: 1, step: 1,
+                type: "number", min: 1, step: 1, autoFocus: true,
                 value: conflito.novaPrioridade || "",
                 onChange: function(e){ setConflito(function(c){ return {...c, novaPrioridade: e.target.value}; }); },
                 placeholder: "Ex: 2",
@@ -1644,21 +1649,19 @@ function CardModal({
               }),
               React.createElement("button", {
                 onClick: function(){
-                  var nova = conflito.novaPrioridade ? String(conflito.novaPrioridade) : "";
-                  // Update the other card in window.__geCards optimistically
+                  var np = conflito.novaPrioridade ? String(conflito.novaPrioridade) : "";
+                  upd("prioridade_remocao", conflito.valor);
+                  upd("hora_prioridade", nowStr());
                   if(window.__geCards && conflito.idConflito) {
                     window.__geCards = window.__geCards.map(function(c){
-                      if(c.id === conflito.idConflito) return {...c, prioridade_remocao: nova, hora_prioridade: nova ? nowStr() : ""};
-                      return c;
+                      return c.id===conflito.idConflito ? {...c, prioridade_remocao:np, hora_prioridade:np?nowStr():""} : c;
                     });
                   }
                   setConflito(null);
                 },
                 style: { padding: "6px 14px", border: "none", borderRadius: 7, background: "#0F172A", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }
-              }, nova ? "Salvar P" + conflito.novaPrioridade : "Deixar sem prioridade")
-            ),
-            React.createElement("div", { style: { fontSize: 10, color: "#94A3B8", marginTop: 4 } },
-              "Deixe em branco para remover a prioridade de " + conflito.nomeConflito)
+              }, conflito.novaPrioridade ? "Salvar P" + conflito.novaPrioridade : "Remover prioridade")
+            )
           )
         ),
         /* Seletor numérico livre de prioridade */
@@ -3294,7 +3297,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Permaneceu", valor: perm.base ? `${perm.pct.toFixed(0)}%` : "—",
         sub: `${perm.n} de ${perm.base} com desfecho`, alerta: perm.base < dados.length * 0.8,
-        tooltip: "% de pacientes que foram removidos para a unidade de destino e permaneceram lá — não retornaram à Santa Casa. Calculado somente sobre registros com campo Permaneceu ou Finalizado preenchido." })
+        tooltip: "% de pacientes removidos que permaneceram na unidade de destino — não retornaram à Santa Casa. Calculado sobre registros com campo Permaneceu ou Finalizado preenchido." })
     ),
 
     /* ══ Série temporal ══ */
@@ -4317,6 +4320,7 @@ function UsersPanel({
     }
   }, "Admin")), !loading && users.filter(u => u.coren !== "299283").map(u => /*#__PURE__*/React.createElement("div", {
     key: u.id,
+    className: "ge-user-card",
     style: {
       background: "#fff",
       border: "1px solid #E2E8F0",
@@ -4324,8 +4328,9 @@ function UsersPanel({
       padding: "12px 16px",
       marginBottom: 8,
       display: "flex",
-      alignItems: "center",
-      gap: 12
+      alignItems: "flex-start",
+      flexWrap: "wrap",
+      gap: 10
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -4411,6 +4416,11 @@ function UsersPanel({
     className: "can-livro-toggle" + (u.can_justificativa ? " on" : ""),
     title: u.can_justificativa ? "Revogar: justificar discrepâncias" : "Liberar: justificar discrepâncias no Dashboard"
   }, u.can_justificativa ? "⚖ Justif. ✓" : "⚖ Justif."),
+  /*#__PURE__*/React.createElement("button", {
+    onClick: () => toggleFlag(u.id, "can_acoes", u.can_acoes, load),
+    className: "can-livro-toggle" + (u.can_acoes ? " on" : ""),
+    title: u.can_acoes ? "Revogar: criar e editar tarefas de enfermagem" : "Liberar: criar e editar tarefas de enfermagem"
+  }, u.can_acoes ? "✅ Tarefas ✓" : "✅ Tarefas"),
   /*#__PURE__*/React.createElement("button", {
     onClick: () => resetarSenha(u),
     className: "can-livro-toggle",
@@ -6522,6 +6532,258 @@ function TempoTag({ label, color, bg }) {
   }, label);
 }
 
+/* ════════════════════════════════════════════
+   AÇÕES DE ENFERMAGEM
+   ════════════════════════════════════════════ */
+function AcoesEnfermagem({ currentUser, userId, onClose }) {
+  var [acoes, setAcoes] = React.useState([]);
+  var [loading, setLoading] = React.useState(true);
+  var [showForm, setShowForm] = React.useState(false);
+  var [editing, setEditing] = React.useState(null);
+  var [users, setUsers] = React.useState([]);
+  var [conflito, setConflito] = React.useState(null);
+  var [toast, setToast] = React.useState(null);
+  var isAdmin = currentUser && currentUser.role === "admin";
+  var podeGerir = isAdmin || !!(currentUser && currentUser.can_acoes);
+  var emptyForm = {titulo:"",descricao:"",prioridade:"",responsavel_id:"",responsavel_nome:"",prazo:""};
+  var [form, setForm] = React.useState(emptyForm);
+
+  function showT(msg,type){setToast({msg,type:type||"ok"});setTimeout(function(){setToast(null);},4000);}
+  function upd(k,v){setForm(function(p){return Object.assign({},p,{[k]:v});});}
+
+  React.useEffect(function(){load();loadUsers();},[]);
+
+  async function load(){
+    setLoading(true);
+    try{
+      var r=await fetch(SB_URL+"/rest/v1/acoes_enfermagem?order=prioridade.asc.nullslast,created_at.asc&limit=200",{headers:H()});
+      var d=await r.json();
+      setAcoes(Array.isArray(d)?d:[]);
+    }catch(e){}
+    setLoading(false);
+  }
+
+  async function loadUsers(){
+    try{
+      var r=await sbGet("users","status=eq.aprovado&order=nome.asc");
+      setUsers(r);
+    }catch(e){}
+  }
+
+  async function callFn(body){
+    var r=await fetch(FN_URL+"/acoes-write",{method:"POST",headers:H(userId),body:JSON.stringify(body)});
+    var d=await r.json();
+    if(!r.ok) throw new Error(d.error||"Erro desconhecido");
+    return d;
+  }
+
+  async function handleSave(){
+    if(!form.titulo.trim()){showT("Título obrigatório","err");return;}
+    var body=Object.assign({},form);
+    if(body.prioridade) body.prioridade=parseInt(body.prioridade,10);
+    else delete body.prioridade;
+    if(!body.responsavel_id) delete body.responsavel_id;
+    if(!body.prazo) delete body.prazo;
+    // responsavel_nome
+    if(body.responsavel_id){
+      var u=users.find(function(x){return x.id===body.responsavel_id;});
+      if(u) body.responsavel_nome=u.nome;
+    }
+    try{
+      if(editing){
+        await callFn({action:"update",id:editing.id,body:body});
+        showT("Tarefa atualizada.");
+      } else {
+        await callFn({action:"create",body:body});
+        showT("Tarefa criada.");
+      }
+      setShowForm(false);setEditing(null);setForm(emptyForm);setConflito(null);
+      load();
+    }catch(ex){
+      // 409 = conflito de prioridade
+      if(ex.message && ex.message.includes("já está com:")){
+        setConflito({msg:ex.message,prioridadeConflito:body.prioridade});
+      } else {
+        showT(ex.message,"err");
+      }
+    }
+  }
+
+  async function handleConcluir(acao){
+    try{await callFn({action:"concluir",id:acao.id});showT("Tarefa concluída!");load();}
+    catch(ex){showT(ex.message,"err");}
+  }
+  async function handleReabrir(acao){
+    try{await callFn({action:"reabrir",id:acao.id});showT("Tarefa reaberta.");load();}
+    catch(ex){showT(ex.message,"err");}
+  }
+  async function handleDelete(acao){
+    if(!window.confirm("Excluir a tarefa \""+acao.titulo+"\"?")) return;
+    try{await callFn({action:"delete",id:acao.id});showT("Excluída.");load();}
+    catch(ex){showT(ex.message,"err");}
+  }
+
+  function startEdit(acao){
+    setEditing(acao);
+    setForm({
+      titulo:acao.titulo||"", descricao:acao.descricao||"",
+      prioridade:acao.prioridade||"", responsavel_id:acao.responsavel_id||"",
+      responsavel_nome:acao.responsavel_nome||"",
+      prazo:acao.prazo?acao.prazo.slice(0,16):"",
+    });
+    setConflito(null);
+    setShowForm(true);
+  }
+
+  var pendentes = acoes.filter(function(a){return a.status==="pendente";});
+  var concluidas = acoes.filter(function(a){return a.status==="concluida";});
+
+  var iS={width:"100%",padding:"8px 10px",border:"1px solid #E2E8F0",borderRadius:7,fontSize:13,fontFamily:"inherit",color:"#0F172A",background:"#fff",outline:"none"};
+  var lS={fontSize:10,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:".04em",display:"block",marginBottom:3};
+
+  function FRow(props){
+    return React.createElement("div",{style:{marginBottom:10}},
+      React.createElement("label",{style:lS},props.label,props.req&&React.createElement("span",{style:{color:"#EF4444",marginLeft:2}},"*")),
+      props.children
+    );
+  }
+
+  return React.createElement("div",{
+    style:{position:"fixed",inset:0,background:"rgba(15,23,42,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:16}
+  },
+    React.createElement("div",{
+      style:{background:"#fff",borderRadius:16,width:"100%",maxWidth:620,maxHeight:"92vh",display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 20px 60px rgba(0,0,0,.22)"}
+    },
+      /* Header */
+      React.createElement("div",{style:{background:"#0F172A",padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}},
+        React.createElement("div",null,
+          React.createElement("div",{style:{color:"#fff",fontSize:15,fontWeight:700}},"✅ Ações de Enfermagem"),
+          React.createElement("div",{style:{color:"#475569",fontSize:11,marginTop:2}},pendentes.length+" pendente"+(pendentes.length!==1?"s":""))
+        ),
+        React.createElement("div",{style:{display:"flex",gap:8,alignItems:"center"}},
+          podeGerir && !showForm && React.createElement("button",{
+            onClick:function(){setShowForm(true);setEditing(null);setForm(emptyForm);setConflito(null);},
+            style:{padding:"6px 14px",border:"none",borderRadius:7,background:"#16A34A",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer"}
+          },"+ Nova tarefa"),
+          React.createElement("button",{onClick:onClose,style:{background:"rgba(255,255,255,.1)",border:"none",color:"#fff",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:16}},"✕")
+        )
+      ),
+
+      /* Toast */
+      toast && React.createElement("div",{style:{background:toast.type==="ok"?"#F0FDF4":"#FEF2F2",borderBottom:"1px solid "+(toast.type==="ok"?"#86EFAC":"#FCA5A5"),padding:"8px 20px",fontSize:12,color:toast.type==="ok"?"#166534":"#991B1B",fontWeight:600}},toast.msg),
+
+      /* Form */
+      showForm && React.createElement("div",{style:{padding:"16px 20px",borderBottom:"1px solid #F1F5F9",background:"#F8FAFC",flexShrink:0,overflowY:"auto",maxHeight:340}},
+        React.createElement("div",{style:{fontWeight:700,fontSize:13,color:"#0F172A",marginBottom:12}},editing?"Editar tarefa":"Nova tarefa"),
+
+        /* Conflito de prioridade */
+        conflito && React.createElement("div",{style:{background:"#FEF3C7",border:"1px solid #FDE68A",borderRadius:8,padding:"10px 12px",marginBottom:12,fontSize:12}},
+          React.createElement("div",{style:{fontWeight:700,color:"#92400E",marginBottom:6}},"⚠️ "+conflito.msg),
+          React.createElement("div",{style:{color:"#78350F",marginBottom:8}},"Escolha outra prioridade ou deixe em branco."),
+          React.createElement("button",{onClick:function(){setConflito(null);upd("prioridade","");},style:{padding:"5px 14px",border:"none",borderRadius:7,background:"#D97706",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer"}},"Limpar prioridade e continuar")
+        ),
+
+        React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 12px"}},
+          React.createElement("div",{style:{gridColumn:"1/-1"}},
+            React.createElement(FRow,{label:"Título",req:true},
+              React.createElement("input",{value:form.titulo,onChange:function(e){upd("titulo",e.target.value);},style:iS,placeholder:"Ex: Conferir medicação UTI"})
+            )
+          ),
+          React.createElement(FRow,{label:"Prioridade"},
+            React.createElement("input",{type:"number",min:1,step:1,value:form.prioridade,onChange:function(e){upd("prioridade",e.target.value);},style:iS,placeholder:"1 = mais urgente"})
+          ),
+          React.createElement(FRow,{label:"Prazo"},
+            React.createElement("input",{type:"datetime-local",value:form.prazo,onChange:function(e){upd("prazo",e.target.value);},style:iS})
+          ),
+          React.createElement("div",{style:{gridColumn:"1/-1"}},
+            React.createElement(FRow,{label:"Responsável"},
+              React.createElement("select",{value:form.responsavel_id,onChange:function(e){upd("responsavel_id",e.target.value);},style:iS},
+                React.createElement("option",{value:""},"— sem responsável —"),
+                users.map(function(u){return React.createElement("option",{key:u.id,value:u.id},u.nome+" ("+u.tipo+" "+(u.coren||u.crm||"")+")")})
+              )
+            )
+          ),
+          React.createElement("div",{style:{gridColumn:"1/-1"}},
+            React.createElement(FRow,{label:"Descrição"},
+              React.createElement("textarea",{rows:2,value:form.descricao,onChange:function(e){upd("descricao",e.target.value);},style:Object.assign({},iS,{resize:"vertical"}),placeholder:"Detalhes opcionais..."})
+            )
+          )
+        ),
+        React.createElement("div",{style:{display:"flex",gap:8,justifyContent:"flex-end",marginTop:4}},
+          React.createElement("button",{onClick:function(){setShowForm(false);setEditing(null);setConflito(null);},style:{padding:"7px 16px",borderRadius:8,border:"1px solid #E2E8F0",background:"none",color:"#64748B",fontWeight:600,fontSize:13,cursor:"pointer"}},"Cancelar"),
+          React.createElement("button",{onClick:handleSave,style:{padding:"7px 20px",borderRadius:8,border:"none",background:"#0F172A",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}},"Salvar")
+        )
+      ),
+
+      /* Lista */
+      React.createElement("div",{style:{flex:1,overflowY:"auto",padding:"12px 20px"}},
+        loading && React.createElement("div",{style:{textAlign:"center",padding:32,color:"#94A3B8"}},"Carregando…"),
+        !loading && acoes.length===0 && React.createElement("div",{style:{textAlign:"center",padding:"48px 0"}},
+          React.createElement("div",{style:{fontSize:32,marginBottom:8}},"✅"),
+          React.createElement("div",{style:{fontWeight:700,fontSize:14,color:"#0F172A"}},"Nenhuma tarefa"),
+          podeGerir && React.createElement("div",{style:{fontSize:12,color:"#94A3B8",marginTop:4}},"Clique em \"+ Nova tarefa\" para criar.")
+        ),
+
+        /* Pendentes */
+        pendentes.length>0 && React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:10,fontWeight:700,color:"#94A3B8",textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}},"Pendentes"),
+          pendentes.map(function(a){
+            var vencida=a.prazo&&new Date(a.prazo)<new Date();
+            var podeConcluir=isAdmin||!!(currentUser&&currentUser.can_acoes)||(a.responsavel_id&&currentUser&&a.responsavel_id===currentUser.id);
+            return React.createElement("div",{
+              key:a.id,
+              style:{background:"#fff",border:"1px solid "+(vencida?"#FCA5A5":"#E2E8F0"),borderLeft:"3px solid "+(a.prioridade?"#7C3AED":"#E2E8F0"),borderRadius:10,padding:"12px 14px",marginBottom:8}
+            },
+              React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}},
+                React.createElement("div",{style:{flex:1,minWidth:0}},
+                  React.createElement("div",{style:{display:"flex",alignItems:"center",gap:6,marginBottom:3}},
+                    a.prioridade&&React.createElement("span",{style:{fontSize:9,fontWeight:800,padding:"2px 7px",borderRadius:99,background:"#EDE9FE",color:"#6D28D9",border:"1px solid #DDD6FE"}},"P"+a.prioridade),
+                    React.createElement("span",{style:{fontWeight:700,fontSize:13,color:"#0F172A"}},a.titulo)
+                  ),
+                  a.descricao&&React.createElement("div",{style:{fontSize:11,color:"#64748B",marginBottom:3}},a.descricao),
+                  React.createElement("div",{style:{display:"flex",gap:8,flexWrap:"wrap",fontSize:10,color:"#94A3B8"}},
+                    a.responsavel_nome&&React.createElement("span",null,"👤 ",a.responsavel_nome),
+                    a.prazo&&React.createElement("span",{style:{color:vencida?"#EF4444":"#94A3B8",fontWeight:vencida?700:400}},
+                      (vencida?"⚠️ Venceu: ":"🕐 Prazo: ")+new Date(a.prazo).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})
+                    ),
+                    React.createElement("span",null,"Criada: "+new Date(a.created_at).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}))
+                  )
+                ),
+                React.createElement("div",{style:{display:"flex",gap:5,flexShrink:0}},
+                  podeConcluir&&React.createElement("button",{onClick:function(){handleConcluir(a);},style:{padding:"5px 10px",border:"none",borderRadius:6,background:"#16A34A",color:"#fff",fontWeight:700,fontSize:11,cursor:"pointer"}},"✓ Concluir"),
+                  podeGerir&&React.createElement("button",{onClick:function(){startEdit(a);},style:{padding:"5px 8px",border:"1px solid #E2E8F0",borderRadius:6,background:"none",color:"#374151",cursor:"pointer",fontSize:11}},"✏️"),
+                  podeGerir&&React.createElement("button",{onClick:function(){handleDelete(a);},style:{padding:"5px 8px",border:"1px solid #E2E8F0",borderRadius:6,background:"none",color:"#94A3B8",cursor:"pointer",fontSize:11}},"✕")
+                )
+              )
+            );
+          })
+        ),
+
+        /* Concluídas */
+        concluidas.length>0 && React.createElement("div",{style:{marginTop:16}},
+          React.createElement("div",{style:{fontSize:10,fontWeight:700,color:"#94A3B8",textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}},"Concluídas ("+concluidas.length+")"),
+          concluidas.map(function(a){
+            return React.createElement("div",{
+              key:a.id,
+              style:{background:"#F8FAFC",border:"1px solid #E2E8F0",borderLeft:"3px solid #22C55E",borderRadius:10,padding:"10px 14px",marginBottom:6,opacity:0.7}
+            },
+              React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}},
+                React.createElement("div",null,
+                  React.createElement("div",{style:{fontWeight:600,fontSize:12,color:"#374151",textDecoration:"line-through"}},a.titulo),
+                  React.createElement("div",{style:{fontSize:10,color:"#94A3B8",marginTop:2}},
+                    "✓ ",a.concluida_por_nome," · ",new Date(a.concluida_em).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})
+                  )
+                ),
+                podeGerir&&React.createElement("button",{onClick:function(){handleReabrir(a);},style:{padding:"4px 10px",border:"1px solid #E2E8F0",borderRadius:6,background:"none",color:"#64748B",cursor:"pointer",fontSize:10}},"↩ Reabrir")
+              )
+            );
+          })
+        )
+      )
+    )
+  );
+}
+
 /* ── FloatingActions: balão flutuante de alertas (admin only) ── */
 function FloatingActions({ cards, discrepancias, pendencias, setView }) {
   var [open, setOpen] = React.useState(false);
@@ -6613,6 +6875,8 @@ function App() {
   const [showDuplicates, setShowDuplicates] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [showLivro, setShowLivro] = useState(false);
+  const [showAcoes, setShowAcoes] = useState(false);
+  const [acoesCount, setAcoesCount] = React.useState(0);
   const [pendentesCount, setPendentesCount] = useState(0);
   const [pendenciasCount, setPendenciasCount] = useState(0);
   const dragId = useRef(null);
@@ -7596,9 +7860,7 @@ function App() {
   );
 
   // Funções de navegação
-  const NAVBTN_TIPS = {dashboard:"Indicadores e métricas de remoções",usuarios:"Gerenciar profissionais, permissões e senhas",historico:"Log completo de todas as ações realizadas no sistema",publicacoes:"Histórico de versões publicadas do Kanban"};
   const NavBtn = ({ id, label }) => /*#__PURE__*/React.createElement("button", {
-    title: NAVBTN_TIPS[id]||"",
     onClick: () => setView(id),
     style: {
       padding: "5px 14px",
@@ -7726,6 +7988,7 @@ function App() {
     },
       /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: "#1E40AF", fontWeight: 500 } }, "👁 Visualização somente leitura", lastPub ? ` · Publicado em: ${lastPub}` : "")
     ),
+    showAcoes && React.createElement(AcoesEnfermagem, { currentUser: currentUser, userId: userId, onClose: () => setShowAcoes(false) }),
     showLivro && /*#__PURE__*/React.createElement(LivroSaida, { currentUser: currentUser, userId: userId, onClose: () => setShowLivro(false), onPendentesChange: n => setPendentesCount(n) }),
     undoQueue.map(item => /*#__PURE__*/React.createElement("div", {
       key: item.id,
@@ -7735,12 +7998,13 @@ function App() {
     /* Conteúdo principal */
     /*#__PURE__*/React.createElement("div", { style: { maxWidth: 1600, margin: "0 auto", padding: "16px 20px" } },
       /* Barra de navegação e filtros */
-      /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 10, alignItems: "center", flexWrap: "nowrap", overflowX: "auto", paddingBottom: 2, WebkitOverflowScrolling: "touch", msOverflowStyle: "none", scrollbarWidth: "none" } },
-        /*#__PURE__*/React.createElement("div", { style: { background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, padding: "2px", display: "flex", gap: 1, flexShrink: 0 } },
+      /*#__PURE__*/React.createElement("div", { className: "ge-nav-bar", style: { display: "flex", gap: 6, marginBottom: 10, alignItems: "center", flexWrap: "nowrap", overflowX: "auto", paddingBottom: 2, WebkitOverflowScrolling: "touch", msOverflowStyle: "none", scrollbarWidth: "none" } },
+        /*#__PURE__*/React.createElement("div", { className: "ge-nav-inner", style: { background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, padding: "2px", display: "flex", gap: 1, flexShrink: 0 } },
           /*#__PURE__*/React.createElement(NavBtn, { id: "dashboard", label: "📊 Dashboard" }),
           /*#__PURE__*/React.createElement(KanbanDropdown, { view: view, setView: setView }),
           /*#__PURE__*/React.createElement("a", { href: "remocao.html", style: { padding: "5px 14px", borderRadius: 6, border: "none", fontSize: 12, fontWeight: 400, background: "transparent", color: "#64748B", cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center" } }, "🚑 Remoção"),
           podeLivro && /*#__PURE__*/React.createElement("div", { className: "livro-btn" }, /*#__PURE__*/React.createElement("button", { onClick: () => setShowLivro(true), style: { padding: "5px 14px", borderRadius: 6, border: "none", fontSize: 12, fontWeight: 400, background: "transparent", color: "#64748B", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 } }, "📒 Livro de Saída"), pendentesCount > 0 && /*#__PURE__*/React.createElement("span", { className: "livro-badge" }, pendentesCount)),
+          /*#__PURE__*/React.createElement("div", { className: "livro-btn" }, /*#__PURE__*/React.createElement("button", { onClick: () => setShowAcoes(true), title: "Tarefas de enfermagem persistentes entre turnos", style: { padding: "5px 14px", borderRadius: 6, border: "none", fontSize: 12, fontWeight: 400, background: "transparent", color: "#64748B", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 } }, "\u2705 A\xE7\xF5es"), acoesCount > 0 && /*#__PURE__*/React.createElement("span", { className: "livro-badge", style:{background:"#7C3AED"} }, acoesCount)),
           isAdmin && /*#__PURE__*/React.createElement(NavBtn, { id: "usuarios", label: "👥 Profissionais" }),
           isAdmin && /*#__PURE__*/React.createElement(NavBtn, { id: "historico", label: "📜 Histórico" }),
           isAdmin && /*#__PURE__*/React.createElement(NavBtn, { id: "publicacoes", label: "📰 Publicações" })
@@ -8063,3 +8327,4 @@ ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.c
 </script>
 </body>
 </html>
+  
