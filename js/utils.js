@@ -15,13 +15,24 @@ function buildText(cards, cols, settings) {
     psiquiatria:"PSIQUIATRIA", andamento:"REMOCAO EM ANDAMENTO", finalizado:"FINALIZADAS"
   };
   cols.forEach(col => {
-    const cc = cards.filter(c => c.col_id === col.id);
+    const cc = [...cards.filter(c => c.col_id === col.id)].sort((a, b) => {
+      if (col.id === "aceite") {
+        const pa = a.prioridade_remocao ? parseInt(a.prioridade_remocao, 10) : 9999;
+        const pb = b.prioridade_remocao ? parseInt(b.prioridade_remocao, 10) : 9999;
+        if (pa !== pb) return pa - pb;
+        const ha = a.hora_aceite || "99:99";
+        const hb = b.hora_aceite || "99:99";
+        return ha.localeCompare(hb);
+      }
+      return 0;
+    });
     if (!cc.length) return;
     const colLabel = COL_LABEL[col.id] || col.label.toUpperCase();
     lines.push(""); lines.push("*" + colLabel + "*");
     lines.push(cc.length + " paciente" + (cc.length !== 1 ? "s" : "")); lines.push(SEP);
     cc.forEach(c => {
       lines.push("");
+      if (c.prioridade_remocao) lines.push("🔢 *P" + c.prioridade_remocao + " — PRIORIDADE DE REMOÇÃO*");
       if (c.pr) lines.push(PR_EMOJI[c.pr] + " *PRIORIDADE " + String(c.pr).padStart(2,"0") + "*");
       const catL = { pediatria:"[Ped]", psiquiatria:"[Psi]", obstetricia:"[Obs]" };
       const catT = c.categoria && c.categoria !== "normal" ? catL[c.categoria] : c.is_rn ? "[RN]" : "";
