@@ -723,7 +723,17 @@ function App() {
       const colsToRender = isAdmin ? cols : pubCols || cols;
       const cardsToRender = isAdmin ? cards : pubCards || [];
       colsToRender.forEach(col => {
-        const colCards = cardsToRender.filter(c => c.col_id === col.id);
+        const colCards = [...cardsToRender.filter(c => c.col_id === col.id)].sort((a, b) => {
+          if (col.id === "aceite") {
+            const pa = a.prioridade_remocao ? parseInt(a.prioridade_remocao, 10) : 9999;
+            const pb = b.prioridade_remocao ? parseInt(b.prioridade_remocao, 10) : 9999;
+            if (pa !== pb) return pa - pb;
+            const ha = a.hora_aceite || "99:99";
+            const hb = b.hora_aceite || "99:99";
+            return ha.localeCompare(hb);
+          }
+          return 0;
+        });
         const colDiv = document.createElement("div");
         colDiv.style.cssText = "background:#fff;border-radius:10px;border:1px solid #E2E8F0;width:240px;flex-shrink:0;overflow:visible;border-top:3px solid " + (col.accent || "#94A3B8") + ";";
         const hdr = document.createElement("div");
@@ -741,6 +751,7 @@ function App() {
           card.style.cssText = "background:#fff;border:1px solid #E2E8F0;border-left:3px solid " + dot + ";border-radius:8px;padding:9px 10px;margin-bottom:6px;";
           let html = "";
           if (c.pr) html += "<div style='font-size:9px;font-weight:700;color:#94A3B8;margin-bottom:1px;'>#" + c.pr + "</div>";
+          if (c.prioridade_remocao) html += "<div style='margin-bottom:4px;'><span style='font-size:9px;font-weight:700;padding:2px 7px;border-radius:99px;background:#EDE9FE;color:#6D28D9;border:1px solid #DDD6FE;'>P" + c.prioridade_remocao + "</span></div>";
           html += "<div style='font-weight:600;font-size:12px;color:#0F172A;margin-bottom:4px;'>" + (c.is_rn ? "👶 " : "") + c.nome + "</div>";
           if (c.hd) html += "<div style='font-size:11px;color:#374151;margin-bottom:3px;'><span style='color:#CBD5E1;'>HD: </span>" + c.hd + "</div>";
           if (c.setor || c.rec) html += "<div style='display:flex;gap:4px;flex-wrap:wrap;margin-bottom:3px;'>" +
