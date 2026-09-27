@@ -57,7 +57,7 @@ function UsersPanel({
   async function action(act, id) {
     const mapa = { approve: "aprovar", delete: "remover", block: "bloquear" };
     try {
-      const r = await adminUsuarios(mapa[act] || act, id);
+      const r = await adminUsuarios(mapa[act] || act, id, undefined, userId);
       load();
       if (act === "approve" && r?.senhaInicial)
         showT(`Aprovado. Senha inicial: ${r.senhaInicial} (o próprio registro).`);
@@ -71,7 +71,7 @@ function UsersPanel({
     const reg = (u.coren || u.crm || "").trim();
     if (!window.confirm(`Redefinir a senha de ${u.nome || reg} para o registro (${reg})?\n\nA pessoa terá que escolher uma nova senha no próximo acesso.`)) return;
     try {
-      const r = await adminUsuarios("redefinir_senha", u.id);
+      const r = await adminUsuarios("reset_password", u.id, undefined, userId);
       load();
       showT(`Senha redefinida para: ${r.senhaInicial}`);
     } catch (ex) { showT(ex.message, "err"); }
