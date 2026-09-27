@@ -527,7 +527,7 @@ async function adminUsuarios(action, id, extra, userId) {
 // Liga/desliga uma area de escrita (can_kanban | can_planilha | can_livro).
 // Antes era um PATCH direto no REST com a anon key — com RLS ligada isso
 // nao passa mais, e nem deveria: permissao se altera no servidor.
-async function toggleFlag(uid, campo, atual, reload) {
-  await adminUsuarios("toggle", uid, { campo, valor: !atual }, currentUser?.id);
+async function toggleFlag(uid, campo, atual, reload, callerId) {
+  await adminUsuarios("toggle", uid, { campo, valor: !atual }, callerId);
   reload();
 }
