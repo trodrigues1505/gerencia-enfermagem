@@ -373,16 +373,16 @@ function UsersPanel({
     React.createElement("div", { style:{ borderTop:"1px solid #F1F5F9", paddingTop:8 } },
       React.createElement("div", { style:{ fontSize:10, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:".05em", marginBottom:4 } }, "Acesso"),
       React.createElement("div", { style:{ display:"flex", gap:4, flexWrap:"wrap", marginBottom:8 } },
-        React.createElement("button", { onClick:()=>toggleFlag(u.id,"can_kanban",u.can_kanban,load), className:"can-livro-toggle"+(u.can_kanban?" on":"") }, u.can_kanban?"🗂 Kanban ✓":"🗂 Kanban"),
-        React.createElement("button", { onClick:()=>toggleFlag(u.id,"can_livro",u.can_livro,load), className:"can-livro-toggle"+(u.can_livro?" on":"") }, u.can_livro?"📒 Livro ✓":"📒 Livro"),
-        React.createElement("button", { onClick:()=>toggleFlag(u.id,"can_planilha",u.can_planilha,load), className:"can-livro-toggle"+(u.can_planilha?" on":"") }, u.can_planilha?"📋 Planilha ✓":"📋 Planilha")
+        React.createElement("button", { onClick:()=>toggleFlag(u.id,"can_kanban",u.can_kanban,load,userId), className:"can-livro-toggle"+(u.can_kanban?" on":"") }, u.can_kanban?"🗂 Kanban ✓":"🗂 Kanban"),
+        React.createElement("button", { onClick:()=>toggleFlag(u.id,"can_livro",u.can_livro,load,userId), className:"can-livro-toggle"+(u.can_livro?" on":"") }, u.can_livro?"📒 Livro ✓":"📒 Livro"),
+        React.createElement("button", { onClick:()=>toggleFlag(u.id,"can_planilha",u.can_planilha,load,userId), className:"can-livro-toggle"+(u.can_planilha?" on":"") }, u.can_planilha?"📋 Planilha ✓":"📋 Planilha")
       ),
       React.createElement("div", { style:{ fontSize:10, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:".05em", marginBottom:4 } }, "Funções especiais"),
       React.createElement("div", { style:{ display:"flex", gap:4, flexWrap:"wrap" } },
-        React.createElement("button", { onClick:()=>toggleFlag(u.id,"can_prioridade",u.can_prioridade,load), className:"can-livro-toggle"+(u.can_prioridade?" on":"") }, u.can_prioridade?"🔢 Prioridade ✓":"🔢 Prioridade"),
-        React.createElement("button", { onClick:()=>toggleFlag(u.id,"can_escala",u.can_escala,load), className:"can-livro-toggle"+(u.can_escala?" on":"") }, u.can_escala?"👥 Escala ✓":"👥 Escala"),
-        React.createElement("button", { onClick:()=>toggleFlag(u.id,"can_justificativa",u.can_justificativa,load), className:"can-livro-toggle"+(u.can_justificativa?" on":"") }, u.can_justificativa?"⚖ Justif. ✓":"⚖ Justif."),
-        React.createElement("button", { onClick:()=>toggleFlag(u.id,"can_acoes",u.can_acoes,load), className:"can-livro-toggle"+(u.can_acoes?" on":"") }, u.can_acoes?"✅ Tarefas ✓":"✅ Tarefas")
+        React.createElement("button", { onClick:()=>toggleFlag(u.id,"can_prioridade",u.can_prioridade,load,userId), className:"can-livro-toggle"+(u.can_prioridade?" on":"") }, u.can_prioridade?"🔢 Prioridade ✓":"🔢 Prioridade"),
+        React.createElement("button", { onClick:()=>toggleFlag(u.id,"can_escala",u.can_escala,load,userId), className:"can-livro-toggle"+(u.can_escala?" on":"") }, u.can_escala?"👥 Escala ✓":"👥 Escala"),
+        React.createElement("button", { onClick:()=>toggleFlag(u.id,"can_justificativa",u.can_justificativa,load,userId), className:"can-livro-toggle"+(u.can_justificativa?" on":"") }, u.can_justificativa?"⚖ Justif. ✓":"⚖ Justif."),
+        React.createElement("button", { onClick:()=>toggleFlag(u.id,"can_acoes",u.can_acoes,load,userId), className:"can-livro-toggle"+(u.can_acoes?" on":"") }, u.can_acoes?"✅ Tarefas ✓":"✅ Tarefas")
       )
     )
   )
