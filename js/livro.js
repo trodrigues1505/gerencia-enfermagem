@@ -521,7 +521,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
  * pelo front. A propria funcao confere, a partir do JWT, se quem chama e
  * admin aprovado; o front so desenha a tela. */
 async function adminUsuarios(action, id, extra, userId) {
-  return await fn("users-admin", { action, id, ...(extra || {}) }, userId);
+  return await fn("users-admin", { action, id, extra: extra || {} }, userId);
 }
 
 // Liga/desliga uma area de escrita (can_kanban | can_planilha | can_livro).
