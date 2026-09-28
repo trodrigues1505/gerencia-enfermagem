@@ -521,13 +521,13 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
  * pelo front. A propria funcao confere, a partir do JWT, se quem chama e
  * admin aprovado; o front so desenha a tela. */
 async function adminUsuarios(action, id, extra, userId) {
-  return await fn("users-admin", { action, id, extra: extra || {} }, userId);
+  return await fn("users-admin", { action, id, ...(extra || {}) }, userId);
 }
 
 // Liga/desliga uma area de escrita (can_kanban | can_planilha | can_livro).
 // Antes era um PATCH direto no REST com a anon key — com RLS ligada isso
 // nao passa mais, e nem deveria: permissao se altera no servidor.
 async function toggleFlag(uid, campo, atual, reload, callerId) {
-  await adminUsuarios("toggle", uid, { campo, valor: !atual }, callerId);
+  await adminUsuarios("flags", uid, { flags: { [campo]: !atual } }, callerId);
   reload();
 }
