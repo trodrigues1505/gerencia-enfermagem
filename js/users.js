@@ -71,7 +71,7 @@ function UsersPanel({
     const reg = (u.coren || u.crm || "").trim();
     if (!window.confirm(`Redefinir a senha de ${u.nome || reg} para o registro (${reg})?\n\nA pessoa terá que escolher uma nova senha no próximo acesso.`)) return;
     try {
-      const r = await adminUsuarios("reset_password", u.id, undefined, userId);
+      const r = await adminUsuarios("redefinir_senha", u.id, undefined, userId);
       load();
       showT(`Senha redefinida para: ${r.senhaInicial}`);
     } catch (ex) { showT(ex.message, "err"); }
