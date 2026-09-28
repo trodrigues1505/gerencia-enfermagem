@@ -199,6 +199,11 @@ const FN = `${SB_URL}/functions/v1/remocoes-write`;
 // ligada, requisicao sem token de sessao nao le nada.
 const H = {"Content-Type":"application/json",apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`};
 
+// Permissao de edicao da planilha: admin ou can_planilha. Comeca fechada e so abre
+// depois que o perfil do usuario for lido (aplicarSessao). A barreira de verdade
+// e a Edge Function remocoes-write; isto evita oferecer o que o servidor recusa.
+let PODE_EDITAR = false;
+
 // A sessao e a mesma do index.html (supabase-js persiste por origem), entao
 // quem ja entrou no Kanban chega aqui autenticado. Sem sessao, volta ao login.
 let _sbAuth = null;
@@ -219,6 +224,12 @@ async function aplicarSessao(){
   const { data } = await sb.auth.getSession();
   if(!data.session){ window.location.href = "index.html"; return null; }
   H.Authorization = `Bearer ${data.session.access_token}`;
+  try{
+    const pr = await fetch(`${SB_URL}/rest/v1/users?auth_uid=eq.${data.session.user.id}&select=role,status,can_planilha&limit=1`,{headers:H});
+    const rows = await pr.json();
+    const u = Array.isArray(rows) ? rows[0] : null;
+    PODE_EDITAR = !!u && u.status==="aprovado" && (u.role==="admin" || u.can_planilha===true);
+  }catch(e){ PODE_EDITAR = false; }
   sb.auth.onAuthStateChange((_e,sess)=>{
     H.Authorization = `Bearer ${sess?.access_token || SB_KEY}`;
     if(!sess) window.location.href = "index.html";
@@ -227,6 +238,7 @@ async function aplicarSessao(){
 }
 
 async function api(body) {
+  if(!PODE_EDITAR) throw new Error("Seu acesso à planilha é somente para visualização.");
   const r = await fetch(FN,{method:"POST",headers:H,body:JSON.stringify(body)});
   const d = await r.json();
   if(!r.ok) throw new Error(d.error||"Erro");
@@ -1689,6 +1701,7 @@ function App(){
             <div><div className="tn">Gerência de Enfermagem</div><div className="ts">Controle de Remoções</div></div>
           </div>
           <a href="." style={{padding:"5px 10px",border:"1px solid #334155",borderRadius:6,background:"none",color:"#94A3B8",fontSize:11,textDecoration:"none",display:"inline-flex",alignItems:"center",gap:5}}>← Kanban</a>
+          {!PODE_EDITAR&&<span title="Você pode consultar a planilha, mas não alterar." style={{padding:"4px 10px",borderRadius:99,background:"#FEF3C7",color:"#92400E",fontSize:11,fontWeight:700,border:"1px solid #FDE68A"}}>Somente leitura</span>}
         </div>
       </div>
 
