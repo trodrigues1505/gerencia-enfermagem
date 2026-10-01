@@ -133,8 +133,9 @@
    */
   var AMBULANCIA = idx({
     "BÁSICA":   ["BASICA", "BASICO", "SBV", "USB", "UNIDADE DE SUPORTE BASICO"],
-    "AVANÇADA": ["AVANCADA", "AVANCADO", "SAV", "USA", "UTI MOVEL",
-                 "UNIDADE DE SUPORTE AVANCADO"]
+    // UTI (móvel) conta como Avançada — decisão da gestão (01/10/2026).
+    "AVANÇADA": ["AVANCADA", "AVANCADO", "SAV", "USA", "UTI", "UTI MOVEL", "UTI MOVEL ADULTO",
+                 "UTI MOVEL NEONATAL", "UNIDADE DE SUPORTE AVANCADO"]
   });
 
   /* ══ SETOR ═══════════════════════════════════════════════════════════════
