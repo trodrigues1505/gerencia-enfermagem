@@ -13,10 +13,68 @@ function strSim(a, b) {
 // O Livro tem DUAS etapas, preenchidas por pessoas (e plantões) diferentes:
 //   1) SAÍDA   — quando a ambulância sai (aba "Registrar saída")
 //   2) RETORNO — quando a ambulância volta (aba "Aguardando retorno")
-const LS_EMPTY={data_saida:"",nome_paciente:"",idade:"",especialidade:"",destino:"",ambulancia:"",medico:"",enfermeiro:"",tecnico_auxiliar:"",hora_solic_ambulancia:"",hora_saida:"",observacao:""};
+const LS_EMPTY={data_solic_ambulancia:"",data_saida:"",nome_paciente:"",idade:"",especialidade:"",destino:"",ambulancia:"",medico:"",enfermeiro:"",tecnico_auxiliar:"",hora_solic_ambulancia:"",hora_saida:"",observacao:""};
 const LS_RET_EMPTY={hora_retorno:"",finalizado:null,permaneceu:null,observacao:""};
 // Obrigatórios da etapa 1 (saída). Na etapa 2 o obrigatório é só o horário de retorno.
-const LS_REQUIRED=["data_saida","nome_paciente","idade","especialidade","destino","ambulancia","medico","enfermeiro","tecnico_auxiliar","hora_solic_ambulancia","hora_saida"];
+const LS_REQUIRED=["data_solic_ambulancia","data_saida","nome_paciente","idade","especialidade","destino","ambulancia","medico","enfermeiro","tecnico_auxiliar","hora_solic_ambulancia","hora_saida"];
+// "Sem médico" etc.: afirmação explícita (não é campo esquecido). Definida em canon.js.
+const LS_SEM=(typeof Canon!=="undefined"&&Canon.EQUIPE_SEM)||{medico:"SEM MÉDICO",enfermeiro:"SEM ENFERMEIRO(A)",tecnico_auxiliar:"SEM TÉCNICO/AUXILIAR"};
+const lsEhSem=v=>(typeof Canon!=="undefined"&&Canon.ehSemEquipe)?Canon.ehSemEquipe(v):Object.values(LS_SEM).includes(String(v||"").trim().toUpperCase());
+// Diferença entre dois momentos (data + hora) em "HH:MM". Sem as datas, assume a virada de meia-noite (23:10 -> 01:40).
+function lsDiff(dIni,hIni,dFim,hFim){
+  const a=lsHora(hIni),b=lsHora(hFim);
+  if(!a||!b)return "";
+  let min=null;
+  if(dIni&&dFim){
+    const t1=new Date(`${dIni}T${a}:00`),t2=new Date(`${dFim}T${b}:00`);
+    if(!isNaN(t1)&&!isNaN(t2)&&t2>=t1)min=Math.round((t2-t1)/60000);
+  }
+  if(min===null){
+    const [h1,m1]=a.split(":").map(Number),[h2,m2]=b.split(":").map(Number);
+    min=(h2*60+m2)-(h1*60+m1);if(min<0)min+=1440;
+  }
+  return String(Math.floor(min/60)).padStart(2,"0")+":"+String(min%60).padStart(2,"0");
+}
+// Tudo que o Livro sabe e a planilha tem coluna para receber. Só vai o que foi preenchido:
+// campo vazio no Livro nunca apaga o que já está na planilha.
+function lsLivroParaPlanilha(l){
+  const u={};
+  if(l.ambulancia)u.tipo_ambulancia=l.ambulancia;
+  if(l.data_solic_ambulancia)u.data_saida_ambulancia=l.data_solic_ambulancia; // coluna da planilha "Solicitação base ambulância — data"
+  if(l.hora_solic_ambulancia)u.hora_solic_ambulancia=lsHora(l.hora_solic_ambulancia);
+  if(l.data_saida)u.data_saida_real=l.data_saida;                              // dia em que a ambulância realmente saiu
+  if(l.hora_saida)u.horario_saida_ambulancia=lsHora(l.hora_saida);
+  if(l.hora_retorno)u.horario_retorno=lsHora(l.hora_retorno);                  // vazio se o retorno ainda não foi registrado
+  if(l.medico)u.medico=l.medico;
+  if(l.enfermeiro)u.enfermeiro=l.enfermeiro;
+  if(l.tecnico_auxiliar)u.tecnico_auxiliar=l.tecnico_auxiliar;
+  if(l.destino)u.instituicao_destino=l.destino;
+  if(l.observacao)u.observacao=l.observacao;
+  if(l.finalizado===true||l.finalizado===false)u.finalizado=l.finalizado;     // Sim/Não só se alguém respondeu
+  if(l.permaneceu===true||l.permaneceu===false)u.permaneceu=l.permaneceu;
+  // tempos calculados (com as datas, porque o pedido pode ser num dia e a saída no outro)
+  const te=lsDiff(l.data_solic_ambulancia||l.data_saida,l.hora_solic_ambulancia,l.data_saida,l.hora_saida);
+  if(te)u.tempo_espera=te;
+  const du=lsDiff(l.data_saida,l.hora_saida,l.data_saida,l.hora_retorno);
+  if(du)u.duracao_remocao=du;
+  return u;
+}
+// O que ainda falta levar do retorno para a planilha (compara o Livro com a linha vinculada).
+function lsDiferencasRetorno(l,rem){
+  const u={};
+  const hr=lsHora(l.hora_retorno);
+  if(hr&&lsHora(rem.horario_retorno)!==hr)u.horario_retorno=hr;
+  ["finalizado","permaneceu"].forEach(k=>{if((l[k]===true||l[k]===false)&&rem[k]!==l[k])u[k]=l[k];});
+  // A observação do retorno é ACRESCENTADA no Livro. Na planilha só acompanha se ela estava vazia ou igual à anterior:
+  // assim não apaga uma observação editada à mão.
+  const lo=(l.observacao||"").trim(),ro=(rem.observacao||"").trim();
+  if(lo&&lo!==ro&&(ro===""||lo.startsWith(ro)))u.observacao=lo;
+  if(u.horario_retorno){
+    const du=lsDiff(l.data_saida,l.hora_saida,l.data_saida,l.hora_retorno);
+    if(du)u.duracao_remocao=du;
+  }
+  return u;
+}
 // "14:30:00" -> "14:30" (o banco pode devolver com segundos; a planilha e o dashboard esperam HH:MM)
 function lsHora(v){const t=String(v||"").trim();const m=t.match(/^(\d{1,2}):(\d{2})/);return m?m[1].padStart(2,"0")+":"+m[2]:t;}
 // Usa H() do app: resolve o JWT da sessao a cada chamada. Header fixo com a
@@ -77,6 +135,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   const [tab,setTab]=useState("novo");
   const [form,setForm]=useState({...LS_EMPTY});
   const [errors,setErrors]=useState({});
+  const [formMsg,setFormMsg]=useState("");
   const [saving,setSaving]=useState(false);
   const [pendentes,setPendentes]=useState([]);
   const [loadingP,setLoadingP]=useState(false);
@@ -113,6 +172,8 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
     const t=String(e&&e.message||e||"");
     if(t.includes("42501")||t.includes("row-level security"))
       return "Sua sessao expirou ou voce nao tem permissao para lancar no Livro. Saia e entre novamente; se continuar, procure a coordenacao.";
+    if(t.includes("PGRST204")||t.includes("data_solic_ambulancia"))
+      return "O banco ainda não foi atualizado para a data da solicitação da ambulância. Avise a coordenação (falta rodar a migração).";
     if(t.includes("Failed to fetch")||t.includes("NetworkError"))
       return "Sem conexao com o servidor. Os dados continuam na tela — tente salvar de novo.";
     return "Nao foi possivel salvar. Detalhe tecnico no console.";
@@ -125,7 +186,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   useEffect(()=>{loadPendentes();loadRemocoes();loadRetornos();},[]);
   // Selo do botão "Livro de Saída" no menu: pendências de vínculo + saídas aguardando retorno
   useEffect(()=>{if(onPendentesChange)onPendentesChange(pendentes.length+retornos.length);},[pendentes,retornos]);
-  useEffect(()=>{if(tab==="todos")loadTodos();if(tab==="retorno")loadRetornos();},[tab]); // lista sempre atualizada ao abrir a aba (outro plantão pode ter lançado saídas)
+  useEffect(()=>{if(tab==="todos")loadTodos();if(tab==="retorno")loadRetornos();if(tab==="pendentes")loadPendentes();},[tab]); // lista sempre atualizada ao abrir a aba (outro plantão pode ter lançado saídas)
 
   // fetch NAO lanca em 401/403 — sem checar r.ok, o corpo de erro virava []
   // e a tela dizia "Nenhum pendente", mascarando falha como sucesso.
@@ -196,23 +257,35 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   }
 
   async function loadRemocoes(){
-    try{const r=await fetch(`${SB_URL}/rest/v1/remocoes?select=id,nome_paciente,data_solicitacao,ficha_cross,horario_retorno,finalizado,permaneceu&order=data_solicitacao.desc&limit=300`,{headers:LS_H()});const d=await r.json();setRemocoes(Array.isArray(d)?d:[]);}catch(e){}
+    try{const r=await fetch(`${SB_URL}/rest/v1/remocoes?select=id,nome_paciente,data_solicitacao,ficha_cross,horario_retorno,finalizado,permaneceu,observacao&order=data_solicitacao.desc&limit=300`,{headers:LS_H()});const d=await r.json();setRemocoes(Array.isArray(d)?d:[]);}catch(e){}
   }
 
-  const set=(k,v)=>{setForm(p=>({...p,[k]:v}));setErrors(p=>({...p,[k]:false}));};
+  const set=(k,v)=>{
+    setForm(p=>{
+      const n={...p,[k]:v};
+      // Pedido e saída costumam ser no mesmo dia: a data do pedido acompanha a da saída enquanto não for alterada.
+      if(k==="data_saida"&&(!p.data_solic_ambulancia||p.data_solic_ambulancia===p.data_saida))n.data_solic_ambulancia=v;
+      return n;
+    });
+    setErrors(p=>({...p,[k]:false,...(k==="data_saida"||k==="data_solic_ambulancia"||k==="hora_saida"||k==="hora_solic_ambulancia"?{data_solic_ambulancia:false,hora_saida:false}:{})}));
+  };
 
   function validate(){
     const errs={};
     LS_REQUIRED.forEach(k=>{if(!form[k]||String(form[k]).trim()==="")errs[k]=true;});
-    setErrors(errs);
+    let msg=Object.keys(errs).length?"⚠ Preencha todos os campos obrigatórios (*) antes de salvar.":"";
+    if(!msg&&form.data_solic_ambulancia>form.data_saida){errs.data_solic_ambulancia=true;msg="⚠ A data da solicitação da ambulância não pode ser depois da data da saída.";}
+    if(!msg&&form.data_solic_ambulancia===form.data_saida&&form.hora_saida<form.hora_solic_ambulancia){errs.hora_saida=true;msg="⚠ A saída está antes da solicitação da ambulância no mesmo dia. Confira os horários e as datas.";}
+    setErrors(errs);setFormMsg(msg);
     return Object.keys(errs).length===0;
   }
 
-  function findMatches(nome,data){
+  function findMatches(nome,datas){
     if(!nome)return[];
+    const ds=(Array.isArray(datas)?datas:[datas]).filter(Boolean);
     return remocoes
       .map(r=>({...r,sim:strSim(r.nome_paciente,nome)}))
-      .filter(r=>{const sd=data&&r.data_solicitacao&&r.data_solicitacao.startsWith(data);return r.sim>=0.75||(r.sim>=0.55&&sd);})
+      .filter(r=>{const sd=r.data_solicitacao&&ds.some(d=>r.data_solicitacao.startsWith(d));return r.sim>=0.75||(r.sim>=0.55&&sd);})
       .sort((a,b)=>b.sim-a.sim).slice(0,5);
   }
 
@@ -224,10 +297,10 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
       const r=await fetch(`${SB_URL}/rest/v1/livro_saida`,{method:"POST",headers:{...LS_H(),Prefer:"return=representation"},body:JSON.stringify(payload)});
       if(!r.ok)throw new Error(await r.text());
       const [saved]=await r.json();
-      const candidates=findMatches(form.nome_paciente,form.data_saida);
-      loadRetornos();
-      if(candidates.length>0){setMatch({livroRow:saved,candidates});setForm({...LS_EMPTY});}
-      else{setForm({...LS_EMPTY});loadPendentes();notify("ok","Saída registrada. Falta registrar o retorno da ambulância (aba Aguardando retorno). Sem correspondência na planilha — ficou em Pendentes.");}
+      const candidates=findMatches(form.nome_paciente,[form.data_saida,form.data_solic_ambulancia]);
+      loadRetornos();loadPendentes();
+      if(candidates.length>0){setMatch({livroRow:saved,candidates});setForm({...LS_EMPTY});setFormMsg("");}
+      else{setForm({...LS_EMPTY});setFormMsg("");notify("ok","Saída registrada. Falta registrar o retorno da ambulância (aba Aguardando retorno). Sem correspondência na planilha — ficou em Pendentes.");}
     }catch(e){console.error("[LivroSaida] falha ao salvar:",e);notify("erro",msgErro(e));}
     setSaving(false);
   }
@@ -235,27 +308,28 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   async function handleVincular(livroId,remocaoId){
     setVinculando(true);
     try{
-      await fetch(`${SB_URL}/rest/v1/livro_saida?id=eq.${livroId}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=minimal"},body:JSON.stringify({remocao_id:remocaoId,status_vinculo:"vinculado"})});
-      const livroEntry=match?.livroRow||pendentes.find(p=>p.id===livroId);
-      if(livroEntry&&remocaoId){
-        const u={};
-        if(livroEntry.ambulancia)u.tipo_ambulancia=livroEntry.ambulancia;
-        if(livroEntry.hora_solic_ambulancia)u.hora_solic_ambulancia=lsHora(livroEntry.hora_solic_ambulancia);
-        if(livroEntry.hora_saida)u.horario_saida_ambulancia=lsHora(livroEntry.hora_saida);
-        if(livroEntry.hora_retorno)u.horario_retorno=lsHora(livroEntry.hora_retorno); // vazio se o retorno ainda não foi registrado
-        if(livroEntry.medico)u.medico=livroEntry.medico;
-        if(livroEntry.enfermeiro)u.enfermeiro=livroEntry.enfermeiro;
-        if(livroEntry.tecnico_auxiliar)u.tecnico_auxiliar=livroEntry.tecnico_auxiliar;
-        if(livroEntry.destino)u.instituicao_destino=livroEntry.destino;
-        if(livroEntry.observacao)u.observacao=livroEntry.observacao;
-        // Sim/Não só vão para a planilha se a enfermeira respondeu; vazio não sobrescreve nada.
-        if(livroEntry.finalizado===true||livroEntry.finalizado===false)u.finalizado=livroEntry.finalizado;
-        if(livroEntry.permaneceu===true||livroEntry.permaneceu===false)u.permaneceu=livroEntry.permaneceu;
-        if(Object.keys(u).length>0)await fetch(`${SB_URL}/rest/v1/remocoes?id=eq.${remocaoId}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=minimal"},body:JSON.stringify(u)});
+      // Lê o registro ATUAL do servidor. A lista de Pendentes pode estar desatualizada: o retorno (e Finalizado/Permaneceu)
+      // costuma ser lançado por outra pessoa DEPOIS de a lista ter sido carregada.
+      let livroEntry=match?.livroRow||pendentes.find(p=>p.id===livroId);
+      try{
+        const rf=await fetch(`${SB_URL}/rest/v1/livro_saida?id=eq.${livroId}`,{headers:LS_H()});
+        if(rf.ok){const d=await rf.json();if(Array.isArray(d)&&d[0])livroEntry=d[0];}
+      }catch(_){/* mantém a cópia que já temos */}
+      const u=livroEntry&&remocaoId?lsLivroParaPlanilha(livroEntry):{};
+      // 1º a planilha: se ela recusar, nada fica pela metade (o registro continua Pendente e dá para tentar de novo)
+      if(Object.keys(u).length>0){
+        const rp=await fetch(`${SB_URL}/rest/v1/remocoes?id=eq.${remocaoId}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=representation"},body:JSON.stringify(u)});
+        if(!rp.ok)throw new Error(await rp.text());
+        const dp=await rp.json();
+        if(!Array.isArray(dp)||dp.length===0)throw new Error("Sem permissão para alterar a planilha de remoção, ou a linha não existe mais.");
       }
-      setMatch(null);setForm({...LS_EMPTY});loadPendentes();
-      notify("ok","Vinculado. Dados mesclados na planilha de remoção.");
-    }catch(e){console.error("[LivroSaida] falha ao vincular:",e);notify("erro",msgErro(e));}
+      const rl=await fetch(`${SB_URL}/rest/v1/livro_saida?id=eq.${livroId}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=minimal"},body:JSON.stringify({remocao_id:remocaoId,status_vinculo:"vinculado"})});
+      if(!rl.ok)throw new Error(await rl.text());
+      setMatch(null);setForm({...LS_EMPTY});loadPendentes();loadRemocoes();if(tab==="todos")loadTodos();
+      notify("ok",livroEntry&&!livroEntry.hora_retorno
+        ?"Vinculado. Dados da saída copiados para a planilha — o retorno será levado quando for registrado."
+        :"Vinculado. Dados mesclados na planilha de remoção.");
+    }catch(e){console.error("[LivroSaida] falha ao vincular:",e);notify("erro",String(e&&e.message||"").startsWith("Sem permiss")?e.message:msgErro(e));}
     setVinculando(false);
   }
 
@@ -284,12 +358,15 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   // para os demais devolve "negado" e a administração atualiza depois (botão na aba Todos).
   async function sincronizarRetorno(l,opts){
     const silencioso=!!(opts&&opts.silencioso);
-    const hr=lsHora(l.hora_retorno);
-    if(!l.remocao_id||!hr)return "nada";
-    const u={horario_retorno:hr};
-    if(l.finalizado===true||l.finalizado===false)u.finalizado=l.finalizado;
-    if(l.permaneceu===true||l.permaneceu===false)u.permaneceu=l.permaneceu;
+    if(!l.remocao_id||!lsHora(l.hora_retorno))return "nada";
     try{
+      // compara com a linha ATUAL da planilha (e só envia o que realmente mudou)
+      const rg=await fetch(`${SB_URL}/rest/v1/remocoes?id=eq.${l.remocao_id}&select=id,horario_retorno,finalizado,permaneceu,observacao`,{headers:LS_H()});
+      if(!rg.ok)throw new Error(await rg.text());
+      const dg=await rg.json();
+      if(!Array.isArray(dg)||!dg[0]){if(!silencioso)notify("erro","Você não tem permissão para ver essa linha da planilha, ou ela não existe mais.");return "negado";}
+      const u=lsDiferencasRetorno(l,dg[0]);
+      if(Object.keys(u).length===0){if(!silencioso)notify("ok","A planilha já está com o retorno do Livro.");return "nada";}
       const r=await fetch(`${SB_URL}/rest/v1/remocoes?id=eq.${l.remocao_id}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=representation"},body:JSON.stringify(u)});
       if(!r.ok)throw new Error(await r.text());
       const d=await r.json();
@@ -309,7 +386,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
         p_observacao:(retForm.observacao||"").trim()||null})});
       if(!r.ok)throw new Error(await r.text());
       const salvo=await r.json();
-      setRetornos(prev=>prev.filter(x=>x.id!==p.id));
+      setRetornos(prev=>prev.filter(x=>x.id!==p.id));loadPendentes();
       setRetAberto(null);setRetForm({...LS_RET_EMPTY});setRetErro(false);
       let msg="Retorno registrado.";
       if(salvo&&salvo.remocao_id&&salvo.status_vinculo==="vinculado"){
@@ -324,7 +401,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   }
 
   async function handleVincularPendente(livro){
-    const candidates=findMatches(livro.nome_paciente,livro.data_saida);
+    const candidates=findMatches(livro.nome_paciente,[livro.data_saida,livro.data_solic_ambulancia]);
     setMatch({livroRow:livro,candidates});setTab("novo");
   }
 
@@ -344,9 +421,23 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
     React.createElement("label",null,React.createElement("input",{type:"radio",name:grupo,checked:val===true,onChange:()=>on(true)})," Sim"),
     React.createElement("label",null,React.createElement("input",{type:"radio",name:grupo,checked:val===false,onChange:()=>on(false)})," Não"),
     val!==null&&val!==undefined&&React.createElement("button",{type:"button",onClick:()=>on(null),style:{background:"none",border:"none",color:"#94A3B8",fontSize:11,cursor:"pointer",textDecoration:"underline"}},"limpar")));
+  // "01/10 → 02/10" quando o pedido da ambulância foi num dia e a saída em outro
+  const datasTxt=p=>(p.data_solic_ambulancia&&p.data_solic_ambulancia!==p.data_saida)
+    ?React.createElement(React.Fragment,null,"Pedido ",fmtDate(p.data_solic_ambulancia)," → Saída ",React.createElement("b",null,fmtDate(p.data_saida)))
+    :fmtDate(p.data_saida);
+  // Nome da equipe; "SEM MÉDICO" etc. aparecem destacados para não parecerem esquecimento
+  const nomeEq=v=>lsEhSem(v)?React.createElement("span",{style:{background:"#FEF3C7",color:"#92400E",border:"1px solid #FDE68A",borderRadius:99,padding:"0 6px",fontSize:10,fontWeight:700}},v):v;
+  // Campo da equipe com a opção "saiu sem ..."
+  const EQP=(k,label,ph,semTxt)=>{
+    const sem=lsEhSem(form[k]);
+    return React.createElement("div",{key:k},LBL(label,true),
+      React.createElement("input",{type:"text",placeholder:ph,value:form[k],disabled:sem,onChange:e=>set(k,e.target.value),style:{...iS(k),...(sem?{background:"#FFFBEB",color:"#92400E",fontWeight:700,border:"1.5px solid #FDE68A"}:null)}}),
+      React.createElement("label",{style:{display:"flex",alignItems:"center",gap:6,marginTop:5,fontSize:11,cursor:"pointer",color:sem?"#92400E":"#64748B",fontWeight:sem?700:500}},
+        React.createElement("input",{type:"checkbox",checked:sem,onChange:e=>set(k,e.target.checked?LS_SEM[k]:"")}),semTxt));
+  };
   // Resumo "Saída … · Retorno …" usado nas listas
   const LINHA_HORAS=p=>React.createElement("div",{style:{fontSize:11,color:"#94A3B8",marginTop:2}},"🕐 Saída: ",p.hora_saida?lsHora(p.hora_saida):"—"," · Retorno: ",
-    p.hora_retorno?lsHora(p.hora_retorno):React.createElement("span",{style:{color:"#B45309",fontWeight:700}},"aguardando")," · ",p.ambulancia," · Enf: ",p.enfermeiro);
+    p.hora_retorno?lsHora(p.hora_retorno):React.createElement("span",{style:{color:"#B45309",fontWeight:700}},"aguardando")," · ",p.ambulancia," · Enf: ",nomeEq(p.enfermeiro));
   const iSR=erro=>({border:`1.5px solid ${erro?"#EF4444":"#E2E8F0"}`,borderRadius:8,padding:"8px 10px",fontSize:13,fontFamily:"inherit",color:"#0F172A",outline:"none",background:"#fff",width:"100%",boxShadow:erro?"0 0 0 3px rgba(239,68,68,.1)":"none"});
 
   return React.createElement("div",{className:"ls-overlay",onClick:e=>{if(e.target!==e.currentTarget)return;if(match||confirmClose||confirmIgnorar)return;pedirFechar();}},
@@ -444,8 +535,9 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
           // Paciente
           React.createElement("div",{className:"ls-section"},
             React.createElement("div",{className:"ls-section-title"},"Dados do Paciente"),
-            React.createElement("div",{className:"ls-grid ls-g2"},
-              FLD("data_saida","Data",React.createElement("input",{type:"date",value:form.data_saida,onChange:e=>set("data_saida",e.target.value),style:iS("data_saida")})),
+            React.createElement("div",{className:"ls-grid ls-g3"},
+              FLD("data_solic_ambulancia","Data da solicitação da ambulância",React.createElement("input",{type:"date",value:form.data_solic_ambulancia,onChange:e=>set("data_solic_ambulancia",e.target.value),style:iS("data_solic_ambulancia")})),
+              FLD("data_saida","Data da saída",React.createElement("input",{type:"date",value:form.data_saida,onChange:e=>set("data_saida",e.target.value),style:iS("data_saida")})),
               FLD("idade","Idade",React.createElement("input",{type:"text",placeholder:"ex: 3 anos",value:form.idade,onChange:e=>set("idade",e.target.value),style:iS("idade")}))
             ),
             React.createElement("div",{style:{marginTop:10}},
@@ -470,10 +562,13 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
           React.createElement("div",{className:"ls-section"},
             React.createElement("div",{className:"ls-section-title"},"Equipe"),
             React.createElement("div",{className:"ls-grid ls-g3"},
-              FLD("medico","Médico(a)",React.createElement("input",{type:"text",placeholder:"Dr. Nome",value:form.medico,onChange:e=>set("medico",e.target.value),style:iS("medico")})),
-              FLD("enfermeiro","Enfermeiro(a)",React.createElement("input",{type:"text",placeholder:"Nome",value:form.enfermeiro,onChange:e=>set("enfermeiro",e.target.value),style:iS("enfermeiro")})),
-              FLD("tecnico_auxiliar","Técnico / Auxiliar",React.createElement("input",{type:"text",placeholder:"Nome",value:form.tecnico_auxiliar,onChange:e=>set("tecnico_auxiliar",e.target.value),style:iS("tecnico_auxiliar")}))
-            )
+              EQP("medico","Médico(a)","Dr. Nome","Saiu sem médico"),
+              EQP("enfermeiro","Enfermeiro(a)","Nome","Saiu sem enfermeiro(a)"),
+              EQP("tecnico_auxiliar","Técnico / Auxiliar","Nome","Saiu sem técnico/auxiliar")
+            ),
+            React.createElement("div",{style:{fontSize:11,color:"#64748B",lineHeight:1.5,marginTop:8}},
+              "Se a remoção realmente saiu sem algum profissional, marque a opção “Saiu sem …”: o registro passa a ",React.createElement("b",null,"afirmar"),
+              " que não houve, e não parece que o campo foi esquecido. Campo em branco quer dizer que ninguém preencheu.")
           ),
           // Horários
           React.createElement("div",{className:"ls-section"},
@@ -490,7 +585,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
           ),
           React.createElement("div",{style:{background:"#EFF6FF",border:"1px solid #BFDBFE",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#1E40AF",lineHeight:1.5,marginTop:4}},
             "\u{1F501} O horário de retorno ",React.createElement("b",null,"não é preenchido agora"),". Quando a ambulância voltar, qualquer profissional registra o retorno na aba “Aguardando retorno” — não precisa ser quem registrou a saída."),
-          Object.keys(errors).length>0&&React.createElement("div",{style:{background:"#FEF2F2",border:"1px solid #FCA5A5",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#DC2626",marginTop:8}},"⚠ Preencha todos os campos obrigatórios (*) antes de salvar.")
+          Object.values(errors).some(Boolean)&&formMsg&&React.createElement("div",{style:{background:"#FEF2F2",border:"1px solid #FCA5A5",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#DC2626",marginTop:8}},formMsg)
         ),
 
         // TAB PENDENTES
@@ -513,15 +608,15 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                             color:p.status_vinculo==="vinculado"?"#15803D":p.status_vinculo==="pendente"?"#B45309":"#64748B"}},
                             p.status_vinculo==="vinculado"?"Vinculado":p.status_vinculo==="pendente"?"Pendente":"Sem vínculo")
                         ),
-                        React.createElement("div",{style:{fontSize:11,color:"#64748B"}},fmtDate(p.data_saida)," · ",p.idade," · ",p.especialidade," → ",p.destino),
+                        React.createElement("div",{style:{fontSize:11,color:"#64748B"}},datasTxt(p)," · ",p.idade," · ",p.especialidade," → ",p.destino),
                         LINHA_HORAS(p),
                         LS_ASSINATURA(p),
                         LS_ASSINATURA_RETORNO(p)
                       ),
                       React.createElement("div",{style:{display:"flex",gap:6,flexShrink:0,alignItems:"center",flexWrap:"wrap",justifyContent:"flex-end"}},
                         (()=>{const rem=remocoes.find(x=>x.id===p.remocao_id);
-                          const desatual=podeVincular&&p.status_vinculo==="vinculado"&&p.hora_retorno&&rem&&lsHora(rem.horario_retorno)!==lsHora(p.hora_retorno);
-                          return desatual?React.createElement("button",{onClick:()=>sincronizarRetorno(p),title:"A planilha de remoção está com outro horário de retorno (ou sem ele). Clique para copiar o retorno do Livro para a planilha.",style:{flexShrink:0,background:"#FFFBEB",border:"1px solid #FDE68A",color:"#92400E",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}},"⟳ Atualizar planilha"):null;})(),
+                          const desatual=podeVincular&&p.status_vinculo==="vinculado"&&p.hora_retorno&&rem&&Object.keys(lsDiferencasRetorno(p,rem)).length>0;
+                          return desatual?React.createElement("button",{onClick:()=>sincronizarRetorno(p),title:"A planilha de remoção está sem o retorno do Livro (horário, Finalizado ou Permaneceu). Clique para copiar.",style:{flexShrink:0,background:"#FFFBEB",border:"1px solid #FDE68A",color:"#92400E",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}},"⟳ Atualizar planilha"):null;})(),
                         React.createElement("button",{onClick:()=>abrirAuditoria(p),title:"Ver historico de auditoria",style:{background:"none",border:"1px solid #E2E8F0",color:"#475569",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}},"\u{1F5D2} Auditoria"),
                         podeVincular&&p.status_vinculo==="independente"&&React.createElement("button",{onClick:()=>handleReabrir(p.id),style:{flexShrink:0,background:"none",border:"1px solid #E2E8F0",color:"#1D4ED8",borderRadius:7,padding:"5px 11px",fontSize:11,fontWeight:600,cursor:"pointer"}},"↩ Reabrir")
                     )
@@ -546,9 +641,9 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}},
                       React.createElement("div",{style:{minWidth:0}},
                         React.createElement("div",{style:{fontWeight:700,fontSize:13}},p.nome_paciente),
-                        React.createElement("div",{style:{fontSize:11,color:"#64748B",marginTop:2}},fmtDate(p.data_saida)," · ",p.idade," · ",p.especialidade," → ",p.destino),
+                        React.createElement("div",{style:{fontSize:11,color:"#64748B",marginTop:2}},datasTxt(p)," · ",p.idade," · ",p.especialidade," → ",p.destino),
                         LINHA_HORAS(p),
-                        React.createElement("div",{style:{fontSize:11,color:"#94A3B8",marginTop:2}},"Téc: ",p.tecnico_auxiliar," · Méd: ",p.medico),
+                        React.createElement("div",{style:{fontSize:11,color:"#94A3B8",marginTop:2}},"Téc: ",nomeEq(p.tecnico_auxiliar)," · Méd: ",nomeEq(p.medico)),
                         LS_ASSINATURA(p)
                       ),
                       retAberto!==p.id&&React.createElement("button",{onClick:()=>abrirRetorno(p),style:{flexShrink:0,background:"#16A34A",color:"#fff",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}},"↩ Registrar retorno")
@@ -589,7 +684,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                   React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}},
                     React.createElement("div",null,
                       React.createElement("div",{style:{fontWeight:700,fontSize:13}},p.nome_paciente),
-                      React.createElement("div",{style:{fontSize:11,color:"#64748B",marginTop:2}},fmtDate(p.data_saida)," · ",p.idade," · ",p.especialidade," → ",p.destino),
+                      React.createElement("div",{style:{fontSize:11,color:"#64748B",marginTop:2}},datasTxt(p)," · ",p.idade," · ",p.especialidade," → ",p.destino),
                       LINHA_HORAS(p),
                       LS_ASSINATURA(p),
                       LS_ASSINATURA_RETORNO(p)

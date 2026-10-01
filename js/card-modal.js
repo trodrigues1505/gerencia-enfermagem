@@ -171,6 +171,10 @@ function parseTSVToCard(txt){
   return raw;
 }
 
+// "SEM MÉDICO" etc.: afirmação explícita de que a remoção saiu sem aquele profissional (definida em canon.js)
+const CARD_SEM = (typeof Canon !== "undefined" && Canon.EQUIPE_SEM) || { medico: "SEM MÉDICO", enfermeiro: "SEM ENFERMEIRO(A)", tecnico_auxiliar: "SEM TÉCNICO/AUXILIAR" };
+const cardEhSem = v => (typeof Canon !== "undefined" && Canon.ehSemEquipe) ? Canon.ehSemEquipe(v) : Object.values(CARD_SEM).includes(String(v || "").trim().toUpperCase());
+
 function CardModal({
   card,
   cols,
@@ -281,7 +285,7 @@ function CardModal({
           formFinal.hora_prioridade = nowStr();
         }
         // Hora da escala: captura se equipe foi preenchida mas hora ainda não foi registrada
-        const temEquipe = formFinal.enfermeiro_escalado || formFinal.medico_escala || formFinal.tecnico_auxiliar_escala;
+        const temEquipe = [formFinal.enfermeiro_escalado, formFinal.medico_escala, formFinal.tecnico_auxiliar_escala].some(v => v && !cardEhSem(v));
         if (temEquipe && !formFinal.hora_escala_equipe) {
           formFinal.hora_escala_equipe = nowStr();
         }
@@ -750,8 +754,9 @@ function CardModal({
       const delta = calcDeltaMin(cardCreatedAt, form.hora_escala_equipe);
 
       /* Mini-seção de membro da equipe */
-      const MembroSection = ({ emoji, titulo, corBg, corBorder, corTexto, fields }) =>
-        React.createElement("div", {
+      const MembroSection = ({ emoji, titulo, corBg, corBorder, corTexto, fields, semKey, semTxt, setorKey }) => {
+        const sem = cardEhSem(form[fields[0][1]]);
+        return React.createElement("div", {
           style: { background: corBg, border: `1px solid ${corBorder}`, borderRadius: 10,
             padding: "12px 14px", marginBottom: 12 }
         },
@@ -764,12 +769,28 @@ function CardModal({
               React.createElement(Field, {
                 key: fieldKey, label, fieldKey,
                 value: form[fieldKey] || "",
-                onChange: upd, disabled: !canEdit,
+                onChange: upd, disabled: !canEdit || (sem && fieldKey === setorKey),
                 placeholder, full: !!full
               })
             )
+          ),
+          /* Afirmação explícita: saiu sem este profissional (não é campo esquecido) */
+          semKey && React.createElement("label", {
+            style: { display: "flex", alignItems: "center", gap: 7, marginTop: 8, fontSize: 12, cursor: canEdit ? "pointer" : "default",
+              color: sem ? "#92400E" : corTexto, fontWeight: sem ? 700 : 500,
+              background: sem ? "#FEF3C7" : "transparent", border: sem ? "1px solid #FDE68A" : "1px solid transparent", borderRadius: 8, padding: "5px 8px" }
+          },
+            React.createElement("input", {
+              type: "checkbox", checked: sem, disabled: !canEdit,
+              onChange: e => {
+                upd(fields[0][1], e.target.checked ? CARD_SEM[semKey] : "");
+                if (e.target.checked && setorKey) upd(setorKey, "");
+              }
+            }),
+            semTxt
           )
         );
+      };
 
       return React.createElement(React.Fragment, null,
         /* Cabeçalho */
@@ -793,6 +814,7 @@ function CardModal({
         React.createElement(MembroSection, {
           emoji: "🩺", titulo: "Médico",
           corBg: "#F0FDF4", corBorder: "#86EFAC", corTexto: "#15803D",
+          semKey: "medico", semTxt: "A remoção saiu SEM médico", setorKey: "setor_medico_escala",
           fields: [
             ["Nome do médico", "medico_escala", "Ex: Dr. Victor", false],
             ["Setor de origem", "setor_medico_escala", "Ex: PS", false],
@@ -802,6 +824,7 @@ function CardModal({
         React.createElement(MembroSection, {
           emoji: "🧑", titulo: "Enfermeiro",
           corBg: "#EFF6FF", corBorder: "#BFDBFE", corTexto: "#1D4ED8",
+          semKey: "enfermeiro", semTxt: "A remoção saiu SEM enfermeiro(a)", setorKey: "setor_saida_enfermeiro",
           fields: [
             ["Nome do enfermeiro", "enfermeiro_escalado", "Ex: Ana Paula", false],
             ["Setor de origem", "setor_saida_enfermeiro", "Ex: CM / L3", false],
@@ -811,6 +834,7 @@ function CardModal({
         React.createElement(MembroSection, {
           emoji: "💊", titulo: "Técnico / Auxiliar",
           corBg: "#F5F3FF", corBorder: "#DDD6FE", corTexto: "#6D28D9",
+          semKey: "tecnico_auxiliar", semTxt: "A remoção saiu SEM técnico/auxiliar", setorKey: "setor_tecnico_escala",
           fields: [
             ["Nome do técnico/auxiliar", "tecnico_auxiliar_escala", "Ex: João Carlos", false],
             ["Setor de origem", "setor_tecnico_escala", "Ex: UTI", false],

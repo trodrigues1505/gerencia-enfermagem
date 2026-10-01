@@ -250,8 +250,9 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       if (a !== null) aceite.push(a);
       const f = min(r.data_solicitacao, r.horario_solicitacao, r.data_resposta_cross, r.horario_resposta_cross);
       if (f !== null) fin.push(f);
-      const b = min(r.data_saida_ambulancia || r.data_solicitacao, r.horario_saida_ambulancia,
-                    r.data_saida_ambulancia || r.data_solicitacao, r.horario_retorno, true);
+      // dia em que a ambulância saiu: data real da saída > data do pedido da ambulância > data do pedido na CROSS
+      const dSaida = r.data_saida_real || r.data_saida_ambulancia || r.data_solicitacao;
+      const b = min(dSaida, r.horario_saida_ambulancia, dSaida, r.horario_retorno, true);
       if (b !== null) remo.push(b);
     });
     const med = arr => { if (!arr.length) return null;
