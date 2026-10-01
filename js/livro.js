@@ -10,8 +10,15 @@ function strSim(a, b) {
   return (2*inter)/(a.length+b.length-2);
 }
 
-const LS_EMPTY={data_saida:"",nome_paciente:"",idade:"",especialidade:"",destino:"",ambulancia:"",medico:"",enfermeiro:"",tecnico_auxiliar:"",hora_solic_ambulancia:"",hora_saida:"",hora_retorno:"",finalizado:null,permaneceu:null,observacao:""};
-const LS_REQUIRED=["data_saida","nome_paciente","idade","especialidade","destino","ambulancia","medico","enfermeiro","tecnico_auxiliar","hora_solic_ambulancia","hora_saida","hora_retorno"];
+// O Livro tem DUAS etapas, preenchidas por pessoas (e plantões) diferentes:
+//   1) SAÍDA   — quando a ambulância sai (aba "Registrar saída")
+//   2) RETORNO — quando a ambulância volta (aba "Aguardando retorno")
+const LS_EMPTY={data_saida:"",nome_paciente:"",idade:"",especialidade:"",destino:"",ambulancia:"",medico:"",enfermeiro:"",tecnico_auxiliar:"",hora_solic_ambulancia:"",hora_saida:"",observacao:""};
+const LS_RET_EMPTY={hora_retorno:"",finalizado:null,permaneceu:null,observacao:""};
+// Obrigatórios da etapa 1 (saída). Na etapa 2 o obrigatório é só o horário de retorno.
+const LS_REQUIRED=["data_saida","nome_paciente","idade","especialidade","destino","ambulancia","medico","enfermeiro","tecnico_auxiliar","hora_solic_ambulancia","hora_saida"];
+// "14:30:00" -> "14:30" (o banco pode devolver com segundos; a planilha e o dashboard esperam HH:MM)
+function lsHora(v){const t=String(v||"").trim();const m=t.match(/^(\d{1,2}):(\d{2})/);return m?m[1].padStart(2,"0")+":"+m[2]:t;}
 // Usa H() do app: resolve o JWT da sessao a cada chamada. Header fixo com a
 // anon key fazia o PostgREST tratar as requisicoes como "anon" e as policies
 // de livro_saida (todas {authenticated}) barravam o INSERT com 42501.
@@ -26,7 +33,8 @@ const LS_ACOES={
   desvinculou:{txt:"Desfez o vinculo",ico:"\u21A9",cor:"#B45309"},
   sem_vinculo:{txt:"Marcou como sem vinculo",ico:"\u2014",cor:"#64748B"},
   reabriu:{txt:"Reabriu para pendentes",ico:"\u21A9",cor:"#B45309"},
-  editou:{txt:"Alterou o registro",ico:"\u270E",cor:"#64748B"}
+  editou:{txt:"Alterou o registro",ico:"\u270E",cor:"#64748B"},
+  retorno:{txt:"Registrou o retorno",ico:"\u21A9",cor:"#15803D"}
 };
 function lsAutor(p){
   if(!p)return null;
@@ -54,6 +62,16 @@ function LS_ASSINATURA(p){
   );
 }
 
+// Linha de assinatura do RETORNO (carimbada no servidor pela função livro_registrar_retorno).
+function LS_ASSINATURA_RETORNO(p){
+  if(!p||!p.retorno_por_nome)return null;
+  const reg=[(p.retorno_por_tipo||"").trim(),(p.retorno_por_registro||"").trim()].filter(Boolean).join(" ");
+  return React.createElement("div",{style:{display:"flex",alignItems:"center",gap:6,marginTop:3,fontSize:11,color:"#15803D",fontWeight:600}},
+    React.createElement("span",{style:{opacity:.8}},"\u21A9"),
+    React.createElement("span",null,"Retorno: ",p.retorno_por_nome,reg?React.createElement("span",{style:{fontWeight:500,color:"#64748B"}}," \u00B7 ",reg):null),
+    p.retorno_em?React.createElement("span",{style:{fontWeight:500,color:"#94A3B8"}}," \u00B7 ",lsQuando(p.retorno_em)):null
+  );
+}
 
 function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   const [tab,setTab]=useState("novo");
@@ -76,6 +94,14 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   // O bloqueio real esta no banco (vinculo-somente-admin.sql); isto aqui
   // apenas evita oferecer uma acao que o servidor vai recusar.
   const podeVincular = currentUser?.role === "admin";
+  // Etapa 2 (retorno da ambulância)
+  const [retornos,setRetornos]=useState([]);
+  const [loadingR,setLoadingR]=useState(false);
+  const [erroR,setErroR]=useState(null);
+  const [retAberto,setRetAberto]=useState(null);   // id do registro com o formulário de retorno aberto
+  const [retForm,setRetForm]=useState({...LS_RET_EMPTY});
+  const [retErro,setRetErro]=useState(false);
+  const [retSaving,setRetSaving]=useState(false);
   const [auditoria,setAuditoria]=useState(null);   // {registro, linhas|null, erro|null}
   const [loadingA,setLoadingA]=useState(false);
 
@@ -96,8 +122,10 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   const dirty=Object.keys(LS_EMPTY).some(k=>form[k]!==LS_EMPTY[k]);
   const pedirFechar=()=>{ if(dirty)setConfirmClose(true); else onClose(); };
 
-  useEffect(()=>{loadPendentes();loadRemocoes();},[]);
-  useEffect(()=>{if(tab==="todos")loadTodos();},[tab]);
+  useEffect(()=>{loadPendentes();loadRemocoes();loadRetornos();},[]);
+  // Selo do botão "Livro de Saída" no menu: pendências de vínculo + saídas aguardando retorno
+  useEffect(()=>{if(onPendentesChange)onPendentesChange(pendentes.length+retornos.length);},[pendentes,retornos]);
+  useEffect(()=>{if(tab==="todos")loadTodos();if(tab==="retorno")loadRetornos();},[tab]); // lista sempre atualizada ao abrir a aba (outro plantão pode ter lançado saídas)
 
   // fetch NAO lanca em 401/403 — sem checar r.ok, o corpo de erro virava []
   // e a tela dizia "Nenhum pendente", mascarando falha como sucesso.
@@ -108,9 +136,22 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
       if(!r.ok)throw new Error(await r.text());
       const d=await r.json();
       if(!Array.isArray(d))throw new Error("Resposta inesperada do servidor.");
-      setPendentes(d);if(onPendentesChange)onPendentesChange(d.length);
+      setPendentes(d);
     }catch(e){console.error("[LivroSaida] falha ao carregar pendentes:",e);setErroP(msgErro(e));}
     setLoadingP(false);
+  }
+
+  // Saídas que ainda não têm o retorno da ambulância (hora_retorno vazia).
+  async function loadRetornos(){
+    setLoadingR(true);setErroR(null);
+    try{
+      const r=await fetch(`${SB_URL}/rest/v1/livro_saida?hora_retorno=is.null&order=created_at.asc`,{headers:LS_H()});
+      if(!r.ok)throw new Error(await r.text());
+      const d=await r.json();
+      if(!Array.isArray(d))throw new Error("Resposta inesperada do servidor.");
+      setRetornos(d);
+    }catch(e){console.error("[LivroSaida] falha ao carregar retornos pendentes:",e);setErroR(msgErro(e));}
+    setLoadingR(false);
   }
 
   // Aba "Todos": sem filtro de status. Antes, qualquer registro que saisse de
@@ -155,7 +196,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   }
 
   async function loadRemocoes(){
-    try{const r=await fetch(`${SB_URL}/rest/v1/remocoes?select=id,nome_paciente,data_solicitacao,ficha_cross&order=data_solicitacao.desc&limit=300`,{headers:LS_H()});const d=await r.json();setRemocoes(Array.isArray(d)?d:[]);}catch(e){}
+    try{const r=await fetch(`${SB_URL}/rest/v1/remocoes?select=id,nome_paciente,data_solicitacao,ficha_cross,horario_retorno,finalizado,permaneceu&order=data_solicitacao.desc&limit=300`,{headers:LS_H()});const d=await r.json();setRemocoes(Array.isArray(d)?d:[]);}catch(e){}
   }
 
   const set=(k,v)=>{setForm(p=>({...p,[k]:v}));setErrors(p=>({...p,[k]:false}));};
@@ -179,14 +220,14 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
     if(!validate())return;
     setSaving(true);
     try{
-      const triBool=v=>v===true?true:v===false?false:null;
-      const payload={...form,finalizado:triBool(form.finalizado),permaneceu:triBool(form.permaneceu),preenchido_por:userId||null,status_vinculo:"pendente"};
+      const payload={...form,preenchido_por:userId||null,status_vinculo:"pendente"}; // sem hora_retorno: é a etapa 2
       const r=await fetch(`${SB_URL}/rest/v1/livro_saida`,{method:"POST",headers:{...LS_H(),Prefer:"return=representation"},body:JSON.stringify(payload)});
       if(!r.ok)throw new Error(await r.text());
       const [saved]=await r.json();
       const candidates=findMatches(form.nome_paciente,form.data_saida);
-      if(candidates.length>0){setMatch({livroRow:saved,candidates});}
-      else{setForm({...LS_EMPTY});loadPendentes();notify("ok","Registro salvo. Sem correspondência na planilha — ficou em Pendentes.");}
+      loadRetornos();
+      if(candidates.length>0){setMatch({livroRow:saved,candidates});setForm({...LS_EMPTY});}
+      else{setForm({...LS_EMPTY});loadPendentes();notify("ok","Saída registrada. Falta registrar o retorno da ambulância (aba Aguardando retorno). Sem correspondência na planilha — ficou em Pendentes.");}
     }catch(e){console.error("[LivroSaida] falha ao salvar:",e);notify("erro",msgErro(e));}
     setSaving(false);
   }
@@ -199,9 +240,9 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
       if(livroEntry&&remocaoId){
         const u={};
         if(livroEntry.ambulancia)u.tipo_ambulancia=livroEntry.ambulancia;
-        if(livroEntry.hora_solic_ambulancia)u.hora_solic_ambulancia=livroEntry.hora_solic_ambulancia;
-        if(livroEntry.hora_saida)u.horario_saida_ambulancia=livroEntry.hora_saida;
-        if(livroEntry.hora_retorno)u.horario_retorno=livroEntry.hora_retorno;
+        if(livroEntry.hora_solic_ambulancia)u.hora_solic_ambulancia=lsHora(livroEntry.hora_solic_ambulancia);
+        if(livroEntry.hora_saida)u.horario_saida_ambulancia=lsHora(livroEntry.hora_saida);
+        if(livroEntry.hora_retorno)u.horario_retorno=lsHora(livroEntry.hora_retorno); // vazio se o retorno ainda não foi registrado
         if(livroEntry.medico)u.medico=livroEntry.medico;
         if(livroEntry.enfermeiro)u.enfermeiro=livroEntry.enfermeiro;
         if(livroEntry.tecnico_auxiliar)u.tecnico_auxiliar=livroEntry.tecnico_auxiliar;
@@ -227,6 +268,61 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
     }catch(e){console.error("[LivroSaida] falha ao marcar independente:",e);notify("erro",msgErro(e));}
   }
 
+  function abrirRetorno(p){setRetAberto(p.id);setRetForm({...LS_RET_EMPTY});setRetErro(false);}
+
+  // Traduz o erro do servidor para quem está no plantão.
+  function msgErroRetorno(e){
+    const t=String(e&&e.message||e||"");
+    let msg="";try{msg=JSON.parse(t).message||"";}catch(_){}
+    if(t.includes("PGRST202")||t.includes("Could not find the function"))
+      return "O servidor ainda não foi atualizado para registrar retorno. Avise a coordenação (falta rodar a migração do Livro em duas etapas).";
+    if(msg)return msg;
+    return msgErro(e);
+  }
+
+  // Passa o retorno do Livro para a linha vinculada da planilha. Só quem pode editar a planilha consegue;
+  // para os demais devolve "negado" e a administração atualiza depois (botão na aba Todos).
+  async function sincronizarRetorno(l,opts){
+    const silencioso=!!(opts&&opts.silencioso);
+    const hr=lsHora(l.hora_retorno);
+    if(!l.remocao_id||!hr)return "nada";
+    const u={horario_retorno:hr};
+    if(l.finalizado===true||l.finalizado===false)u.finalizado=l.finalizado;
+    if(l.permaneceu===true||l.permaneceu===false)u.permaneceu=l.permaneceu;
+    try{
+      const r=await fetch(`${SB_URL}/rest/v1/remocoes?id=eq.${l.remocao_id}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=representation"},body:JSON.stringify(u)});
+      if(!r.ok)throw new Error(await r.text());
+      const d=await r.json();
+      if(!Array.isArray(d)||d.length===0){if(!silencioso)notify("erro","Você não tem permissão para alterar a planilha de remoção.");return "negado";}
+      if(!silencioso){notify("ok","Planilha de remoção atualizada com o retorno.");loadRemocoes();}
+      return "ok";
+    }catch(e){console.error("[LivroSaida] falha ao sincronizar retorno:",e);if(!silencioso)notify("erro",msgErro(e));return "erro";}
+  }
+
+  async function registrarRetorno(p){
+    if(!retForm.hora_retorno){setRetErro(true);return;}
+    setRetSaving(true);
+    try{
+      const r=await fetch(`${SB_URL}/rest/v1/rpc/livro_registrar_retorno`,{method:"POST",headers:LS_H(),body:JSON.stringify({
+        p_id:String(p.id),p_hora_retorno:retForm.hora_retorno,
+        p_finalizado:retForm.finalizado,p_permaneceu:retForm.permaneceu,
+        p_observacao:(retForm.observacao||"").trim()||null})});
+      if(!r.ok)throw new Error(await r.text());
+      const salvo=await r.json();
+      setRetornos(prev=>prev.filter(x=>x.id!==p.id));
+      setRetAberto(null);setRetForm({...LS_RET_EMPTY});setRetErro(false);
+      let msg="Retorno registrado.";
+      if(salvo&&salvo.remocao_id&&salvo.status_vinculo==="vinculado"){
+        const sinc=await sincronizarRetorno(salvo,{silencioso:true});
+        msg=sinc==="ok"?"Retorno registrado e planilha atualizada.":"Retorno registrado. A planilha será atualizada pela administração.";
+        loadRemocoes();
+      }
+      notify("ok",msg);
+      if(tab==="todos")loadTodos();
+    }catch(e){console.error("[LivroSaida] falha ao registrar retorno:",e);notify("erro",msgErroRetorno(e));}
+    setRetSaving(false);
+  }
+
   async function handleVincularPendente(livro){
     const candidates=findMatches(livro.nome_paciente,livro.data_saida);
     setMatch({livroRow:livro,candidates});setTab("novo");
@@ -243,6 +339,15 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
     React.createElement("button",{onClick:retry,style:{background:"#0F172A",color:"#fff",border:"none",borderRadius:8,padding:"8px 18px",fontSize:12,fontWeight:700,cursor:"pointer"}},"Tentar de novo")
   );
   const fmtDate=d=>{try{return new Date(d+"T12:00:00").toLocaleDateString("pt-BR");}catch{return d;}};
+  // Sim / Não / vazio (nada vem marcado por padrão)
+  const TRI=(grupo,label,val,on)=>React.createElement("div",null,LBL(label,false),React.createElement("div",{className:"ls-bool"},
+    React.createElement("label",null,React.createElement("input",{type:"radio",name:grupo,checked:val===true,onChange:()=>on(true)})," Sim"),
+    React.createElement("label",null,React.createElement("input",{type:"radio",name:grupo,checked:val===false,onChange:()=>on(false)})," Não"),
+    val!==null&&val!==undefined&&React.createElement("button",{type:"button",onClick:()=>on(null),style:{background:"none",border:"none",color:"#94A3B8",fontSize:11,cursor:"pointer",textDecoration:"underline"}},"limpar")));
+  // Resumo "Saída … · Retorno …" usado nas listas
+  const LINHA_HORAS=p=>React.createElement("div",{style:{fontSize:11,color:"#94A3B8",marginTop:2}},"🕐 Saída: ",p.hora_saida?lsHora(p.hora_saida):"—"," · Retorno: ",
+    p.hora_retorno?lsHora(p.hora_retorno):React.createElement("span",{style:{color:"#B45309",fontWeight:700}},"aguardando")," · ",p.ambulancia," · Enf: ",p.enfermeiro);
+  const iSR=erro=>({border:`1.5px solid ${erro?"#EF4444":"#E2E8F0"}`,borderRadius:8,padding:"8px 10px",fontSize:13,fontFamily:"inherit",color:"#0F172A",outline:"none",background:"#fff",width:"100%",boxShadow:erro?"0 0 0 3px rgba(239,68,68,.1)":"none"});
 
   return React.createElement("div",{className:"ls-overlay",onClick:e=>{if(e.target!==e.currentTarget)return;if(match||confirmClose||confirmIgnorar)return;pedirFechar();}},
     React.createElement("div",{className:"ls-modal",style:{position:"relative"}},
@@ -292,7 +397,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
           !podeVincular&&React.createElement("div",{style:{background:"#F0FDF4",border:"1px solid #86EFAC",borderRadius:10,padding:"20px 16px",textAlign:"center",marginBottom:4}},
             React.createElement("div",{style:{fontSize:24,marginBottom:6}},"\u2713"),
             React.createElement("div",{style:{fontSize:13,fontWeight:700,color:"#15803D",marginBottom:4}},"Registro salvo no Livro"),
-            React.createElement("div",{style:{fontSize:12,color:"#16A34A",lineHeight:1.5}},"Ele fica em Pendentes at\u00E9 a administra\u00E7\u00E3o conferir e vincular \u00E0 planilha de remo\u00E7\u00E3o.")
+            React.createElement("div",{style:{fontSize:12,color:"#16A34A",lineHeight:1.5}},"Ele fica em Pendentes at\u00E9 a administra\u00E7\u00E3o conferir e vincular \u00E0 planilha de remo\u00E7\u00E3o. O retorno da ambul\u00E2ncia ser\u00E1 registrado depois, na aba \u201CAguardando retorno\u201D.")
           ),
           podeVincular&&match.candidates.length===0&&React.createElement("div",{style:{background:"#F8FAFC",border:"1px dashed #CBD5E1",borderRadius:10,padding:"20px 16px",textAlign:"center",marginBottom:4}},
             React.createElement("div",{style:{fontSize:24,marginBottom:6}},"🔍"),
@@ -326,7 +431,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
 
       // ── Tabs ──
       React.createElement("div",{style:{display:"flex",borderBottom:"2px solid #F1F5F9",flexShrink:0,background:"#F8FAFC"}},
-        [["novo","📝 Novo Registro"],["pendentes",`⏳ Pendentes (${erroP?"!":pendentes.length})`],["todos","📚 Todos"]].map(([id,label])=>
+        [["novo","📝 Registrar saída"],["retorno",`🔁 Aguardando retorno (${erroR?"!":retornos.length})`],["pendentes",`⏳ Pendentes (${erroP?"!":pendentes.length})`],["todos","📚 Todos"]].map(([id,label])=>
           React.createElement("button",{key:id,onClick:()=>setTab(id),style:{flex:1,padding:"10px 16px",background:"none",border:"none",borderBottom:`3px solid ${tab===id?"#3B82F6":"transparent"}`,color:tab===id?"#1D4ED8":"#64748B",fontWeight:tab===id?700:500,fontSize:12,cursor:"pointer",transition:"all .15s"}},label)
         )
       ),
@@ -373,32 +478,18 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
           // Horários
           React.createElement("div",{className:"ls-section"},
             React.createElement("div",{className:"ls-section-title"},"Horários"),
-            React.createElement("div",{className:"ls-grid ls-g3"},
-              FLD("hora_solic_ambulancia","Solic. Ambulância",React.createElement("input",{type:"time",value:form.hora_solic_ambulancia,onChange:e=>set("hora_solic_ambulancia",e.target.value),style:iS("hora_solic_ambulancia")})),
-              FLD("hora_saida","Saída",React.createElement("input",{type:"time",value:form.hora_saida,onChange:e=>set("hora_saida",e.target.value),style:iS("hora_saida")})),
-              FLD("hora_retorno","Retorno",React.createElement("input",{type:"time",value:form.hora_retorno,onChange:e=>set("hora_retorno",e.target.value),style:iS("hora_retorno")}))
-            )
-          ),
-          // Encerramento
-          React.createElement("div",{className:"ls-section"},
-            React.createElement("div",{className:"ls-section-title"},"Encerramento"),
             React.createElement("div",{className:"ls-grid ls-g2"},
-              React.createElement("div",null,LBL("Finalizado",false),React.createElement("div",{className:"ls-bool"},
-                React.createElement("label",null,React.createElement("input",{type:"radio",name:"ls_fin",checked:form.finalizado===true,onChange:()=>set("finalizado",true)})," Sim"),
-                React.createElement("label",null,React.createElement("input",{type:"radio",name:"ls_fin",checked:form.finalizado===false,onChange:()=>set("finalizado",false)})," Não"),
-                form.finalizado!==null&&form.finalizado!==undefined&&React.createElement("button",{type:"button",onClick:()=>set("finalizado",null),style:{background:"none",border:"none",color:"#94A3B8",fontSize:11,cursor:"pointer",textDecoration:"underline"}},"limpar")
-              )),
-              React.createElement("div",null,LBL("Permaneceu no hospital de destino",false),React.createElement("div",{className:"ls-bool"},
-                React.createElement("label",null,React.createElement("input",{type:"radio",name:"ls_per",checked:form.permaneceu===true,onChange:()=>set("permaneceu",true)})," Sim"),
-                React.createElement("label",null,React.createElement("input",{type:"radio",name:"ls_per",checked:form.permaneceu===false,onChange:()=>set("permaneceu",false)})," Não"),
-                form.permaneceu!==null&&form.permaneceu!==undefined&&React.createElement("button",{type:"button",onClick:()=>set("permaneceu",null),style:{background:"none",border:"none",color:"#94A3B8",fontSize:11,cursor:"pointer",textDecoration:"underline"}},"limpar")
-              ))
-            ),
-            React.createElement("div",{style:{marginTop:10}},
-              LBL("Observação",false),
-              React.createElement("textarea",{rows:2,value:form.observacao,onChange:e=>set("observacao",e.target.value),placeholder:"Observações adicionais…",style:{...iS("observacao"),resize:"vertical"}})
+              FLD("hora_solic_ambulancia","Solic. Ambulância",React.createElement("input",{type:"time",value:form.hora_solic_ambulancia,onChange:e=>set("hora_solic_ambulancia",e.target.value),style:iS("hora_solic_ambulancia")})),
+              FLD("hora_saida","Saída",React.createElement("input",{type:"time",value:form.hora_saida,onChange:e=>set("hora_saida",e.target.value),style:iS("hora_saida")}))
             )
           ),
+          // Observação (a etapa 2 — retorno, Finalizado e Permaneceu — é preenchida depois, em outra aba)
+          React.createElement("div",{className:"ls-section"},
+            React.createElement("div",{className:"ls-section-title"},"Observação"),
+            React.createElement("textarea",{rows:2,value:form.observacao,onChange:e=>set("observacao",e.target.value),placeholder:"Observações adicionais…",style:{...iS("observacao"),resize:"vertical"}})
+          ),
+          React.createElement("div",{style:{background:"#EFF6FF",border:"1px solid #BFDBFE",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#1E40AF",lineHeight:1.5,marginTop:4}},
+            "\u{1F501} O horário de retorno ",React.createElement("b",null,"não é preenchido agora"),". Quando a ambulância voltar, qualquer profissional registra o retorno na aba “Aguardando retorno” — não precisa ser quem registrou a saída."),
           Object.keys(errors).length>0&&React.createElement("div",{style:{background:"#FEF2F2",border:"1px solid #FCA5A5",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#DC2626",marginTop:8}},"⚠ Preencha todos os campos obrigatórios (*) antes de salvar.")
         ),
 
@@ -423,13 +514,62 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                             p.status_vinculo==="vinculado"?"Vinculado":p.status_vinculo==="pendente"?"Pendente":"Sem vínculo")
                         ),
                         React.createElement("div",{style:{fontSize:11,color:"#64748B"}},fmtDate(p.data_saida)," · ",p.idade," · ",p.especialidade," → ",p.destino),
-                        React.createElement("div",{style:{fontSize:11,color:"#94A3B8",marginTop:2}},"🕐 Saída: ",p.hora_saida||"—"," · ",p.ambulancia," · Enf: ",p.enfermeiro),
-                        LS_ASSINATURA(p)
+                        LINHA_HORAS(p),
+                        LS_ASSINATURA(p),
+                        LS_ASSINATURA_RETORNO(p)
                       ),
-                      React.createElement("div",{style:{display:"flex",gap:6,flexShrink:0,alignItems:"center"}},
+                      React.createElement("div",{style:{display:"flex",gap:6,flexShrink:0,alignItems:"center",flexWrap:"wrap",justifyContent:"flex-end"}},
+                        (()=>{const rem=remocoes.find(x=>x.id===p.remocao_id);
+                          const desatual=podeVincular&&p.status_vinculo==="vinculado"&&p.hora_retorno&&rem&&lsHora(rem.horario_retorno)!==lsHora(p.hora_retorno);
+                          return desatual?React.createElement("button",{onClick:()=>sincronizarRetorno(p),title:"A planilha de remoção está com outro horário de retorno (ou sem ele). Clique para copiar o retorno do Livro para a planilha.",style:{flexShrink:0,background:"#FFFBEB",border:"1px solid #FDE68A",color:"#92400E",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}},"⟳ Atualizar planilha"):null;})(),
                         React.createElement("button",{onClick:()=>abrirAuditoria(p),title:"Ver historico de auditoria",style:{background:"none",border:"1px solid #E2E8F0",color:"#475569",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}},"\u{1F5D2} Auditoria"),
                         podeVincular&&p.status_vinculo==="independente"&&React.createElement("button",{onClick:()=>handleReabrir(p.id),style:{flexShrink:0,background:"none",border:"1px solid #E2E8F0",color:"#1D4ED8",borderRadius:7,padding:"5px 11px",fontSize:11,fontWeight:600,cursor:"pointer"}},"↩ Reabrir")
                     )
+                    )
+                  ))
+        ),
+
+        // TAB AGUARDANDO RETORNO (etapa 2)
+        tab==="retorno"&&React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:12,color:"#64748B",lineHeight:1.5,marginBottom:12}},
+            "Saídas já registradas que ainda não têm o retorno da ambulância. Quando ela voltar, clique em ",React.createElement("b",null,"Registrar retorno"),". Pode ser outro profissional, de outro plantão."),
+          loadingR
+            ?React.createElement("div",{style:{textAlign:"center",padding:32,color:"#94A3B8"}},"Carregando…")
+            :erroR
+              ?ERRO_BOX(erroR,loadRetornos)
+              :retornos.length===0
+                ?React.createElement("div",{style:{textAlign:"center",padding:48,color:"#94A3B8"}},
+                    React.createElement("div",{style:{fontSize:32,marginBottom:8}},"✅"),
+                    React.createElement("div",{style:{fontSize:14,fontWeight:600}},"Nenhuma saída aguardando retorno"),
+                    React.createElement("div",{style:{fontSize:12,marginTop:4}},"Todas as ambulâncias que saíram já voltaram."))
+                :retornos.map(p=>React.createElement("div",{key:p.id,className:"ls-pending-card"},
+                    React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}},
+                      React.createElement("div",{style:{minWidth:0}},
+                        React.createElement("div",{style:{fontWeight:700,fontSize:13}},p.nome_paciente),
+                        React.createElement("div",{style:{fontSize:11,color:"#64748B",marginTop:2}},fmtDate(p.data_saida)," · ",p.idade," · ",p.especialidade," → ",p.destino),
+                        LINHA_HORAS(p),
+                        React.createElement("div",{style:{fontSize:11,color:"#94A3B8",marginTop:2}},"Téc: ",p.tecnico_auxiliar," · Méd: ",p.medico),
+                        LS_ASSINATURA(p)
+                      ),
+                      retAberto!==p.id&&React.createElement("button",{onClick:()=>abrirRetorno(p),style:{flexShrink:0,background:"#16A34A",color:"#fff",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}},"↩ Registrar retorno")
+                    ),
+                    retAberto===p.id&&React.createElement("div",{style:{marginTop:12,paddingTop:12,borderTop:"1px dashed #E2E8F0"}},
+                      React.createElement("div",{className:"ls-grid ls-g2"},
+                        React.createElement("div",null,LBL("Horário de retorno",true),React.createElement("input",{type:"time",autoFocus:true,value:retForm.hora_retorno,onChange:e=>{setRetForm(f=>({...f,hora_retorno:e.target.value}));setRetErro(false);},style:iSR(retErro)})),
+                        React.createElement("div",null)
+                      ),
+                      React.createElement("div",{className:"ls-grid ls-g2",style:{marginTop:10}},
+                        TRI("ret_fin_"+p.id,"Finalizado",retForm.finalizado,v=>setRetForm(f=>({...f,finalizado:v}))),
+                        TRI("ret_per_"+p.id,"Permaneceu no hospital de destino",retForm.permaneceu,v=>setRetForm(f=>({...f,permaneceu:v})))
+                      ),
+                      React.createElement("div",{style:{marginTop:10}},
+                        LBL("Observação do retorno",false),
+                        React.createElement("textarea",{rows:2,value:retForm.observacao,onChange:e=>setRetForm(f=>({...f,observacao:e.target.value})),placeholder:"Opcional — é acrescentada à observação da saída",style:{...iSR(false),resize:"vertical"}})),
+                      retErro&&React.createElement("div",{style:{background:"#FEF2F2",border:"1px solid #FCA5A5",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#DC2626",marginTop:10}},"⚠ Informe o horário de retorno."),
+                      React.createElement("div",{style:{display:"flex",gap:8,justifyContent:"flex-end",marginTop:12}},
+                        React.createElement("button",{onClick:()=>{setRetAberto(null);setRetErro(false);},disabled:retSaving,style:{background:"none",border:"1px solid #E2E8F0",color:"#64748B",borderRadius:8,padding:"7px 16px",fontSize:12,cursor:"pointer"}},"Cancelar"),
+                        React.createElement("button",{onClick:()=>registrarRetorno(p),disabled:retSaving,style:{background:"#0F172A",color:"#fff",border:"none",borderRadius:8,padding:"7px 18px",fontSize:12,fontWeight:700,cursor:retSaving?"not-allowed":"pointer",opacity:retSaving?.7:1}},retSaving?"Salvando…":"Salvar retorno")
+                      )
                     )
                   ))
         ),
@@ -450,8 +590,9 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                     React.createElement("div",null,
                       React.createElement("div",{style:{fontWeight:700,fontSize:13}},p.nome_paciente),
                       React.createElement("div",{style:{fontSize:11,color:"#64748B",marginTop:2}},fmtDate(p.data_saida)," · ",p.idade," · ",p.especialidade," → ",p.destino),
-                      React.createElement("div",{style:{fontSize:11,color:"#94A3B8",marginTop:2}},"🕐 Saída: ",p.hora_saida||"—"," · ",p.ambulancia," · Enf: ",p.enfermeiro),
-                      LS_ASSINATURA(p)
+                      LINHA_HORAS(p),
+                      LS_ASSINATURA(p),
+                      LS_ASSINATURA_RETORNO(p)
                     ),
                     React.createElement("div",{style:{display:"flex",gap:6,flexShrink:0,marginLeft:12,alignItems:"center"}},
                       React.createElement("button",{onClick:()=>abrirAuditoria(p),title:"Ver historico de auditoria",style:{background:"none",border:"1px solid #E2E8F0",color:"#475569",borderRadius:7,padding:"5px 10px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}},"\u{1F5D2}"),
@@ -513,8 +654,8 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
 
       // ── Footer ──
       React.createElement("div",{className:"ls-ft"},
-        React.createElement("div",{style:{fontSize:11,color:"#94A3B8"}},tab==="novo"?"Campos com * são obrigatórios":tab==="todos"?`${todos.length} registro(s) no Livro`:`${pendentes.length} registro(s) aguardando vinculação`),
-        tab==="novo"&&React.createElement("button",{onClick:handleSalvar,disabled:saving,style:{background:"#0F172A",color:"#fff",border:"none",borderRadius:9,padding:"9px 24px",fontSize:13,fontWeight:700,cursor:saving?"not-allowed":"pointer",opacity:saving?.7:1}},saving?"Salvando…":"💾 Salvar Registro")
+        React.createElement("div",{style:{fontSize:11,color:"#94A3B8"}},tab==="novo"?"Campos com * são obrigatórios":tab==="retorno"?`${retornos.length} saída(s) aguardando retorno`:tab==="todos"?`${todos.length} registro(s) no Livro`:`${pendentes.length} registro(s) aguardando vinculação`),
+        tab==="novo"&&React.createElement("button",{onClick:handleSalvar,disabled:saving,style:{background:"#0F172A",color:"#fff",border:"none",borderRadius:9,padding:"9px 24px",fontSize:13,fontWeight:700,cursor:saving?"not-allowed":"pointer",opacity:saving?.7:1}},saving?"Salvando…":"💾 Salvar saída")
       )
     )
   );

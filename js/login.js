@@ -1,4 +1,28 @@
 /* ─── LOGIN ─── */
+/* Senha inicial no servidor (Supabase Auth).
+ * O Supabase recusa senha curta (mínimo 8 neste projeto) e muitos registros —
+ * CRM principalmente — têm só 4, 5 ou 6 dígitos. Para quem tem registro curto,
+ * a conta é criada com o registro completado até 8 caracteres. A pessoa continua
+ * digitando só o registro no primeiro acesso: doLogin tenta as duas formas.
+ * ATENÇÃO: deve ser igual à função senhaInicialAuth da Edge Function users-admin. */
+const SENHA_INICIAL_MIN = 8;
+function senhaInicialAuth(registro) {
+  const r = String(registro || "").trim();
+  return r.length >= SENHA_INICIAL_MIN ? r : (r + "-scfm-ge").slice(0, SENHA_INICIAL_MIN);
+}
+async function loginComRegistro(registro, senha) {
+  try {
+    return await authLogin(registro, senha);
+  } catch (ex) {
+    // Primeiro acesso de registro curto: o que foi digitado é o próprio registro.
+    const inicial = senhaInicialAuth(registro);
+    if (inicial !== registro && senha.trim() === registro) {
+      try { return await authLogin(registro, inicial); } catch (_) { /* mostra o erro original */ }
+    }
+    throw ex;
+  }
+}
+
 /* ─── Troca obrigatoria de senha ───────────────────────────────────────────
  * A senha inicial e o proprio COREN/CRM, que e consultavel no site do
  * Conselho. Enquanto senha_trocada for false, o app NAO abre: e isto que
@@ -16,7 +40,7 @@ function TrocaSenhaScreen({ user, onPronto, onSair }) {
     setErr("");
     if (s1.length < 8) return setErr("A senha precisa ter ao menos 8 caracteres.");
     if (s1 !== s2)     return setErr("As senhas não conferem.");
-    if (s1.trim() === registro) return setErr("A nova senha não pode ser igual ao seu registro.");
+    if (s1.trim() === registro || s1 === senhaInicialAuth(registro)) return setErr("A nova senha não pode ser igual ao seu registro.");
     setLoading(true);
     try { onPronto(await authTrocarSenha(s1, user.id)); }
     catch (ex) { setErr(ex.message); }
@@ -76,7 +100,7 @@ function LoginScreen({
       // Antes: Edge Function auth-login, que devolvia o usuario e o app
       // guardava em localStorage — sessao so no navegador, invisivel para o
       // Postgres. Agora passa pelo Supabase Auth e gera JWT de verdade.
-      const perfil = await authLogin(coren.trim(), senha);
+      const perfil = await loginComRegistro(coren.trim(), senha);
       onLogin(perfil);
     } catch (ex) {
       setErr(ex.message);

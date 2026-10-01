@@ -508,11 +508,11 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Pedido → finalização", valor: fmtMin(tempos.final.mediana),
         sub: `mediana · ${tempos.final.n} com horário`, cor: "#0369A1",
-        tooltip: "Tempo mediano do ciclo completo: da solicitação até a finalização da ficha na CROSS. Inclui a espera pela ambulância, por isso é maior que o tempo até o aceite." }),
+        tooltip: "Tempo mediano entre a solicitação e a finalização da ficha na CROSS. É um intervalo diferente da duração da remoção (saída → retorno da ambulância): os dois começam e terminam em momentos distintos, não se somam nem um contém o outro, e cada um usa só os registros que têm os horários preenchidos." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Duração da remoção", valor: fmtMin(tempos.remocao.mediana),
         sub: `mediana · ${tempos.remocao.n} com horário`, cor: "#0369A1",
-        tooltip: "Tempo mediano que a ambulância ficou fora: da saída ao retorno à Santa Casa. Mediana para não ser distorcido por casos extremos." }),
+        tooltip: "Tempo mediano que a ambulância ficou fora: da saída ao retorno à Santa Casa. Não é comparável com o tempo até a finalização da ficha — são intervalos diferentes, medidos em conjuntos diferentes de registros." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Permaneceu no destino", valor: perm.n ? `${perm.pct.toFixed(0)}%` : "—",
         sub: `${perm.sim} de ${perm.n} remoções · ${perm.semInfo} sem registro`,
