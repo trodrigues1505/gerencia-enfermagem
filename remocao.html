@@ -84,6 +84,11 @@ select.fsel{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;color:
   letter-spacing:0;padding:8px 12px;border-radius:8px;white-space:normal;width:250px;
   line-height:1.6;box-shadow:0 4px 16px rgba(0,0,0,.5);pointer-events:none;border:1px solid #334155}
 .tipbox strong{color:#fff;display:block;margin-bottom:2px}
+/* Tooltip dos cabeçalhos: position:fixed, para não ser cortado pelo overflow:hidden das colunas */
+.tipfix{position:fixed;z-index:9999;width:250px;background:#0F172A;color:#CBD5E1;font-size:11px;font-weight:400;
+  text-transform:none;letter-spacing:0;line-height:1.6;padding:8px 12px;border-radius:8px;border:1px solid #334155;
+  box-shadow:0 4px 16px rgba(0,0,0,.5);pointer-events:none}
+.tipfix strong{color:#fff}
 /* Linhas compactas — altura AUTOMÁTICA para caber texto quebrado */
 .rt tbody tr:nth-child(odd){background:#fff}
 .rt tbody tr:nth-child(even){background:#EEF2FF}
@@ -118,6 +123,9 @@ select.fsel{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;color:
 .bool-label{font-size:10px;font-weight:700;min-width:22px}
 .bool-on .bool-label{color:#16A34A}
 .bool-off .bool-label{color:#94A3B8}
+.bool-nil .bt-track{background:#E2E8F0}
+.bool-nil .bt-thumb{left:8px}
+.bool-nil .bool-label{color:#CBD5E1}
 /* Modal */
 .mbk{position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:12px}
 .mdl{background:#fff;border-radius:14px;width:100%;max-width:860px;max-height:94vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)}
@@ -296,22 +304,24 @@ const COLS = [
   ["diagnostico",             "DIAGNÓSTICO",                            "DIAGNÓSTICO",       "hd",          "text","",       "CID ou hipótese. Fonte: CROSS 'CID 1'/Kanban 'hd'",150],
   ["status",                  "STATUS",                                 "STATUS",            "—",           "sel", "S_OPTS", "Status da remoção. Manual",140],
   ["gravidade",               "GRAVIDADE",                              "GRAVIDADE",         "grav",        "sel", "G_OPTS", "Gravidade. CROSS 'Prioridade'/Kanban 'grav'",100],
-  ["data_resposta_cross",     "DATA DA RESPOSTA CROSS",                 "DATA RESP. CROSS",  "data_resolucao","date","",    "Data resposta CROSS. Fonte: Kanban 'data_resolucao'",80],
-  ["horario_resposta_cross",  "HORÁRIO DA RESPOSTA CROSS",              "HOR. RESP. CROSS",  "hora_resolucao","time","",    "Hora resposta CROSS. Fonte: Kanban 'hora_resolucao'",60],
+  ["data_resposta_cross",     "DATA DA FINALIZAÇÃO CROSS",              "DATA FINALIZ. CROSS","data_resolucao","date","",    "Data em que a ficha foi finalizada na CROSS. Fonte: Kanban 'data_resolucao'",80],
+  ["horario_resposta_cross",  "HORÁRIO DA FINALIZAÇÃO CROSS",           "HOR. FINALIZ. CROSS","hora_resolucao","time","",    "Hora em que a ficha foi finalizada na CROSS. Fonte: Kanban 'hora_resolucao'",60],
   ["instituicao_destino",     "INSTITUIÇÃO DESTINO",                    "INSTITUIÇÃO DEST.", "hosp",        "text","",       "Hospital receptor. Fonte: Kanban 'hosp'",130],
   ["tipo_ambulancia",         "TIPO DE AMBULÂNCIA",                     "TIPO AMB.",         "amb",         "sel", "A_OPTS", "BÁSICA (SBV) ou AVANÇADA (SAV). Fonte: Kanban 'amb'",80],
   ["data_saida_ambulancia",   "SOLICITAÇÃO BASE AMBULANCIA DATA",       "DATA SOLIC. AMB.",  "—",           "date","",       "Data da solicitação da ambulância. Manual",80],
   ["hora_solic_ambulancia",   "HORÁRIO SOLICITAÇÃO AMBULÂNCIA",         "HORA SOLIC. AMB.",  "—",           "time","",       "Hora da solicitação à base. Manual",60],
   ["horario_saida_ambulancia","HORÁRIO DE SAÍDA DA AMBULÂNCIA DA SCFM", "SAÍDA AMB. SCFM",   "saida",       "time","",       "Hora saída ambulância. Fonte: Kanban 'saida'",60],
   ["tempo_espera",            "TEMPO DE ESPERA DA AMBULÂNCIA",          "T. ESPERA",         "—",           "ro", "",        "Auto: Saída SCFM − Hora Solic. Ambulância",60],
-  ["observacao",              "OBSERVAÇÃO",                             "OBSERVAÇÃO",        "obs",         "text","",       "Obs. Fonte: CROSS 'Resumo Clínico'/Kanban 'obs'",160],
+  ["observacao",              "OBSERVAÇÃO",                             "OBSERVAÇÃO",        "—",           "text","",       "Preenchimento manual (não vem da ficha CROSS). O Livro de Saída também pode preencher",160],
   ["enfermeiro",              "ENFERMEIRO",                             "ENFERMEIRO",        "—",           "text","",       "Enfermeiro responsável. Manual",110],
   ["tecnico_auxiliar",        "TÉCNICO/AUXILIAR ENFERMAGEM",            "TÉCNICO/AUX.",      "—",           "text","",       "Técnico/auxiliar. Manual",110],
-  ["medico",                  "MÉDICO",                                 "MÉDICO",            "medico_solic","text","",       "Médico. Fonte: CROSS 'Médico Solicitante'",110],
+  ["medico",                  "MÉDICO",                                 "MÉDICO",            "medico_escala","text","",      "Médico da escala. Fonte: Kanban 'medico_escala' (ou Livro de Saída ao vincular)",110],
   ["horario_retorno",         "HORARIO DO RETORNO DO PACIENTE",         "HORA RETORNO",      "retorno",     "time","",       "Retorno do paciente. Fonte: Kanban 'retorno'",60],
   ["duracao_remocao",         "DURAÇÃO DA REMOÇÃO",                     "DURAÇÃO",           "—",           "ro", "",        "Auto: Hora Retorno − Saída SCFM",60],
-  ["finalizado",              "FINALIZADO",                             "FINALIZADO",        "—",           "bool","",       "Remoção finalizada? Sim/Não",70],
-  ["permaneceu",              "PERMANECEU",                             "PERMANECEU",        "—",           "bool","",       "Paciente permaneceu na unidade? Sim/Não",80],
+  ["finalizado",              "FINALIZADO",                             "FINALIZADO",        "—",           "bool","",       "Remoção finalizada? Sim / Não / vazio (não informado). Clique para alternar",70],
+  ["permaneceu",              "PERMANECEU",                             "PERMANECEU",        "—",           "bool","",       "Paciente ficou no hospital de destino e não voltou à Santa Casa? Sim / Não / vazio (não informado)",80],
+  ["data_aceite_cross",       "DATA DO ACEITE CROSS",                   "DATA ACEITE CROSS", "data_aceite", "date","",       "Data em que a CROSS aceitou a solicitação (vaga confirmada). Fonte: Kanban 'data_aceite'",80],
+  ["horario_aceite_cross",    "HORÁRIO DO ACEITE CROSS",                "HOR. ACEITE CROSS", "hora_aceite", "time","",       "Hora em que a CROSS aceitou a solicitação. Fonte: Kanban 'hora_aceite'",60],
 ];
 
 const EMPTY = Object.fromEntries(COLS.map(([f])=>[f,""]));
@@ -372,12 +382,15 @@ function SelOrFree({value,onChange,opts,isGrav}){
 
 // Toggle Sim/Não para campos booleanos
 function BoolCell({rowId,field,value,onSave}){
-  const on=value===true||value==="true"||value==="sim"||value===1;
-  function toggle(e){e.stopPropagation();onSave(rowId,field,!on);}
+  // Três estados: Sim (true) → Não (false) → vazio (null) → Sim ...
+  const st = (value===true||value==="true"||value==="sim"||value===1) ? "on"
+           : (value===false||value==="false"||value==="nao"||value===0) ? "off" : "nil";
+  function toggle(e){e.stopPropagation();onSave(rowId,field, st==="nil" ? true : st==="on" ? false : null);}
+  const dica = st==="nil" ? "Não informado — clique para marcar Sim" : st==="on" ? "Sim — clique para marcar Não" : "Não — clique para limpar (voltar a não informado)";
   return(
-    <div className={`bool-toggle ${on?"bool-on":"bool-off"}`} onClick={toggle} title={on?"Sim — clique para alternar":"Não — clique para alternar"}>
+    <div className={`bool-toggle bool-${st}`} onClick={toggle} title={dica}>
       <div className="bt-track"><div className="bt-thumb"/></div>
-      <span className="bool-label">{on?"Sim":"Não"}</span>
+      <span className="bool-label">{st==="on"?"Sim":st==="off"?"Não":"—"}</span>
     </div>
   );
 }
@@ -613,12 +626,14 @@ function FormModal({row,onClose,onSave,saving}){
               <div className="fd" style={{gridColumn:"1/-1"}}><label>Diagnóstico</label><input type="text" placeholder="CID ou hipótese" value={form.diagnostico} onChange={e=>set("diagnostico",e.target.value)}/></div>
             </div>
           </div>
-          <div className="fsc"><div className="fst">Status / Resposta CROSS</div>
+          <div className="fsc"><div className="fst">Status / CROSS</div>
             <div className="fg fg2">
               <div className="fd"><label>Status</label><SelOrFree value={form.status} onChange={v=>set("status",v)} opts={S_OPTS}/></div>
               <div className="fd"><label>Instituição Destino</label><input type="text" placeholder="Hospital receptor" value={form.instituicao_destino} onChange={e=>set("instituicao_destino",e.target.value)}/></div>
-              <div className="fd"><label>Data Resposta CROSS</label><input type="date" value={form.data_resposta_cross} onChange={e=>set("data_resposta_cross",e.target.value)}/></div>
-              <div className="fd"><label>Horário Resposta CROSS</label><input type="time" value={form.horario_resposta_cross} onChange={e=>set("horario_resposta_cross",e.target.value)}/></div>
+              <div className="fd"><label>Data Aceite CROSS</label><input type="date" value={form.data_aceite_cross||""} onChange={e=>set("data_aceite_cross",e.target.value)}/></div>
+              <div className="fd"><label>Horário Aceite CROSS</label><input type="time" value={form.horario_aceite_cross||""} onChange={e=>set("horario_aceite_cross",e.target.value)}/></div>
+              <div className="fd"><label>Data Finalização CROSS</label><input type="date" value={form.data_resposta_cross||""} onChange={e=>set("data_resposta_cross",e.target.value)}/></div>
+              <div className="fd"><label>Horário Finalização CROSS</label><input type="time" value={form.horario_resposta_cross||""} onChange={e=>set("horario_resposta_cross",e.target.value)}/></div>
             </div>
           </div>
           <div className="fsc"><div className="fst">Ambulância</div>
@@ -652,25 +667,17 @@ function FormModal({row,onClose,onSave,saving}){
             <div className="fg fg2">
               <div className="fd">
                 <label>Finalizado</label>
-                <div style={{display:"flex",alignItems:"center",gap:16,paddingTop:6}}>
-                  <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:12,fontWeight:500,color:"#374151"}}>
-                    <input type="radio" name="finalizado" checked={form.finalizado===true||form.finalizado==="true"} onChange={()=>set("finalizado",true)}/> Sim
-                  </label>
-                  <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:12,fontWeight:500,color:"#374151"}}>
-                    <input type="radio" name="finalizado" checked={!form.finalizado||form.finalizado===false||form.finalizado==="false"} onChange={()=>set("finalizado",false)}/> Não
-                  </label>
-                </div>
+                <select value={form.finalizado===true||form.finalizado==="true"?"s":form.finalizado===false||form.finalizado==="false"?"n":""}
+                  onChange={e=>set("finalizado",e.target.value==="s"?true:e.target.value==="n"?false:null)}>
+                  <option value="">— não informado</option><option value="s">Sim</option><option value="n">Não</option>
+                </select>
               </div>
               <div className="fd">
-                <label>Permaneceu na unidade</label>
-                <div style={{display:"flex",alignItems:"center",gap:16,paddingTop:6}}>
-                  <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:12,fontWeight:500,color:"#374151"}}>
-                    <input type="radio" name="permaneceu" checked={form.permaneceu===true||form.permaneceu==="true"} onChange={()=>set("permaneceu",true)}/> Sim
-                  </label>
-                  <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:12,fontWeight:500,color:"#374151"}}>
-                    <input type="radio" name="permaneceu" checked={!form.permaneceu||form.permaneceu===false||form.permaneceu==="false"} onChange={()=>set("permaneceu",false)}/> Não
-                  </label>
-                </div>
+                <label>Permaneceu no hospital de destino</label>
+                <select value={form.permaneceu===true||form.permaneceu==="true"?"s":form.permaneceu===false||form.permaneceu==="false"?"n":""}
+                  onChange={e=>set("permaneceu",e.target.value==="s"?true:e.target.value==="n"?false:null)}>
+                  <option value="">— não informado</option><option value="s">Sim</option><option value="n">Não</option>
+                </select>
               </div>
             </div>
           </div>
@@ -764,6 +771,14 @@ function normalizeAmbValue(v){
   return null;
 }
 
+const BOOL_FIELDS_SET=new Set(["finalizado","permaneceu"]);
+function normalizeBoolValue(v){
+  if(v===true||v===false)return v;
+  const t=normHdr(v);
+  if(["sim","s","true","1","x"].includes(t))return true;
+  if(["nao","n","false","0"].includes(t))return false;
+  return null; // vazio ou irreconhecível = não informado
+}
 const DATE_FIELDS=new Set(COLS.filter(([,,,,tipo])=>tipo==="date").map(([f])=>f));
 const TIME_FIELDS=new Set(COLS.filter(([,,,,tipo])=>tipo==="time").map(([f])=>f));
 function normalizeRowValues(row){
@@ -773,6 +788,7 @@ function normalizeRowValues(row){
   Object.keys(out).forEach(f=>{
     if(DATE_FIELDS.has(f))out[f]=normalizeDateValue(out[f]);
     if(TIME_FIELDS.has(f))out[f]=normalizeTimeValue(out[f]);
+    if(BOOL_FIELDS_SET.has(f))out[f]=normalizeBoolValue(out[f]);
   });
   // remove campos null/undefined para nao mandar strings vazias ao banco
   Object.keys(out).forEach(f=>{ if(out[f]===null||out[f]==="")delete out[f]; });
@@ -852,10 +868,7 @@ function parseFichaCross(txt){
   const cid2 = /n[ãa]o\s*informado/i.test(cid2r) ? "" : cid2r;
   const diagnostico = cid1 ? cid1.toUpperCase() : cid2 ? cid2.toUpperCase() : null;
 
-  // Médico Solicitante — valor na linha seguinte ao rótulo (padrão real das fichas)
-  const mMed = txt.match(/M[eé]dico\s+Solicitante\s*[:\-]?\s*[\r\n]+\s*([^\r\n\t]+?)(?:\s{2,}|\t|\s*CRM|[\r\n]|$)/i)
-             || txt.match(/M[eé]dico\s+Solicitante\s*:\s*([^\r\n\t]+)/i);
-  const medico = mMed ? mMed[1].trim() : null;
+  // Médico: NÃO vem da ficha CROSS (é o médico da escala, preenchido no Kanban/Livro).
 
   // Gravidade — campo explícito; fallback: varredura no texto
   let gravidade = "AMARELO";
@@ -879,19 +892,21 @@ function parseFichaCross(txt){
   else if(/Cancelou\s+Solicita[çc][aã]o|Cancelada\s+pelo\s+solicitante/i.test(txt))
     status = "CANCELADA PELO SOLICITANTE";
 
-  // Data/Hora resposta CROSS — bloco FINALIZAÇÃO; fallback: Aceitou Solicitação
+  // FINALIZAÇÃO da ficha na CROSS (bloco FINALIZAÇÃO) — coluna "finalização"
   let data_resposta_cross = null;
   let horario_resposta_cross = null;
   const mFinal = txt.match(/FINALIZA[ÇC][AÃ]O[\s\S]*?Data\s*:\s*(\d{2}\/\d{2}\/\d{4})[\s\S]*?Hora\s*:\s*(\d{2}:\d{2})(?::\d{2})?/i);
   if(mFinal){
     data_resposta_cross    = normalizeDateValue(mFinal[1]);
     horario_resposta_cross = mFinal[2];
-  } else {
-    const mAceitou = txt.match(/Aceitou\s+Solicita[çc][aã]o[\s\S]*?(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2})(?::\d{2})?/i);
-    if(mAceitou){
-      data_resposta_cross    = normalizeDateValue(mAceitou[1]);
-      horario_resposta_cross = mAceitou[2];
-    }
+  }
+  // ACEITE da CROSS ("Aceitou Solicitação") — coluna própria, independente da finalização
+  let data_aceite_cross = null;
+  let horario_aceite_cross = null;
+  const mAceitou = txt.match(/Aceitou\s+Solicita[çc][aã]o[\s\S]*?(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2})(?::\d{2})?/i);
+  if(mAceitou){
+    data_aceite_cross    = normalizeDateValue(mAceitou[1]);
+    horario_aceite_cross = mAceitou[2];
   }
 
   // Instituição destino — Unidade Receptora do bloco Resolução quando existir.
@@ -904,15 +919,7 @@ function parseFichaCross(txt){
   const temFinalizacao = /FINALIZA[ÇC][AÃ]O/i.test(txt);
   const instituicao_destino = (temFinalizacao && mHosp) ? mHosp[1].trim().toUpperCase() : null;
 
-  // Observação — campo "Observações" ou fallback Resumo Clínico; quebras → espaço
-  let observacao = null;
-  const mObs = txt.match(/Observa[çc][õo]es?\s*[:\-]?\s*[\r\n\t]*([\s\S]*?)(?=\n\s*[A-ZÁÉÍÓÚÂÊÔÃÕÇ][^\n:]{2,40}:|$)/i);
-  if(mObs && mObs[1].trim()){
-    observacao = mObs[1].trim().replace(/[\r\n\t]+/g," ");
-  } else {
-    const mRes = txt.match(/Resumo\s*Cl[íi]nico\s*[:\-]?\s*[\r\n\t]*([\s\S]*?)(?=\n\s*[A-ZÁÉÍÓÚÂÊÔÃÕÇ][^\n:]{2,40}:|$)/i);
-    if(mRes && mRes[1].trim()) observacao = mRes[1].trim().replace(/[\r\n\t]+/g," ");
-  }
+  // Observação: NÃO vem da ficha CROSS — fica vazia para preenchimento manual.
 
   // Monta o objeto com os campos internos da planilha de remoção.
   // Só monta se tiver pelo menos ficha ou nome — evita retornar objeto
@@ -928,13 +935,13 @@ function parseFichaCross(txt){
   if(procedimento)           row.procedimento            = procedimento;
   if(especialidade)          row.especialidade           = especialidade;
   if(diagnostico)            row.diagnostico             = diagnostico;
-  if(medico)                 row.medico                  = medico;
   row.gravidade = gravidade; // sempre inclui — tem fallback AMARELO validado
   if(status)                 row.status                  = status;
+  if(data_aceite_cross)      row.data_aceite_cross       = data_aceite_cross;
+  if(horario_aceite_cross)   row.horario_aceite_cross    = horario_aceite_cross;
   if(data_resposta_cross)    row.data_resposta_cross     = data_resposta_cross;
   if(horario_resposta_cross) row.horario_resposta_cross  = horario_resposta_cross;
   if(instituicao_destino)    row.instituicao_destino     = instituicao_destino;
-  if(observacao)             row.observacao              = observacao;
 
   return row;
 }
@@ -974,7 +981,7 @@ function PasteModal({onClose,onImport}){
         <div className="mbd">
           <div style={{fontSize:11,color:"#64748B",marginBottom:8,lineHeight:1.6}}>
             Abra a ficha no sistema CROSS, selecione tudo (<b>Ctrl+A</b>), copie (<b>Ctrl+C</b>) e cole aqui.<br/>
-            O app extrai automaticamente: ficha, nome, data/hora, CID, recurso, gravidade, médico.
+            O app extrai automaticamente: ficha, nome, data/hora, CID, recurso, gravidade, aceite e finalização da CROSS. Médico e observação ficam em branco (preenchimento manual).
           </div>
           <div className="fsc">
             <textarea rows={10} value={txt} onChange={e=>setTxt(e.target.value)}
@@ -1309,6 +1316,12 @@ function App(){
   // Foco vindo do dashboard: ?foco=<id do registro>&campo=<coluna>
   // O painel de pendencias linka direto para a celula errada, em vez de so
   // dizer que existe um valor invalido em algum lugar da planilha.
+  const [tipAtivo,setTipAtivo]=useState(null);
+  const tipProps=(planilha,kanban,texto)=>({
+    onMouseEnter:e=>{const r=e.currentTarget.getBoundingClientRect();
+      setTipAtivo({x:Math.max(8,Math.min(r.left,window.innerWidth-268)),y:r.bottom+6,planilha,kanban,texto});},
+    onMouseLeave:()=>setTipAtivo(null)
+  });
   const [foco,setFoco]=useState(()=>{
     const q=new URLSearchParams(window.location.search);
     const id=q.get("foco");
@@ -1330,8 +1343,22 @@ function App(){
 
   // Feature 1: ordem das colunas — APENAS colunas não-sticky (índices >= 4 em COLS)
   const STK_COLS = [0,1,2,3];
-  const MOV_COLS_DEFAULT = COLS.map((_,i)=>i).filter(i=>!STK_COLS.includes(i));
-  const savedOrder=loadLS(LS_ORDER,null);
+  const idxCol = f => COLS.findIndex(c=>c[0]===f);
+  const MOV_COLS_DEFAULT = (()=>{
+    const novos=[idxCol("data_aceite_cross"),idxCol("horario_aceite_cross")];
+    const base=COLS.map((_,i)=>i).filter(i=>!STK_COLS.includes(i)&&!novos.includes(i));
+    base.splice(base.indexOf(idxCol("data_resposta_cross")),0,...novos);
+    return base;
+  })();
+  const savedOrder=(()=>{
+    const sv=loadLS(LS_ORDER,null);
+    if(!Array.isArray(sv))return null;
+    const ok=sv.filter(i=>Number.isInteger(i)&&i>=0&&i<COLS.length&&!STK_COLS.includes(i));
+    const faltam=MOV_COLS_DEFAULT.filter(i=>!ok.includes(i)); // colunas novas que a ordem salva ainda não conhece
+    const pos=ok.indexOf(idxCol("data_resposta_cross"));
+    ok.splice(pos<0?ok.length:pos,0,...faltam);
+    return ok;
+  })();
   const {order:movColOrder,setOrder:setMovColOrder,onDragStart:colDragStart,onDragOver:colDragOver,onDragEnd:colDragEnd}=useColDragOrder(savedOrder||MOV_COLS_DEFAULT);
   // Salvar ordem quando muda
   const orderTimer=useRef(null);
@@ -1406,10 +1433,6 @@ function App(){
       if(p.tipo_ambulancia!==undefined&&p.tipo_ambulancia!==null&&p.tipo_ambulancia!=="")
         p.tipo_ambulancia=normalizeAmbValue(p.tipo_ambulancia)||null;
       Object.keys(p).forEach(k=>{if(p[k]==="")p[k]=null;});
-      // Garantir defaults para campos NOT NULL do banco
-      if(p.finalizado===undefined||p.finalizado===null) p.finalizado=false;
-      if(p.permaneceu===undefined||p.permaneceu===null) p.permaneceu=false;
-      console.log("[handleSave] payload:", JSON.stringify({finalizado:p.finalizado,permaneceu:p.permaneceu}));
       if(form.id){await api({action:"update",id:form.id,...p});push("Atualizado");}
       else{await api({action:"create",...p});push("Criado!");}
       setModal(null);await load();
@@ -1511,7 +1534,7 @@ function App(){
       try{
         const hoje=new Date().toISOString().split("T")[0];
         const agora=new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
-        await api({action:"create",nome_paciente:c.nome||"",setor:c.setor||"",especialidade:c.rec||"",diagnostico:c.hd||"",instituicao_destino:c.hosp||c.unidade_receptora||"",tipo_ambulancia:AM[c.amb]||"",gravidade:normalizeKanbanGrav(c.grav),data_solicitacao:hoje,horario_solicitacao:c.hora_adm||agora,ficha_cross:c.ficha_cross||"",medico:c.medico_solic||"",horario_saida_ambulancia:c.saida||"",horario_retorno:c.retorno||"",data_resposta_cross:c.data_resolucao||"",horario_resposta_cross:c.hora_resolucao||"",status:"PACIENTE AGUARDANDO AMBULÂNCIA"});
+        await api({action:"create",nome_paciente:c.nome||"",setor:c.setor||"",especialidade:c.rec||"",diagnostico:c.hd||"",instituicao_destino:c.hosp||c.unidade_receptora||"",tipo_ambulancia:AM[c.amb]||"",gravidade:normalizeKanbanGrav(c.grav),data_solicitacao:hoje,horario_solicitacao:c.hora_adm||agora,ficha_cross:c.ficha_cross||"",medico:c.medico_escala||"",horario_saida_ambulancia:c.saida||"",horario_retorno:c.retorno||"",data_aceite_cross:normalizeDateValue(c.data_aceite)||"",horario_aceite_cross:normalizeTimeValue(c.hora_aceite)||"",data_resposta_cross:normalizeDateValue(c.data_resolucao)||"",horario_resposta_cross:normalizeTimeValue(c.hora_resolucao)||"",status:"PACIENTE AGUARDANDO AMBULÂNCIA"});
         ok++;
       }catch(e){fails.push({nome:c.nome||"(sem nome)",erro:e.message||"erro desconhecido"});}
     }
@@ -1662,7 +1685,7 @@ function App(){
         return String(v);
       })]);
       const xlsSheet=window.XLSX.utils.aoa_to_sheet([hdr,...data]);
-      const cw={data_solicitacao:12,horario_solicitacao:8,ficha_cross:18,nome_paciente:26,setor:18,procedimento:14,especialidade:18,diagnostico:24,status:28,gravidade:14,data_resposta_cross:12,horario_resposta_cross:8,instituicao_destino:20,tipo_ambulancia:12,data_saida_ambulancia:12,hora_solic_ambulancia:10,horario_saida_ambulancia:10,tempo_espera:10,observacao:28,enfermeiro:16,tecnico_auxiliar:16,medico:16,horario_retorno:10,duracao_remocao:12};
+      const cw={data_aceite_cross:12,horario_aceite_cross:10,data_solicitacao:12,horario_solicitacao:8,ficha_cross:18,nome_paciente:26,setor:18,procedimento:14,especialidade:18,diagnostico:24,status:28,gravidade:14,data_resposta_cross:12,horario_resposta_cross:8,instituicao_destino:20,tipo_ambulancia:12,data_saida_ambulancia:12,hora_solic_ambulancia:10,horario_saida_ambulancia:10,tempo_espera:10,observacao:28,enfermeiro:16,tecnico_auxiliar:16,medico:16,horario_retorno:10,duracao_remocao:12};
       xlsSheet["!cols"]=[{wch:4},...COLS.map(([f])=>({wch:cw[f]||14}))];
       const wb=window.XLSX.utils.book_new();
       window.XLSX.utils.book_append_sheet(wb,"Remoções",xlsSheet);
@@ -1676,7 +1699,7 @@ function App(){
     try{
       const data=filtered.map(r=>{
         const o={};
-        COLS.forEach(([f])=>{o[f]=r[f]||"";});
+        COLS.forEach(([f])=>{o[f]=(r[f]===false||r[f]===true)?r[f]:(r[f]||"");}); // mantém Sim/Não; vazio continua vazio
         return o;
       });
       const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
@@ -1812,6 +1835,7 @@ function App(){
                 return(
                   <th key={f} data-field={f}
                     style={{position:"relative",cursor:"pointer",overflow:"hidden"}}
+                    {...tipProps(planilha,kanban,tip)}
                     className={`th-wrap${isSorted?" sorted":""} stk${isLast?" stk-last":""}`}>
                     <div style={{display:"flex",alignItems:"flex-start",gap:2,paddingRight:10,userSelect:"none"}}
                       onClick={()=>toggleSort(f)}>
@@ -1826,11 +1850,6 @@ function App(){
                       onDoubleClick={e=>{e.stopPropagation();autoFitCol(f);}}
                       title="Arrastar para redimensionar / duplo-clique para ajustar"
                     />
-                    <div className="tipbox">
-                      <strong>Planilha:</strong> {planilha}<br/>
-                      <strong>Kanban:</strong> {kanban||"—"}<br/>
-                      {tip}
-                    </div>
                   </th>
                 );
               })}
@@ -1841,10 +1860,11 @@ function App(){
                 return(
                   <th key={f} data-field={f}
                     draggable
-                    onDragStart={(e)=>colDragStart(mPos,e)}
+                    onDragStart={(e)=>{setTipAtivo(null);colDragStart(mPos,e);}}
                     onDragOver={(e)=>colDragOver(mPos,e)}
                     onDragEnd={colDragEnd}
                     style={{position:"relative",cursor:"pointer"}}
+                    {...tipProps(planilha,kanban,tip)}
                     className={`th-wrap${isSorted?" sorted":""}`}>
                     <div style={{display:"flex",alignItems:"flex-start",gap:2,paddingRight:10,userSelect:"none"}}
                       onClick={()=>toggleSort(f)}>
@@ -1867,11 +1887,6 @@ function App(){
                       onDoubleClick={e=>{e.stopPropagation();autoFitCol(f);}}
                       title="Arrastar para redimensionar / duplo-clique para ajustar"
                     />
-                    <div className="tipbox">
-                      <strong>Planilha:</strong> {planilha}<br/>
-                      <strong>Kanban:</strong> {kanban||"—"}<br/>
-                      {tip}
-                    </div>
                   </th>
                 );
               })}
@@ -1908,6 +1923,8 @@ function App(){
                   "horario_retorno":<td><Cell rowId={r.id} field="horario_retorno" value={r.horario_retorno} tipo="time" onSave={handleCell}/></td>,
                   "duracao_remocao":<td><Cell rowId={r.id} field="duracao_remocao" value={r.duracao_remocao||calcTempo(r.horario_saida_ambulancia,r.horario_retorno)||""} tipo="time" onSave={handleCell} colorStyle={{color:r.duracao_remocao?"#0369A1":"#0284C7",fontWeight:700}}/></td>,
                   "finalizado":<td style={{textAlign:"center"}}><BoolCell rowId={r.id} field="finalizado" value={r.finalizado} onSave={handleCell}/></td>,
+                  "data_aceite_cross":<td><Cell rowId={r.id} field="data_aceite_cross" value={r.data_aceite_cross} tipo="date" onSave={handleCell} fmtDisplay={fmtD}/></td>,
+                  "horario_aceite_cross":<td><Cell rowId={r.id} field="horario_aceite_cross" value={r.horario_aceite_cross} tipo="time" onSave={handleCell}/></td>,
                   "permaneceu":<td style={{textAlign:"center"}}><BoolCell rowId={r.id} field="permaneceu" value={r.permaneceu} onSave={handleCell}/></td>,
                 };
 
@@ -2000,6 +2017,11 @@ function App(){
       {exportResult&&<ExportResultModal data={exportResult} onClose={()=>setExportResult(null)}/>}
       {showDuplicates&&<DuplicatesModal rows={rows} onClose={()=>setShowDuplicates(false)} onDelete={async(id)=>{await handleDelete(id);}}/>}
       {modal!==null&&<FormModal row={modal} onClose={()=>setModal(null)} onSave={handleSave} saving={saving}/>}
+      {tipAtivo&&<div className="tipfix" style={{left:tipAtivo.x,top:tipAtivo.y}}>
+        <strong>Planilha:</strong> {tipAtivo.planilha}<br/>
+        <strong>Kanban:</strong> {tipAtivo.kanban||"—"}<br/>
+        {tipAtivo.texto}
+      </div>}
       <div className="tst">
         {ts.map(t=><div key={t.id} className={`toast ${t.type}`}><span>{t.type==="ok"?"✓":"✕"}</span><span>{t.msg}</span></div>)}
       </div>
