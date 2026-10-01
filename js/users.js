@@ -3,7 +3,9 @@ function UsersPanel({
   currentUser,
   userId,
   showT,
-  cards
+  cards,
+  busca,
+  onBusca
 }) {
   const [users, setUsers] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
@@ -44,6 +46,16 @@ function UsersPanel({
   useEffect(() => {
     load();
   }, []);
+  function fecharForm() {
+    setShowAdd(false);
+    setEditing(null);
+  }
+  useEffect(() => {
+    if (!showAdd) return;
+    const f = e => { if (e.key === "Escape") fecharForm(); };
+    window.addEventListener("keydown", f);
+    return () => window.removeEventListener("keydown", f);
+  }, [showAdd]);
   // Alterna uma permissao de acesso. Antes, se a Edge Function recusasse
   // (403, 500...) o erro sumia no console e o botao simplesmente nao mudava.
   async function flag(u, campo) {
@@ -97,17 +109,22 @@ function UsersPanel({
     e.preventDefault();
     if (!form.registro.trim() || !form.nome.trim()) return;
     const act = editing ? "update" : "create";
-    await fn("users-write", {
-      action: act,
-      id: editing,
-      body: {
-        tipo: form.tipo,
-        registro: form.registro,
-        nome: form.nome,
-        zap: form.zap,
-        foto: form.foto
-      }
-    }, userId);
+    try {
+      await fn("users-write", {
+        action: act,
+        id: editing,
+        body: {
+          tipo: form.tipo,
+          registro: form.registro,
+          nome: form.nome,
+          zap: form.zap,
+          foto: form.foto
+        }
+      }, userId);
+    } catch (ex) {
+      showT("Não foi possível salvar: " + ex.message, "err");
+      return;
+    }
     setShowAdd(false);
     setEditing(null);
     setForm({
@@ -130,6 +147,12 @@ function UsersPanel({
     }));
     r.readAsDataURL(f);
   }
+  const normBusca = t => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const termo = normBusca(busca).trim();
+  const semAdmin = users.filter(u => u.coren !== "299283");
+  const usuariosVisiveis = !termo ? semAdmin : semAdmin.filter(u =>
+    normBusca([u.nome, u.coren, u.crm, u.zap, u.tipo, u.status].join(" ")).includes(termo));
+  const mostraAdmin = !termo || normBusca("Fabiana Faria de Figueiredo COREN 299283 Administradora Admin").includes(termo);
   const sC = {
     aprovado: "#16A34A",
     pendente: "#F59E0B",
@@ -166,13 +189,25 @@ function UsersPanel({
         foto: null
       });
     }
-  }, showAdd ? "✕ Fechar" : "+ Cadastrar")), showAdd && /*#__PURE__*/React.createElement("div", {
+  }, showAdd ? "✕ Fechar" : "+ Cadastrar")), showAdd && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    onClick: fecharForm,
+    style: { position: "fixed", inset: 0, background: "rgba(15,23,42,.5)", zIndex: 2000 }
+  }), /*#__PURE__*/React.createElement("div", {
+    role: "dialog",
+    "aria-modal": "true",
     style: {
+      position: "fixed",
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%,-50%)",
+      zIndex: 2001,
+      width: "min(520px, calc(100vw - 32px))",
+      maxHeight: "90vh",
+      overflowY: "auto",
       background: "#fff",
-      border: "1px solid #E2E8F0",
-      borderRadius: 12,
-      padding: "16px 20px",
-      marginBottom: 16
+      borderRadius: 16,
+      padding: "20px 24px",
+      boxShadow: "0 20px 60px rgba(0,0,0,.22)"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -270,19 +305,28 @@ function UsersPanel({
     style: {
       display: "none"
     }
-  }))))), /*#__PURE__*/React.createElement(Btn, {
+  }))))), /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    type: "button",
+    variant: "ghost",
+    onClick: fecharForm,
+    style: {
+      padding: "8px 16px"
+    }
+  }, "Cancelar"), /*#__PURE__*/React.createElement(Btn, {
     type: "submit",
     style: {
       padding: "8px 20px"
     }
-  }, editing ? "Salvar" : "Cadastrar e aprovar"))), loading && /*#__PURE__*/React.createElement("div", {
+  }, editing ? "Salvar" : "Cadastrar e aprovar"))))), loading && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       padding: 32,
       color: "#94A3B8",
       fontSize: 13
     }
-  }, "Carregando…"), !loading && /*#__PURE__*/React.createElement("div", {
+  }, "Carregando…"), !loading && mostraAdmin && /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#fff",
       border: "2px solid #E2E8F0",
@@ -342,7 +386,18 @@ function UsersPanel({
       background: "#EFF6FF",
       color: "#1E40AF"
     }
-  }, "Admin")), !loading && users.filter(u => u.coren !== "299283").map(u =>
+  }, "Admin")), !loading && termo && React.createElement("div", {
+    style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "0 0 10px", fontSize: 12, color: "#475569" }
+  },
+    React.createElement("span", null, "Filtrando por ", React.createElement("b", null, "“" + busca.trim() + "”"), " — ",
+      usuariosVisiveis.length + (mostraAdmin ? 1 : 0), " de ", semAdmin.length + 1, " profissionais"),
+    onBusca && React.createElement("button", {
+      onClick: () => onBusca(""),
+      style: { padding: "3px 10px", border: "1px solid #E2E8F0", borderRadius: 6, background: "#fff", color: "#64748B", cursor: "pointer", fontSize: 11 }
+    }, "Limpar busca")
+  ), !loading && termo && usuariosVisiveis.length === 0 && !mostraAdmin && React.createElement("div", {
+    style: { textAlign: "center", padding: "32px 12px", color: "#94A3B8", fontSize: 13 }
+  }, "Nenhum profissional encontrado para “" + busca.trim() + "”."), !loading && usuariosVisiveis.map(u =>
   React.createElement("div", {
     key: u.id,
     className: "ge-user-card",

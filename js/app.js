@@ -436,9 +436,13 @@ function App() {
       const action = form.id === "new" ? "create" : "update";
       // Verificar se justificativa de prioridade mudou para inserir comentário de sistema
       const cardAnterior = cards.find(c => c.id === form.id);
-      const justifMudou = form.justificativa_prioridade?.trim() &&
+      // Saindo da coluna Aceite: a prioridade deixa de valer e os de trás sobem uma posição.
+      const saiuDoAceite = action === "update" && cardAnterior?.col_id === "aceite" && form.col_id !== "aceite";
+      const prSaiu = saiuDoAceite ? parseInt(cardAnterior.prioridade_remocao, 10) : NaN;
+      const justifMudou = !saiuDoAceite && form.justificativa_prioridade?.trim() &&
         form.justificativa_prioridade !== cardAnterior?.justificativa_prioridade;
-      const data = await fn("cards-write", { action, id: form.id, body: form }, userId);
+      const corpo = saiuDoAceite ? { ...form, prioridade_remocao: "", hora_prioridade: "" } : form;
+      const data = await fn("cards-write", { action, id: form.id, body: corpo }, userId);
       if (action === "create") setCards(p => { const next = [...p, data]; window.__geCards = next; return next; });
       else setCards(p => { const next = p.map(c => c.id === form.id ? data : c); window.__geCards = next; return next; });
       // Inserir comentário de sistema com a justificativa
@@ -450,6 +454,7 @@ function App() {
         } catch(e) { console.warn("Erro ao registrar justificativa como comentário:", e); }
       }
       showT("Salvo.");
+      if (saiuDoAceite && !isNaN(prSaiu)) await recompactarPrioridades(form.id, prSaiu, false);
     } catch (ex) {
       showT(ex.message, "err");
     }
@@ -507,11 +512,45 @@ function App() {
   }
 
   async function moveCard(cardId, newColId, aceiteData) {
+    // Antes de mover: se o card está saindo do Aceite com prioridade, guarda o número dele.
+    const antes = cardsRef.current.find(c => c.id === cardId);
+    const saiuDoAceite = !!antes && antes.col_id === "aceite" && newColId !== "aceite";
+    const prSaiu = saiuDoAceite ? parseInt(antes.prioridade_remocao, 10) : NaN;
     try {
       const data = await fn("cards-move", { card_id: cardId, new_col_id: newColId, aceite: aceiteData || null }, userId);
       setCards(p => { const next = p.map(c => c.id === cardId ? data : c); window.__geCards = next; return next; });
       showT("Card movido.");
+      if (saiuDoAceite && !isNaN(prSaiu)) await recompactarPrioridades(cardId, prSaiu, true);
     } catch (ex) { showT(ex.message, "err"); }
+  }
+
+  // Quando o card de prioridade N sai do Aceite: ele perde a prioridade (se limparSaiu)
+  // e todo card do Aceite com prioridade maior que N desce uma posição (P2 vira P1 etc.).
+  // A hora em que cada prioridade foi definida (hora_prioridade) NÃO é alterada nos que descem.
+  async function recompactarPrioridades(saiuId, prSaiu, limparSaiu) {
+    const ops = [];
+    if (limparSaiu) ops.push({ id: saiuId, campos: { prioridade_remocao: "", hora_prioridade: "" } });
+    cardsRef.current.forEach(c => {
+      if (c.id === saiuId || c.col_id !== "aceite") return;
+      const n = parseInt(c.prioridade_remocao, 10);
+      if (!isNaN(n) && n > prSaiu) ops.push({ id: c.id, campos: { prioridade_remocao: String(n - 1) } });
+    });
+    if (!ops.length) return;
+    const res = await Promise.allSettled(ops.map(o =>
+      fn("cards-write", { action: "update", id: o.id, body: o.campos }, userId)));
+    const feitos = ops.filter((_, i) => res[i].status === "fulfilled");
+    if (feitos.length) {
+      setCards(p => {
+        const next = p.map(c => { const o = feitos.find(x => x.id === c.id); return o ? { ...c, ...o.campos } : c; });
+        window.__geCards = next;
+        return next;
+      });
+    }
+    const falhas = ops.length - feitos.length;
+    if (falhas) {
+      const motivo = res.find(r => r.status === "rejected");
+      showT(`${falhas} de ${ops.length} prioridades não foram atualizadas (${motivo?.reason?.message || "erro"}). Recarregue a página para conferir.`, "err");
+    }
   }
 
   function handleMoveAttempt(cardId, newColId) {
@@ -1254,7 +1293,7 @@ function App() {
           isAdmin && /*#__PURE__*/React.createElement(NavBtn, { id: "publicacoes", label: "📰 Publicações" })
         ),
         /*#__PURE__*/React.createElement("input", {
-          placeholder: "Buscar…",
+          placeholder: view === "usuarios" ? "Buscar profissional…" : "Buscar…",
           value: search,
           onChange: e => setSearch(e.target.value),
           style: { padding: "6px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12, color: "#0F172A", width: 220, background: "#fff", fontFamily: "inherit" }
@@ -1292,9 +1331,9 @@ function App() {
       loading && /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", padding: 48, color: "#94A3B8", fontSize: 14 } }, "Carregando dados…"),
 
       !loading && view === "dashboard" && /*#__PURE__*/React.createElement("div", { id: "view-content" },
-        /*#__PURE__*/React.createElement(Dashboard, { cards: filtered, cols: displayCols, dashMode: dashMode, setDashMode: setDashMode, isAdmin: isAdmin, lastPub: lastPub, currentUser: currentUser, discrepancias: discrepancias, onPendenciasChange: (n) => { setPendenciasCount(n); saveLS("ge_pend_count", n); } })
+        /*#__PURE__*/React.createElement(Dashboard, { cards: displayCards, showT: showT, cols: displayCols, dashMode: dashMode, setDashMode: setDashMode, isAdmin: isAdmin, lastPub: lastPub, currentUser: currentUser, discrepancias: discrepancias, onPendenciasChange: (n) => { setPendenciasCount(n); saveLS("ge_pend_count", n); } })
       ),
-      !loading && view === "usuarios" && isAdmin && /*#__PURE__*/React.createElement(UsersPanel, { currentUser: currentUser, userId: userId, showT: showT, cards: cards }),
+      !loading && view === "usuarios" && isAdmin && /*#__PURE__*/React.createElement(UsersPanel, { currentUser: currentUser, userId: userId, showT: showT, cards: cards, busca: search, onBusca: setSearch }),
       !loading && view === "historico" && isAdmin && /*#__PURE__*/React.createElement("div", { id: "view-content" },
         /*#__PURE__*/React.createElement(HistoryPanel, null)
       ),

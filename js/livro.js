@@ -10,7 +10,7 @@ function strSim(a, b) {
   return (2*inter)/(a.length+b.length-2);
 }
 
-const LS_EMPTY={data_saida:"",nome_paciente:"",idade:"",especialidade:"",destino:"",ambulancia:"",medico:"",enfermeiro:"",tecnico_auxiliar:"",hora_solic_ambulancia:"",hora_saida:"",hora_retorno:"",finalizado:false,permaneceu:false,observacao:""};
+const LS_EMPTY={data_saida:"",nome_paciente:"",idade:"",especialidade:"",destino:"",ambulancia:"",medico:"",enfermeiro:"",tecnico_auxiliar:"",hora_solic_ambulancia:"",hora_saida:"",hora_retorno:"",finalizado:null,permaneceu:null,observacao:""};
 const LS_REQUIRED=["data_saida","nome_paciente","idade","especialidade","destino","ambulancia","medico","enfermeiro","tecnico_auxiliar","hora_solic_ambulancia","hora_saida","hora_retorno"];
 // Usa H() do app: resolve o JWT da sessao a cada chamada. Header fixo com a
 // anon key fazia o PostgREST tratar as requisicoes como "anon" e as policies
@@ -179,7 +179,8 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
     if(!validate())return;
     setSaving(true);
     try{
-      const payload={...form,finalizado:Boolean(form.finalizado),permaneceu:Boolean(form.permaneceu),preenchido_por:userId||null,status_vinculo:"pendente"};
+      const triBool=v=>v===true?true:v===false?false:null;
+      const payload={...form,finalizado:triBool(form.finalizado),permaneceu:triBool(form.permaneceu),preenchido_por:userId||null,status_vinculo:"pendente"};
       const r=await fetch(`${SB_URL}/rest/v1/livro_saida`,{method:"POST",headers:{...LS_H(),Prefer:"return=representation"},body:JSON.stringify(payload)});
       if(!r.ok)throw new Error(await r.text());
       const [saved]=await r.json();
@@ -206,8 +207,9 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
         if(livroEntry.tecnico_auxiliar)u.tecnico_auxiliar=livroEntry.tecnico_auxiliar;
         if(livroEntry.destino)u.instituicao_destino=livroEntry.destino;
         if(livroEntry.observacao)u.observacao=livroEntry.observacao;
-        u.finalizado=Boolean(livroEntry.finalizado);
-        u.permaneceu=Boolean(livroEntry.permaneceu);
+        // Sim/Não só vão para a planilha se a enfermeira respondeu; vazio não sobrescreve nada.
+        if(livroEntry.finalizado===true||livroEntry.finalizado===false)u.finalizado=livroEntry.finalizado;
+        if(livroEntry.permaneceu===true||livroEntry.permaneceu===false)u.permaneceu=livroEntry.permaneceu;
         if(Object.keys(u).length>0)await fetch(`${SB_URL}/rest/v1/remocoes?id=eq.${remocaoId}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=minimal"},body:JSON.stringify(u)});
       }
       setMatch(null);setForm({...LS_EMPTY});loadPendentes();
@@ -381,13 +383,15 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
           React.createElement("div",{className:"ls-section"},
             React.createElement("div",{className:"ls-section-title"},"Encerramento"),
             React.createElement("div",{className:"ls-grid ls-g2"},
-              React.createElement("div",null,LBL("Finalizado",true),React.createElement("div",{className:"ls-bool"},
+              React.createElement("div",null,LBL("Finalizado",false),React.createElement("div",{className:"ls-bool"},
                 React.createElement("label",null,React.createElement("input",{type:"radio",name:"ls_fin",checked:form.finalizado===true,onChange:()=>set("finalizado",true)})," Sim"),
-                React.createElement("label",null,React.createElement("input",{type:"radio",name:"ls_fin",checked:form.finalizado!==true,onChange:()=>set("finalizado",false)})," Não")
+                React.createElement("label",null,React.createElement("input",{type:"radio",name:"ls_fin",checked:form.finalizado===false,onChange:()=>set("finalizado",false)})," Não"),
+                form.finalizado!==null&&form.finalizado!==undefined&&React.createElement("button",{type:"button",onClick:()=>set("finalizado",null),style:{background:"none",border:"none",color:"#94A3B8",fontSize:11,cursor:"pointer",textDecoration:"underline"}},"limpar")
               )),
-              React.createElement("div",null,LBL("Permaneceu na unidade",true),React.createElement("div",{className:"ls-bool"},
+              React.createElement("div",null,LBL("Permaneceu no hospital de destino",false),React.createElement("div",{className:"ls-bool"},
                 React.createElement("label",null,React.createElement("input",{type:"radio",name:"ls_per",checked:form.permaneceu===true,onChange:()=>set("permaneceu",true)})," Sim"),
-                React.createElement("label",null,React.createElement("input",{type:"radio",name:"ls_per",checked:form.permaneceu!==true,onChange:()=>set("permaneceu",false)})," Não")
+                React.createElement("label",null,React.createElement("input",{type:"radio",name:"ls_per",checked:form.permaneceu===false,onChange:()=>set("permaneceu",false)})," Não"),
+                form.permaneceu!==null&&form.permaneceu!==undefined&&React.createElement("button",{type:"button",onClick:()=>set("permaneceu",null),style:{background:"none",border:"none",color:"#94A3B8",fontSize:11,cursor:"pointer",textDecoration:"underline"}},"limpar")
               ))
             ),
             React.createElement("div",{style:{marginTop:10}},

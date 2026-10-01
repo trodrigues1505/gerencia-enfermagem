@@ -1,4 +1,14 @@
 /* ─── DASHBOARD ─── */
+/* Efeito de passar o mouse nos cartões clicáveis (injetado aqui para não depender do css/app.css). */
+(function () {
+  if (typeof document === "undefined" || document.getElementById("ge-dash-css")) return;
+  const st = document.createElement("style");
+  st.id = "ge-dash-css";
+  st.textContent = ".ge-click:hover{box-shadow:0 4px 14px rgba(15,23,42,.08);transform:translateY(-1px)}" +
+                   ".ge-click:focus-visible{outline:2px solid #3B82F6;outline-offset:2px}";
+  document.head.appendChild(st);
+})();
+
 /* ════════════════════════════════════════════════════════════════════════════
    DASHBOARD — indicadores de regulação
    ----------------------------------------------------------------------------
@@ -17,7 +27,83 @@
       com as clínicas; ficam visualmente apartados.
    ══════════════════════════════════════════════════════════════════════════ */
 
-function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, currentUser, discrepancias, onPendenciasChange }) {
+/* ─── Fila do Kanban: cartões clicáveis que abrem a lista dos pacientes ───────
+ * Componente próprio (fora do Dashboard) de propósito: abrir/fechar a janela
+ * não re-renderiza o Dashboard inteiro, então os números não reanimam do zero.
+ * "Aceitos sem hospital" conta só pacientes nas colunas abaixo. Pediatria e
+ * Psiquiatria não são colunas — são marcas dentro delas, então já entram.
+ * Para incluir outra coluna, acrescente o id dela aqui.                      */
+const DASH_COLUNAS_ACEITAS = ["aceite", "andamento"];
+
+function DashFilaKanban({ cols, cards, Card, Num, titulo }) {
+  const h = React.createElement;
+  const [sel, setSel] = useState(null); // { titulo, chave }
+  const porCol = useMemo(() => {
+    const m = {};
+    cols.forEach(c => { m[c.id] = cards.filter(k => k.col_id === c.id); });
+    return m;
+  }, [cards, cols]);
+  const semHosp = useMemo(
+    () => cards.filter(c => !(c.hosp || "").trim() && DASH_COLUNAS_ACEITAS.includes(c.col_id)),
+    [cards]);
+  const rotuloCol = id => (cols.find(c => c.id === id) || {}).label || id;
+  const lista = !sel ? [] : sel.chave === "__semhosp" ? semHosp : (porCol[sel.chave] || []);
+  const abrir = (tit, chave, n) => n ? () => setSel({ titulo: tit, chave }) : undefined;
+
+  useEffect(() => {
+    if (!sel) return;
+    const f = e => { if (e.key === "Escape") setSel(null); };
+    window.addEventListener("keydown", f);
+    return () => window.removeEventListener("keydown", f);
+  }, [sel]);
+
+  const catRotulo = c => (c.categoria && c.categoria !== "normal")
+    ? (c.categoria.charAt(0).toUpperCase() + c.categoria.slice(1)) : (c.is_rn ? "RN" : null);
+
+  return h(React.Fragment, null,
+    h("div", { style: { marginBottom: 22 } },
+      h("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 } }, titulo),
+      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 11 } },
+        cols.map(c => h(Card, { key: c.id, style: { padding: "13px 15px" }, onClick: abrir(c.label, c.id, (porCol[c.id] || []).length) },
+          h("div", { style: { fontSize: 10, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, c.label),
+          h("div", { style: { fontSize: 23, fontWeight: 700, color: c.accent || "#64748B", lineHeight: 1 } },
+            h(Num, { valor: (porCol[c.id] || []).length })))),
+        semHosp.length > 0 && h(Card, {
+          key: "sh", style: { padding: "13px 15px", borderColor: "#FDE68A", background: "#FFFBEB" },
+          onClick: abrir("Aceitos sem hospital de destino", "__semhosp", semHosp.length)
+        },
+          h("div", { style: { fontSize: 10, fontWeight: 600, color: "#B45309", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 } }, "Aceitos sem hospital"),
+          h("div", { style: { fontSize: 23, fontWeight: 700, color: "#B45309", lineHeight: 1 } }, h(Num, { valor: semHosp.length }))))),
+
+    sel && h("div", {
+      onClick: e => { if (e.target === e.currentTarget) setSel(null); },
+      style: { position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 16 }
+    },
+      h("div", { role: "dialog", "aria-modal": "true", style: { background: "#fff", borderRadius: 16, width: "100%", maxWidth: 520, maxHeight: "85vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,.25)", overflow: "hidden" } },
+        h("div", { style: { padding: "14px 20px", borderBottom: "1px solid #F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "center" } },
+          h("div", null,
+            h("div", { style: { fontWeight: 700, fontSize: 15, color: "#0F172A" } }, sel.titulo),
+            h("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 2 } }, lista.length + " paciente" + (lista.length !== 1 ? "s" : ""))),
+          h("button", { onClick: () => setSel(null), "aria-label": "Fechar", style: { background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 20, padding: 4 } }, "✕")),
+        h("div", { style: { overflowY: "auto", padding: "8px 20px 16px" } },
+          lista.length === 0
+            ? h("div", { style: { padding: "24px 0", textAlign: "center", color: "#94A3B8", fontSize: 13 } }, "Nenhum paciente aqui agora.")
+            : lista.map((c, i) => {
+                const g = GC[c.grav] || GC.urgencia;
+                const cat = catRotulo(c);
+                const meta = [c.setor, c.rec, sel.chave === "__semhosp" ? rotuloCol(c.col_id) : (c.hosp ? "→ " + c.hosp : null)].filter(Boolean).join(" · ");
+                return h("div", { key: c.id, style: { padding: "11px 0", borderTop: i ? "1px solid #F1F5F9" : "none" } },
+                  h("div", { style: { display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" } },
+                    h("span", { style: { fontWeight: 600, fontSize: 13, color: "#0F172A" } }, c.nome,
+                      cat && h("span", { style: { marginLeft: 6, fontSize: 9.5, fontWeight: 700, color: "#6D28D9", background: "#F5F3FF", borderRadius: 4, padding: "1px 5px", verticalAlign: "middle" } }, cat)),
+                    h("span", { style: { fontSize: 10, fontWeight: 700, color: g.text, background: g.bg, border: "1px solid " + g.border, borderRadius: 99, padding: "1px 8px", whiteSpace: "nowrap" } }, g.label)),
+                  c.hd && h("div", { style: { fontSize: 11.5, color: "#475569", marginTop: 3 } }, "HD: " + c.hd),
+                  meta && h("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 3 } }, meta));
+              })))));
+}
+
+function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, currentUser, discrepancias, onPendenciasChange, showT: showTProp }) {
+  const showT = showTProp || function () {};
   const [remocoes, setRemocoes] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
@@ -45,18 +131,23 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   }, []);
 
   /* ── Recorte temporal ─────────────────────────────────────────────────── */
+  // Datas em horário LOCAL. Antes usava toISOString (UTC): depois das 21h de
+  // Brasília a "data de hoje" virava a de amanhã e a janela deslocava um dia.
   const hoje = new Date();
-  const iso = d => d.toISOString().slice(0, 10);
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const hojeIso = iso(hoje);
+  // "7 dias" = hoje + os 6 anteriores (7 datas). Antes pegava 8.
+  const diasJanela = { hoje: 1, "7d": 7, "30d": 30, "90d": 90 }[periodo] || 0;
+  const inicioJanela = diasJanela
+    ? iso(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - (diasJanela - 1))) : null;
   const dados = useMemo(() => {
     if (periodo === "tudo") return remocoes;
     if (periodo === "custom") {
       if (!ini || !fim) return remocoes;
       return remocoes.filter(r => r.data_solicitacao >= ini && r.data_solicitacao <= fim);
     }
-    const dias = periodo === "7d" ? 7 : periodo === "30d" ? 30 : 90;
-    const corte = iso(new Date(hoje.getTime() - dias * 86400000));
-    return remocoes.filter(r => (r.data_solicitacao || "") >= corte);
-  }, [remocoes, periodo, ini, fim]);
+    return remocoes.filter(r => { const d = r.data_solicitacao || ""; return d >= inicioJanela && d <= hojeIso; });
+  }, [remocoes, periodo, ini, fim, inicioJanela, hojeIso]);
 
   /* ── Amplitude real da base: decide quais escalas fazem sentido ───────── */
   const amplitude = useMemo(() => {
@@ -68,6 +159,16 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     const mesesSet = new Set(ds.map(d => d.slice(0, 7)));
     return { dias, meses: mesesSet.size, min, max, mesesSet };
   }, [remocoes]);
+
+  // Quantos dias o período realmente cobre (denominador do "por dia").
+  // Antes dividia pelo tamanho da BASE INTEIRA, subestimando em qualquer recorte.
+  const diasNoPeriodo = !amplitude.min ? 0
+    : periodo === "tudo" ? amplitude.dias
+    : periodo === "custom" ? ((ini && fim) ? Math.max(1, Math.round((new Date(fim) - new Date(ini)) / 86400000) + 1) : amplitude.dias)
+    : (() => {
+        const a = inicioJanela > amplitude.min ? inicioJanela : amplitude.min; // base mais curta que a janela
+        return Math.max(1, Math.round((new Date(hojeIso) - new Date(a)) / 86400000) + 1);
+      })();
 
   const escalaLiberada = {
     dia: true,
@@ -94,7 +195,24 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     };
     const m = {};
     dados.forEach(r => { const k = chave(r.data_solicitacao); if (k) m[k] = (m[k] || 0) + 1; });
-    return Object.keys(m).sort().map(k => ({ k, n: m[k] }));
+    // Preenche com zero os dias/semanas/meses sem remoção: uma pausa de dias
+    // não pode parecer volume contínuo.
+    const keys = Object.keys(m).sort();
+    if (!keys.length) return [];
+    const prox = k => {
+      if (escalaEfetiva === "mes") {
+        const [y, mo] = k.split("-").map(Number);
+        const d = new Date(y, mo, 1);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      }
+      const d = new Date(k + "T00:00:00");
+      d.setDate(d.getDate() + (escalaEfetiva === "semana" ? 7 : 1));
+      return iso(d);
+    };
+    const out = [];
+    let k = keys[0], guarda = 0;
+    while (k <= keys[keys.length - 1] && guarda++ < 1000) { out.push({ k, n: m[k] || 0 }); k = prox(k); }
+    return out;
   }, [dados, escalaEfetiva]);
 
   /* ── Agregações canonicalizadas ───────────────────────────────────────── */
@@ -113,37 +231,47 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   // tempo_espera e duracao_remocao sao `text` com formato variavel — servem
   // para exibir, nao para media. Aqui reconstruimos a partir das datas/horas.
   const tempos = useMemo(() => {
-    const min = (d1, h1, d2, h2) => {
+    // viraMeiaNoite: só vale para a duração da remoção (saída 23:10 / retorno 01:40,
+    // as duas horas sem data própria). Na CROSS as datas são reais: negativo é erro
+    // de digitação e fica de fora, em vez de virar "+24h" dentro da mediana.
+    const min = (d1, h1, d2, h2, viraMeiaNoite) => {
       if (!d1 || !h1 || !d2 || !h2) return null;
       const a = new Date(`${d1}T${h1.padStart(5, "0")}:00`);
       const b = new Date(`${d2}T${h2.padStart(5, "0")}:00`);
       if (isNaN(a) || isNaN(b)) return null;
       let diff = (b - a) / 60000;
-      // Horarios sem data associada: saida 23:10 / retorno 01:40 daria negativo
-      if (diff < 0 && diff > -1440) diff += 1440;
-      return diff >= 0 && diff < 4320 ? diff : null;
+      if (viraMeiaNoite && diff < 0 && diff > -1440) diff += 1440;
+      // remoção: até 3 dias; CROSS: até 30 dias (esperas longas existem e não podem sumir da mediana)
+      return diff >= 0 && diff < (viraMeiaNoite ? 4320 : 43200) ? diff : null;
     };
-    const resp = [], remo = [];
+    const aceite = [], fin = [], remo = [];
     dados.forEach(r => {
-      const a = min(r.data_solicitacao, r.horario_solicitacao, r.data_resposta_cross, r.horario_resposta_cross);
-      if (a !== null) resp.push(a);
+      const a = min(r.data_solicitacao, r.horario_solicitacao, r.data_aceite_cross, r.horario_aceite_cross);
+      if (a !== null) aceite.push(a);
+      const f = min(r.data_solicitacao, r.horario_solicitacao, r.data_resposta_cross, r.horario_resposta_cross);
+      if (f !== null) fin.push(f);
       const b = min(r.data_saida_ambulancia || r.data_solicitacao, r.horario_saida_ambulancia,
-                    r.data_saida_ambulancia || r.data_solicitacao, r.horario_retorno);
+                    r.data_saida_ambulancia || r.data_solicitacao, r.horario_retorno, true);
       if (b !== null) remo.push(b);
     });
     const med = arr => { if (!arr.length) return null;
       const s = [...arr].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
     return {
-      respCross: { mediana: med(resp), n: resp.length },
-      remocao:   { mediana: med(remo), n: remo.length }
+      aceite:  { mediana: med(aceite), n: aceite.length },
+      final:   { mediana: med(fin),    n: fin.length },
+      remocao: { mediana: med(remo),   n: remo.length }
     };
   }, [dados]);
 
-  /* ── Permanência: denominador são os vinculados, não o total ──────────── */
+  /* ── Permaneceu no destino ────────────────────────────────────────────────
+   * Denominador: TODAS as remoções do período. Campo vazio (null) = ninguém
+   * registrou; conta como "não permaneceu" no percentual, mas o número de
+   * "sem registro" aparece ao lado para o valor não parecer mais firme do que é. */
   const perm = useMemo(() => {
-    const vinc = dados.filter(r => r.finalizado === true || r.permaneceu === true);
-    const p = dados.filter(r => r.permaneceu === true).length;
-    return { n: p, base: vinc.length, pct: vinc.length ? p / vinc.length * 100 : 0 };
+    const n = dados.length;
+    const sim = dados.filter(r => r.permaneceu === true).length;
+    const semInfo = dados.filter(r => r.permaneceu !== true && r.permaneceu !== false).length;
+    return { n, sim, semInfo, pct: n ? sim / n * 100 : 0 };
   }, [dados]);
 
   // Percorre os registros (nao os agregados) para levar o id junto: sem ele
@@ -164,15 +292,6 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     return out;
   }, [dados]);
   useEffect(() => { if(onPendenciasChange) onPendenciasChange(pendencias.length); }, [pendencias.length]);
-
-  /* ── Pulso operacional (Kanban) ───────────────────────────────────────── */
-  const fila = useMemo(() => {
-    const porCol = {};
-    cols.forEach(c => { porCol[c.id] = cards.filter(k => k.col_id === c.id).length; });
-    const semHosp = cards.filter(c => !c.hosp && c.col_id !== "finalizado").length;
-    const emerg = cards.filter(c => c.grav === "emergencia").length;
-    return { porCol, semHosp, emerg, total: cards.length };
-  }, [cards, cols]);
 
   /* ═══ Animação de entrada ═════════════════════════════════════════════
    * Números sobem até o valor e barras preenchem ao montar. easeOutCubic:
@@ -217,9 +336,13 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   };
 
   /* ═══ Primitivas visuais ══════════════════════════════════════════════ */
-  const Card = ({ children, style }) => /*#__PURE__*/React.createElement("div", {
+  const Card = ({ children, style, onClick }) => /*#__PURE__*/React.createElement("div", {
+    onClick, className: onClick ? "ge-click" : undefined,
+    role: onClick ? "button" : undefined, tabIndex: onClick ? 0 : undefined,
+    onKeyDown: onClick ? (e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }) : undefined,
     style: { background: "#fff", border: "1px solid #E8EDF3", borderRadius: 14,
-             padding: "16px 18px", ...style }
+             padding: "16px 18px", cursor: onClick ? "pointer" : undefined,
+             transition: "box-shadow .15s, transform .15s", ...style }
   }, children);
 
   const Titulo = ({ children, extra, tooltip }) => /*#__PURE__*/React.createElement("div", {
@@ -297,6 +420,10 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
              borderRadius: 12, color: "#991B1B", fontSize: 13, lineHeight: 1.6 }
   }, /*#__PURE__*/React.createElement("b", null, "Não foi possível carregar as remoções."), " ", erro);
 
+  const fmtDia = d => new Date(d + "T00:00:00").toLocaleDateString("pt-BR");
+  const [deDia, ateDia] = periodo === "custom" && ini && fim ? [ini, fim]
+    : (periodo === "tudo" || periodo === "custom") ? [amplitude.min, amplitude.max]
+    : [inicioJanela, hojeIso];
   const fmtMin = m => m === null ? "—" : m >= 60 ? `${Math.floor(m / 60)}h${String(Math.round(m % 60)).padStart(2, "0")}` : `${Math.round(m)}min`;
   const rotuloSerie = k => escalaEfetiva === "mes"
     ? new Date(k + "-01T00:00:00").toLocaleDateString("pt-BR", { month: "short" })
@@ -335,8 +462,8 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     },
       /*#__PURE__*/React.createElement("div", {
         style: { display: "flex", gap: 2, background: "#F1F5F9", borderRadius: 9, padding: 3 }
-      }, ["tudo", "90d", "30d", "7d"].map(p =>
-        btnPeriodo(p, p === "tudo" ? "Tudo" : p === "90d" ? "90 dias" : p === "30d" ? "30 dias" : "7 dias"))),
+      }, ["tudo", "90d", "30d", "7d", "hoje"].map(p =>
+        btnPeriodo(p, p === "tudo" ? "Tudo" : p === "90d" ? "90 dias" : p === "30d" ? "30 dias" : p === "7d" ? "7 dias" : "Hoje"))),
 
       /*#__PURE__*/React.createElement("div", {
         style: { display: "flex", gap: 2, background: "#F1F5F9", borderRadius: 9, padding: 3 }
@@ -344,7 +471,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginLeft: "auto" } },
         dados.length, " remoções",
-        amplitude.min && ` · ${new Date(amplitude.min + "T00:00:00").toLocaleDateString("pt-BR")} a ${new Date(amplitude.max + "T00:00:00").toLocaleDateString("pt-BR")}`)
+        deDia && ` · ${fmtDia(deDia)}${ateDia && ateDia !== deDia ? " a " + fmtDia(ateDia) : ""}`)
     ),
 
     /* Escala indisponível: diz o porquê em vez de esconder o botão */
@@ -354,33 +481,11 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     }, "Escala ", escala === "mes" ? "mensal" : "semanal", " ainda não disponível — ", motivoBloqueio[escala],
        ". Mostrando a diária."),
 
-    /* ══ Pulso operacional — única seção que vem do Kanban ══ */
-    /*#__PURE__*/React.createElement("div", { style: { marginBottom: 22 } },
-      /*#__PURE__*/React.createElement("div", {
-        style: { fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase",
-                 letterSpacing: ".06em", marginBottom: 10 }
-      }, "Agora · fila do Kanban"),
-      /*#__PURE__*/React.createElement("div", {
-        style: { display: "grid", gridTemplateColumns: `repeat(auto-fit,minmax(150px,1fr))`, gap: 11 }
-      },
-        cols.map(c => /*#__PURE__*/React.createElement(Card, { key: c.id, style: { padding: "13px 15px" } },
-          /*#__PURE__*/React.createElement("div", {
-            style: { fontSize: 10, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase",
-                     letterSpacing: ".04em", marginBottom: 6, overflow: "hidden",
-                     textOverflow: "ellipsis", whiteSpace: "nowrap" }
-          }, c.label),
-          /*#__PURE__*/React.createElement("div", {
-            style: { fontSize: 23, fontWeight: 700, color: c.accent || "#64748B", lineHeight: 1 }
-          }, /*#__PURE__*/React.createElement(Num, { valor: fila.porCol[c.id] || 0 })))),
-        fila.semHosp > 0 && /*#__PURE__*/React.createElement(Card, {
-          key: "sh", style: { padding: "13px 15px", borderColor: "#FDE68A", background: "#FFFBEB" }
-        },
-          /*#__PURE__*/React.createElement("div", {
-            style: { fontSize: 10, fontWeight: 600, color: "#B45309", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 }
-          }, "Sem hospital"),
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: 23, fontWeight: 700, color: "#B45309", lineHeight: 1 } },
-            /*#__PURE__*/React.createElement(Num, { valor: fila.semHosp }))))
-    ),
+    /* ══ Pulso operacional — única seção que vem do Kanban (cartões clicáveis) ══ */
+    /*#__PURE__*/React.createElement(DashFilaKanban, {
+      cols, cards, Card, Num,
+      titulo: isAdmin ? "Agora · fila do Kanban" : "Última publicação · fila do Kanban"
+    }),
 
     /* ══ KPIs do período (remocoes) ══ */
     /*#__PURE__*/React.createElement("div", {
@@ -388,7 +493,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     },
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Remoções", valor: dados.length,
-        sub: amplitude.dias ? `${(dados.length / Math.max(amplitude.dias, 1)).toFixed(1)} por dia` : null,
+        sub: diasNoPeriodo ? `${(dados.length / diasNoPeriodo).toFixed(1)} por dia · ${diasNoPeriodo} dia${diasNoPeriodo !== 1 ? "s" : ""}` : null,
         tooltip: "Total de saídas registradas na planilha no período selecionado. Fonte: planilha de remoções." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Ambulância avançada",
@@ -397,17 +502,22 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
         alerta: gAmb.cobertura < 80,
         tooltip: "% de remoções que usaram SAV (Suporte Avançado de Vida). Calculado só sobre registros com tipo de ambulância preenchido — o denominador aparece abaixo." }),
       /*#__PURE__*/React.createElement(Kpi, {
-        label: "Resposta da CROSS", valor: fmtMin(tempos.respCross.mediana),
-        sub: `mediana · ${tempos.respCross.n} com horário`, cor: "#0369A1",
-        tooltip: "Tempo mediano entre a hora da solicitação e a hora da resposta da CROSS. Usa mediana (não média) para não ser distorcido por esperas extremas. Calculado só para registros com ambos os horários." }),
+        label: "Pedido → aceite", valor: fmtMin(tempos.aceite.mediana),
+        sub: `mediana · ${tempos.aceite.n} com horário`, cor: "#0369A1",
+        tooltip: "Tempo mediano entre a solicitação da Santa Casa e o aceite da CROSS (vaga confirmada). Só entram registros com os dois horários preenchidos. Usa mediana para não ser distorcido por esperas extremas." }),
+      /*#__PURE__*/React.createElement(Kpi, {
+        label: "Pedido → finalização", valor: fmtMin(tempos.final.mediana),
+        sub: `mediana · ${tempos.final.n} com horário`, cor: "#0369A1",
+        tooltip: "Tempo mediano do ciclo completo: da solicitação até a finalização da ficha na CROSS. Inclui a espera pela ambulância, por isso é maior que o tempo até o aceite." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Duração da remoção", valor: fmtMin(tempos.remocao.mediana),
         sub: `mediana · ${tempos.remocao.n} com horário`, cor: "#0369A1",
         tooltip: "Tempo mediano que a ambulância ficou fora: da saída ao retorno à Santa Casa. Mediana para não ser distorcido por casos extremos." }),
       /*#__PURE__*/React.createElement(Kpi, {
-        label: "Permaneceu", valor: perm.base ? `${perm.pct.toFixed(0)}%` : "—",
-        sub: `${perm.n} de ${perm.base} com desfecho`, alerta: perm.base < dados.length * 0.8,
-        tooltip: "% de pacientes removidos que permaneceram na unidade de destino — não retornaram à Santa Casa. Calculado sobre registros com campo Permaneceu ou Finalizado preenchido." })
+        label: "Permaneceu no destino", valor: perm.n ? `${perm.pct.toFixed(0)}%` : "—",
+        sub: `${perm.sim} de ${perm.n} remoções · ${perm.semInfo} sem registro`,
+        alerta: perm.n > 0 && perm.semInfo / perm.n > 0.2,
+        tooltip: "% das remoções do período em que o paciente ficou no hospital de destino e não voltou à Santa Casa. O denominador é o total de remoções; as sem registro (campo vazio) contam como não-permaneceu, então o valor real pode ser maior." })
     ),
 
     /* ══ Série temporal ══ */
@@ -514,7 +624,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
         /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gAmb }), tooltip: "Básica (SBV) = apenas técnico e motorista. Avançada (SAV) = médico a bordo, usada em casos críticos. O percentual de avançada é um indicador de gravidade da demanda." }, "Tipo de ambulância"),
         gAmb.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
         gAmb.itens.map(i => /*#__PURE__*/React.createElement(Barra, {
-          key: i.canonico, label: i.canonico, n: i.n, pct: i.pct, max: gAmb.itens[0].n,
+          key: i.canonico, label: i.canonico === (C && C.NAO_CLASSIFICADO) ? "Outro / não classificado" : i.canonico, n: i.n, pct: i.pct, max: gAmb.itens[0].n,
           cor: i.canonico === "AVANÇADA" ? "#F59E0B" : "#64748B" })))
     ),
 
@@ -643,7 +753,8 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
               if(!justTexto.trim())return; setJustSaving(true);
               var d=justModal;
               try{
-                await fetch(SB_URL+"/rest/v1/discrepancia_justificativas",{method:"POST",headers:Object.assign({},H(),{Prefer:"return=minimal"}),body:JSON.stringify({card_id:d.aceitado.id,card_nome:d.aceitado.nome,card_grav:d.aceitado.grav,conflito_card_id:d.pendente.id,conflito_card_nome:d.pendente.nome,conflito_card_grav:d.pendente.grav,justificativa:justTexto.trim(),justificado_por_nome:(currentUser&&currentUser.nome)||""})});
+                const rj=await fetch(SB_URL+"/rest/v1/discrepancia_justificativas",{method:"POST",headers:Object.assign({},H(),{Prefer:"return=minimal"}),body:JSON.stringify({card_id:d.aceitado.id,card_nome:d.aceitado.nome,card_grav:d.aceitado.grav,conflito_card_id:d.pendente.id,conflito_card_nome:d.pendente.nome,conflito_card_grav:d.pendente.grav,justificativa:justTexto.trim(),justificado_por_nome:(currentUser&&currentUser.nome)||""})});
+                if(!rj.ok) throw new Error(await rj.text());
                 setJustModal(null); showT("Justificativa registrada.");
               }catch(ex){showT("Erro ao salvar: "+ex.message,"err");}
               setJustSaving(false);

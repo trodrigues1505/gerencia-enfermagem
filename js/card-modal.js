@@ -272,7 +272,7 @@ function CardModal({
         // Captura automática de horários no momento do Salvar
         const formFinal = { ...form };
         // Validar justificativa obrigatória para prioridade
-        if (formFinal.prioridade_remocao && !formFinal.justificativa_prioridade?.trim()) {
+        if (formFinal.col_id === "aceite" && formFinal.prioridade_remocao && !formFinal.justificativa_prioridade?.trim()) {
           alert("Justificativa obrigatória ao definir prioridade.");
           return;
         }
