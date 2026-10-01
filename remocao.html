@@ -126,6 +126,11 @@ select.fsel{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;color:
 .bool-nil .bt-track{background:#E2E8F0}
 .bool-nil .bt-thumb{left:8px}
 .bool-nil .bool-label{color:#CBD5E1}
+/* Afirmação explícita de equipe ("SEM MÉDICO"): destacada para não parecer campo esquecido */
+.sem-eq{display:inline-block;background:#FEF3C7;color:#92400E;border:1px solid #FDE68A;border-radius:99px;padding:0 7px;font-size:9px;font-weight:700;white-space:nowrap}
+.sem-ck{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:10.5px;color:#64748B;cursor:pointer;text-transform:none;letter-spacing:0;font-weight:500}
+.sem-ck input{width:auto!important;margin:0}
+.sem-ck.on{color:#92400E;font-weight:700}
 /* Modal */
 .mbk{position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:12px}
 .mdl{background:#fff;border-radius:14px;width:100%;max-width:860px;max-height:94vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)}
@@ -272,6 +277,21 @@ function calcTempo(h1, h2) {
   } catch { return ""; }
 }
 
+// Diferença entre dois momentos (data + hora) no formato HH:MM. Se as duas datas existem, usa-as:
+// a ambulância pode ser pedida num dia e sair no outro (pedido 10:00 dia 1, saída 12:00 dia 2 = 26:00, não 02:00).
+// Sem as duas datas, cai no cálculo antigo só com horários (com virada de meia-noite).
+function calcTempoD(dIni, hIni, dFim, hFim) {
+  if(!hIni||!hFim) return "";
+  if(dIni&&dFim){
+    const a=new Date(`${dIni}T${String(hIni).padStart(5,"0")}:00`), b=new Date(`${dFim}T${String(hFim).padStart(5,"0")}:00`);
+    if(!isNaN(a)&&!isNaN(b)){
+      const diff=Math.round((b-a)/60000);
+      if(diff>=0) return `${String(Math.floor(diff/60)).padStart(2,"0")}:${String(diff%60).padStart(2,"0")}`;
+    }
+  }
+  return calcTempo(hIni,hFim);
+}
+
 const GRAV_MAP = {
   emergencia:      {label:"EMERGÊNCIA",      bg:"#FEE2E2",fc:"#991B1B",bd:"#FCA5A5"},
   urgencia:        {label:"URGÊNCIA",        bg:"#FEF9C3",fc:"#713F12",bd:"#FDE047"},
@@ -308,7 +328,7 @@ const COLS = [
   ["horario_resposta_cross",  "HORÁRIO DA FINALIZAÇÃO CROSS",           "HOR. FINALIZ. CROSS","hora_resolucao","time","",    "Hora em que a ficha foi finalizada na CROSS. Fonte: Kanban 'hora_resolucao'",60],
   ["instituicao_destino",     "INSTITUIÇÃO DESTINO",                    "INSTITUIÇÃO DEST.", "hosp",        "text","",       "Hospital receptor. Fonte: Kanban 'hosp'",130],
   ["tipo_ambulancia",         "TIPO DE AMBULÂNCIA",                     "TIPO AMB.",         "amb",         "sel", "A_OPTS", "BÁSICA (SBV) ou AVANÇADA (SAV). Fonte: Kanban 'amb'",80],
-  ["data_saida_ambulancia",   "SOLICITAÇÃO BASE AMBULANCIA DATA",       "DATA SOLIC. AMB.",  "—",           "date","",       "Data da solicitação da ambulância. Manual",80],
+  ["data_saida_ambulancia",   "SOLICITAÇÃO BASE AMBULANCIA DATA",       "DATA SOLIC. AMB.",  "—",           "date","",       "Dia em que a ambulância foi SOLICITADA (pode ser diferente do dia da saída). Fonte: Livro de Saída",80],
   ["hora_solic_ambulancia",   "HORÁRIO SOLICITAÇÃO AMBULÂNCIA",         "HORA SOLIC. AMB.",  "—",           "time","",       "Hora da solicitação à base. Manual",60],
   ["horario_saida_ambulancia","HORÁRIO DE SAÍDA DA AMBULÂNCIA DA SCFM", "SAÍDA AMB. SCFM",   "saida",       "time","",       "Hora saída ambulância. Fonte: Kanban 'saida'",60],
   ["tempo_espera",            "TEMPO DE ESPERA DA AMBULÂNCIA",          "T. ESPERA",         "—",           "ro", "",        "Auto: Saída SCFM − Hora Solic. Ambulância",60],
@@ -322,7 +342,13 @@ const COLS = [
   ["permaneceu",              "PERMANECEU",                             "PERMANECEU",        "—",           "bool","",       "Paciente ficou no hospital de destino e não voltou à Santa Casa? Sim / Não / vazio (não informado)",80],
   ["data_aceite_cross",       "DATA DO ACEITE CROSS",                   "DATA ACEITE CROSS", "data_aceite", "date","",       "Data em que a CROSS aceitou a solicitação (vaga confirmada). Fonte: Kanban 'data_aceite'",80],
   ["horario_aceite_cross",    "HORÁRIO DO ACEITE CROSS",                "HOR. ACEITE CROSS", "hora_aceite", "time","",       "Hora em que a CROSS aceitou a solicitação. Fonte: Kanban 'hora_aceite'",60],
+  ["data_saida_real",         "DATA DA SAÍDA DA AMBULÂNCIA",            "DATA SAÍDA AMB.",   "—",           "date","",       "Dia em que a ambulância realmente SAIU (pode ser diferente do dia em que foi solicitada). Fonte: Livro de Saída",80],
 ];
+
+// "SEM MÉDICO" etc.: afirmação explícita de que não houve aquele profissional (definida em canon.js)
+const EQ_SEM = (typeof Canon!=="undefined"&&Canon.EQUIPE_SEM)||{medico:"SEM MÉDICO",enfermeiro:"SEM ENFERMEIRO(A)",tecnico_auxiliar:"SEM TÉCNICO/AUXILIAR"};
+const ehSemEq = v => (typeof Canon!=="undefined"&&Canon.ehSemEquipe)?Canon.ehSemEquipe(v):Object.values(EQ_SEM).includes(String(v||"").trim().toUpperCase());
+const fmtEquipe = v => ehSemEq(v) ? <span className="sem-eq" title="Afirmação explícita: a remoção saiu sem este profissional">{v}</span> : v;
 
 const EMPTY = Object.fromEntries(COLS.map(([f])=>[f,""]));
 const fmtD=v=>{if(!v)return"";try{return new Date(v+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"})}catch{return v}};
@@ -419,7 +445,7 @@ function navigateCell(currentTd, direction){
 }
 
 // Célula editável — texto quebra na célula
-function Cell({rowId,field,value,tipo,optsKey,onSave,fmtDisplay,colorStyle}){
+function Cell({rowId,field,value,tipo,optsKey,onSave,fmtDisplay,colorStyle,sugestao}){
   const [ed,setEd]=useState(false);
   const [val,setVal]=useState(value||"");
   const [free,setFree]=useState(false);
@@ -478,6 +504,7 @@ function Cell({rowId,field,value,tipo,optsKey,onSave,fmtDisplay,colorStyle}){
     <input ref={free?ref:null} style={{width:"100%",minHeight:24,padding:"2px 6px",border:"none",
       borderLeft:"2px solid #3B82F6",background:"#EFF6FF",fontSize:11,color:"#0F172A",outline:"none"}}
       type={tipo==="sel"?"text":tipo||"text"} value={val}
+      list={sugestao?`dl-${field}`:undefined}
       placeholder={free?"Digite o valor...":""}
       onChange={e=>setVal(e.target.value)} onBlur={commit}
       onKeyDown={e=>{
@@ -485,6 +512,7 @@ function Cell({rowId,field,value,tipo,optsKey,onSave,fmtDisplay,colorStyle}){
         if(e.key==="Escape"){setEd(false);setVal(value||"");setFree(false);return;}
         handleKeyNav(e);
       }}/>
+    {sugestao&&<datalist id={`dl-${field}`}><option value={sugestao}/></datalist>}
     </div>
   );
 }
@@ -587,8 +615,8 @@ function FormModal({row,onClose,onSave,saving}){
   const [form,setForm]=useState(row?{...EMPTY,...row}:{...EMPTY,data_solicitacao:new Date().toISOString().split("T")[0]});
   const set=(k,v)=>setForm(f=>{
     const n={...f,[k]:v};
-    if(k==="horario_saida_ambulancia"||k==="hora_solic_ambulancia")
-      n.tempo_espera=calcTempo(k==="hora_solic_ambulancia"?v:n.hora_solic_ambulancia,k==="horario_saida_ambulancia"?v:n.horario_saida_ambulancia);
+    if(k==="horario_saida_ambulancia"||k==="hora_solic_ambulancia"||k==="data_saida_ambulancia"||k==="data_saida_real")
+      n.tempo_espera=calcTempoD(n.data_saida_ambulancia,n.hora_solic_ambulancia,n.data_saida_real||n.data_saida_ambulancia,n.horario_saida_ambulancia);
     if(k==="horario_retorno"||k==="horario_saida_ambulancia")
       n.duracao_remocao=calcTempo(k==="horario_saida_ambulancia"?v:n.horario_saida_ambulancia,k==="horario_retorno"?v:n.horario_retorno);
     return n;
@@ -637,13 +665,14 @@ function FormModal({row,onClose,onSave,saving}){
             </div>
           </div>
           <div className="fsc"><div className="fst">Ambulância</div>
-            <div className="fg fg4">
+            <div className="fg fg3">
               <div className="fd"><label>Tipo</label><SelOrFree value={form.tipo_ambulancia} onChange={v=>set("tipo_ambulancia",v)} opts={A_OPTS}/></div>
               <div className="fd"><label>Data Solic. Ambulância</label><input type="date" value={form.data_saida_ambulancia} onChange={e=>set("data_saida_ambulancia",e.target.value)}/></div>
               <div className="fd"><label>Hora Solic. Ambulância</label><input type="time" value={form.hora_solic_ambulancia} onChange={e=>set("hora_solic_ambulancia",e.target.value)}/></div>
-              <div className="fd"><label>Saída SCFM</label><input type="time" value={form.horario_saida_ambulancia} onChange={e=>set("horario_saida_ambulancia",e.target.value)}/></div>
+              <div className="fd"><label>Data da Saída</label><input type="date" value={form.data_saida_real||""} onChange={e=>set("data_saida_real",e.target.value)}/></div>
+              <div className="fd"><label>Hora da Saída (SCFM)</label><input type="time" value={form.horario_saida_ambulancia} onChange={e=>set("horario_saida_ambulancia",e.target.value)}/></div>
               <div className="fd"><label>Tempo Espera <span style={{color:"#7C3AED",fontWeight:400,textTransform:"none"}}>(auto)</span></label>
-                <input type="text" readOnly value={form.tempo_espera||calcTempo(form.hora_solic_ambulancia,form.horario_saida_ambulancia)} style={{background:"#F5F3FF",color:"#7C3AED",fontWeight:700}}/></div>
+                <input type="text" readOnly value={form.tempo_espera||calcTempoD(form.data_saida_ambulancia,form.hora_solic_ambulancia,form.data_saida_real||form.data_saida_ambulancia,form.horario_saida_ambulancia)} style={{background:"#F5F3FF",color:"#7C3AED",fontWeight:700}}/></div>
             </div>
           </div>
           <div className="fsc"><div className="fst">Retorno</div>
@@ -655,10 +684,18 @@ function FormModal({row,onClose,onSave,saving}){
           </div>
           <div className="fsc"><div className="fst">Equipe</div>
             <div className="fg fg3">
-              <div className="fd"><label>Enfermeiro(a)</label><input type="text" placeholder="Nome" value={form.enfermeiro} onChange={e=>set("enfermeiro",e.target.value)}/></div>
-              <div className="fd"><label>Técnico/Aux.</label><input type="text" placeholder="Nome" value={form.tecnico_auxiliar} onChange={e=>set("tecnico_auxiliar",e.target.value)}/></div>
-              <div className="fd"><label>Médico(a)</label><input type="text" placeholder="Nome" value={form.medico} onChange={e=>set("medico",e.target.value)}/></div>
+              {[["enfermeiro","Enfermeiro(a)","Saiu sem enfermeiro(a)"],["tecnico_auxiliar","Técnico/Aux.","Saiu sem técnico/auxiliar"],["medico","Médico(a)","Saiu sem médico"]].map(([k,lab,semTxt])=>{
+                const sem=ehSemEq(form[k]);
+                return(
+                  <div className="fd" key={k}>
+                    <label>{lab}</label>
+                    <input type="text" placeholder="Nome" value={form[k]||""} disabled={sem} onChange={e=>set(k,e.target.value)} style={sem?{background:"#FFFBEB",color:"#92400E",fontWeight:700}:undefined}/>
+                    <label className={`sem-ck${sem?" on":""}`}><input type="checkbox" checked={sem} onChange={e=>set(k,e.target.checked?EQ_SEM[k]:"")}/>{semTxt}</label>
+                  </div>
+                );
+              })}
             </div>
+            <div style={{fontSize:10.5,color:"#64748B",marginTop:6,lineHeight:1.5}}>Marque “Saiu sem …” quando a remoção realmente saiu sem aquele profissional: o registro passa a <b>afirmar</b> que não houve. Campo em branco quer dizer que ninguém preencheu.</div>
           </div>
           <div className="fsc"><div className="fst">Observação</div>
             <div className="fd"><textarea rows={3} placeholder="Observações…" value={form.observacao} onChange={e=>set("observacao",e.target.value)}/></div>
@@ -1344,19 +1381,31 @@ function App(){
   // Feature 1: ordem das colunas — APENAS colunas não-sticky (índices >= 4 em COLS)
   const STK_COLS = [0,1,2,3];
   const idxCol = f => COLS.findIndex(c=>c[0]===f);
-  const MOV_COLS_DEFAULT = (()=>{
-    const novos=[idxCol("data_aceite_cross"),idxCol("horario_aceite_cross")];
-    const base=COLS.map((_,i)=>i).filter(i=>!STK_COLS.includes(i)&&!novos.includes(i));
-    base.splice(base.indexOf(idxCol("data_resposta_cross")),0,...novos);
-    return base;
-  })();
+  // Colunas acrescentadas depois (ficam no FIM do array COLS, para não deslocar a colagem do Excel) e a coluna
+  // antes da qual aparecem na tela. Vale também para quem já tem uma ordem salva no navegador.
+  const COL_NOVAS_ANTES_DE = [
+    ["data_aceite_cross","data_resposta_cross"],
+    ["horario_aceite_cross","data_resposta_cross"],
+    ["data_saida_real","horario_saida_ambulancia"],
+  ];
+  const inserirNovas = (lista, quais) => {
+    quais.forEach(([f,ancora])=>{
+      const i=idxCol(f); if(i<0||lista.includes(i)) return;
+      const pos=lista.indexOf(idxCol(ancora));
+      lista.splice(pos<0?lista.length:pos,0,i);
+    });
+    return lista;
+  };
+  const MOV_COLS_DEFAULT = inserirNovas(
+    COLS.map((_,i)=>i).filter(i=>!STK_COLS.includes(i)&&!COL_NOVAS_ANTES_DE.some(([f])=>idxCol(f)===i)),
+    COL_NOVAS_ANTES_DE);
   const savedOrder=(()=>{
     const sv=loadLS(LS_ORDER,null);
     if(!Array.isArray(sv))return null;
     const ok=sv.filter(i=>Number.isInteger(i)&&i>=0&&i<COLS.length&&!STK_COLS.includes(i));
-    const faltam=MOV_COLS_DEFAULT.filter(i=>!ok.includes(i)); // colunas novas que a ordem salva ainda não conhece
-    const pos=ok.indexOf(idxCol("data_resposta_cross"));
-    ok.splice(pos<0?ok.length:pos,0,...faltam);
+    // as que a ordem salva ainda não conhece entram antes da sua âncora; qualquer outra faltante vai ao fim
+    inserirNovas(ok, COL_NOVAS_ANTES_DE);
+    MOV_COLS_DEFAULT.forEach(i=>{ if(!ok.includes(i)) ok.push(i); });
     return ok;
   })();
   const {order:movColOrder,setOrder:setMovColOrder,onDragStart:colDragStart,onDragOver:colDragOver,onDragEnd:colDragEnd}=useColDragOrder(savedOrder||MOV_COLS_DEFAULT);
@@ -1424,7 +1473,7 @@ function App(){
     try{
       let p={...form};
       if(p.hora_solic_ambulancia&&p.horario_saida_ambulancia&&!p.tempo_espera)
-        p.tempo_espera=calcTempo(p.hora_solic_ambulancia,p.horario_saida_ambulancia);
+        p.tempo_espera=calcTempoD(p.data_saida_ambulancia,p.hora_solic_ambulancia,p.data_saida_real||p.data_saida_ambulancia,p.horario_saida_ambulancia);
       if(p.horario_saida_ambulancia&&p.horario_retorno&&!p.duracao_remocao)
         p.duracao_remocao=calcTempo(p.horario_saida_ambulancia,p.horario_retorno);
       // normaliza gravidade e tipo_ambulancia para os valores aceitos pelo banco
@@ -1454,7 +1503,9 @@ function App(){
         // Feature 3: se campo calculado foi limpo (value vazio), recalcula
         const teManual=field==="tempo_espera"?value:null;
         const durManual=field==="duracao_remocao"?value:null;
-        const te = teManual!==null ? (teManual||calcTempo(hs,hsa)) : calcTempo(hs,hsa);
+        const dSol=field==="data_saida_ambulancia"?value:row.data_saida_ambulancia;
+        const dSai=(field==="data_saida_real"?value:row.data_saida_real)||dSol;
+        const te = teManual!==null ? (teManual||calcTempoD(dSol,hs,dSai,hsa)) : calcTempoD(dSol,hs,dSai,hsa);
         const dur = durManual!==null ? (durManual||calcTempo(hsa,hr)) : calcTempo(hsa,hr);
         if(te)u.tempo_espera=te;
         if(dur)u.duracao_remocao=dur;
@@ -1690,7 +1741,7 @@ function App(){
         return String(v);
       })]);
       const xlsSheet=window.XLSX.utils.aoa_to_sheet([hdr,...data]);
-      const cw={data_aceite_cross:12,horario_aceite_cross:10,data_solicitacao:12,horario_solicitacao:8,ficha_cross:18,nome_paciente:26,setor:18,procedimento:14,especialidade:18,diagnostico:24,status:28,gravidade:14,data_resposta_cross:12,horario_resposta_cross:8,instituicao_destino:20,tipo_ambulancia:12,data_saida_ambulancia:12,hora_solic_ambulancia:10,horario_saida_ambulancia:10,tempo_espera:10,observacao:28,enfermeiro:16,tecnico_auxiliar:16,medico:16,horario_retorno:10,duracao_remocao:12};
+      const cw={data_saida_real:12,data_aceite_cross:12,horario_aceite_cross:10,data_solicitacao:12,horario_solicitacao:8,ficha_cross:18,nome_paciente:26,setor:18,procedimento:14,especialidade:18,diagnostico:24,status:28,gravidade:14,data_resposta_cross:12,horario_resposta_cross:8,instituicao_destino:20,tipo_ambulancia:12,data_saida_ambulancia:12,hora_solic_ambulancia:10,horario_saida_ambulancia:10,tempo_espera:10,observacao:28,enfermeiro:16,tecnico_auxiliar:16,medico:16,horario_retorno:10,duracao_remocao:12};
       xlsSheet["!cols"]=[{wch:4},...COLS.map(([f])=>({wch:cw[f]||14}))];
       const wb=window.XLSX.utils.book_new();
       window.XLSX.utils.book_append_sheet(wb,"Remoções",xlsSheet);
@@ -1920,14 +1971,15 @@ function App(){
                   "data_saida_ambulancia":<td><Cell rowId={r.id} field="data_saida_ambulancia" value={r.data_saida_ambulancia} tipo="date" onSave={handleCell} fmtDisplay={fmtD}/></td>,
                   "hora_solic_ambulancia":<td><Cell rowId={r.id} field="hora_solic_ambulancia" value={r.hora_solic_ambulancia} tipo="time" onSave={handleCell}/></td>,
                   "horario_saida_ambulancia":<td><Cell rowId={r.id} field="horario_saida_ambulancia" value={r.horario_saida_ambulancia} tipo="time" onSave={handleCell}/></td>,
-                  "tempo_espera":<td><Cell rowId={r.id} field="tempo_espera" value={r.tempo_espera||calcTempo(r.hora_solic_ambulancia,r.horario_saida_ambulancia)||""} tipo="time" onSave={handleCell} colorStyle={{color:r.tempo_espera?"#7C3AED":"#6D28D9",fontWeight:700}}/></td>,
+                  "tempo_espera":<td><Cell rowId={r.id} field="tempo_espera" value={r.tempo_espera||calcTempoD(r.data_saida_ambulancia,r.hora_solic_ambulancia,r.data_saida_real||r.data_saida_ambulancia,r.horario_saida_ambulancia)||""} tipo="time" onSave={handleCell} colorStyle={{color:r.tempo_espera?"#7C3AED":"#6D28D9",fontWeight:700}}/></td>,
                   "observacao":<td><Cell rowId={r.id} field="observacao" value={r.observacao} onSave={handleCell}/></td>,
-                  "enfermeiro":<td><Cell rowId={r.id} field="enfermeiro" value={r.enfermeiro} onSave={handleCell}/></td>,
-                  "tecnico_auxiliar":<td><Cell rowId={r.id} field="tecnico_auxiliar" value={r.tecnico_auxiliar} onSave={handleCell}/></td>,
-                  "medico":<td><Cell rowId={r.id} field="medico" value={r.medico} onSave={handleCell}/></td>,
+                  "enfermeiro":<td><Cell rowId={r.id} field="enfermeiro" value={r.enfermeiro} onSave={handleCell} fmtDisplay={fmtEquipe} sugestao={EQ_SEM.enfermeiro}/></td>,
+                  "tecnico_auxiliar":<td><Cell rowId={r.id} field="tecnico_auxiliar" value={r.tecnico_auxiliar} onSave={handleCell} fmtDisplay={fmtEquipe} sugestao={EQ_SEM.tecnico_auxiliar}/></td>,
+                  "medico":<td><Cell rowId={r.id} field="medico" value={r.medico} onSave={handleCell} fmtDisplay={fmtEquipe} sugestao={EQ_SEM.medico}/></td>,
                   "horario_retorno":<td><Cell rowId={r.id} field="horario_retorno" value={r.horario_retorno} tipo="time" onSave={handleCell}/></td>,
                   "duracao_remocao":<td><Cell rowId={r.id} field="duracao_remocao" value={r.duracao_remocao||calcTempo(r.horario_saida_ambulancia,r.horario_retorno)||""} tipo="time" onSave={handleCell} colorStyle={{color:r.duracao_remocao?"#0369A1":"#0284C7",fontWeight:700}}/></td>,
                   "finalizado":<td style={{textAlign:"center"}}><BoolCell rowId={r.id} field="finalizado" value={r.finalizado} onSave={handleCell}/></td>,
+                  "data_saida_real":<td><Cell rowId={r.id} field="data_saida_real" value={r.data_saida_real} tipo="date" onSave={handleCell} fmtDisplay={fmtD}/></td>,
                   "data_aceite_cross":<td><Cell rowId={r.id} field="data_aceite_cross" value={r.data_aceite_cross} tipo="date" onSave={handleCell} fmtDisplay={fmtD}/></td>,
                   "horario_aceite_cross":<td><Cell rowId={r.id} field="horario_aceite_cross" value={r.horario_aceite_cross} tipo="time" onSave={handleCell}/></td>,
                   "permaneceu":<td style={{textAlign:"center"}}><BoolCell rowId={r.id} field="permaneceu" value={r.permaneceu} onSave={handleCell}/></td>,

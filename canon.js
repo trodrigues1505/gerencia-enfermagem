@@ -302,6 +302,26 @@
     return achados.length ? { campo: campo, valor: valor, pertenceA: achados } : null;
   }
 
+  /* ══ EQUIPE: "SEM MÉDICO" é uma AFIRMAÇÃO, não um campo esquecido ══════════
+   * Campo em branco = ninguém preencheu. Quando a remoção realmente saiu sem
+   * médico (ou sem enfermeiro / técnico), o registro precisa DIZER isso, com um
+   * valor fixo que não se confunde com esquecimento nem com um nome digitado.
+   * Usado pelo Livro de Saída, pela escala do card e pela planilha de remoção.
+   */
+  var EQUIPE_SEM = {
+    medico:           "SEM MÉDICO",
+    enfermeiro:       "SEM ENFERMEIRO(A)",
+    tecnico_auxiliar: "SEM TÉCNICO/AUXILIAR"
+  };
+  var EQUIPE_SEM_NORM = {};
+  Object.keys(EQUIPE_SEM).forEach(function (k) { EQUIPE_SEM_NORM[norm(EQUIPE_SEM[k])] = k; });
+  // grafias digitadas à mão que significam o mesmo
+  ["SEM ENFERMEIRO", "SEM ENFERMEIRA"].forEach(function (a) { EQUIPE_SEM_NORM[norm(a)] = "enfermeiro"; });
+  ["SEM TECNICO", "SEM AUXILIAR", "SEM TECNICO AUXILIAR", "SEM TECNICA"].forEach(function (a) { EQUIPE_SEM_NORM[norm(a)] = "tecnico_auxiliar"; });
+  EQUIPE_SEM_NORM[norm("SEM MEDICA")] = "medico";
+  /* true se o texto é uma das afirmações "sem ..." acima (ignora acento/caixa) */
+  function ehSemEquipe(v) { return !!EQUIPE_SEM_NORM[norm(v)]; }
+
   /* ══ API PÚBLICA ═════════════════════════════════════════════════════════ */
 
   function classificar(campo, valor) {
@@ -388,6 +408,7 @@
     norm: norm, isVazio: isVazio,
     classificar: classificar, validarLinha: validarLinha,
     agrupar: agrupar, parseSetor: parseSetor, ehVazamento: ehVazamento,
+    EQUIPE_SEM: EQUIPE_SEM, ehSemEquipe: ehSemEquipe,
     NAO_CLASSIFICADO: NAO_CLASSIFICADO, NAO_INFORMADO: NAO_INFORMADO,
     GRAVIDADE_ORDEM: GRAVIDADE_ORDEM, GRAVIDADE_COR: GRAVIDADE_COR,
     STATUS_FECHADOS: STATUS_FECHADOS, ESPEC_META: ESPEC_META
