@@ -268,6 +268,71 @@ async function dbGet(path) {
   return r.json();
 }
 
+// ── Carga da planilha por período ────────────────────────────────────────────
+// O Supabase devolve no máximo 1.000 linhas por consulta (Settings → API → Max rows) e corta o resto SEM avisar.
+// Por isso a planilha faz duas coisas: (1) pede ao servidor só o período escolhido; (2) dentro do período, lê em
+// páginas de 1.000 até acabar, então nenhuma linha some mesmo que o período tenha mais do que isso.
+const PAGINA = 1000;
+// Período em que a planilha abre. Valores: "30d" | "mes_atual" | "mes_ant" | "90d" | "mes" | "tudo"
+const PERIODO_PADRAO = "30d";
+// Datas em horário LOCAL (toISOString é UTC e, depois das 21h em Brasília, devolve o dia seguinte)
+const isoLocal = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+function faixaPeriodo(periodo, mesSel){
+  const h = new Date();
+  const mesCompleto = (ano, mes0) => ({ ini: isoLocal(new Date(ano, mes0, 1)), fim: isoLocal(new Date(ano, mes0+1, 0)) });
+  const nomeMes = (ano, mes0) => {
+    const t = new Date(ano, mes0, 1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"});
+    return t.charAt(0).toUpperCase()+t.slice(1);
+  };
+  if(periodo==="tudo") return { ini:null, fim:null, rotulo:"Tudo" };
+  if(periodo==="30d") return { ini:isoLocal(new Date(h.getFullYear(),h.getMonth(),h.getDate()-29)), fim:null, rotulo:"Últimos 30 dias" };
+  if(periodo==="90d") return { ini:isoLocal(new Date(h.getFullYear(),h.getMonth(),h.getDate()-89)), fim:null, rotulo:"Últimos 90 dias" };
+  if(periodo==="mes_ant"){
+    const a = new Date(h.getFullYear(), h.getMonth()-1, 1);
+    return { ...mesCompleto(a.getFullYear(), a.getMonth()), rotulo:nomeMes(a.getFullYear(), a.getMonth()) };
+  }
+  if(periodo==="mes"){
+    const m = String(mesSel||"").match(/^(\d{4})-(\d{2})$/);
+    if(m){ const ano=+m[1], mes0=+m[2]-1; return { ...mesCompleto(ano, mes0), rotulo:nomeMes(ano, mes0) }; }
+  }
+  // "mes_atual" e qualquer valor desconhecido caem aqui
+  return { ...mesCompleto(h.getFullYear(), h.getMonth()), rotulo:nomeMes(h.getFullYear(), h.getMonth()) };
+}
+// Caminho da consulta. Linhas SEM data de solicitação entram sempre: sem isto sumiriam de qualquer período
+// e ninguém conseguiria encontrá-las para corrigir. A ordem tem desempate por id para as páginas não repetirem linha.
+function pathRemocoes(faixa){
+  let p = "remocoes?select=*&order=created_at.desc,id.asc";
+  if(faixa.ini || faixa.fim){
+    const cond = [];
+    if(faixa.ini) cond.push(`data_solicitacao.gte.${faixa.ini}`);
+    if(faixa.fim) cond.push(`data_solicitacao.lte.${faixa.fim}`);
+    const dentro = cond.length>1 ? `and(${cond.join(",")})` : cond[0];
+    p += `&or=(${dentro},data_solicitacao.is.null)`;
+  }
+  return p;
+}
+// Lê todas as páginas. Avança pelo que o servidor realmente devolveu (não por PAGINA), então funciona
+// mesmo que o "Max rows" do projeto seja menor que 1.000. Para quando o total (Content-Range) é atingido
+// ou quando uma página vem vazia.
+async function dbGetTodas(path){
+  const out = [];
+  let off = 0, total = null;
+  while(true){
+    const r = await fetch(`${SB_URL}/rest/v1/${path}${path.includes("?")?"&":"?"}limit=${PAGINA}&offset=${off}`,{headers:{...H,Prefer:"count=exact"}});
+    if(!r.ok) throw new Error(await r.text());
+    const page = await r.json();
+    const cr = r.headers.get("Content-Range");            // ex.: "0-232/233"
+    const m = cr && cr.match(/\/(\d+)$/);
+    if(m) total = Number(m[1]);
+    if(!Array.isArray(page) || page.length===0) break;
+    out.push(...page);
+    off += page.length;
+    if(total!==null && off>=total) break;
+    if(off>200000) break;                                  // trava de segurança
+  }
+  return out;
+}
+
 function calcTempo(h1, h2) {
   if(!h1||!h2) return "";
   try {
@@ -1198,7 +1263,7 @@ function ExportResultModal({data,onClose}){
   );
 }
 
-function DuplicatesModal({rows,onClose,onDelete}){
+function DuplicatesModal({rows,onClose,onDelete,rotulo}){
   const [selected,setSelected]=React.useState(new Set());
   const [deleted,setDeleted]=React.useState(new Set());
   const [confirming,setConfirming]=React.useState(false);
@@ -1218,9 +1283,9 @@ function DuplicatesModal({rows,onClose,onDelete}){
   if(groups.length===0) return(
     <div className="mbk">
       <div className="mdl" style={{maxWidth:420}}>
-        <div className="mhd"><div><h2>✅ Sem duplicatas</h2><p>Nenhum nome repetido encontrado.</p></div>
+        <div className="mhd"><div><h2>✅ Sem duplicatas</h2><p>Nenhum nome repetido encontrado{rotulo?` em: ${rotulo}`:""}.</p></div>
           <button className="btn btn-g btn-sm" onClick={onClose}><Ico n="x" s={13}/></button></div>
-        <div className="mbd"><p style={{color:"#64748B",fontSize:13}}>Todos os registros têm nomes únicos.</p></div>
+        <div className="mbd"><p style={{color:"#64748B",fontSize:13}}>Todos os registros{rotulo?" do período exibido":""} têm nomes únicos.</p></div>
         <div className="mft"><button className="btn btn-p" onClick={onClose}>Fechar</button></div>
       </div>
     </div>
@@ -1251,7 +1316,7 @@ function DuplicatesModal({rows,onClose,onDelete}){
         <div className="mhd">
           <div>
             <h2>🔍 Verificação de duplicatas</h2>
-            <p style={{marginTop:3,fontSize:12,color:"#64748B"}}>{groups.length} nome{groups.length!==1?"s":""} repetido{groups.length!==1?"s":""} · {groups.reduce((a,g)=>a+g.length,0)} registros envolvidos</p>
+            <p style={{marginTop:3,fontSize:12,color:"#64748B"}}>{groups.length} nome{groups.length!==1?"s":""} repetido{groups.length!==1?"s":""} · {groups.reduce((a,g)=>a+g.length,0)} registros envolvidos{rotulo?` · ${rotulo}`:""}</p>
           </div>
           <button className="btn btn-g btn-sm" onClick={onClose}><Ico n="x" s={13}/></button>
         </div>
@@ -1439,7 +1504,10 @@ function App(){
   });
   const [fG,setFG]=useState("");
   const [fS,setFS]=useState("");
-  const [fM,setFM]=useState("");
+  // Período carregado do servidor. Quando se chega por um link do dashboard (?foco=...), abre em "Tudo":
+  // a linha a corrigir pode estar em qualquer mês e não pode ficar de fora da carga.
+  const [periodo,setPeriodo]=useState(()=>foco?"tudo":PERIODO_PADRAO);
+  const [mesSel,setMesSel]=useState(()=>isoLocal(new Date()).slice(0,7));
   const [fF,setFF]=useState("");   // "Faltando…": ver FALTA_OPCOES
   const [sc,setSc]=useState("created_at");
   const [sd,setSd]=useState("desc");
@@ -1568,13 +1636,23 @@ function App(){
     setWmap(m=>({...m,[field]:newW}));
   }
 
+  // ── Carga por período ──
+  // faixa = {ini, fim, rotulo}. O servidor só devolve as remoções desse período (e as sem data); os outros meses
+  // continuam salvos no banco e voltam ao trocar o período.
+  const faixa=useMemo(()=>faixaPeriodo(periodo,mesSel),[periodo,mesSel]);
+  const reqRef=useRef(0);   // evita que uma resposta lenta de um período antigo sobrescreva o período atual
   const load=useCallback(async()=>{
+    const meu=++reqRef.current;
     setLoading(true);
-    try{const d=await dbGet("remocoes?select=*&order=created_at.desc");setRows(Array.isArray(d)?d:[]);}
-    catch(e){push("Erro: "+e.message,"err");}
-    finally{setLoading(false);}
-  },[]);
-  useEffect(()=>{load();},[]);
+    try{
+      const d=await dbGetTodas(pathRemocoes(faixa));
+      if(meu!==reqRef.current)return;
+      setRows(Array.isArray(d)?d:[]);
+    }
+    catch(e){if(meu===reqRef.current)push("Erro: "+e.message,"err");}
+    finally{if(meu===reqRef.current)setLoading(false);}
+  },[faixa]);
+  useEffect(()=>{load();},[load]);
 
   const handleSave=async(form)=>{
     setSaving(true);
@@ -1594,6 +1672,10 @@ function App(){
       if(form.id){await api({action:"update",id:form.id,...p});push("Atualizado");}
       else{await api({action:"create",...p});push("Criado!");}
       setModal(null);await load();
+      // registro com data fora do período exibido não aparece na tabela: avisa, para não parecer que sumiu
+      const dr=p.data_solicitacao;
+      if(dr&&((faixa.ini&&dr<faixa.ini)||(faixa.fim&&dr>faixa.fim)))
+        push(`Salvo com data ${fmtD(dr)}, fora do período exibido (${faixa.rotulo}). Mude o período para vê-lo.`);
     }catch(e){push(e.message||"Erro","err");}
     finally{setSaving(false);}
   };
@@ -1660,9 +1742,10 @@ function App(){
     await load();
   };
 
+  // Só apaga o que está CARREGADO, ou seja, o período exibido. Os outros períodos não são tocados.
   const handleDeleteAll=async()=>{
     if(rows.length===0)return;
-    const conf=prompt(`Isso vai excluir TODOS os ${rows.length} registros da planilha, permanentemente. Digite EXCLUIR para confirmar:`);
+    const conf=prompt(`Isso vai excluir TODOS os ${rows.length} registros do período exibido (${faixa.rotulo}), permanentemente. Registros de outros períodos não são afetados. Digite EXCLUIR para confirmar:`);
     if(conf!=="EXCLUIR")return;
     setSaving(true);
     let ok=0,fail=0;
@@ -1719,6 +1802,8 @@ function App(){
     await load();
   };
 
+  // Importação por JSON: o protocolo de AVC NÃO entra aqui de propósito. Ele sai na exportação (backup), mas só
+  // pode voltar quando a Edge Function remocoes-write aceitar o campo `protocolo_avc`.
   const FIELDS=COLS.map(([f])=>f).filter(f=>!CAMPOS_CALCULADOS.has(f));
   const handleImportJSON=async(file)=>{
     if(!file)return;
@@ -1814,12 +1899,12 @@ function App(){
     } else { setSc(col); setSd("asc"); }
   }
 
+  // O período (mês, 30 dias...) já foi aplicado no servidor em load(); aqui ficam só os filtros da tela.
   const filtered=useMemo(()=>{
     let d=rows;
     if(search){const s=search.toLowerCase();d=d.filter(r=>(r.nome_paciente||"").toLowerCase().includes(s)||(r.ficha_cross||"").toLowerCase().includes(s)||(r.diagnostico||"").toLowerCase().includes(s)||(r.instituicao_destino||"").toLowerCase().includes(s));}
     if(fG)d=d.filter(r=>r.gravidade===fG);
     if(fS)d=d.filter(r=>(r.status||"").includes(fS));
-    if(fM)d=d.filter(r=>(r.data_solicitacao||"").startsWith(fM));
     if(fF){const cs=(FALTA_OPCOES.find(o=>o[0]===fF)||[0,0,[]])[2];d=d.filter(r=>cs.some(k=>!String(r[k]??"").trim()));}
     return [...d].sort((a,b)=>{
       const av=a[sc];
@@ -1845,7 +1930,7 @@ function App(){
       const bvs=(bv||"").toString().toLowerCase();
       return sd==="asc"?avs.localeCompare(bvs,"pt"):bvs.localeCompare(avs,"pt");
     });
-  },[rows,search,fG,fS,fM,fF,sc,sd]);
+  },[rows,search,fG,fS,fF,sc,sd]);
 
   const stats=useMemo(()=>{
     const total=filtered.length;
@@ -1860,6 +1945,13 @@ function App(){
     return {total,conc,nao,verm,medStr,ct:tempos.length};
   },[filtered]);
 
+  // Nome do arquivo exportado: carrega o período, para os backups mensais não se confundirem
+  // (ex.: remocoes_outubro-de-2026_2026-10-31.xlsx)
+  const nomeArquivo=ext=>{
+    const tag=String(faixa.rotulo||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
+    return `remocoes_${tag}_${isoLocal(new Date())}.${ext}`;
+  };
+
   function exportXLS(){
     if(!window.XLSX){push("XLSX não carregado","err");return;}
     try{
@@ -1872,19 +1964,20 @@ function App(){
       // Na exportação o valor continua "HH:MM" (dá para somar/ordenar no Excel); o título passa a dizer que são horas:minutos.
       const hdr=["#",...COLS.map(([f,pl])=>String(pl||"")+((f==="tempo_espera"||f==="duracao_remocao")?" (horas:minutos)":(f==="min_finalizacao_pedido_amb"?" (minutos)":"")))];
       hdr.push("TEMPO DA FINALIZAÇÃO CROSS ATÉ A SOLICITAÇÃO DA AMBULÂNCIA (horas e minutos)");   // ao lado da coluna em minutos, só para leitura
+      hdr.push("PROTOCOLO DE AVC");   // fica fora de COLS de propósito: COLS manda na tabela da tela e nas colunas da colagem do Excel
       const snapshot=[...filtered]; // captura o array neste momento
       const data=snapshot.map((r,i)=>[i+1,...COLS.map(([f])=>{
         const v=safe(r[f]);
         if(f==="data_solicitacao"&&v){try{return new Date(v+"T12:00:00").toLocaleDateString("pt-BR");}catch{return String(v);}}
         if(f==="gravidade"&&v)return String(gravInfo(v).label||v);
         return String(v);
-      }),fmtMinCol(r.min_finalizacao_pedido_amb)||""]);
+      }),fmtMinCol(r.min_finalizacao_pedido_amb)||"",safe(r.protocolo_avc)]);   // Sim / Não / vazio (sem registro)
       const xlsSheet=window.XLSX.utils.aoa_to_sheet([hdr,...data]);
       const cw={min_finalizacao_pedido_amb:14,data_retorno:12,data_saida_real:12,data_solicitacao:12,horario_solicitacao:8,ficha_cross:18,nome_paciente:26,setor:18,procedimento:14,especialidade:18,diagnostico:24,status:28,gravidade:14,data_resposta_cross:12,horario_resposta_cross:8,instituicao_destino:20,tipo_ambulancia:12,data_saida_ambulancia:12,hora_solic_ambulancia:10,horario_saida_ambulancia:10,tempo_espera:10,observacao:28,enfermeiro:16,tecnico_auxiliar:16,medico:16,horario_retorno:10,duracao_remocao:12};
-      xlsSheet["!cols"]=[{wch:4},...COLS.map(([f])=>({wch:cw[f]||14})),{wch:18}];
+      xlsSheet["!cols"]=[{wch:4},...COLS.map(([f])=>({wch:cw[f]||14})),{wch:18},{wch:14}];
       const wb=window.XLSX.utils.book_new();
       window.XLSX.utils.book_append_sheet(wb,"Remoções",xlsSheet);
-      const fname=`remocoes_${new Date().toISOString().slice(0,10)}.xlsx`;
+      const fname=nomeArquivo("xlsx");
       window.XLSX.writeFile(wb,fname);
       setExportResult({tipo:"Excel",total:data.length,filename:fname});
     }catch(e){push("Erro ao exportar Excel: "+e.message,"err");}
@@ -1895,18 +1988,20 @@ function App(){
       const data=filtered.map(r=>{
         const o={};
         COLS.forEach(([f])=>{o[f]=(r[f]===false||r[f]===true||typeof r[f]==="number")?r[f]:(r[f]||"");}); // mantém Sim/Não; vazio continua vazio
+        o.protocolo_avc=(r.protocolo_avc===true||r.protocolo_avc===false)?r.protocolo_avc:"";   // true / false / "" (sem registro)
         return o;
       });
       const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
       const url=URL.createObjectURL(blob);
       const a=document.createElement("a");
+      const fname=nomeArquivo("json");
       a.href=url;
-      a.download=`remocoes_${new Date().toISOString().slice(0,10)}.json`;
+      a.download=fname;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      setExportResult({tipo:"JSON",total:data.length,filename:`remocoes_${new Date().toISOString().slice(0,10)}.json`});
+      setExportResult({tipo:"JSON",total:data.length,filename:fname});
     }catch(e){push("Erro ao exportar JSON: "+e.message,"err");}
   }
 
@@ -1930,6 +2025,19 @@ function App(){
             <span>Corrigindo{foco.campo?<> o campo <b>{foco.campo}</b></>:""} — linha destacada</span>
             <button className="btn btn-g btn-sm" onClick={()=>{setFoco(null);history.replaceState(null,"",window.location.pathname);}} style={{padding:"2px 8px"}}>✕</button>
           </div>}
+          <select className="fsel" value={periodo} onChange={e=>setPeriodo(e.target.value)} style={{fontWeight:600,color:"#0F172A"}}
+            title="Período carregado do servidor. Os outros meses continuam salvos no banco: é só trocar o período para vê-los.">
+            <option value="30d">Últimos 30 dias</option>
+            <option value="mes_atual">Mês atual</option>
+            <option value="mes_ant">Mês anterior</option>
+            <option value="90d">Últimos 90 dias</option>
+            <option value="mes">Escolher mês…</option>
+            <option value="tudo">Tudo</option>
+          </select>
+          {periodo==="mes"&&<input type="month" className="fsel" value={mesSel} onChange={e=>setMesSel(e.target.value||isoLocal(new Date()).slice(0,7))} style={{width:"auto"}}/>}
+          <span style={{fontSize:11,color:"#64748B",whiteSpace:"nowrap",flexShrink:0}} title="Quantas remoções foram carregadas do servidor para este período">
+            {loading?"Carregando…":`${rows.length} no período`}
+          </span>
           <select className="fsel" value={fG} onChange={e=>setFG(e.target.value)}>
             <option value="">Gravidade</option>
             {G_OPTS.map(o=><option key={o} value={o}>{gravInfo(o).label}</option>)}
@@ -1942,12 +2050,11 @@ function App(){
             <option value="AGUARDANDO">Aguardando</option>
             <option value="ENCERRADA">Encerrada</option>
           </select>
-          <input type="month" className="fsel" value={fM} onChange={e=>setFM(e.target.value)} style={{width:"auto"}}/>
           <select className="fsel" value={fF} onChange={e=>setFF(e.target.value)} title="Mostra só as remoções em que falta a data ou a hora de um momento do caminho (para completar à mão). Saída e retorno só olham a hora.">
             <option value="">Faltando…</option>
             {FALTA_OPCOES.map(([k,rot])=><option key={k} value={k}>{rot}</option>)}
           </select>
-          {(search||fG||fS||fM||fF)&&<button className="btn btn-g btn-sm" onClick={()=>{setSearch("");setFG("");setFS("");setFM("");setFF("");}}>✕ Filtros</button>}
+          {(search||fG||fS||fF)&&<button className="btn btn-g btn-sm" onClick={()=>{setSearch("");setFG("");setFS("");setFF("");}}>✕ Filtros</button>}
           {sc!=="created_at"&&<button className="btn btn-g btn-sm" title="Voltar à ordem de inserção (mais recente primeiro)" onClick={resetSort} style={{color:"#F59E0B",borderColor:"#FCD34D"}}>⇅ Resetar ordem</button>}
           <div style={{marginLeft:"auto",display:"flex",gap:6,flexShrink:0,alignItems:"center"}}>
             <input type="file" accept=".json,application/json" ref={jsonFileRef} style={{display:"none"}}
@@ -1975,12 +2082,13 @@ function App(){
               ]}
             />
             <button className="btn btn-p" onClick={()=>setModal({})}><Ico n="plus"/> Novo</button>
-            <button className="btn btn-g" onClick={()=>setShowDuplicates(true)} title="Verificar registros com nomes repetidos">🔍 Duplicatas</button>
+            <button className="btn btn-g" onClick={()=>setShowDuplicates(true)} title="Verificar registros com nomes repetidos no período exibido">🔍 Duplicatas</button>
             <button className="btn btn-g btn-sm" onClick={()=>setQuebra(q=>!q)} aria-pressed={quebra}
               title={quebra?"Desligar: voltar a cortar o texto que não cabe na célula":"Ligar: o texto que não cabe na célula passa para a linha de baixo (fica salvo neste navegador)"}
               style={quebra?{background:"#DBEAFE",borderColor:"#93C5FD",color:"#1D4ED8",fontWeight:700}:undefined}>↵ Quebrar texto{quebra?": ligado":""}</button>
             <button className="btn btn-g btn-sm" title="Restaurar ordem e largura original das colunas" onClick={()=>{setMovColOrder(MOV_COLS_DEFAULT);const base={'#':48,actions:36};COLS.forEach(([f,,,,,,,w])=>{base[f]=w||100;});setWmap(base);localStorage.removeItem(LS_WMAP);localStorage.removeItem(LS_ORDER);localStorage.removeItem(LS_ORDER_V2);localStorage.removeItem(LS_ORDER_ANTIGA);setQuebra(false);}} style={{fontSize:11,padding:"4px 8px"}}>⚏ Colunas</button>
-            <button className="btn btn-g" style={{color:"#DC2626",borderColor:"#FCA5A5"}} disabled={rows.length===0} onClick={handleDeleteAll}><Ico n="trash" s={13}/> Excluir todos</button>
+            <button className="btn btn-g" style={{color:"#DC2626",borderColor:"#FCA5A5"}} disabled={rows.length===0} onClick={handleDeleteAll}
+              title="Exclui só as remoções do período exibido. Os outros períodos não são afetados."><Ico n="trash" s={13}/> Excluir período</button>
           </div>
         </div>
       </div>
@@ -1999,7 +2107,7 @@ function App(){
 
       <div className="tw">
         {loading?(<div className="empty" style={{marginTop:60}}><Ico n="pulse" s={24}/><p>Carregando…</p></div>)
-        :filtered.length===0?(<div className="empty" style={{marginTop:60}}><p>{rows.length===0?"Nenhum registro. Clique em «Novo» para começar.":"Nenhum resultado."}</p></div>)
+        :filtered.length===0?(<div className="empty" style={{marginTop:60}}><p>{rows.length===0?(periodo==="tudo"?"Nenhum registro. Clique em «Novo» para começar.":`Nenhum registro em «${faixa.rotulo}». Mude o período ou clique em «Novo».`):"Nenhum resultado."}</p></div>)
         :(
           <table className={"rt"+(quebra?" rt-wrap":"")} ref={tableRef} style={{width:Object.values(wmap).reduce((a,b)=>a+b,0)}}>
             <colgroup>
@@ -2218,7 +2326,7 @@ function App(){
       {showPaste&&<PasteModal onClose={()=>setShowPaste(false)} onImport={handleImportPaste}/>}
       {importErrors&&<ImportResultModal data={importErrors} onClose={()=>setImportErrors(null)}/>}
       {exportResult&&<ExportResultModal data={exportResult} onClose={()=>setExportResult(null)}/>}
-      {showDuplicates&&<DuplicatesModal rows={rows} onClose={()=>setShowDuplicates(false)} onDelete={async(id)=>{await handleDelete(id);}}/>}
+      {showDuplicates&&<DuplicatesModal rows={rows} rotulo={faixa.rotulo} onClose={()=>setShowDuplicates(false)} onDelete={async(id)=>{await handleDelete(id);}}/>}
       {modal!==null&&<FormModal row={modal} onClose={()=>setModal(null)} onSave={handleSave} saving={saving}/>}
       {tipAtivo&&<div className="tipfix" style={{left:tipAtivo.x,top:tipAtivo.y}}>
         <strong>Planilha:</strong> {tipAtivo.planilha}<br/>
