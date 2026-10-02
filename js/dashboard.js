@@ -9,6 +9,31 @@
   document.head.appendChild(st);
 })();
 
+/* ─── Leitura em páginas ──────────────────────────────────────────────────────
+ * O Supabase devolve no máximo 1.000 linhas por consulta (Settings → API → Max rows) e corta o resto SEM avisar.
+ * Antes, o dashboard pedia limit=5000 e recebia só 1.000. Esta função repete a consulta com limit/offset até acabar.
+ * Avança pelo que o servidor REALMENTE devolveu (não por 1.000), então funciona mesmo que o limite do projeto seja outro.
+ * Para quando atinge o total informado em Content-Range ou quando uma página vem vazia.
+ * Atenção: aqui H() é função (resolve o token da sessão a cada chamada). Na planilha (remocao.html) H é objeto.          */
+async function sbGetTodas(path) {
+  const out = [];
+  let off = 0, total = null;
+  while (true) {
+    const r = await fetch(`${SB_URL}/rest/v1/${path}${path.includes("?") ? "&" : "?"}limit=1000&offset=${off}`,
+      { headers: Object.assign({}, H(), { Prefer: "count=exact" }) });
+    if (!r.ok) throw new Error(await r.text());
+    const page = await r.json();
+    const m = (r.headers.get("Content-Range") || "").match(/\/(\d+)$/);   // ex.: "0-232/233"
+    if (m) total = Number(m[1]);
+    if (!Array.isArray(page) || page.length === 0) break;
+    out.push(...page);
+    off += page.length;
+    if (total !== null && off >= total) break;
+    if (off > 200000) break;                                              // trava de segurança
+  }
+  return out;
+}
+
 /* ════════════════════════════════════════════════════════════════════════════
    DASHBOARD — indicadores de regulação
    ----------------------------------------------------------------------------
@@ -301,10 +326,12 @@ function DashTempos({ intervalos, Card, Kpi, Titulo, fmtMin }) {
 function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, currentUser, discrepancias, onPendenciasChange, showT: showTProp }) {
   const showT = showTProp || function () {};
   const [remocoes, setRemocoes] = useState([]);
-  const [carregando, setCarregando] = useState(true);
+  const [carregando, setCarregando] = useState(true);   // só a 1ª carga troca a tela inteira por "Carregando…"
+  const [atualizando, setAtualizando] = useState(false); // trocas de período: mantém a tela e mostra "atualizando…"
   const [erro, setErro] = useState("");
   const [escala, setEscala] = useState("dia");
-  const [periodo, setPeriodo] = useState("tudo");
+  // "90d" e não "tudo": a abertura não baixa mais o histórico inteiro. "Tudo" continua um clique de distância.
+  const [periodo, setPeriodo] = useState("90d");
   const [ini, setIni] = useState("");
   const [fim, setFim] = useState("");
   const [verPendencias, setVerPendencias] = useState(false);
@@ -313,18 +340,6 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const [justTexto, setJustTexto] = useState("");
   const [justSaving, setJustSaving] = useState(false);
   const podeJustificar = isAdmin || !!(currentUser && currentUser.can_justificativa);
-
-  useEffect(() => {
-    let vivo = true;
-    (async () => {
-      try {
-        const r = await sbGet("remocoes", "select=*&order=data_solicitacao.desc&limit=5000");
-        if (vivo) setRemocoes(r);
-      } catch (e) { if (vivo) setErro(e.message); }
-      finally { if (vivo) setCarregando(false); }
-    })();
-    return () => { vivo = false; };
-  }, []);
 
   /* ── Recorte temporal ─────────────────────────────────────────────────── */
   // Datas em horário LOCAL. Antes usava toISOString (UTC): depois das 21h de
@@ -336,6 +351,28 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const diasJanela = { hoje: 1, "7d": 7, "30d": 30, "90d": 90 }[periodo] || 0;
   const inicioJanela = diasJanela
     ? iso(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - (diasJanela - 1))) : null;
+
+  /* ── Carga das remoções ───────────────────────────────────────────────────
+   * O período vai para o SERVIDOR (data_solicitacao >= início), então a tela baixa só o que vai mostrar, e a leitura é feita
+   * em páginas de 1.000 (sbGetTodas), então nada é cortado em silêncio. O filtro do navegador (`dados`, mais abaixo) continua
+   * valendo: ele refina a janela e garante o limite superior. Linhas sem data de solicitação só vêm em "Tudo", como antes.
+   * Fica DEPOIS de inicioJanela porque usa esse valor na lista de dependências.                                          */
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      setAtualizando(true);
+      try {
+        let filtro = "";
+        if (periodo === "custom") { if (ini && fim) filtro = `&data_solicitacao=gte.${ini}&data_solicitacao=lte.${fim}`; }
+        else if (inicioJanela) filtro = `&data_solicitacao=gte.${inicioJanela}`;
+        const r = await sbGetTodas("remocoes?select=*&order=data_solicitacao.desc,id.asc" + filtro);
+        if (vivo) { setRemocoes(r); setErro(""); }
+      } catch (e) { if (vivo) setErro(e.message); }
+      finally { if (vivo) { setCarregando(false); setAtualizando(false); } }
+    })();
+    return () => { vivo = false; };
+  }, [periodo, ini, fim, inicioJanela]);
+
   const dados = useMemo(() => {
     if (periodo === "tudo") return remocoes;
     if (periodo === "custom") {
@@ -779,7 +816,10 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
              color: periodo === id ? "#0F172A" : "#64748B", fontFamily: "inherit" }
   }, txt);
 
-  return /*#__PURE__*/React.createElement("div", { style: { padding: "4px 0 40px" } },
+  return /*#__PURE__*/React.createElement("div", {
+    // ao trocar de período a tela fica visível, só mais clara, até chegar o dado novo
+    style: { padding: "4px 0 40px", opacity: atualizando ? 0.6 : 1, transition: "opacity .15s" }
+  },
 
     /* ══ Controles ══ */
     /*#__PURE__*/React.createElement("div", {
@@ -796,7 +836,8 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginLeft: "auto" } },
         dados.length, " remoções",
-        deDia && ` · ${fmtDia(deDia)}${ateDia && ateDia !== deDia ? " a " + fmtDia(ateDia) : ""}`)
+        deDia && ` · ${fmtDia(deDia)}${ateDia && ateDia !== deDia ? " a " + fmtDia(ateDia) : ""}`,
+        atualizando && " · atualizando…")
     ),
 
     /* Escala indisponível: diz o porquê em vez de esconder o botão */
