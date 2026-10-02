@@ -53,6 +53,8 @@ select.fsel{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;color:
 /* Tabela — largura controlada pelo JS (colgroup), não CSS fixo */
 .rt{min-width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
 .rt td,.rt th{overflow:hidden;text-overflow:ellipsis}
+/* Botão "Quebrar texto": o texto das células passa a ocupar várias linhas em vez de ser cortado */
+.rt.rt-wrap tbody td [data-nav]{white-space:normal!important;word-break:break-word;overflow-wrap:anywhere}
 .rt thead{position:sticky;top:0;z-index:50}
 .rt thead tr th{background:#1E293B;padding:4px 8px 4px 6px;height:38px;text-align:left;
   font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;
@@ -486,6 +488,12 @@ function Cell({rowId,field,value,tipo,optsKey,onSave,fmtDisplay,colorStyle,suges
       fontWeight:colorStyle?.fontWeight||(val?400:400),
       fontStyle:(val&&!inferida)?"normal":"italic",whiteSpace:"nowrap",
       ...(colorStyle||{})}}
+      onMouseEnter={e=>{
+        // Só quando o texto está cortado: o "title" passa a trazer o texto inteiro (senão fica só a dica de editar)
+        const el=e.currentTarget, cheio=(fmtDisplay&&val?fmtDisplay(val):val)||"";
+        const cortado=el.scrollWidth>el.clientWidth+1||(el.scrollWidth===0&&String(cheio).length>24);
+        if(cortado&&cheio&&!inferida&&!colorStyle)el.title=cheio+"\n\n✎ Clique para editar";
+      }}
       onClick={()=>setEd(true)} title={inferida&&val?"Data DEDUZIDA pelo horário (ninguém digitou). Clique para corrigir; ao sair do campo com a data certa, ela fica confirmada.":(colorStyle?"Clique para editar (calculado — limpe para recalcular automático)":"Clique para editar")}>
       {inferida&&val?"≈ ":""}{fmtDisplay&&val ? fmtDisplay(val) : (val||"—")}
     </div>
@@ -1385,9 +1393,15 @@ function App(){
   // Feature 4: seleção múltipla de linhas
   const [selectedRows,setSelectedRows]=useState(new Set());
   const [showDeleteConfirm,setShowDeleteConfirm]=useState(false);
+  const [quebra,setQuebra]=useState(()=>{try{return localStorage.getItem('remocoes_quebra_texto')==='1';}catch{return false;}});
+  useEffect(()=>{try{localStorage.setItem('remocoes_quebra_texto',quebra?'1':'0');}catch{}},[quebra]);
   // ── Persistência localStorage ──
   const LS_WMAP='remocoes_col_widths';
-  const LS_ORDER='remocoes_col_order';
+  // v2: a ordem padrão mudou (segue o fluxo da remoção). Trocar a chave faz todo mundo receber a ordem nova uma vez;
+  // depois disso, quem arrastar colunas continua com a própria ordem salva neste navegador.
+  const LS_ORDER='remocoes_col_order_v2';
+  const LS_ORDER_ANTIGA='remocoes_col_order';
+  const LS_QUEBRA='remocoes_quebra_texto';
   function loadLS(key,fallback){try{const v=localStorage.getItem(key);return v?JSON.parse(v):fallback;}catch{return fallback;}}
   function saveLS(key,val){try{localStorage.setItem(key,JSON.stringify(val));}catch{}}
 
@@ -1410,9 +1424,22 @@ function App(){
     });
     return lista;
   };
-  const MOV_COLS_DEFAULT = inserirNovas(
-    COLS.map((_,i)=>i).filter(i=>!STK_COLS.includes(i)&&!COL_NOVAS_ANTES_DE.some(([f])=>idxCol(f)===i)),
-    COL_NOVAS_ANTES_DE);
+  // Ordem padrão = o caminho da remoção, da esquerda para a direita (as 4 primeiras colunas ficam fixas):
+  //  1) o pedido (clínico)   2) a CROSS (aceite → destino → finalização → status)
+  //  3) a ambulância (pedido → saída → espera → equipe → retorno → duração)   4) o desfecho (Finalizado, Permaneceu, Observação)
+  const ORDEM_PADRAO = [
+    "setor","procedimento","especialidade","diagnostico","gravidade",
+    "data_aceite_cross","horario_aceite_cross","instituicao_destino","data_resposta_cross","horario_resposta_cross","status",
+    "tipo_ambulancia","data_saida_ambulancia","hora_solic_ambulancia","data_saida_real","horario_saida_ambulancia","tempo_espera",
+    "medico","enfermeiro","tecnico_auxiliar","data_retorno","horario_retorno","duracao_remocao",
+    "finalizado","permaneceu","observacao",
+  ];
+  const MOV_COLS_DEFAULT = (()=>{
+    const l=ORDEM_PADRAO.map(idxCol).filter(i=>i>=0&&!STK_COLS.includes(i));
+    // segurança: coluna futura que não esteja na lista vai para o fim, em vez de sumir
+    COLS.forEach((_,i)=>{ if(!STK_COLS.includes(i)&&!l.includes(i)) l.push(i); });
+    return l;
+  })();
   const savedOrder=(()=>{
     const sv=loadLS(LS_ORDER,null);
     if(!Array.isArray(sv))return null;
@@ -1847,7 +1874,10 @@ function App(){
             />
             <button className="btn btn-p" onClick={()=>setModal({})}><Ico n="plus"/> Novo</button>
             <button className="btn btn-g" onClick={()=>setShowDuplicates(true)} title="Verificar registros com nomes repetidos">🔍 Duplicatas</button>
-            <button className="btn btn-g btn-sm" title="Restaurar ordem e largura original das colunas" onClick={()=>{setMovColOrder(MOV_COLS_DEFAULT);const base={'#':48,actions:36};COLS.forEach(([f,,,,,,,w])=>{base[f]=w||100;});setWmap(base);localStorage.removeItem(LS_WMAP);localStorage.removeItem(LS_ORDER);}} style={{fontSize:11,padding:"4px 8px"}}>⚏ Colunas</button>
+            <button className="btn btn-g btn-sm" onClick={()=>setQuebra(q=>!q)} aria-pressed={quebra}
+              title={quebra?"Desligar: voltar a cortar o texto que não cabe na célula":"Ligar: o texto que não cabe na célula passa para a linha de baixo (fica salvo neste navegador)"}
+              style={quebra?{background:"#DBEAFE",borderColor:"#93C5FD",color:"#1D4ED8",fontWeight:700}:undefined}>↵ Quebrar texto{quebra?": ligado":""}</button>
+            <button className="btn btn-g btn-sm" title="Restaurar ordem e largura original das colunas" onClick={()=>{setMovColOrder(MOV_COLS_DEFAULT);const base={'#':48,actions:36};COLS.forEach(([f,,,,,,,w])=>{base[f]=w||100;});setWmap(base);localStorage.removeItem(LS_WMAP);localStorage.removeItem(LS_ORDER);localStorage.removeItem(LS_ORDER_ANTIGA);setQuebra(false);}} style={{fontSize:11,padding:"4px 8px"}}>⚏ Colunas</button>
             <button className="btn btn-g" style={{color:"#DC2626",borderColor:"#FCA5A5"}} disabled={rows.length===0} onClick={handleDeleteAll}><Ico n="trash" s={13}/> Excluir todos</button>
           </div>
         </div>
@@ -1869,7 +1899,7 @@ function App(){
         {loading?(<div className="empty" style={{marginTop:60}}><Ico n="pulse" s={24}/><p>Carregando…</p></div>)
         :filtered.length===0?(<div className="empty" style={{marginTop:60}}><p>{rows.length===0?"Nenhum registro. Clique em «Novo» para começar.":"Nenhum resultado."}</p></div>)
         :(
-          <table className="rt" ref={tableRef} style={{width:Object.values(wmap).reduce((a,b)=>a+b,0)}}>
+          <table className={"rt"+(quebra?" rt-wrap":"")} ref={tableRef} style={{width:Object.values(wmap).reduce((a,b)=>a+b,0)}}>
             <colgroup>
               <col style={{width:wmap['#']}}/>
               {STK_COLS.map((colIdx)=>{
