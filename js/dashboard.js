@@ -102,6 +102,211 @@ function DashFilaKanban({ cols, cards, Card, Num, titulo }) {
               })))));
 }
 
+/* ─── Protocolo de AVC e Demora para pedir: componentes PRÓPRIOS, fora do Dashboard ───────────────────────
+ * Mesmo motivo do DashFilaKanban: Card/Kpi/Titulo são criados dentro do Dashboard, então qualquer estado
+ * guardado lá refaz todos os cartões a cada clique e os números reanimam do zero. Aqui o estado de
+ * "qual card/linha está aberto" fica no próprio componente e o resto da tela não é tocado.            */
+function DashProtocoloAVC({ protocolos, totalRemocoes, Card, Kpi, Titulo, Vazio, fmtMin }) {
+  const [avcSel, setAvcSel] = useState(null);   // card aberto: "total" | "noHorario" | "atrasoSantaCasa" | "atrasoAmbulancia"
+  useEffect(() => {
+    if (!avcSel) return;
+    const f = e => { if (e.key === "Escape") setAvcSel(null); };
+    window.addEventListener("keydown", f);
+    return () => window.removeEventListener("keydown", f);
+  }, [avcSel]);
+  return /*#__PURE__*/React.createElement("div", { style: { marginBottom: 22 } },
+      /*#__PURE__*/React.createElement(Titulo, {
+        extra: "meta: sair com médico e enfermeiro em até 1h da finalização da CROSS",
+        tooltip: "Só entram remoções marcadas como Protocolo de AVC no Livro de Remoção (a partir de outubro/2026; antes disso não há registro). O tempo conta da finalização da ficha na CROSS até a saída da ambulância. Cada protocolo aparece em uma categoria só: no horário; atraso porque a Santa Casa demorou a pedir a ambulância (pedido feito mais de 1h depois da finalização); ou atraso da ambulância (a Santa Casa pediu em até 1h, mas a saída passou de 1h). O protocolo só aparece aqui depois que a administração vincula o registro do Livro à planilha de remoção. Clique em um card para ver os casos."
+      }, "Protocolo de AVC"),
+      protocolos.total === 0
+        ? /*#__PURE__*/React.createElement(Card, null,
+            /*#__PURE__*/React.createElement(Vazio, null, "Nenhum protocolo de AVC no período. Marque “Protocolo de AVC” ao lançar o pedido no Livro de Remoção."))
+        : /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 12 }
+            },
+              /*#__PURE__*/React.createElement(Kpi, {
+                label: "Protocolos de AVC", valor: protocolos.total, cor: "#BE123C",
+                sub: totalRemocoes ? `${(protocolos.total / totalRemocoes * 100).toFixed(1).replace(".", ",")}% das remoções do período · clique para ver` : "clique para ver",
+                ativo: avcSel === "total", onClick: () => setAvcSel(avcSel === "total" ? null : "total"),
+                tooltip: "Total de remoções marcadas como Protocolo de AVC no período selecionado. Clique para ver todos os casos." }),
+              /*#__PURE__*/React.createElement(Kpi, {
+                label: "Saíram no horário", valor: protocolos.noHorario, cor: "#15803D",
+                sub: `${(protocolos.noHorario / protocolos.total * 100).toFixed(0)}% dos protocolos · até 1h`,
+                ativo: avcSel === "noHorario", onClick: protocolos.noHorario ? () => setAvcSel(avcSel === "noHorario" ? null : "noHorario") : undefined,
+                tooltip: "A ambulância saiu em até 1 hora depois da finalização da ficha na CROSS." }),
+              /*#__PURE__*/React.createElement(Kpi, {
+                label: "Atraso · Santa Casa", valor: protocolos.atrasoSantaCasa, cor: "#B45309",
+                sub: "demorou a pedir a ambulância",
+                alerta: protocolos.atrasoSantaCasa > 0,
+                ativo: avcSel === "atrasoSantaCasa", onClick: protocolos.atrasoSantaCasa ? () => setAvcSel(avcSel === "atrasoSantaCasa" ? null : "atrasoSantaCasa") : undefined,
+                tooltip: "Saíram depois de 1h porque o pedido da ambulância foi feito mais de 1 hora depois da finalização da CROSS." }),
+              /*#__PURE__*/React.createElement(Kpi, {
+                label: "Atraso · ambulância", valor: protocolos.atrasoAmbulancia, cor: "#BE123C",
+                sub: "chegou depois de 1h",
+                alerta: protocolos.atrasoAmbulancia > 0,
+                ativo: avcSel === "atrasoAmbulancia", onClick: protocolos.atrasoAmbulancia ? () => setAvcSel(avcSel === "atrasoAmbulancia" ? null : "atrasoAmbulancia") : undefined,
+                tooltip: "Saíram depois de 1h mesmo com o pedido feito em até 1 hora da finalização da CROSS: o atraso foi do setor de ambulância." })),
+
+            /* ── A hora dividida: quanto levou cada lado ── */
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 12, marginTop: 12 }
+            },
+              /*#__PURE__*/React.createElement(Kpi, {
+                label: "Santa Casa · finalização → pedido", valor: fmtMin(protocolos.santaCasa.mediana), cor: "#B45309",
+                sub: protocolos.santaCasa.n ? `mediana · ${protocolos.santaCasa.n} com horário · maior: ${fmtMin(protocolos.santaCasa.max)}` : "sem protocolos com os dois horários",
+                tooltip: "Tempo mediano entre a finalização da ficha na CROSS e o pedido da ambulância pela Santa Casa. É a parte da hora que depende da Santa Casa. Pedido registrado antes da finalização não entra. Só entram protocolos com os dois horários." }),
+              /*#__PURE__*/React.createElement(Kpi, {
+                label: "Ambulância · pedido → saída", valor: fmtMin(protocolos.ambulancia.mediana), cor: "#BE123C",
+                sub: protocolos.ambulancia.n ? `mediana · ${protocolos.ambulancia.n} com horário · maior: ${fmtMin(protocolos.ambulancia.max)}` : "sem protocolos com os dois horários",
+                tooltip: "Tempo mediano entre o pedido da ambulância e a saída dela. É a parte da hora que depende do setor de ambulância. A meta de 1h é a soma das duas partes: se a Santa Casa gasta 45 min para pedir, sobram 15 min para a ambulância sair. Só entram protocolos com os dois horários." })),
+
+            /* ── Casos do card selecionado ── */
+            avcSel && (() => {
+              const TIT = { total: "Todos os protocolos de AVC", noHorario: "Saíram no horário", atrasoSantaCasa: "Atraso · Santa Casa demorou a pedir a ambulância", atrasoAmbulancia: "Atraso · ambulância saiu depois de 1h" };
+              const SEL = { noHorario: ["No horário", "#15803D", "#DCFCE7"], atrasoSantaCasa: ["Atraso · Santa Casa", "#92400E", "#FEF3C7"],
+                atrasoAmbulancia: ["Atraso · ambulância", "#9F1239", "#FFE4E6"], atrasoSemCausa: ["Atraso · causa não apurada", "#475569", "#F1F5F9"],
+                semHorarios: ["Sem horário para medir", "#92400E", "#FFFBEB"] };
+              const itens = avcSel === "total" ? protocolos.lista : protocolos.lista.filter(c => c.cat === avcSel);
+              const rel = m => m === null ? "" : m >= 0 ? ` (${fmtMin(m)} após a finalização)` : ` (${fmtMin(-m)} antes da finalização)`;
+              const linha = (rot, valor, falta, extra) => /*#__PURE__*/React.createElement("div", { style: { fontSize: 11.5, color: falta ? "#B45309" : "#475569", lineHeight: 1.55 } },
+                rot + ": ", /*#__PURE__*/React.createElement("b", { style: { fontWeight: 600 } }, valor), falta ? " — falta" : "", extra || "");
+              return /*#__PURE__*/React.createElement(Card, { style: { marginTop: 12 } },
+                /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 10 } },
+                  /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#0F172A" } }, TIT[avcSel],
+                    /*#__PURE__*/React.createElement("span", { style: { fontWeight: 500, color: "#94A3B8", marginLeft: 8 } }, `${itens.length} caso${itens.length !== 1 ? "s" : ""}`)),
+                  /*#__PURE__*/React.createElement("button", { onClick: () => setAvcSel(null), style: { background: "none", border: "1px solid #E2E8F0", color: "#64748B", borderRadius: 8, padding: "4px 12px", fontSize: 11.5, cursor: "pointer" } }, "Fechar")),
+                itens.map((c, k) => /*#__PURE__*/React.createElement("div", { key: k, style: { padding: "10px 0", borderTop: k ? "1px solid #F1F5F9" : "none" } },
+                  /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 3 } },
+                    /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: "#0F172A" } }, c.nome),
+                    c.ficha && /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: "#94A3B8" } }, "ficha " + c.ficha),
+                    avcSel === "total" && c.cat && /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, fontWeight: 700, borderRadius: 99, padding: "2px 9px", color: SEL[c.cat][1], background: SEL[c.cat][2] } }, SEL[c.cat][0])),
+                  c.destino && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginBottom: 2 } }, "Destino: " + c.destino),
+                  linha("Finalização da CROSS", c.finTxt, c.faltaFin),
+                  linha("Pedido da ambulância", c.pedTxt, false, rel(c.minPedido)),
+                  linha("Saída da ambulância", c.saiTxt, c.faltaSaida, rel(c.minSaida)),
+                  (c.minPedido !== null && c.minPedido >= 0 && c.minAmb !== null && c.minAmb >= 0) && (() => {
+                    const total = c.minPedido + c.minAmb, escala = Math.max(60, total);
+                    return /*#__PURE__*/React.createElement("div", { style: { marginTop: 7 } },
+                      /*#__PURE__*/React.createElement("div", { style: { position: "relative", display: "flex", height: 8, borderRadius: 99, overflow: "hidden", background: "#F1F5F9" } },
+                        /*#__PURE__*/React.createElement("div", { title: `Santa Casa: ${fmtMin(c.minPedido)}`, style: { width: `${c.minPedido / escala * 100}%`, background: "#F59E0B" } }),
+                        /*#__PURE__*/React.createElement("div", { title: `Ambulância: ${fmtMin(c.minAmb)}`, style: { width: `${c.minAmb / escala * 100}%`, background: "#E11D48" } })),
+                      /*#__PURE__*/React.createElement("div", { style: { position: "relative", height: 0 } },
+                        /*#__PURE__*/React.createElement("div", { title: "Meta: 1h", style: { position: "absolute", left: `${60 / escala * 100}%`, top: -10, width: 2, height: 12, background: "#0F172A", borderRadius: 1 } })),
+                      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#64748B", marginTop: 4 } },
+                        /*#__PURE__*/React.createElement("span", { style: { color: "#B45309", fontWeight: 600 } }, "Santa Casa " + fmtMin(c.minPedido)), " · ",
+                        /*#__PURE__*/React.createElement("span", { style: { color: "#BE123C", fontWeight: 600 } }, "Ambulância " + fmtMin(c.minAmb)),
+                        ` · total ${fmtMin(total)} (meta 1h)`));
+                  })(),
+                  (c.medico || c.enfermeiro) && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 2 } },
+                    "Médico: " + (c.medico || "—") + " · Enfermeiro(a): " + (c.enfermeiro || "—")))));
+            })(),
+
+            (protocolos.semHorarios > 0 || protocolos.atrasoSemCausa > 0) && /*#__PURE__*/React.createElement("div", {
+              style: { fontSize: 11.5, color: "#64748B", lineHeight: 1.6, marginTop: 10 } },
+              protocolos.semHorarios > 0 && /*#__PURE__*/React.createElement("div", null,
+                `${protocolos.semHorarios} protocolo${protocolos.semHorarios !== 1 ? "s" : ""} sem horário para medir (contam no total, mas não entram nas três categorias): ${protocolos.semFinalizacao} sem finalização da CROSS · ${protocolos.semSaida} sem saída da ambulância. Clique em “Protocolos de AVC” para ver quais.`),
+              protocolos.atrasoSemCausa > 0 && /*#__PURE__*/React.createElement("div", null,
+                `${protocolos.atrasoSemCausa} saíram depois de 1h, mas sem o horário do pedido da ambulância — a causa do atraso não pôde ser apurada.`))
+          ));
+}
+
+function DashDemoraPedido({ pedidos, Card, Kpi, Titulo, Vazio, Barra, fmtMin }) {
+  const [pedSel, setPedSel] = useState(null);   // linha aberta no quadro por gravidade: "todas" ou o nome da gravidade
+  useEffect(() => {
+    if (!pedSel) return;
+    const f = e => { if (e.key === "Escape") setPedSel(null); };
+    window.addEventListener("keydown", f);
+    return () => window.removeEventListener("keydown", f);
+  }, [pedSel]);
+  return /*#__PURE__*/React.createElement("div", { style: { marginBottom: 22 } },
+      /*#__PURE__*/React.createElement(Titulo, {
+        extra: `${pedidos.medidos} de ${pedidos.total} remoções com os dois horários`,
+        tooltip: "Tempo entre a finalização da ficha na CROSS e o pedido da ambulância pela Santa Casa. Vale para todas as remoções do período, não só AVC. Vem da coluna min_finalizacao_pedido_amb da planilha de remoção (calculada automaticamente). Compare dentro da mesma gravidade: emergências e agendamentos têm ritmos diferentes. Não há meta de tempo aqui (a meta de 1h existe só no protocolo de AVC). Remoção sem finalização da CROSS ou sem horário do pedido não entra na conta."
+      }, "Demora para pedir a ambulância"),
+      pedidos.medidos === 0
+        ? /*#__PURE__*/React.createElement(Card, null,
+            /*#__PURE__*/React.createElement(Vazio, null, "Nenhuma remoção do período tem finalização da CROSS e horário do pedido da ambulância."))
+        : /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 12 }
+            },
+              /*#__PURE__*/React.createElement(Kpi, {
+                label: "Finalização → pedido", valor: fmtMin(pedidos.mediana), cor: "#B45309",
+                sub: pedidos.nPos ? `mediana · ${pedidos.nPos} pedido${pedidos.nPos !== 1 ? "s" : ""} medido${pedidos.nPos !== 1 ? "s" : ""}` : "sem pedidos medidos",
+                tooltip: "Tempo mediano entre a finalização da ficha na CROSS e o pedido da ambulância, somando todas as gravidades. Usa mediana para não ser distorcido por um caso extremo. Para comparar de forma justa, olhe o quadro por gravidade logo abaixo." }),
+              pedidos.antes > 0 && /*#__PURE__*/React.createElement(Kpi, {
+                label: "Pedido antes da finalização", valor: pedidos.antes, cor: "#475569",
+                sub: "horário a conferir",
+                tooltip: "Remoções com o pedido da ambulância registrado ANTES da finalização da CROSS. Pode ser um pedido antecipado ou um horário digitado errado. Não entram nas faixas nem na mediana." })),
+
+            /* ── Por gravidade: compara casos parecidos entre si ── */
+            /*#__PURE__*/React.createElement(Card, { style: { marginTop: 12 } },
+              /*#__PURE__*/React.createElement(Titulo, { extra: "clique em uma linha para ver os casos" }, "Por gravidade"),
+              /*#__PURE__*/React.createElement("div", {
+                style: { display: "grid", gridTemplateColumns: "minmax(150px,2fr) repeat(4,minmax(64px,1fr))", gap: "0 10px", alignItems: "center",
+                         fontSize: 10, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", padding: "0 8px 6px" }
+              }, /*#__PURE__*/React.createElement("span", null, "Gravidade"), /*#__PURE__*/React.createElement("span", { style: { textAlign: "right" } }, "Remoções"),
+                 /*#__PURE__*/React.createElement("span", { style: { textAlign: "right" } }, "Medidas"),
+                 /*#__PURE__*/React.createElement("span", { style: { textAlign: "right" } }, "Mediana"),
+                 /*#__PURE__*/React.createElement("span", { style: { textAlign: "right" } }, "Maior")),
+              [pedidos.todas, ...pedidos.grupos].map(g => {
+                const aberta = pedSel === g.chave, clicavel = g.nPos > 0;
+                return /*#__PURE__*/React.createElement("div", {
+                  key: g.chave, role: clicavel ? "button" : undefined, tabIndex: clicavel ? 0 : undefined,
+                  onClick: clicavel ? () => setPedSel(aberta ? null : g.chave) : undefined,
+                  onKeyDown: clicavel ? (e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setPedSel(aberta ? null : g.chave); } }) : undefined,
+                  style: { display: "grid", gridTemplateColumns: "minmax(150px,2fr) repeat(4,minmax(64px,1fr))", gap: "0 10px", alignItems: "center",
+                           padding: "9px 8px", borderRadius: 10, cursor: clicavel ? "pointer" : "default",
+                           background: aberta ? "#F8FAFC" : "transparent", border: `1px solid ${aberta ? "#CBD5E1" : "transparent"}`,
+                           transition: "background .15s,border-color .15s" } },
+                  /*#__PURE__*/React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: g.chave === "todas" ? 700 : 600, color: "#0F172A", minWidth: 0 } },
+                    g.chave !== "todas" && /*#__PURE__*/React.createElement("span", { style: { width: 8, height: 8, borderRadius: 99, background: g.cor, flexShrink: 0 } }),
+                    g.chave === "todas" ? "Todas" : g.chave),
+                  /*#__PURE__*/React.createElement("span", { style: { textAlign: "right", fontSize: 12, color: "#64748B", fontVariantNumeric: "tabular-nums" } }, g.total),
+                  /*#__PURE__*/React.createElement("span", { style: { textAlign: "right", fontSize: 12, color: "#64748B", fontVariantNumeric: "tabular-nums" } }, g.nPos),
+                  /*#__PURE__*/React.createElement("span", { style: { textAlign: "right", fontSize: 13, fontWeight: 700, color: g.nPos ? "#0F172A" : "#CBD5E1", fontVariantNumeric: "tabular-nums" } }, fmtMin(g.mediana)),
+                  /*#__PURE__*/React.createElement("span", { style: { textAlign: "right", fontSize: 12, color: g.nPos ? "#64748B" : "#CBD5E1", fontVariantNumeric: "tabular-nums" } }, fmtMin(g.max)));
+              }),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", lineHeight: 1.55, marginTop: 8, padding: "0 8px" } },
+                "“Medidas” são as remoções com finalização da CROSS e horário do pedido, com o pedido depois da finalização. Só elas entram na mediana e no maior tempo."),
+
+              /* ── Casos da linha aberta ── */
+              pedSel && (() => {
+                const g = pedSel === "todas" ? pedidos.todas : pedidos.grupos.find(x => x.chave === pedSel);
+                if (!g) return null;
+                return /*#__PURE__*/React.createElement("div", { style: { marginTop: 12, paddingTop: 12, borderTop: "1px solid #F1F5F9" } },
+                  /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 8 } },
+                    /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#0F172A" } },
+                      `Maiores demoras · ${g.chave === "todas" ? "todas as gravidades" : g.chave}`,
+                      /*#__PURE__*/React.createElement("span", { style: { fontWeight: 500, color: "#94A3B8", marginLeft: 8 } }, `${g.casos.length} caso${g.casos.length !== 1 ? "s" : ""}`)),
+                    /*#__PURE__*/React.createElement("button", { onClick: () => setPedSel(null), style: { background: "none", border: "1px solid #E2E8F0", color: "#64748B", borderRadius: 8, padding: "4px 12px", fontSize: 11.5, cursor: "pointer" } }, "Fechar")),
+                  /*#__PURE__*/React.createElement("div", { style: { maxHeight: 340, overflowY: "auto" } },
+                    g.casos.slice(0, 60).map((c, k) => /*#__PURE__*/React.createElement("div", {
+                      key: k, style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, padding: "7px 0", borderBottom: "1px solid #F1F5F9" } },
+                      /*#__PURE__*/React.createElement("div", { style: { minWidth: 0 } },
+                        /*#__PURE__*/React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: "#0F172A" } }, c.nome),
+                        c.ficha && /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: "#94A3B8", marginLeft: 6 } }, "ficha " + c.ficha),
+                        c.avc && /*#__PURE__*/React.createElement("span", { style: { fontSize: 9.5, fontWeight: 800, marginLeft: 7, padding: "1px 7px", borderRadius: 99, background: "#FFE4E6", color: "#9F1239" } }, "AVC"),
+                        pedSel === "todas" && /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, marginLeft: 7, color: "#64748B" } }, c.grav),
+                        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#64748B", marginTop: 1 } }, `Finalização ${c.finTxt} → pedido ${c.pedTxt}`)),
+                      /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: "#0F172A", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" } }, fmtMin(c.min)))),
+                    g.casos.length > 60 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 6 } }, `e mais ${g.casos.length - 60} casos`)))
+              })()),
+
+            /*#__PURE__*/React.createElement(Card, { style: { marginTop: 12 } },
+              /*#__PURE__*/React.createElement(Titulo, { extra: `${pedidos.nPos} pedidos` }, "Quanto tempo levou para pedir"),
+              [["Até 30 min", "#22C55E"], ["30 min a 2h", "#EAB308"], ["2h a 6h", "#F59E0B"], ["6h a 24h", "#F97316"], ["Mais de 1 dia", "#E11D48"]].map(([rot, cor], k) =>
+                /*#__PURE__*/React.createElement(Barra, {
+                  key: rot, label: rot, n: pedidos.faixas[k], pct: pedidos.nPos ? pedidos.faixas[k] / pedidos.nPos * 100 : 0,
+                  max: Math.max(...pedidos.faixas, 1), cor })),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", lineHeight: 1.55, marginTop: 6 } },
+                "As faixas só agrupam para facilitar a leitura. Não são metas.")),
+            pedidos.semDado > 0 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11.5, color: "#64748B", lineHeight: 1.6, marginTop: 10 } },
+              `${pedidos.semDado} remoç${pedidos.semDado !== 1 ? "ões" : "ão"} sem finalização da CROSS ou sem horário do pedido da ambulância — não entram nesta conta.`)));
+}
+
 function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, currentUser, discrepancias, onPendenciasChange, showT: showTProp }) {
   const showT = showTProp || function () {};
   const [remocoes, setRemocoes] = useState([]);
@@ -116,13 +321,6 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const [justModal, setJustModal] = useState(null);
   const [justTexto, setJustTexto] = useState("");
   const [justSaving, setJustSaving] = useState(false);
-  const [avcSel, setAvcSel] = useState(null);   // card de AVC aberto: "total" | "noHorario" | "atrasoSantaCasa" | "atrasoAmbulancia"
-  useEffect(() => {
-    if (!avcSel) return;
-    const f = e => { if (e.key === "Escape") setAvcSel(null); };
-    window.addEventListener("keydown", f);
-    return () => window.removeEventListener("keydown", f);
-  }, [avcSel]);
   const podeJustificar = isAdmin || !!(currentUser && currentUser.can_justificativa);
 
   useEffect(() => {
@@ -313,22 +511,42 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   // Demora para pedir a ambulância depois da finalização da CROSS — TODAS as remoções do período (AVC ou não).
   // Faixas são só agrupamento para leitura, não metas. A única meta é a do protocolo de AVC (1h no total).
   const pedidos = useMemo(() => {
-    const r = { total: dados.length, medidos: 0, antes: 0, semDado: 0, nPos: 0, mediana: null, faixas: [0, 0, 0, 0], acima: [] };
-    const pos = [];
+    // Mesmos nomes, ordem e cores que o dashboard já usa para gravidade (canon.js). Sem o canon.js, usa o mapa local.
+    const ORDEM = (C && C.GRAVIDADE_ORDEM) ? C.GRAVIDADE_ORDEM : ["EMERGÊNCIA", "URGÊNCIA", "MENOR GRAVIDADE", "AGENDAMENTO"];
+    const COR = (C && C.GRAVIDADE_COR) ? C.GRAVIDADE_COR : { "EMERGÊNCIA": "#EF4444", "URGÊNCIA": "#EAB308", "MENOR GRAVIDADE": "#22C55E", "AGENDAMENTO": "#94A3B8" };
+    const LOCAL = { VERMELHO: "EMERGÊNCIA", emergencia: "EMERGÊNCIA", AMARELO: "URGÊNCIA", urgencia: "URGÊNCIA",
+                    VERDE: "MENOR GRAVIDADE", menor_gravidade: "MENOR GRAVIDADE", CINZA: "AGENDAMENTO", agendamento: "AGENDAMENTO" };
+    const SEM = "Sem gravidade informada";
+    const grupoDe = v => {
+      const g = (C && C.classificar) ? (C.classificar("gravidade", v) || {}).canonico : LOCAL[String(v || "").trim()];
+      return ORDEM.includes(g) ? g : SEM;
+    };
+    const novo = (chave, cor) => ({ chave, cor, total: 0, nPos: 0, mediana: null, max: null, casos: [], v: [] });
+    const grupos = new Map([...ORDEM, SEM].map(g => [g, novo(g, COR[g] || "#94A3B8")]));
+    const todas = novo("todas", "#0F172A");
+    const r = { total: dados.length, medidos: 0, antes: 0, semDado: 0, nPos: 0, mediana: null, faixas: [0, 0, 0, 0, 0], grupos: [], todas };
     dados.forEach(x => {
+      const g = grupos.get(grupoDe(x.gravidade));
+      g.total++; todas.total++;
       const m = minFinPed(x);
       if (m === null) { r.semDado++; return; }
       r.medidos++;
       if (m < 0) { r.antes++; return; }   // pedido antes da finalização: não é uma "demora"; fica fora das faixas e da mediana
-      pos.push(m);
-      r.faixas[m <= 15 ? 0 : m <= 30 ? 1 : m <= 60 ? 2 : 3]++;
-      if (m > 60) r.acima.push({ nome: x.nome_paciente || "(sem nome)", ficha: x.ficha_cross || "", avc: x.protocolo_avc === true, min: m,
-        finTxt: dm(x.data_resposta_cross, x.horario_resposta_cross), pedTxt: dm(x.data_saida_ambulancia, x.hora_solic_ambulancia) });
+      const caso = { nome: x.nome_paciente || "(sem nome)", ficha: x.ficha_cross || "", avc: x.protocolo_avc === true, min: m, grav: g.chave,
+        finTxt: dm(x.data_resposta_cross, x.horario_resposta_cross), pedTxt: dm(x.data_saida_ambulancia, x.hora_solic_ambulancia) };
+      [g, todas].forEach(o => { o.nPos++; o.v.push(m); o.casos.push(caso); });
+      // Faixas só agrupam para leitura (não são metas). Vão até "mais de 1 dia" porque a mediana é de horas.
+      r.faixas[m <= 30 ? 0 : m <= 120 ? 1 : m <= 360 ? 2 : m <= 1440 ? 3 : 4]++;
     });
-    pos.sort((x, y) => x - y);
-    r.nPos = pos.length;
-    r.mediana = pos.length ? pos[Math.floor(pos.length / 2)] : null;
-    r.acima.sort((x, y) => y.min - x.min);
+    [...grupos.values(), todas].forEach(o => {
+      o.v.sort((x, y) => x - y);
+      o.mediana = o.v.length ? o.v[Math.floor(o.v.length / 2)] : null;
+      o.max = o.v.length ? o.v[o.v.length - 1] : null;
+      o.casos.sort((x, y) => y.min - x.min);
+      delete o.v;
+    });
+    r.grupos = [...grupos.values()].filter(g => g.total > 0);
+    r.nPos = todas.nPos; r.mediana = todas.mediana;
     return r;
   }, [dados]);
 
@@ -648,150 +866,10 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     ),
 
     /* ══ Protocolo de AVC (Livro de Remoção): meta de saída em até 1h da finalização da CROSS ══ */
-    /*#__PURE__*/React.createElement("div", { style: { marginBottom: 22 } },
-      /*#__PURE__*/React.createElement(Titulo, {
-        extra: "meta: sair com médico e enfermeiro em até 1h da finalização da CROSS",
-        tooltip: "Só entram remoções marcadas como Protocolo de AVC no Livro de Remoção (a partir de outubro/2026; antes disso não há registro). O tempo conta da finalização da ficha na CROSS até a saída da ambulância. Cada protocolo aparece em uma categoria só: no horário; atraso porque a Santa Casa demorou a pedir a ambulância (pedido feito mais de 1h depois da finalização); ou atraso da ambulância (a Santa Casa pediu em até 1h, mas a saída passou de 1h). O protocolo só aparece aqui depois que a administração vincula o registro do Livro à planilha de remoção. Clique em um card para ver os casos."
-      }, "Protocolo de AVC"),
-      protocolos.total === 0
-        ? /*#__PURE__*/React.createElement(Card, null,
-            /*#__PURE__*/React.createElement(Vazio, null, "Nenhum protocolo de AVC no período. Marque “Protocolo de AVC” ao lançar o pedido no Livro de Remoção."))
-        : /*#__PURE__*/React.createElement(React.Fragment, null,
-            /*#__PURE__*/React.createElement("div", {
-              style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 12 }
-            },
-              /*#__PURE__*/React.createElement(Kpi, {
-                label: "Protocolos de AVC", valor: protocolos.total, cor: "#BE123C",
-                sub: dados.length ? `${(protocolos.total / dados.length * 100).toFixed(1).replace(".", ",")}% das remoções do período · clique para ver` : "clique para ver",
-                ativo: avcSel === "total", onClick: () => setAvcSel(avcSel === "total" ? null : "total"),
-                tooltip: "Total de remoções marcadas como Protocolo de AVC no período selecionado. Clique para ver todos os casos." }),
-              /*#__PURE__*/React.createElement(Kpi, {
-                label: "Saíram no horário", valor: protocolos.noHorario, cor: "#15803D",
-                sub: `${(protocolos.noHorario / protocolos.total * 100).toFixed(0)}% dos protocolos · até 1h`,
-                ativo: avcSel === "noHorario", onClick: protocolos.noHorario ? () => setAvcSel(avcSel === "noHorario" ? null : "noHorario") : undefined,
-                tooltip: "A ambulância saiu em até 1 hora depois da finalização da ficha na CROSS." }),
-              /*#__PURE__*/React.createElement(Kpi, {
-                label: "Atraso · Santa Casa", valor: protocolos.atrasoSantaCasa, cor: "#B45309",
-                sub: "demorou a pedir a ambulância",
-                alerta: protocolos.atrasoSantaCasa > 0,
-                ativo: avcSel === "atrasoSantaCasa", onClick: protocolos.atrasoSantaCasa ? () => setAvcSel(avcSel === "atrasoSantaCasa" ? null : "atrasoSantaCasa") : undefined,
-                tooltip: "Saíram depois de 1h porque o pedido da ambulância foi feito mais de 1 hora depois da finalização da CROSS." }),
-              /*#__PURE__*/React.createElement(Kpi, {
-                label: "Atraso · ambulância", valor: protocolos.atrasoAmbulancia, cor: "#BE123C",
-                sub: "chegou depois de 1h",
-                alerta: protocolos.atrasoAmbulancia > 0,
-                ativo: avcSel === "atrasoAmbulancia", onClick: protocolos.atrasoAmbulancia ? () => setAvcSel(avcSel === "atrasoAmbulancia" ? null : "atrasoAmbulancia") : undefined,
-                tooltip: "Saíram depois de 1h mesmo com o pedido feito em até 1 hora da finalização da CROSS: o atraso foi do setor de ambulância." })),
-
-            /* ── A hora dividida: quanto levou cada lado ── */
-            /*#__PURE__*/React.createElement("div", {
-              style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 12, marginTop: 12 }
-            },
-              /*#__PURE__*/React.createElement(Kpi, {
-                label: "Santa Casa · finalização → pedido", valor: fmtMin(protocolos.santaCasa.mediana), cor: "#B45309",
-                sub: protocolos.santaCasa.n ? `mediana · ${protocolos.santaCasa.n} com horário · maior: ${fmtMin(protocolos.santaCasa.max)}` : "sem protocolos com os dois horários",
-                tooltip: "Tempo mediano entre a finalização da ficha na CROSS e o pedido da ambulância pela Santa Casa. É a parte da hora que depende da Santa Casa. Pedido registrado antes da finalização não entra. Só entram protocolos com os dois horários." }),
-              /*#__PURE__*/React.createElement(Kpi, {
-                label: "Ambulância · pedido → saída", valor: fmtMin(protocolos.ambulancia.mediana), cor: "#BE123C",
-                sub: protocolos.ambulancia.n ? `mediana · ${protocolos.ambulancia.n} com horário · maior: ${fmtMin(protocolos.ambulancia.max)}` : "sem protocolos com os dois horários",
-                tooltip: "Tempo mediano entre o pedido da ambulância e a saída dela. É a parte da hora que depende do setor de ambulância. A meta de 1h é a soma das duas partes: se a Santa Casa gasta 45 min para pedir, sobram 15 min para a ambulância sair. Só entram protocolos com os dois horários." })),
-
-            /* ── Casos do card selecionado ── */
-            avcSel && (() => {
-              const TIT = { total: "Todos os protocolos de AVC", noHorario: "Saíram no horário", atrasoSantaCasa: "Atraso · Santa Casa demorou a pedir a ambulância", atrasoAmbulancia: "Atraso · ambulância saiu depois de 1h" };
-              const SEL = { noHorario: ["No horário", "#15803D", "#DCFCE7"], atrasoSantaCasa: ["Atraso · Santa Casa", "#92400E", "#FEF3C7"],
-                atrasoAmbulancia: ["Atraso · ambulância", "#9F1239", "#FFE4E6"], atrasoSemCausa: ["Atraso · causa não apurada", "#475569", "#F1F5F9"],
-                semHorarios: ["Sem horário para medir", "#92400E", "#FFFBEB"] };
-              const itens = avcSel === "total" ? protocolos.lista : protocolos.lista.filter(c => c.cat === avcSel);
-              const rel = m => m === null ? "" : m >= 0 ? ` (${fmtMin(m)} após a finalização)` : ` (${fmtMin(-m)} antes da finalização)`;
-              const linha = (rot, valor, falta, extra) => /*#__PURE__*/React.createElement("div", { style: { fontSize: 11.5, color: falta ? "#B45309" : "#475569", lineHeight: 1.55 } },
-                rot + ": ", /*#__PURE__*/React.createElement("b", { style: { fontWeight: 600 } }, valor), falta ? " — falta" : "", extra || "");
-              return /*#__PURE__*/React.createElement(Card, { style: { marginTop: 12 } },
-                /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 10 } },
-                  /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#0F172A" } }, TIT[avcSel],
-                    /*#__PURE__*/React.createElement("span", { style: { fontWeight: 500, color: "#94A3B8", marginLeft: 8 } }, `${itens.length} caso${itens.length !== 1 ? "s" : ""}`)),
-                  /*#__PURE__*/React.createElement("button", { onClick: () => setAvcSel(null), style: { background: "none", border: "1px solid #E2E8F0", color: "#64748B", borderRadius: 8, padding: "4px 12px", fontSize: 11.5, cursor: "pointer" } }, "Fechar")),
-                itens.map((c, k) => /*#__PURE__*/React.createElement("div", { key: k, style: { padding: "10px 0", borderTop: k ? "1px solid #F1F5F9" : "none" } },
-                  /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 3 } },
-                    /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: "#0F172A" } }, c.nome),
-                    c.ficha && /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: "#94A3B8" } }, "ficha " + c.ficha),
-                    avcSel === "total" && c.cat && /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, fontWeight: 700, borderRadius: 99, padding: "2px 9px", color: SEL[c.cat][1], background: SEL[c.cat][2] } }, SEL[c.cat][0])),
-                  c.destino && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginBottom: 2 } }, "Destino: " + c.destino),
-                  linha("Finalização da CROSS", c.finTxt, c.faltaFin),
-                  linha("Pedido da ambulância", c.pedTxt, false, rel(c.minPedido)),
-                  linha("Saída da ambulância", c.saiTxt, c.faltaSaida, rel(c.minSaida)),
-                  (c.minPedido !== null && c.minPedido >= 0 && c.minAmb !== null && c.minAmb >= 0) && (() => {
-                    const total = c.minPedido + c.minAmb, escala = Math.max(60, total);
-                    return /*#__PURE__*/React.createElement("div", { style: { marginTop: 7 } },
-                      /*#__PURE__*/React.createElement("div", { style: { position: "relative", display: "flex", height: 8, borderRadius: 99, overflow: "hidden", background: "#F1F5F9" } },
-                        /*#__PURE__*/React.createElement("div", { title: `Santa Casa: ${fmtMin(c.minPedido)}`, style: { width: `${c.minPedido / escala * 100}%`, background: "#F59E0B" } }),
-                        /*#__PURE__*/React.createElement("div", { title: `Ambulância: ${fmtMin(c.minAmb)}`, style: { width: `${c.minAmb / escala * 100}%`, background: "#E11D48" } })),
-                      /*#__PURE__*/React.createElement("div", { style: { position: "relative", height: 0 } },
-                        /*#__PURE__*/React.createElement("div", { title: "Meta: 1h", style: { position: "absolute", left: `${60 / escala * 100}%`, top: -10, width: 2, height: 12, background: "#0F172A", borderRadius: 1 } })),
-                      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#64748B", marginTop: 4 } },
-                        /*#__PURE__*/React.createElement("span", { style: { color: "#B45309", fontWeight: 600 } }, "Santa Casa " + fmtMin(c.minPedido)), " · ",
-                        /*#__PURE__*/React.createElement("span", { style: { color: "#BE123C", fontWeight: 600 } }, "Ambulância " + fmtMin(c.minAmb)),
-                        ` · total ${fmtMin(total)} (meta 1h)`));
-                  })(),
-                  (c.medico || c.enfermeiro) && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 2 } },
-                    "Médico: " + (c.medico || "—") + " · Enfermeiro(a): " + (c.enfermeiro || "—")))));
-            })(),
-
-            (protocolos.semHorarios > 0 || protocolos.atrasoSemCausa > 0) && /*#__PURE__*/React.createElement("div", {
-              style: { fontSize: 11.5, color: "#64748B", lineHeight: 1.6, marginTop: 10 } },
-              protocolos.semHorarios > 0 && /*#__PURE__*/React.createElement("div", null,
-                `${protocolos.semHorarios} protocolo${protocolos.semHorarios !== 1 ? "s" : ""} sem horário para medir (contam no total, mas não entram nas três categorias): ${protocolos.semFinalizacao} sem finalização da CROSS · ${protocolos.semSaida} sem saída da ambulância. Clique em “Protocolos de AVC” para ver quais.`),
-              protocolos.atrasoSemCausa > 0 && /*#__PURE__*/React.createElement("div", null,
-                `${protocolos.atrasoSemCausa} saíram depois de 1h, mas sem o horário do pedido da ambulância — a causa do atraso não pôde ser apurada.`))
-          )),
+    /*#__PURE__*/React.createElement(DashProtocoloAVC, { protocolos, totalRemocoes: dados.length, Card, Kpi, Titulo, Vazio, fmtMin }),
 
     /* ══ Demora para pedir a ambulância (todas as remoções): finalização da CROSS → pedido ══ */
-    /*#__PURE__*/React.createElement("div", { style: { marginBottom: 22 } },
-      /*#__PURE__*/React.createElement(Titulo, {
-        extra: `${pedidos.medidos} de ${pedidos.total} remoções com os dois horários`,
-        tooltip: "Tempo entre a finalização da ficha na CROSS e o pedido da ambulância pela Santa Casa. Vale para todas as remoções do período, não só AVC. Vem da coluna min_finalizacao_pedido_amb da planilha de remoção (calculada automaticamente). As faixas só agrupam para facilitar a leitura; não são metas. Remoção sem finalização da CROSS ou sem horário do pedido não entra na conta."
-      }, "Demora para pedir a ambulância"),
-      pedidos.medidos === 0
-        ? /*#__PURE__*/React.createElement(Card, null,
-            /*#__PURE__*/React.createElement(Vazio, null, "Nenhuma remoção do período tem finalização da CROSS e horário do pedido da ambulância."))
-        : /*#__PURE__*/React.createElement(React.Fragment, null,
-            /*#__PURE__*/React.createElement("div", {
-              style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 12 }
-            },
-              /*#__PURE__*/React.createElement(Kpi, {
-                label: "Finalização → pedido", valor: fmtMin(pedidos.mediana), cor: "#B45309",
-                sub: pedidos.nPos ? `mediana · ${pedidos.nPos} pedido${pedidos.nPos !== 1 ? "s" : ""} medido${pedidos.nPos !== 1 ? "s" : ""}` : "sem pedidos medidos",
-                tooltip: "Tempo mediano entre a finalização da ficha na CROSS e o pedido da ambulância. Usa mediana para não ser distorcido por um caso extremo." }),
-              /*#__PURE__*/React.createElement(Kpi, {
-                label: "Pedidos após mais de 1h", valor: pedidos.acima.length, cor: "#BE123C",
-                sub: pedidos.nPos ? `${(pedidos.acima.length / pedidos.nPos * 100).toFixed(0)}% dos pedidos medidos` : null,
-                alerta: pedidos.acima.length > 0,
-                tooltip: "Remoções em que a ambulância só foi pedida mais de 1 hora depois da finalização da CROSS. A lista completa está logo abaixo." }),
-              pedidos.antes > 0 && /*#__PURE__*/React.createElement(Kpi, {
-                label: "Pedido antes da finalização", valor: pedidos.antes, cor: "#475569",
-                sub: "horário a conferir",
-                tooltip: "Remoções com o pedido da ambulância registrado ANTES da finalização da CROSS. Pode ser um pedido antecipado ou um horário digitado errado. Não entram nas faixas nem na mediana." })),
-            /*#__PURE__*/React.createElement(Card, { style: { marginTop: 12 } },
-              /*#__PURE__*/React.createElement(Titulo, { extra: `${pedidos.nPos} pedidos` }, "Quanto tempo levou para pedir"),
-              [["Até 15 min", "#22C55E"], ["15 a 30 min", "#EAB308"], ["30 min a 1h", "#F59E0B"], ["Mais de 1h", "#E11D48"]].map(([rot, cor], k) =>
-                /*#__PURE__*/React.createElement(Barra, {
-                  key: rot, label: rot, n: pedidos.faixas[k], pct: pedidos.nPos ? pedidos.faixas[k] / pedidos.nPos * 100 : 0,
-                  max: Math.max(...pedidos.faixas, 1), cor })),
-              pedidos.acima.length > 0 && /*#__PURE__*/React.createElement("details", { style: { marginTop: 10 } },
-                /*#__PURE__*/React.createElement("summary", { style: { cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#BE123C" } },
-                  `Ver os ${pedidos.acima.length} pedido${pedidos.acima.length !== 1 ? "s" : ""} feito${pedidos.acima.length !== 1 ? "s" : ""} após mais de 1h`),
-                /*#__PURE__*/React.createElement("div", { style: { marginTop: 8, maxHeight: 320, overflowY: "auto" } },
-                  pedidos.acima.slice(0, 60).map((c, k) => /*#__PURE__*/React.createElement("div", {
-                    key: k, style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, padding: "7px 0", borderBottom: "1px solid #F1F5F9" } },
-                    /*#__PURE__*/React.createElement("div", { style: { minWidth: 0 } },
-                      /*#__PURE__*/React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: "#0F172A" } }, c.nome),
-                      c.ficha && /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: "#94A3B8", marginLeft: 6 } }, "ficha " + c.ficha),
-                      c.avc && /*#__PURE__*/React.createElement("span", { style: { fontSize: 9.5, fontWeight: 800, marginLeft: 7, padding: "1px 7px", borderRadius: 99, background: "#FFE4E6", color: "#9F1239" } }, "AVC"),
-                      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#64748B", marginTop: 1 } }, `Finalização ${c.finTxt} → pedido ${c.pedTxt}`)),
-                    /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: "#BE123C", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" } }, fmtMin(c.min)))),
-                  pedidos.acima.length > 60 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 6 } }, `e mais ${pedidos.acima.length - 60} pedidos`)))),
-            pedidos.semDado > 0 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11.5, color: "#64748B", lineHeight: 1.6, marginTop: 10 } },
-              `${pedidos.semDado} remoç${pedidos.semDado !== 1 ? "ões" : "ão"} sem finalização da CROSS ou sem horário do pedido da ambulância — não entram nesta conta.`))),
+    /*#__PURE__*/React.createElement(DashDemoraPedido, { pedidos, Card, Kpi, Titulo, Vazio, Barra, fmtMin }),
 
     /* ══ Série temporal ══ */
     /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
