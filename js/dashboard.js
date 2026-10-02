@@ -199,6 +199,10 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     // não pode parecer volume contínuo.
     const keys = Object.keys(m).sort();
     if (!keys.length) return [];
+    // Janelas (Hoje, 7, 30, 90 dias) vão de inicioJanela até hoje, mesmo que os primeiros/últimos dias não tenham remoção;
+    // sem isso o gráfico cortava o dia de hoje (e dias vazios no começo) e parecia menor que o período escolhido.
+    const ini0 = inicioJanela && escalaEfetiva === "dia" ? inicioJanela : keys[0];
+    const fim0 = inicioJanela && escalaEfetiva === "dia" ? hojeIso : keys[keys.length - 1];
     const prox = k => {
       if (escalaEfetiva === "mes") {
         const [y, mo] = k.split("-").map(Number);
@@ -210,10 +214,10 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       return iso(d);
     };
     const out = [];
-    let k = keys[0], guarda = 0;
-    while (k <= keys[keys.length - 1] && guarda++ < 1000) { out.push({ k, n: m[k] || 0 }); k = prox(k); }
+    let k = ini0, guarda = 0;
+    while (k <= fim0 && guarda++ < 1000) { out.push({ k, n: m[k] || 0 }); k = prox(k); }
     return out;
-  }, [dados, escalaEfetiva]);
+  }, [dados, escalaEfetiva, inicioJanela, hojeIso]);
 
   /* ── Agregações canonicalizadas ───────────────────────────────────────── */
   const C = typeof Canon !== "undefined" ? Canon : null;
@@ -234,6 +238,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     // viraMeiaNoite: só vale para a duração da remoção (saída 23:10 / retorno 01:40,
     // as duas horas sem data própria). Na CROSS as datas são reais: negativo é erro
     // de digitação e fica de fora, em vez de virar "+24h" dentro da mediana.
+    // viraMeiaNoite = quando NÃO há data para um dos lados (retorno sem data de retorno): o horário "menor" conta como dia seguinte.
     const min = (d1, h1, d2, h2, viraMeiaNoite) => {
       if (!d1 || !h1 || !d2 || !h2) return null;
       const a = new Date(`${d1}T${h1.padStart(5, "0")}:00`);
@@ -242,9 +247,9 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       let diff = (b - a) / 60000;
       if (viraMeiaNoite && diff < 0 && diff > -1440) diff += 1440;
       // remoção: até 3 dias; CROSS: até 30 dias (esperas longas existem e não podem sumir da mediana)
-      return diff >= 0 && diff < (viraMeiaNoite ? 4320 : 43200) ? diff : null;
+      return diff >= 0 && diff < (viraMeiaNoite ? 4320 : 43200) ? diff : null;   // sem datas: até 3 dias; com datas: até 30 dias
     };
-    const aceite = [], fin = [], remo = [];
+    const aceite = [], fin = [], remo = [], espera = [];
     dados.forEach(r => {
       const a = min(r.data_solicitacao, r.horario_solicitacao, r.data_aceite_cross, r.horario_aceite_cross);
       if (a !== null) aceite.push(a);
@@ -252,15 +257,25 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       if (f !== null) fin.push(f);
       // dia em que a ambulância saiu: data real da saída > data do pedido da ambulância > data do pedido na CROSS
       const dSaida = r.data_saida_real || r.data_saida_ambulancia || r.data_solicitacao;
-      const b = min(dSaida, r.horario_saida_ambulancia, dSaida, r.horario_retorno, true);
+      // Duração: com data de retorno, usa as duas datas (pode passar de 24 h); sem ela, assume mesmo dia ou dia seguinte.
+      const b = r.data_retorno
+        ? min(dSaida, r.horario_saida_ambulancia, r.data_retorno, r.horario_retorno, false)
+        : min(dSaida, r.horario_saida_ambulancia, dSaida, r.horario_retorno, true);
       if (b !== null) remo.push(b);
+      // Espera pela ambulância: pedido da ambulância → saída. Só usa datas quando as DUAS existem
+      // (sem a data do pedido da ambulância, cai no cálculo só com horários, que assume virada de meia-noite).
+      const e = (r.data_saida_ambulancia && r.data_saida_real)
+        ? min(r.data_saida_ambulancia, r.hora_solic_ambulancia, r.data_saida_real, r.horario_saida_ambulancia, false)
+        : min(dSaida, r.hora_solic_ambulancia, dSaida, r.horario_saida_ambulancia, true);
+      if (e !== null) espera.push(e);
     });
     const med = arr => { if (!arr.length) return null;
       const s = [...arr].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
     return {
       aceite:  { mediana: med(aceite), n: aceite.length },
       final:   { mediana: med(fin),    n: fin.length },
-      remocao: { mediana: med(remo),   n: remo.length }
+      remocao: { mediana: med(remo),   n: remo.length },
+      espera:  { mediana: med(espera), n: espera.length }
     };
   }, [dados]);
 
@@ -504,16 +519,20 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
         tooltip: "% de remoções que usaram SAV (Suporte Avançado de Vida). Calculado só sobre registros com tipo de ambulância preenchido — o denominador aparece abaixo." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Pedido → aceite", valor: fmtMin(tempos.aceite.mediana),
-        sub: `mediana · ${tempos.aceite.n} com horário`, cor: "#0369A1",
+        sub: tempos.aceite.n ? `mediana · ${tempos.aceite.n} com horário` : "ainda sem dados — preenche com as fichas novas importadas", cor: "#0369A1",
         tooltip: "Tempo mediano entre a solicitação da Santa Casa e o aceite da CROSS (vaga confirmada). Só entram registros com os dois horários preenchidos. Usa mediana para não ser distorcido por esperas extremas." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Pedido → finalização", valor: fmtMin(tempos.final.mediana),
         sub: `mediana · ${tempos.final.n} com horário`, cor: "#0369A1",
         tooltip: "Tempo mediano entre a solicitação e a finalização da ficha na CROSS. É um intervalo diferente da duração da remoção (saída → retorno da ambulância): os dois começam e terminam em momentos distintos, não se somam nem um contém o outro, e cada um usa só os registros que têm os horários preenchidos." }),
       /*#__PURE__*/React.createElement(Kpi, {
+        label: "Espera pela ambulância", valor: fmtMin(tempos.espera.mediana),
+        sub: `mediana · ${tempos.espera.n} com horário`, cor: "#B45309",
+        tooltip: "Tempo mediano entre o pedido da ambulância e a saída dela. Quando o Livro tem as duas datas, usa-as (pedido num dia, saída no outro); sem elas, assume que a saída foi no mesmo dia ou no dia seguinte. Só entram registros com os dois horários." }),
+      /*#__PURE__*/React.createElement(Kpi, {
         label: "Duração da remoção", valor: fmtMin(tempos.remocao.mediana),
         sub: `mediana · ${tempos.remocao.n} com horário`, cor: "#0369A1",
-        tooltip: "Tempo mediano que a ambulância ficou fora: da saída ao retorno à Santa Casa. Não é comparável com o tempo até a finalização da ficha — são intervalos diferentes, medidos em conjuntos diferentes de registros." }),
+        tooltip: "Tempo mediano que a ambulância ficou fora: da saída ao retorno à Santa Casa. Com a data do retorno registrada, usa as duas datas; sem ela, assume mesmo dia ou dia seguinte. Não é comparável com o tempo até a finalização da ficha — são intervalos diferentes, medidos em conjuntos diferentes de registros." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Permaneceu no destino", valor: perm.n ? `${perm.pct.toFixed(0)}%` : "—",
         sub: `${perm.sim} de ${perm.n} remoções · ${perm.semInfo} sem registro`,
