@@ -221,22 +221,37 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
   /* ── Agregações canonicalizadas ───────────────────────────────────────── */
   const C = typeof Canon !== "undefined" ? Canon : null;
-  // Caso de AVC. HOJE vem só da hipótese diagnóstica (campo "diagnostico": texto ou CID). Quando existir o campo de
-  // protocolo de AVC no Livro, é só mudar esta função: o resto do dashboard não precisa saber de onde vem a informação.
-  const casoAVC = r => (C && C.classificarAVC) ? C.classificarAVC(r.diagnostico) : { avc: false, antigo: false, via: null };
-  const avc = useMemo(() => {
-    const contados = new Map(), antigos = new Map();
-    let n = 0, nAntigo = 0, porCid = 0;
-    const soma = (m, txt) => { const k = txt.toUpperCase(); const o = m.get(k); if (o) o.n++; else m.set(k, { texto: txt, n: 1 }); };
-    dados.forEach(r => {
-      const c = casoAVC(r);
-      const txt = String(r.diagnostico || "").trim().replace(/\s+/g, " ");
-      if (c.avc) { n++; if (c.via === "cid") porCid++; soma(contados, txt); }
-      else if (c.antigo) { nAntigo++; soma(antigos, txt); }
+  // Protocolo de AVC. Vem do checkbox do Livro de Remoção (coluna `protocolo_avc` da planilha, que chega à planilha quando
+  // o registro do Livro é vinculado). Meta: sair em até 1h da FINALIZAÇÃO da ficha na CROSS (data/horario_resposta_cross,
+  // os mesmos campos do indicador "Pedido → finalização"). Cada protocolo cai em UMA categoria, nesta ordem:
+  //   noHorario        saída em até 60 min da finalização
+  //   atrasoSantaCasa  saiu depois de 1h E o pedido da ambulância foi feito mais de 60 min depois da finalização
+  //   atrasoAmbulancia saiu depois de 1h e o pedido da ambulância foi feito em até 60 min (o atraso é do setor de ambulância)
+  //   atrasoSemCausa   saiu depois de 1h, mas falta o horário do pedido da ambulância (a causa não pode ser apurada)
+  //   semHorarios      falta a finalização da CROSS ou a saída (ainda não saiu, ou dado incompleto): não dá para medir
+  const protocolos = useMemo(() => {
+    const quando = (d, h) => {
+      const dia = String(d || "").slice(0, 10);
+      const m = String(h || "").trim().match(/^(\d{1,2}):(\d{2})/);   // aceita "14:30" e "14:30:00"
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dia) || !m) return null;
+      const t = new Date(`${dia}T${m[1].padStart(2, "0")}:${m[2]}:00`);
+      return isNaN(t) ? null : t.getTime();
+    };
+    const HORA = 60 * 60000;
+    const r = { total: 0, noHorario: 0, atrasoSantaCasa: 0, atrasoAmbulancia: 0, atrasoSemCausa: 0, semHorarios: 0 };
+    dados.forEach(x => {
+      if (x.protocolo_avc !== true) return;
+      r.total++;
+      const fin = quando(x.data_resposta_cross, x.horario_resposta_cross);
+      const sai = quando(x.data_saida_real, x.horario_saida_ambulancia);
+      if (fin === null || sai === null) { r.semHorarios++; return; }
+      if (sai - fin <= HORA) { r.noHorario++; return; }
+      const ped = quando(x.data_saida_ambulancia, x.hora_solic_ambulancia);   // pedido da ambulância pela Santa Casa
+      if (ped === null) { r.atrasoSemCausa++; return; }
+      if (ped - fin > HORA) r.atrasoSantaCasa++; else r.atrasoAmbulancia++;
     });
-    const ord = m => [...m.values()].sort((a, b) => b.n - a.n || a.texto.localeCompare(b.texto));
-    return { n, nAntigo, porCid, contados: ord(contados), antigos: ord(antigos) };
-  }, [dados, C]);
+    return r;
+  }, [dados]);
   const ag = campo => C ? C.agrupar(dados, campo)
     : { itens: [], total: dados.length, informados: 0, cobertura: 0, naoClassificados: [] };
 
@@ -558,40 +573,47 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
         label: "Permaneceu no destino", valor: perm.n ? `${perm.pct.toFixed(0)}%` : "—",
         sub: `${perm.sim} de ${perm.n} remoções · ${perm.semInfo} sem registro`,
         alerta: perm.n > 0 && perm.semInfo / perm.n > 0.2,
-        tooltip: "% das remoções do período em que o paciente ficou no hospital de destino e não voltou à Santa Casa. O denominador é o total de remoções; as sem registro (campo vazio) contam como não-permaneceu, então o valor real pode ser maior." }),
-      /*#__PURE__*/React.createElement(Kpi, {
-        label: "Casos de AVC", valor: avc.n, cor: "#BE123C",
-        sub: dados.length ? `${(avc.n / dados.length * 100).toFixed(1).replace(".", ",")}% das remoções · pela hipótese diagnóstica` : null,
-        tooltip: "Remoções cuja hipótese diagnóstica cita AVC (AVC, AVCI, AVCH, AVE, acidente vascular, derrame ou infarto cerebral) ou tem CID I60 a I64. É uma ESTIMATIVA: depende de como o diagnóstico foi digitado. Será substituída pelo campo de protocolo de AVC do Livro, quando ele existir. Citações de AVC antigo (sequela, prévio, histórico) não entram. Veja logo abaixo o que foi contado."
-      })
+        tooltip: "% das remoções do período em que o paciente ficou no hospital de destino e não voltou à Santa Casa. O denominador é o total de remoções; as sem registro (campo vazio) contam como não-permaneceu, então o valor real pode ser maior." })
     ),
 
-    /* ══ AVC: o que entrou na contagem (conferência da estimativa) ══ */
-    (avc.n + avc.nAntigo) > 0 && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+    /* ══ Protocolo de AVC (Livro de Remoção): meta de saída em até 1h da finalização da CROSS ══ */
+    /*#__PURE__*/React.createElement("div", { style: { marginBottom: 22 } },
       /*#__PURE__*/React.createElement(Titulo, {
-        extra: `${avc.n} caso${avc.n !== 1 ? "s" : ""}${avc.porCid ? ` · ${avc.porCid} só pelo CID` : ""}`,
-        tooltip: "Lista de conferência. Mostra exatamente quais diagnósticos foram contados como AVC e quais foram deixados de fora por indicarem AVC antigo. Se aparecer algo errado aqui (contado sem ser AVC, ou AVC que ficou de fora), avise para ajustar a regra."
-      }, "Casos de AVC · o que entrou na contagem"),
-      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11.5, color: "#64748B", lineHeight: 1.55, marginBottom: 10 } },
-        "Estimativa pela ", /*#__PURE__*/React.createElement("b", null, "hipótese diagnóstica"),
-        " (texto ou CID I60–I64). Vai ser substituída pelo campo de protocolo de AVC do Livro."),
-      /*#__PURE__*/React.createElement("details", null,
-        /*#__PURE__*/React.createElement("summary", { style: { cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#BE123C" } },
-          `Ver os ${avc.contados.length} diagnóstico${avc.contados.length !== 1 ? "s" : ""} contado${avc.contados.length !== 1 ? "s" : ""}`),
-        /*#__PURE__*/React.createElement("div", { style: { marginTop: 8, maxHeight: 220, overflowY: "auto" } },
-          avc.contados.slice(0, 60).map(i => /*#__PURE__*/React.createElement("div", {
-            key: i.texto, style: { display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12, padding: "4px 0", borderBottom: "1px solid #F1F5F9" } },
-            /*#__PURE__*/React.createElement("span", { style: { color: "#334155", wordBreak: "break-word" } }, i.texto || "(vazio)"),
-            /*#__PURE__*/React.createElement("span", { style: { color: "#94A3B8", fontVariantNumeric: "tabular-nums", flexShrink: 0 } }, i.n))),
-          avc.contados.length > 60 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 6 } }, `e mais ${avc.contados.length - 60} diagnósticos`))),
-      avc.nAntigo > 0 && /*#__PURE__*/React.createElement("details", { style: { marginTop: 10 } },
-        /*#__PURE__*/React.createElement("summary", { style: { cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#64748B" } },
-          `${avc.nAntigo} citam AVC antigo e NÃO foram contados — ver`),
-        /*#__PURE__*/React.createElement("div", { style: { marginTop: 8 } },
-          avc.antigos.slice(0, 30).map(i => /*#__PURE__*/React.createElement("div", {
-            key: i.texto, style: { display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12, padding: "4px 0", borderBottom: "1px solid #F1F5F9" } },
-            /*#__PURE__*/React.createElement("span", { style: { color: "#64748B", wordBreak: "break-word" } }, i.texto),
-            /*#__PURE__*/React.createElement("span", { style: { color: "#94A3B8", fontVariantNumeric: "tabular-nums", flexShrink: 0 } }, i.n)))))),
+        extra: "meta: sair com médico e enfermeiro em até 1h da finalização da CROSS",
+        tooltip: "Só entram remoções marcadas como Protocolo de AVC no Livro de Remoção (a partir de outubro/2026; antes disso não há registro). O tempo conta da finalização da ficha na CROSS até a saída da ambulância. Cada protocolo aparece em uma categoria só: no horário; atraso porque a Santa Casa demorou a pedir a ambulância (pedido feito mais de 1h depois da finalização); ou atraso da ambulância (a Santa Casa pediu em até 1h, mas a saída passou de 1h). O protocolo só aparece aqui depois que a administração vincula o registro do Livro à planilha de remoção."
+      }, "Protocolo de AVC"),
+      protocolos.total === 0
+        ? /*#__PURE__*/React.createElement(Card, null,
+            /*#__PURE__*/React.createElement(Vazio, null, "Nenhum protocolo de AVC no período. Marque “Protocolo de AVC” ao lançar o pedido no Livro de Remoção."))
+        : /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 12 }
+            },
+              /*#__PURE__*/React.createElement(Kpi, {
+                label: "Protocolos de AVC", valor: protocolos.total, cor: "#BE123C",
+                sub: dados.length ? `${(protocolos.total / dados.length * 100).toFixed(1).replace(".", ",")}% das remoções do período` : null,
+                tooltip: "Total de remoções marcadas como Protocolo de AVC no período selecionado." }),
+              /*#__PURE__*/React.createElement(Kpi, {
+                label: "Saíram no horário", valor: protocolos.noHorario, cor: "#15803D",
+                sub: `${(protocolos.noHorario / protocolos.total * 100).toFixed(0)}% dos protocolos · até 1h`,
+                tooltip: "A ambulância saiu em até 1 hora depois da finalização da ficha na CROSS." }),
+              /*#__PURE__*/React.createElement(Kpi, {
+                label: "Atraso · Santa Casa", valor: protocolos.atrasoSantaCasa, cor: "#B45309",
+                sub: "demorou a pedir a ambulância",
+                alerta: protocolos.atrasoSantaCasa > 0,
+                tooltip: "Saíram depois de 1h porque o pedido da ambulância foi feito mais de 1 hora depois da finalização da CROSS." }),
+              /*#__PURE__*/React.createElement(Kpi, {
+                label: "Atraso · ambulância", valor: protocolos.atrasoAmbulancia, cor: "#BE123C",
+                sub: "chegou depois de 1h",
+                alerta: protocolos.atrasoAmbulancia > 0,
+                tooltip: "Saíram depois de 1h mesmo com o pedido feito em até 1 hora da finalização da CROSS: o atraso foi do setor de ambulância." })),
+            (protocolos.semHorarios > 0 || protocolos.atrasoSemCausa > 0) && /*#__PURE__*/React.createElement("div", {
+              style: { fontSize: 11.5, color: "#64748B", lineHeight: 1.6, marginTop: 10 } },
+              protocolos.semHorarios > 0 && /*#__PURE__*/React.createElement("div", null,
+                `${protocolos.semHorarios} protocolo${protocolos.semHorarios !== 1 ? "s" : ""} ainda sem finalização da CROSS ou sem saída registrada — contam no total, mas não entram nas três categorias.`),
+              protocolos.atrasoSemCausa > 0 && /*#__PURE__*/React.createElement("div", null,
+                `${protocolos.atrasoSemCausa} saíram depois de 1h, mas sem o horário do pedido da ambulância — a causa do atraso não pôde ser apurada.`))
+          )),
 
     /* ══ Série temporal ══ */
     /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
