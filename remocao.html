@@ -294,6 +294,14 @@ function calcTempoD(dIni, hIni, dFim, hFim) {
   return calcTempo(hIni,hFim);
 }
 
+// Tempos (espera, duração) ficam guardados como "HH:MM", mas são MOSTRADOS com a unidade escrita:
+// "05:22" -> "5h 22min", "00:45" -> "45min", "02:00" -> "2h 00min". Valor que não é HH:MM aparece como está.
+const fmtHM = v => {
+  const m = String(v||"").trim().match(/^(\d+):(\d{2})(?::\d{2})?$/);
+  if(!m) return v;
+  const h = parseInt(m[1],10), mi = parseInt(m[2],10);
+  return h>0 ? `${h}h ${String(mi).padStart(2,"0")}min` : `${mi}min`;
+};
 // Datas/horários de uma linha da planilha → tempos. Um só lugar, usado pelo formulário, pela edição na tabela e pelas células.
 //  espera  = pedido da ambulância → saída   (só usa datas quando as DUAS existem; senão, só horários)
 //  duração = saída → retorno da ambulância  (sem data de retorno: mesmo dia, ou dia seguinte se o retorno for "menor")
@@ -342,13 +350,13 @@ const COLS = [
   ["data_saida_ambulancia",   "SOLICITAÇÃO BASE AMBULANCIA DATA",       "DATA SOLIC. AMB.",  "—",           "date","",       "Dia em que a ambulância foi SOLICITADA (pode ser diferente do dia da saída). Fonte: Livro de Saída",80],
   ["hora_solic_ambulancia",   "HORÁRIO SOLICITAÇÃO AMBULÂNCIA",         "HORA SOLIC. AMB.",  "—",           "time","",       "Hora da solicitação à base. Manual",60],
   ["horario_saida_ambulancia","HORÁRIO DE SAÍDA DA AMBULÂNCIA DA SCFM", "SAÍDA AMB. SCFM",   "saida",       "time","",       "Hora saída ambulância. Fonte: Kanban 'saida'",60],
-  ["tempo_espera",            "TEMPO DE ESPERA DA AMBULÂNCIA",          "T. ESPERA",         "—",           "ro", "",        "Auto: Saída SCFM − Hora Solic. Ambulância",60],
+  ["tempo_espera",            "TEMPO DE ESPERA DA AMBULÂNCIA",          "T. ESPERA",         "—",           "ro", "",        "Mostrado em horas e minutos (ex.: 5h 22min). Auto: Saída SCFM − Hora Solic. Ambulância",80],
   ["observacao",              "OBSERVAÇÃO",                             "OBSERVAÇÃO",        "—",           "text","",       "Preenchimento manual (não vem da ficha CROSS). O Livro de Saída também pode preencher",160],
   ["enfermeiro",              "ENFERMEIRO",                             "ENFERMEIRO",        "—",           "text","",       "Enfermeiro responsável. Manual",110],
   ["tecnico_auxiliar",        "TÉCNICO/AUXILIAR ENFERMAGEM",            "TÉCNICO/AUX.",      "—",           "text","",       "Técnico/auxiliar. Manual",110],
   ["medico",                  "MÉDICO",                                 "MÉDICO",            "medico_escala","text","",      "Médico da escala. Fonte: Kanban 'medico_escala' (ou Livro de Saída ao vincular)",110],
   ["horario_retorno",         "HORÁRIO DO RETORNO DA AMBULÂNCIA",       "HORA RETORNO AMBULÂNCIA","retorno",   "time","",       "Hora em que a ambulância voltou à Santa Casa. Fonte: Livro de Saída / Kanban 'retorno'",80],
-  ["duracao_remocao",         "DURAÇÃO DA REMOÇÃO",                     "DURAÇÃO",           "—",           "ro", "",        "Auto: da saída ao retorno da ambulância. Usa as datas de saída e de retorno; sem elas, o retorno 'menor' que a saída conta como dia seguinte",60],
+  ["duracao_remocao",         "DURAÇÃO DA REMOÇÃO",                     "DURAÇÃO",           "—",           "ro", "",        "Mostrado em horas e minutos (ex.: 5h 22min). Auto: da saída ao retorno da ambulância. Usa as datas de saída e de retorno; sem elas, o retorno 'menor' que a saída conta como dia seguinte",80],
   ["finalizado",              "FINALIZADO",                             "FINALIZADO",        "—",           "bool","",       "Remoção finalizada? Sim / Não / vazio (não informado). Clique para alternar",70],
   ["permaneceu",              "PERMANECEU",                             "PERMANECEU",        "—",           "bool","",       "Paciente ficou no hospital de destino e não voltou à Santa Casa? Sim / Não / vazio (não informado)",80],
   ["data_aceite_cross",       "DATA DO ACEITE CROSS",                   "DATA ACEITE CROSS", "data_aceite", "date","",       "Data em que a CROSS aceitou a solicitação (vaga confirmada). Fonte: Kanban 'data_aceite'",80],
@@ -692,7 +700,7 @@ function FormModal({row,onClose,onSave,saving}){
               <div className="fd"><label>Data da Saída{form.data_saida_real_inferida===true&&<span style={{color:"#B45309",fontWeight:400,textTransform:"none"}}> (≈ deduzida)</span>}</label><input type="date" value={form.data_saida_real||""} onChange={e=>set("data_saida_real",e.target.value)}/></div>
               <div className="fd"><label>Hora da Saída (SCFM)</label><input type="time" value={form.horario_saida_ambulancia} onChange={e=>set("horario_saida_ambulancia",e.target.value)}/></div>
               <div className="fd"><label>Tempo Espera <span style={{color:"#7C3AED",fontWeight:400,textTransform:"none"}}>(auto)</span></label>
-                <input type="text" readOnly value={form.tempo_espera||tempoEsperaDe(form)} style={{background:"#F5F3FF",color:"#7C3AED",fontWeight:700}}/></div>
+                <input type="text" readOnly value={fmtHM(form.tempo_espera||tempoEsperaDe(form))} style={{background:"#F5F3FF",color:"#7C3AED",fontWeight:700}}/></div>
             </div>
           </div>
           <div className="fsc"><div className="fst">Retorno</div>
@@ -700,7 +708,7 @@ function FormModal({row,onClose,onSave,saving}){
               <div className="fd"><label>Data Retorno Ambulância{form.data_retorno_inferida===true&&<span style={{color:"#B45309",fontWeight:400,textTransform:"none"}}> (≈ deduzida)</span>}</label><input type="date" value={form.data_retorno||""} onChange={e=>set("data_retorno",e.target.value)}/></div>
               <div className="fd"><label>Hora Retorno Ambulância</label><input type="time" value={form.horario_retorno} onChange={e=>set("horario_retorno",e.target.value)}/></div>
               <div className="fd"><label>Duração Remoção <span style={{color:"#0369A1",fontWeight:400,textTransform:"none"}}>(auto)</span></label>
-                <input type="text" readOnly value={form.duracao_remocao||duracaoDe(form)} style={{background:"#EFF6FF",color:"#0369A1",fontWeight:700}}/></div>
+                <input type="text" readOnly value={fmtHM(form.duracao_remocao||duracaoDe(form))} style={{background:"#EFF6FF",color:"#0369A1",fontWeight:700}}/></div>
             </div>
           </div>
           <div className="fsc"><div className="fst">Equipe</div>
@@ -1464,7 +1472,14 @@ function App(){
     const base={'#':48, actions:36};
     COLS.forEach(([f,,,,,,,w])=>{ base[f]=w||100; });
     const saved=loadLS(LS_WMAP,null);
-    return saved?{...base,...saved}:base;
+    const m=saved?{...base,...saved}:base;
+    // Uma vez só: as colunas de tempo passaram a mostrar "5h 22min" e precisam de mais espaço do que os 60px antigos.
+    // Depois disso a largura que o usuário escolher é respeitada.
+    if(!loadLS('remocoes_larg_tempos_v1',false)){
+      ['tempo_espera','duracao_remocao'].forEach(f=>{ if(!(m[f]>=80)) m[f]=80; });
+      saveLS('remocoes_larg_tempos_v1',true);
+    }
+    return m;
   },[]);
   const {wmap,setWmap,startDrag}=useColResize(INIT_WMAP);
 
@@ -1773,7 +1788,8 @@ function App(){
         if(typeof v==="object")return String(v);
         return String(v);
       };
-      const hdr=["#",...COLS.map(([,pl])=>String(pl||""))];
+      // Na exportação o valor continua "HH:MM" (dá para somar/ordenar no Excel); o título passa a dizer que são horas:minutos.
+      const hdr=["#",...COLS.map(([f,pl])=>String(pl||"")+((f==="tempo_espera"||f==="duracao_remocao")?" (horas:minutos)":""))];
       const snapshot=[...filtered]; // captura o array neste momento
       const data=snapshot.map((r,i)=>[i+1,...COLS.map(([f])=>{
         const v=safe(r[f]);
@@ -2015,13 +2031,13 @@ function App(){
                   "data_saida_ambulancia":<td><Cell rowId={r.id} field="data_saida_ambulancia" value={r.data_saida_ambulancia} tipo="date" onSave={handleCell} fmtDisplay={fmtD}/></td>,
                   "hora_solic_ambulancia":<td><Cell rowId={r.id} field="hora_solic_ambulancia" value={r.hora_solic_ambulancia} tipo="time" onSave={handleCell}/></td>,
                   "horario_saida_ambulancia":<td><Cell rowId={r.id} field="horario_saida_ambulancia" value={r.horario_saida_ambulancia} tipo="time" onSave={handleCell}/></td>,
-                  "tempo_espera":<td><Cell rowId={r.id} field="tempo_espera" value={r.tempo_espera||tempoEsperaDe(r)||""} tipo="time" onSave={handleCell} colorStyle={{color:r.tempo_espera?"#7C3AED":"#6D28D9",fontWeight:700}}/></td>,
+                  "tempo_espera":<td><Cell rowId={r.id} field="tempo_espera" value={r.tempo_espera||tempoEsperaDe(r)||""} tipo="time" fmtDisplay={fmtHM} onSave={handleCell} colorStyle={{color:r.tempo_espera?"#7C3AED":"#6D28D9",fontWeight:700}}/></td>,
                   "observacao":<td><Cell rowId={r.id} field="observacao" value={r.observacao} onSave={handleCell}/></td>,
                   "enfermeiro":<td><Cell rowId={r.id} field="enfermeiro" value={r.enfermeiro} onSave={handleCell} fmtDisplay={fmtEquipe} sugestao={EQ_SEM.enfermeiro}/></td>,
                   "tecnico_auxiliar":<td><Cell rowId={r.id} field="tecnico_auxiliar" value={r.tecnico_auxiliar} onSave={handleCell} fmtDisplay={fmtEquipe} sugestao={EQ_SEM.tecnico_auxiliar}/></td>,
                   "medico":<td><Cell rowId={r.id} field="medico" value={r.medico} onSave={handleCell} fmtDisplay={fmtEquipe} sugestao={EQ_SEM.medico}/></td>,
                   "horario_retorno":<td><Cell rowId={r.id} field="horario_retorno" value={r.horario_retorno} tipo="time" onSave={handleCell}/></td>,
-                  "duracao_remocao":<td><Cell rowId={r.id} field="duracao_remocao" value={r.duracao_remocao||duracaoDe(r)||""} tipo="time" onSave={handleCell} colorStyle={{color:r.duracao_remocao?"#0369A1":"#0284C7",fontWeight:700}}/></td>,
+                  "duracao_remocao":<td><Cell rowId={r.id} field="duracao_remocao" value={r.duracao_remocao||duracaoDe(r)||""} tipo="time" fmtDisplay={fmtHM} onSave={handleCell} colorStyle={{color:r.duracao_remocao?"#0369A1":"#0284C7",fontWeight:700}}/></td>,
                   "finalizado":<td style={{textAlign:"center"}}><BoolCell rowId={r.id} field="finalizado" value={r.finalizado} onSave={handleCell}/></td>,
                   "data_saida_real":<td><Cell rowId={r.id} field="data_saida_real" value={r.data_saida_real} tipo="date" onSave={handleCell} fmtDisplay={fmtD} inferida={r.data_saida_real_inferida===true}/></td>,
                   "data_retorno":<td><Cell rowId={r.id} field="data_retorno" value={r.data_retorno} tipo="date" onSave={handleCell} fmtDisplay={fmtD} inferida={r.data_retorno_inferida===true}/></td>,
