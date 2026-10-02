@@ -16,7 +16,7 @@ function strSim(a, b) {
 //   3) RETORNO — quando a ambulância volta        (aba "Em andamento")
 // Cada etapa tem os seus campos obrigatórios; quem registra a etapa é carimbado pelo servidor.
 const LS_EMPTY={data_solic_ambulancia:"",hora_solic_ambulancia:"",nome_paciente:"",idade:"",especialidade:"",destino:"",ambulancia:"",observacao:"",
-  data_saida:"",hora_saida:"",medico:"",enfermeiro:"",tecnico_auxiliar:""};
+  data_saida:"",hora_saida:"",medico:"",enfermeiro:"",tecnico_auxiliar:"",protocolo_avc:false};
 const LS_SAIDA_EMPTY={data_saida:"",hora_saida:"",medico:"",enfermeiro:"",tecnico_auxiliar:"",observacao:""};
 const LS_RET_EMPTY={data_retorno:"",hora_retorno:"",finalizado:null,permaneceu:null,observacao:""};
 // Obrigatórios do PEDIDO. Os da saída só valem quando a saída é registrada (LS_REQ_SAIDA); os do retorno, no retorno.
@@ -40,6 +40,14 @@ function lsCheckRetorno(dSai,hSai,dRet,hRet){
 // "Sem médico" etc.: afirmação explícita (não é campo esquecido). Definida em canon.js.
 const LS_SEM=(typeof Canon!=="undefined"&&Canon.EQUIPE_SEM)||{medico:"SEM MÉDICO",enfermeiro:"SEM ENFERMEIRO(A)",tecnico_auxiliar:"SEM TÉCNICO/AUXILIAR"};
 const lsEhSem=v=>(typeof Canon!=="undefined"&&Canon.ehSemEquipe)?Canon.ehSemEquipe(v):Object.values(LS_SEM).includes(String(v||"").trim().toUpperCase());
+// Protocolo de AVC: a ambulância tem que sair com médico E enfermeiro. "Saiu sem …" não vale.
+// (Esta conferência é da tela. O servidor ainda não recusa — ver avc-protocolo.sql.)
+function lsCheckEquipeAVC(o){
+  const falta=k=>!String(o[k]||"").trim()||lsEhSem(o[k]);
+  if(falta("medico"))return {campo:"medico",msg:"Protocolo de AVC: a ambulância tem que sair com médico. “Saiu sem médico” não é aceito."};
+  if(falta("enfermeiro"))return {campo:"enfermeiro",msg:"Protocolo de AVC: a ambulância tem que sair com enfermeiro(a). “Saiu sem enfermeiro(a)” não é aceito."};
+  return null;
+}
 // Diferença entre dois momentos (data + hora) em "HH:MM". Com as duas datas, usa-as (o pedido pode ser num dia e a saída
 // no outro); sem elas, assume a virada de meia-noite (23:10 -> 01:40).
 function lsDiff(dIni,hIni,dFim,hFim){
@@ -72,6 +80,7 @@ function lsLivroParaPlanilha(l){
   if(l.tecnico_auxiliar)u.tecnico_auxiliar=l.tecnico_auxiliar;
   if(l.destino)u.instituicao_destino=l.destino;
   if(l.observacao)u.observacao=l.observacao;
+  if(l.protocolo_avc===true)u.protocolo_avc=true;   // marca de protocolo de AVC: só liga, nunca desliga
   if(l.finalizado===true||l.finalizado===false)u.finalizado=l.finalizado;     // Sim/Não só se alguém respondeu
   if(l.permaneceu===true||l.permaneceu===false)u.permaneceu=l.permaneceu;
   // tempos calculados (com as datas, porque cada etapa pode ser num dia diferente)
@@ -92,6 +101,7 @@ function lsDiferencasPlanilha(l,rem){
   // O Livro é o registro de quem realmente foi na ambulância: vale mais que a escala prevista.
   ["medico","enfermeiro","tecnico_auxiliar"].forEach(k=>{const v=String(l[k]||"").trim();if(v&&String(rem[k]||"").trim()!==v)u[k]=v;});
   ["finalizado","permaneceu"].forEach(k=>{if((l[k]===true||l[k]===false)&&rem[k]!==l[k])u[k]=l[k];});
+  if(l.protocolo_avc===true&&rem.protocolo_avc!==true)u.protocolo_avc=true;
   // A observação de cada etapa é ACRESCENTADA no Livro. Na planilha só acompanha se ela estava vazia ou igual à anterior:
   // assim não apaga uma observação editada à mão.
   const lo=(l.observacao||"").trim(),ro=(rem.observacao||"").trim();
@@ -108,7 +118,7 @@ function lsDiferencasPlanilha(l,rem){
   return u;
 }
 // Campos da planilha que o Livro compara/atualiza depois do vínculo
-const LS_REM_SEL="id,nome_paciente,data_solicitacao,ficha_cross,data_saida_real,horario_saida_ambulancia,data_retorno,horario_retorno,medico,enfermeiro,tecnico_auxiliar,finalizado,permaneceu,observacao,data_saida_real_inferida,data_retorno_inferida";
+const LS_REM_SEL="id,nome_paciente,data_solicitacao,ficha_cross,data_saida_real,horario_saida_ambulancia,data_retorno,horario_retorno,medico,enfermeiro,tecnico_auxiliar,finalizado,permaneceu,observacao,data_saida_real_inferida,data_retorno_inferida,protocolo_avc";
 // "14:30:00" -> "14:30" (o banco pode devolver com segundos; a planilha e o dashboard esperam HH:MM)
 function lsHora(v){const t=String(v||"").trim();const m=t.match(/^(\d{1,2}):(\d{2})/);return m?m[1].padStart(2,"0")+":"+m[2]:t;}
 // Usa H() do app: resolve o JWT da sessao a cada chamada. Header fixo com a
@@ -322,11 +332,20 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                  :{...p,data_saida:"",hora_saida:"",medico:"",enfermeiro:"",tecnico_auxiliar:""});
   }
 
+  // Marcar "Protocolo de AVC": médico e enfermeiro passam a ser obrigatórios, então "saiu sem …" é limpo.
+  function toggleAVC(v){
+    setErrors({});setFormMsg("");
+    setForm(p=>({...p,protocolo_avc:v,
+      ...(v&&lsEhSem(p.medico)?{medico:""}:null),
+      ...(v&&lsEhSem(p.enfermeiro)?{enfermeiro:""}:null)}));
+  }
+
   function validate(){
     const errs={};
     [...LS_REQ_PEDIDO,...(jaSaiu?LS_REQ_SAIDA:[])].forEach(k=>{if(!form[k]||String(form[k]).trim()==="")errs[k]=true;});
     let msg=Object.keys(errs).length?"⚠ Preencha todos os campos obrigatórios (*) antes de salvar.":"";
     if(!msg&&jaSaiu){const c=lsCheckSaida(form.data_solic_ambulancia,form.hora_solic_ambulancia,form.data_saida,form.hora_saida);if(c){errs[c.campo]=true;msg="⚠ "+c.msg;}}
+    if(!msg&&jaSaiu&&form.protocolo_avc){const c=lsCheckEquipeAVC(form);if(c){errs[c.campo]=true;msg="⚠ "+c.msg;}}
     setErrors(errs);setFormMsg(msg);
     return Object.keys(errs).length===0;
   }
@@ -348,6 +367,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
       const campos=[...LS_REQ_PEDIDO,"observacao",...(jaSaiu?LS_REQ_SAIDA:[])];
       const payload={preenchido_por:userId||null,status_vinculo:"pendente"};
       campos.forEach(k=>{payload[k]=form[k];});
+      if(form.protocolo_avc===true)payload.protocolo_avc=true;
       const r=await fetch(`${SB_URL}/rest/v1/livro_saida`,{method:"POST",headers:{...LS_H(),Prefer:"return=representation"},body:JSON.stringify(payload)});
       if(!r.ok)throw new Error(await r.text());
       const [saved]=await r.json();
@@ -455,6 +475,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
     LS_REQ_SAIDA.forEach(k=>{if(!saiForm[k]||String(saiForm[k]).trim()==="")errs[k]=true;});
     let msg=Object.keys(errs).length?"⚠ Preencha data, horário e equipe da saída (ou marque “Saiu sem …”).":"";
     if(!msg){const c=lsCheckSaida(p.data_solic_ambulancia,p.hora_solic_ambulancia,saiForm.data_saida,saiForm.hora_saida);if(c){errs[c.campo]=true;msg="⚠ "+c.msg;}}
+    if(!msg&&p.protocolo_avc){const c=lsCheckEquipeAVC(saiForm);if(c){errs[c.campo]=true;msg="⚠ "+c.msg;}}
     setPassoErros(errs);setPassoMsg(msg);
     if(msg)return;
     setPassoSaving(true);
@@ -519,16 +540,16 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   // Nome da equipe; "SEM MÉDICO" etc. aparecem destacados para não parecerem esquecimento
   const nomeEq=v=>lsEhSem(v)?React.createElement("span",{style:{background:"#FEF3C7",color:"#92400E",border:"1px solid #FDE68A",borderRadius:99,padding:"0 6px",fontSize:10,fontWeight:700}},v):v;
   // Campo da equipe com a opção "saiu sem ...". obj/setter/errs permitem usar o mesmo campo no formulário do pedido e no da saída.
-  const EQP=(k,label,ph,semTxt,obj,setter,errs)=>{
+  const EQP=(k,label,ph,semTxt,obj,setter,errs,bloqSem)=>{
     const sem=lsEhSem(obj[k]);
     return React.createElement("div",{key:k},LBL(label,true),
       React.createElement("input",{type:"text",placeholder:ph,value:obj[k],disabled:sem,onChange:e=>setter(k,e.target.value),style:{...iS(k,errs),...(sem?{background:"#FFFBEB",color:"#92400E",fontWeight:700,border:"1.5px solid #FDE68A"}:null)}}),
-      React.createElement("label",{style:{display:"flex",alignItems:"center",gap:6,marginTop:5,fontSize:11,cursor:"pointer",color:sem?"#92400E":"#64748B",fontWeight:sem?700:500}},
+      bloqSem?React.createElement("div",{style:{marginTop:5,fontSize:11,fontWeight:600,color:"#BE123C"}},"Obrigatório no protocolo de AVC"):React.createElement("label",{style:{display:"flex",alignItems:"center",gap:6,marginTop:5,fontSize:11,cursor:"pointer",color:sem?"#92400E":"#64748B",fontWeight:sem?700:500}},
         React.createElement("input",{type:"checkbox",checked:sem,onChange:e=>setter(k,e.target.checked?LS_SEM[k]:"")}),semTxt));
   };
-  const EQUIPE3=(obj,setter,errs)=>React.createElement("div",{className:"ls-grid ls-g3"},
-    EQP("medico","Médico(a)","Dr. Nome","Saiu sem médico",obj,setter,errs),
-    EQP("enfermeiro","Enfermeiro(a)","Nome","Saiu sem enfermeiro(a)",obj,setter,errs),
+  const EQUIPE3=(obj,setter,errs,avc)=>React.createElement("div",{className:"ls-grid ls-g3"},
+    EQP("medico","Médico(a)","Dr. Nome","Saiu sem médico",obj,setter,errs,avc),
+    EQP("enfermeiro","Enfermeiro(a)","Nome","Saiu sem enfermeiro(a)",obj,setter,errs,avc),
     EQP("tecnico_auxiliar","Técnico / Auxiliar","Nome","Saiu sem técnico/auxiliar",obj,setter,errs));
   const NOTA_SEM=React.createElement("div",{style:{fontSize:11,color:"#64748B",lineHeight:1.5,marginTop:8}},
     "Se a remoção realmente saiu sem algum profissional, marque a opção “Saiu sem …”: o registro passa a ",React.createElement("b",null,"afirmar"),
@@ -538,8 +559,11 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   // Selo de uma etapa: ✓ feita (com dia/hora) ou ○ aguardando
   const ETAPA=(feita,titulo,qd)=>React.createElement("span",{style:{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,padding:"2px 9px",borderRadius:99,fontWeight:700,background:feita?"#DCFCE7":"#F1F5F9",color:feita?"#15803D":"#94A3B8",border:`1px solid ${feita?"#86EFAC":"#E2E8F0"}`}},
     feita?"✓":"○"," ",titulo,qd?React.createElement("span",{style:{fontWeight:500,marginLeft:2}},qd):null);
+  // Selo de protocolo de AVC (aparece em todas as listas, junto da linha do tempo)
+  const AVC_BADGE=React.createElement("span",{style:{display:"inline-flex",alignItems:"center",fontSize:10,padding:"2px 8px",borderRadius:99,fontWeight:800,letterSpacing:".04em",background:"#FFE4E6",color:"#9F1239",border:"1px solid #FDA4AF"}},"PROTOCOLO AVC");
   // Linha do tempo das três etapas, usada nas listas
   const ETAPAS=p=>React.createElement("div",{style:{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginTop:6}},
+    p.protocolo_avc&&AVC_BADGE,
     ETAPA(true,"Pedido",quando(p.data_solic_ambulancia||p.data_saida,p.hora_solic_ambulancia)),
     ETAPA(!!lsHora(p.hora_saida),"Saída",lsHora(p.hora_saida)?quando(p.data_saida,p.hora_saida):"aguardando"),
     ETAPA(!!lsHora(p.hora_retorno),"Retorno",lsHora(p.hora_retorno)?quando(p.data_retorno,p.hora_retorno):"aguardando"));
@@ -640,6 +664,12 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
 
         // TAB NOVO (etapa 1: pedido da ambulância; a saída é opcional)
         tab==="novo"&&React.createElement("div",null,
+          // Protocolo de AVC: liga a regra de equipe (médico + enfermeiro) e entra na contagem do dashboard
+          React.createElement("label",{style:{display:"flex",alignItems:"flex-start",gap:12,cursor:"pointer",padding:"14px 16px",borderRadius:12,marginBottom:18,background:form.protocolo_avc?"#FFF1F2":"#F8FAFC",border:`1.5px solid ${form.protocolo_avc?"#FDA4AF":"#E2E8F0"}`,transition:"background .15s,border-color .15s"}},
+            React.createElement("input",{type:"checkbox",checked:form.protocolo_avc===true,onChange:e=>toggleAVC(e.target.checked),style:{width:18,height:18,marginTop:1,accentColor:"#BE123C",flexShrink:0,cursor:"pointer"}}),
+            React.createElement("div",null,
+              React.createElement("div",{style:{fontSize:13,fontWeight:700,color:form.protocolo_avc?"#9F1239":"#0F172A"}},"Protocolo de AVC"),
+              React.createElement("div",{style:{fontSize:12,color:"#64748B",lineHeight:1.5,marginTop:3}},"Tem que sair com ",React.createElement("b",null,"médico e enfermeiro"),", em até ",React.createElement("b",null,"1 hora")," da finalização da CROSS."))),
           React.createElement("div",{className:"ls-section"},
             React.createElement("div",{className:"ls-section-title"},"Dados do Paciente"),
             React.createElement("div",{className:"ls-grid ls-g2"},
@@ -680,7 +710,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                 FLD("data_saida","Data da saída",React.createElement("input",{type:"date",value:form.data_saida,onChange:e=>set("data_saida",e.target.value),style:iS("data_saida")}),true),
                 FLD("hora_saida","Hora da saída",React.createElement("input",{type:"time",value:form.hora_saida,onChange:e=>set("hora_saida",e.target.value),style:iS("hora_saida")}),true)
               ),
-              React.createElement("div",{style:{marginTop:12}},EQUIPE3(form,set,errors)),
+              React.createElement("div",{style:{marginTop:12}},EQUIPE3(form,set,errors,form.protocolo_avc===true)),
               NOTA_SEM)
           ),
           React.createElement("div",{className:"ls-section"},
@@ -766,7 +796,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                           React.createElement("div",null,LBL("Data da saída",true),React.createElement("input",{type:"date",value:saiForm.data_saida,onChange:e=>{setSaiForm(f=>({...f,data_saida:e.target.value}));setPassoErros({});setPassoMsg("");},style:iS("data_saida",passoErros)})),
                           React.createElement("div",null,LBL("Hora da saída",true),React.createElement("input",{type:"time",autoFocus:true,value:saiForm.hora_saida,onChange:e=>{setSaiForm(f=>({...f,hora_saida:e.target.value}));setPassoErros({});setPassoMsg("");},style:iS("hora_saida",passoErros)}))
                         ),
-                        React.createElement("div",{style:{marginTop:12}},EQUIPE3(saiForm,(k,v)=>{setSaiForm(f=>({...f,[k]:v}));setPassoErros(er=>({...er,[k]:false}));},passoErros)),
+                        React.createElement("div",{style:{marginTop:12}},EQUIPE3(saiForm,(k,v)=>{setSaiForm(f=>({...f,[k]:v}));setPassoErros(er=>({...er,[k]:false}));},passoErros,p.protocolo_avc===true)),
                         NOTA_SEM,
                         React.createElement("div",{style:{marginTop:10}},
                           LBL("Observação da saída",false),
