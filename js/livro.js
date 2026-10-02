@@ -230,6 +230,8 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   // Traduz o erro cru do PostgREST numa mensagem util para quem esta no plantao.
   function msgErro(e){
     const t=String(e&&e.message||e||"");
+    // Regra de negócio do banco (ex.: protocolo de AVC sem médico/enfermeiro): mostra a mensagem dela, não a genérica.
+    try{const o=JSON.parse(t);if(o&&typeof o.message==="string"&&o.message.startsWith("Protocolo de AVC"))return o.message;}catch(_){}
     if(t.includes("42501")||t.includes("row-level security"))
       return "Sua sessao expirou ou voce nao tem permissao para lancar no Livro. Saia e entre novamente; se continuar, procure a coordenacao.";
     if(t.includes("PGRST204")||t.includes("data_solic_ambulancia")||t.includes("data_retorno"))
