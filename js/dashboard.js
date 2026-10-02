@@ -269,7 +269,8 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
         saiTxt: dm(dSaida, x.horario_saida_ambulancia),
         faltaFin: fin === null, faltaSaida: sai === null,
         minSaida: fin !== null && sai !== null ? (sai - fin) / 60000 : null,     // finalização → saída
-        minPedido: fin !== null && ped !== null ? (ped - fin) / 60000 : null     // finalização → pedido da ambulância
+        minPedido: fin !== null && ped !== null ? (ped - fin) / 60000 : null,    // finalização → pedido da ambulância (parte da Santa Casa)
+        minAmb: ped !== null && sai !== null ? (sai - ped) / 60000 : null        // pedido → saída (parte do setor de ambulância)
       };
       r.lista.push(caso);
       if (fin === null || sai === null) {
@@ -283,6 +284,12 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       if (ped - fin > HORA) { r.atrasoSantaCasa++; caso.cat = "atrasoSantaCasa"; }
       else { r.atrasoAmbulancia++; caso.cat = "atrasoAmbulancia"; }
     });
+    // As duas partes da hora: Santa Casa (finalização → pedido) e setor de ambulância (pedido → saída).
+    // Pedido ANTES da finalização dá intervalo negativo: não entra na mediana (não é um tempo de espera).
+    const med = a => { if (!a.length) return null; const o = [...a].sort((x, y) => x - y); return o[Math.floor(o.length / 2)]; };
+    const resumo = a => ({ mediana: med(a), n: a.length, max: a.length ? Math.max(...a) : null });
+    r.santaCasa = resumo(r.lista.map(c => c.minPedido).filter(v => v !== null && v >= 0));
+    r.ambulancia = resumo(r.lista.map(c => c.minAmb).filter(v => v !== null && v >= 0));
     return r;
   }, [dados]);
   const ag = campo => C ? C.agrupar(dados, campo)
@@ -646,6 +653,19 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
                 ativo: avcSel === "atrasoAmbulancia", onClick: protocolos.atrasoAmbulancia ? () => setAvcSel(avcSel === "atrasoAmbulancia" ? null : "atrasoAmbulancia") : undefined,
                 tooltip: "Saíram depois de 1h mesmo com o pedido feito em até 1 hora da finalização da CROSS: o atraso foi do setor de ambulância." })),
 
+            /* ── A hora dividida: quanto levou cada lado ── */
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 12, marginTop: 12 }
+            },
+              /*#__PURE__*/React.createElement(Kpi, {
+                label: "Santa Casa · finalização → pedido", valor: fmtMin(protocolos.santaCasa.mediana), cor: "#B45309",
+                sub: protocolos.santaCasa.n ? `mediana · ${protocolos.santaCasa.n} com horário · maior: ${fmtMin(protocolos.santaCasa.max)}` : "sem protocolos com os dois horários",
+                tooltip: "Tempo mediano entre a finalização da ficha na CROSS e o pedido da ambulância pela Santa Casa. É a parte da hora que depende da Santa Casa. Pedido registrado antes da finalização não entra. Só entram protocolos com os dois horários." }),
+              /*#__PURE__*/React.createElement(Kpi, {
+                label: "Ambulância · pedido → saída", valor: fmtMin(protocolos.ambulancia.mediana), cor: "#BE123C",
+                sub: protocolos.ambulancia.n ? `mediana · ${protocolos.ambulancia.n} com horário · maior: ${fmtMin(protocolos.ambulancia.max)}` : "sem protocolos com os dois horários",
+                tooltip: "Tempo mediano entre o pedido da ambulância e a saída dela. É a parte da hora que depende do setor de ambulância. A meta de 1h é a soma das duas partes: se a Santa Casa gasta 45 min para pedir, sobram 15 min para a ambulância sair. Só entram protocolos com os dois horários." })),
+
             /* ── Casos do card selecionado ── */
             avcSel && (() => {
               const TIT = { total: "Todos os protocolos de AVC", noHorario: "Saíram no horário", atrasoSantaCasa: "Atraso · Santa Casa demorou a pedir a ambulância", atrasoAmbulancia: "Atraso · ambulância saiu depois de 1h" };
@@ -670,6 +690,19 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
                   linha("Finalização da CROSS", c.finTxt, c.faltaFin),
                   linha("Pedido da ambulância", c.pedTxt, false, rel(c.minPedido)),
                   linha("Saída da ambulância", c.saiTxt, c.faltaSaida, rel(c.minSaida)),
+                  (c.minPedido !== null && c.minPedido >= 0 && c.minAmb !== null && c.minAmb >= 0) && (() => {
+                    const total = c.minPedido + c.minAmb, escala = Math.max(60, total);
+                    return /*#__PURE__*/React.createElement("div", { style: { marginTop: 7 } },
+                      /*#__PURE__*/React.createElement("div", { style: { position: "relative", display: "flex", height: 8, borderRadius: 99, overflow: "hidden", background: "#F1F5F9" } },
+                        /*#__PURE__*/React.createElement("div", { title: `Santa Casa: ${fmtMin(c.minPedido)}`, style: { width: `${c.minPedido / escala * 100}%`, background: "#F59E0B" } }),
+                        /*#__PURE__*/React.createElement("div", { title: `Ambulância: ${fmtMin(c.minAmb)}`, style: { width: `${c.minAmb / escala * 100}%`, background: "#E11D48" } })),
+                      /*#__PURE__*/React.createElement("div", { style: { position: "relative", height: 0 } },
+                        /*#__PURE__*/React.createElement("div", { title: "Meta: 1h", style: { position: "absolute", left: `${60 / escala * 100}%`, top: -10, width: 2, height: 12, background: "#0F172A", borderRadius: 1 } })),
+                      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#64748B", marginTop: 4 } },
+                        /*#__PURE__*/React.createElement("span", { style: { color: "#B45309", fontWeight: 600 } }, "Santa Casa " + fmtMin(c.minPedido)), " · ",
+                        /*#__PURE__*/React.createElement("span", { style: { color: "#BE123C", fontWeight: 600 } }, "Ambulância " + fmtMin(c.minAmb)),
+                        ` · total ${fmtMin(total)} (meta 1h)`));
+                  })(),
                   (c.medico || c.enfermeiro) && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 2 } },
                     "Médico: " + (c.medico || "—") + " · Enfermeiro(a): " + (c.enfermeiro || "—")))));
             })(),
