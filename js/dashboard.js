@@ -221,6 +221,22 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
   /* ── Agregações canonicalizadas ───────────────────────────────────────── */
   const C = typeof Canon !== "undefined" ? Canon : null;
+  // Caso de AVC. HOJE vem só da hipótese diagnóstica (campo "diagnostico": texto ou CID). Quando existir o campo de
+  // protocolo de AVC no Livro, é só mudar esta função: o resto do dashboard não precisa saber de onde vem a informação.
+  const casoAVC = r => (C && C.classificarAVC) ? C.classificarAVC(r.diagnostico) : { avc: false, antigo: false, via: null };
+  const avc = useMemo(() => {
+    const contados = new Map(), antigos = new Map();
+    let n = 0, nAntigo = 0, porCid = 0;
+    const soma = (m, txt) => { const k = txt.toUpperCase(); const o = m.get(k); if (o) o.n++; else m.set(k, { texto: txt, n: 1 }); };
+    dados.forEach(r => {
+      const c = casoAVC(r);
+      const txt = String(r.diagnostico || "").trim().replace(/\s+/g, " ");
+      if (c.avc) { n++; if (c.via === "cid") porCid++; soma(contados, txt); }
+      else if (c.antigo) { nAntigo++; soma(antigos, txt); }
+    });
+    const ord = m => [...m.values()].sort((a, b) => b.n - a.n || a.texto.localeCompare(b.texto));
+    return { n, nAntigo, porCid, contados: ord(contados), antigos: ord(antigos) };
+  }, [dados, C]);
   const ag = campo => C ? C.agrupar(dados, campo)
     : { itens: [], total: dados.length, informados: 0, cobertura: 0, naoClassificados: [] };
 
@@ -440,7 +456,12 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const [deDia, ateDia] = periodo === "custom" && ini && fim ? [ini, fim]
     : (periodo === "tudo" || periodo === "custom") ? [amplitude.min, amplitude.max]
     : [inicioJanela, hojeIso];
-  const fmtMin = m => m === null ? "—" : m >= 60 ? `${Math.floor(m / 60)}h${String(Math.round(m % 60)).padStart(2, "0")}` : `${Math.round(m)}min`;
+  // Sempre com a unidade escrita: "5h 22min" (5 horas e 22 minutos) ou "22min". Nunca "5:22", que não diz se são horas ou minutos.
+  const fmtMin = m => {
+    if (m === null) return "—";
+    const t = Math.round(m), h = Math.floor(t / 60);
+    return h > 0 ? `${h}h ${String(t % 60).padStart(2, "0")}min` : `${t}min`;
+  };
   const rotuloSerie = k => escalaEfetiva === "mes"
     ? new Date(k + "-01T00:00:00").toLocaleDateString("pt-BR", { month: "short" })
     : new Date(k + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
@@ -537,8 +558,40 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
         label: "Permaneceu no destino", valor: perm.n ? `${perm.pct.toFixed(0)}%` : "—",
         sub: `${perm.sim} de ${perm.n} remoções · ${perm.semInfo} sem registro`,
         alerta: perm.n > 0 && perm.semInfo / perm.n > 0.2,
-        tooltip: "% das remoções do período em que o paciente ficou no hospital de destino e não voltou à Santa Casa. O denominador é o total de remoções; as sem registro (campo vazio) contam como não-permaneceu, então o valor real pode ser maior." })
+        tooltip: "% das remoções do período em que o paciente ficou no hospital de destino e não voltou à Santa Casa. O denominador é o total de remoções; as sem registro (campo vazio) contam como não-permaneceu, então o valor real pode ser maior." }),
+      /*#__PURE__*/React.createElement(Kpi, {
+        label: "Casos de AVC", valor: avc.n, cor: "#BE123C",
+        sub: dados.length ? `${(avc.n / dados.length * 100).toFixed(1).replace(".", ",")}% das remoções · pela hipótese diagnóstica` : null,
+        tooltip: "Remoções cuja hipótese diagnóstica cita AVC (AVC, AVCI, AVCH, AVE, acidente vascular, derrame ou infarto cerebral) ou tem CID I60 a I64. É uma ESTIMATIVA: depende de como o diagnóstico foi digitado. Será substituída pelo campo de protocolo de AVC do Livro, quando ele existir. Citações de AVC antigo (sequela, prévio, histórico) não entram. Veja logo abaixo o que foi contado."
+      })
     ),
+
+    /* ══ AVC: o que entrou na contagem (conferência da estimativa) ══ */
+    (avc.n + avc.nAntigo) > 0 && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+      /*#__PURE__*/React.createElement(Titulo, {
+        extra: `${avc.n} caso${avc.n !== 1 ? "s" : ""}${avc.porCid ? ` · ${avc.porCid} só pelo CID` : ""}`,
+        tooltip: "Lista de conferência. Mostra exatamente quais diagnósticos foram contados como AVC e quais foram deixados de fora por indicarem AVC antigo. Se aparecer algo errado aqui (contado sem ser AVC, ou AVC que ficou de fora), avise para ajustar a regra."
+      }, "Casos de AVC · o que entrou na contagem"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11.5, color: "#64748B", lineHeight: 1.55, marginBottom: 10 } },
+        "Estimativa pela ", /*#__PURE__*/React.createElement("b", null, "hipótese diagnóstica"),
+        " (texto ou CID I60–I64). Vai ser substituída pelo campo de protocolo de AVC do Livro."),
+      /*#__PURE__*/React.createElement("details", null,
+        /*#__PURE__*/React.createElement("summary", { style: { cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#BE123C" } },
+          `Ver os ${avc.contados.length} diagnóstico${avc.contados.length !== 1 ? "s" : ""} contado${avc.contados.length !== 1 ? "s" : ""}`),
+        /*#__PURE__*/React.createElement("div", { style: { marginTop: 8, maxHeight: 220, overflowY: "auto" } },
+          avc.contados.slice(0, 60).map(i => /*#__PURE__*/React.createElement("div", {
+            key: i.texto, style: { display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12, padding: "4px 0", borderBottom: "1px solid #F1F5F9" } },
+            /*#__PURE__*/React.createElement("span", { style: { color: "#334155", wordBreak: "break-word" } }, i.texto || "(vazio)"),
+            /*#__PURE__*/React.createElement("span", { style: { color: "#94A3B8", fontVariantNumeric: "tabular-nums", flexShrink: 0 } }, i.n))),
+          avc.contados.length > 60 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 6 } }, `e mais ${avc.contados.length - 60} diagnósticos`))),
+      avc.nAntigo > 0 && /*#__PURE__*/React.createElement("details", { style: { marginTop: 10 } },
+        /*#__PURE__*/React.createElement("summary", { style: { cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#64748B" } },
+          `${avc.nAntigo} citam AVC antigo e NÃO foram contados — ver`),
+        /*#__PURE__*/React.createElement("div", { style: { marginTop: 8 } },
+          avc.antigos.slice(0, 30).map(i => /*#__PURE__*/React.createElement("div", {
+            key: i.texto, style: { display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12, padding: "4px 0", borderBottom: "1px solid #F1F5F9" } },
+            /*#__PURE__*/React.createElement("span", { style: { color: "#64748B", wordBreak: "break-word" } }, i.texto),
+            /*#__PURE__*/React.createElement("span", { style: { color: "#94A3B8", fontVariantNumeric: "tabular-nums", flexShrink: 0 } }, i.n)))))),
 
     /* ══ Série temporal ══ */
     /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
