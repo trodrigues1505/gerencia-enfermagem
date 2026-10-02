@@ -117,7 +117,7 @@ function DashProtocoloAVC({ protocolos, totalRemocoes, Card, Kpi, Titulo, Vazio,
   return /*#__PURE__*/React.createElement("div", { style: { marginBottom: 22 } },
       /*#__PURE__*/React.createElement(Titulo, {
         extra: "meta: sair com médico e enfermeiro em até 1h da finalização da CROSS",
-        tooltip: "Só entram remoções marcadas como Protocolo de AVC no Livro de Remoção (a partir de outubro/2026; antes disso não há registro). O tempo conta da finalização da ficha na CROSS até a saída da ambulância. Cada protocolo aparece em uma categoria só: no horário; atraso porque a Santa Casa demorou a pedir a ambulância (pedido feito mais de 1h depois da finalização); ou atraso da ambulância (a Santa Casa pediu em até 1h, mas a saída passou de 1h). O protocolo só aparece aqui depois que a administração vincula o registro do Livro à planilha de remoção. Clique em um card para ver os casos."
+        tooltip: "Só entram remoções marcadas como Protocolo de AVC no Livro de Remoção (a partir de outubro/2026; antes disso não há registro). O tempo conta da finalização da ficha na CROSS até a saída da ambulância. Cada protocolo aparece em uma categoria só: no horário; atraso porque a Santa Casa demorou a solicitar a ambulância (solicitação feita mais de 1h depois da finalização); ou atraso da ambulância (a Santa Casa solicitou em até 1h, mas a saída passou de 1h). O protocolo só aparece aqui depois que a administração vincula o registro do Livro à planilha de remoção. Clique em um card para ver os casos."
       }, "Protocolo de AVC"),
       protocolos.total === 0
         ? /*#__PURE__*/React.createElement(Card, null,
@@ -141,26 +141,26 @@ function DashProtocoloAVC({ protocolos, totalRemocoes, Card, Kpi, Titulo, Vazio,
                 sub: "demorou a pedir a ambulância",
                 alerta: protocolos.atrasoSantaCasa > 0,
                 ativo: avcSel === "atrasoSantaCasa", onClick: protocolos.atrasoSantaCasa ? () => setAvcSel(avcSel === "atrasoSantaCasa" ? null : "atrasoSantaCasa") : undefined,
-                tooltip: "Saíram depois de 1h porque o pedido da ambulância foi feito mais de 1 hora depois da finalização da CROSS." }),
+                tooltip: "Saíram depois de 1h porque a solicitação da ambulância foi feita mais de 1 hora depois da finalização da CROSS." }),
               /*#__PURE__*/React.createElement(Kpi, {
                 label: "Atraso · ambulância", valor: protocolos.atrasoAmbulancia, cor: "#BE123C",
                 sub: "chegou depois de 1h",
                 alerta: protocolos.atrasoAmbulancia > 0,
                 ativo: avcSel === "atrasoAmbulancia", onClick: protocolos.atrasoAmbulancia ? () => setAvcSel(avcSel === "atrasoAmbulancia" ? null : "atrasoAmbulancia") : undefined,
-                tooltip: "Saíram depois de 1h mesmo com o pedido feito em até 1 hora da finalização da CROSS: o atraso foi do setor de ambulância." })),
+                tooltip: "Saíram depois de 1h mesmo com a solicitação feita em até 1 hora da finalização da CROSS: o atraso foi do setor de ambulância." })),
 
             /* ── A hora dividida: quanto levou cada lado ── */
             /*#__PURE__*/React.createElement("div", {
               style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 12, marginTop: 12 }
             },
               /*#__PURE__*/React.createElement(Kpi, {
-                label: "Santa Casa · finalização → pedido", valor: fmtMin(protocolos.santaCasa.mediana), cor: "#B45309",
+                label: "Santa Casa · finalização → solicitação", valor: fmtMin(protocolos.santaCasa.mediana), cor: "#B45309",
                 sub: protocolos.santaCasa.n ? `mediana · ${protocolos.santaCasa.n} com horário · maior: ${fmtMin(protocolos.santaCasa.max)}` : "sem protocolos com os dois horários",
-                tooltip: "Tempo mediano entre a finalização da ficha na CROSS e o pedido da ambulância pela Santa Casa. É a parte da hora que depende da Santa Casa. Pedido registrado antes da finalização não entra. Só entram protocolos com os dois horários." }),
+                tooltip: "Tempo mediano entre a finalização da ficha na CROSS e a solicitação da ambulância pela Santa Casa. É a parte da hora que depende da Santa Casa. Solicitação registrada antes da finalização não entra. Só entram protocolos com os dois horários." }),
               /*#__PURE__*/React.createElement(Kpi, {
-                label: "Ambulância · pedido → saída", valor: fmtMin(protocolos.ambulancia.mediana), cor: "#BE123C",
+                label: "Ambulância · solicitação → saída", valor: fmtMin(protocolos.ambulancia.mediana), cor: "#BE123C",
                 sub: protocolos.ambulancia.n ? `mediana · ${protocolos.ambulancia.n} com horário · maior: ${fmtMin(protocolos.ambulancia.max)}` : "sem protocolos com os dois horários",
-                tooltip: "Tempo mediano entre o pedido da ambulância e a saída dela. É a parte da hora que depende do setor de ambulância. A meta de 1h é a soma das duas partes: se a Santa Casa gasta 45 min para pedir, sobram 15 min para a ambulância sair. Só entram protocolos com os dois horários." })),
+                tooltip: "Tempo mediano entre a solicitação da ambulância e a saída dela. É a parte da hora que depende do setor de ambulância. A meta de 1h é a soma das duas partes: se a Santa Casa gasta 45 min para solicitar, sobram 15 min para a ambulância sair. Só entram protocolos com os dois horários." })),
 
             /* ── Casos do card selecionado ── */
             avcSel && (() => {
@@ -184,7 +184,7 @@ function DashProtocoloAVC({ protocolos, totalRemocoes, Card, Kpi, Titulo, Vazio,
                     avcSel === "total" && c.cat && /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, fontWeight: 700, borderRadius: 99, padding: "2px 9px", color: SEL[c.cat][1], background: SEL[c.cat][2] } }, SEL[c.cat][0])),
                   c.destino && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginBottom: 2 } }, "Destino: " + c.destino),
                   linha("Finalização da CROSS", c.finTxt, c.faltaFin),
-                  linha("Pedido da ambulância", c.pedTxt, false, rel(c.minPedido)),
+                  linha("Solicitação da ambulância", c.pedTxt, false, rel(c.minPedido)),
                   linha("Saída da ambulância", c.saiTxt, c.faltaSaida, rel(c.minSaida)),
                   (c.minPedido !== null && c.minPedido >= 0 && c.minAmb !== null && c.minAmb >= 0) && (() => {
                     const total = c.minPedido + c.minAmb, escala = Math.max(60, total);
@@ -208,7 +208,7 @@ function DashProtocoloAVC({ protocolos, totalRemocoes, Card, Kpi, Titulo, Vazio,
               protocolos.semHorarios > 0 && /*#__PURE__*/React.createElement("div", null,
                 `${protocolos.semHorarios} protocolo${protocolos.semHorarios !== 1 ? "s" : ""} sem horário para medir (contam no total, mas não entram nas três categorias): ${protocolos.semFinalizacao} sem finalização da CROSS · ${protocolos.semSaida} sem saída da ambulância. Clique em “Protocolos de AVC” para ver quais.`),
               protocolos.atrasoSemCausa > 0 && /*#__PURE__*/React.createElement("div", null,
-                `${protocolos.atrasoSemCausa} saíram depois de 1h, mas sem o horário do pedido da ambulância — a causa do atraso não pôde ser apurada.`))
+                `${protocolos.atrasoSemCausa} saíram depois de 1h, mas sem o horário da solicitação da ambulância — a causa do atraso não pôde ser apurada.`))
           ));
 }
 
@@ -231,7 +231,7 @@ function DashTempos({ intervalos, Card, Kpi, Titulo, fmtMin }) {
     h("div", { style: { marginBottom: 22 } },
       h(Titulo, {
         extra: "clique em um card para ver por gravidade",
-        tooltip: "A ordem dos momentos é: solicitação (pedido à CROSS) → aceite (CROSS) → finalização (CROSS) → pedido da ambulância (Santa Casa) → saída da ambulância → retorno. Cada card é o intervalo entre dois momentos seguidos, pela mediana (para um caso extremo não distorcer). Só entram remoções com os dois horários. Horário fora de ordem (o de depois anterior ao de antes) não entra e é contado no card."
+        tooltip: "A ordem dos momentos é: solicitação (da Santa Casa à CROSS) → finalização (CROSS; o aceite é o mesmo momento) → solicitação da ambulância (Santa Casa) → saída da ambulância → retorno. Cada card é o intervalo entre dois momentos seguidos, pela mediana (para um caso extremo não distorcer). Só entram remoções com os dois horários. Horário fora de ordem (o de depois anterior ao de antes) não entra e é contado no card."
       }, "Tempos do caminho da remoção"),
       h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 12 } },
         intervalos.map(i => h(Kpi, {
@@ -501,9 +501,9 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
   /* ── Tempos do caminho da remoção ─────────────────────────────────────────
    * Os 6 momentos, em ordem:
-   *   solicitação (pedido à CROSS) → aceite (CROSS) → finalização (CROSS)
-   *   → pedido da ambulância (Santa Casa) → saída da ambulância → retorno
-   * e os 5 intervalos entre momentos seguidos. Cada um é calculado das datas/horas (os campos tempo_espera e
+   *   solicitação (Santa Casa → CROSS) → finalização (CROSS; o aceite é o mesmo momento)
+   *   → solicitação da ambulância (Santa Casa) → saída da ambulância → retorno
+   * e os 4 intervalos entre momentos seguidos. Cada um é calculado das datas/horas (os campos tempo_espera e
    * duracao_remocao são texto de formato variável: servem para exibir, não para calcular).
    * Por intervalo guarda: mediana geral e, para o modal, a mesma conta por gravidade e os casos.
    * "Fora de ordem" = o momento de depois com horário ANTERIOR ao de antes (provável erro de digitação):
@@ -532,20 +532,16 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     // dia da saída: data real > data do pedido da ambulância > data do pedido na CROSS
     const dSaidaDe = x => x.data_saida_real || x.data_saida_ambulancia || x.data_solicitacao;
     const DEFS = [
-      { id: "sol_ace", de: "Solicitação", ate: "Aceite", dono: "CROSS", cor: "#0369A1",
-        tip: "Tempo mediano entre a solicitação (pedido à CROSS) e o aceite da CROSS (vaga confirmada).",
-        calc: x => par(x.data_solicitacao, x.horario_solicitacao, x.data_aceite_cross, x.horario_aceite_cross, false),
-        pts: x => [dm(x.data_solicitacao, x.horario_solicitacao), dm(x.data_aceite_cross, x.horario_aceite_cross)] },
-      { id: "ace_fin", de: "Aceite", ate: "Finalização", dono: "CROSS", cor: "#0369A1",
-        tip: "Tempo mediano entre o aceite da CROSS e a finalização da ficha na CROSS.",
-        calc: x => par(x.data_aceite_cross, x.horario_aceite_cross, x.data_resposta_cross, x.horario_resposta_cross, false),
-        pts: x => [dm(x.data_aceite_cross, x.horario_aceite_cross), dm(x.data_resposta_cross, x.horario_resposta_cross)] },
-      { id: "fin_ped", de: "Finalização", ate: "Pedido da ambulância", dono: "Santa Casa", cor: "#B45309",
-        tip: "Tempo mediano entre a finalização da ficha na CROSS e o pedido da ambulância pela Santa Casa. Vem da coluna min_finalizacao_pedido_amb da planilha de remoção.",
+      { id: "sol_fin", de: "Solicitação", ate: "Finalização", dono: "CROSS", cor: "#0369A1",
+        tip: "Tempo mediano entre a solicitação da Santa Casa à CROSS e a finalização da ficha na CROSS (o aceite é o mesmo momento da finalização).",
+        calc: x => par(x.data_solicitacao, x.horario_solicitacao, x.data_resposta_cross, x.horario_resposta_cross, false),
+        pts: x => [dm(x.data_solicitacao, x.horario_solicitacao), dm(x.data_resposta_cross, x.horario_resposta_cross)] },
+      { id: "fin_ped", de: "Finalização", ate: "Solicitação da ambulância", dono: "Santa Casa", cor: "#B45309",
+        tip: "Tempo mediano entre a finalização da ficha na CROSS e a solicitação da ambulância pela Santa Casa. Vem da coluna min_finalizacao_pedido_amb da planilha de remoção.",
         calc: x => { const m = minFinPed(x); return m === null ? { v: null, neg: false } : m < 0 ? { v: null, neg: true } : { v: m < 43200 ? m : null, neg: false }; },
         pts: x => [dm(x.data_resposta_cross, x.horario_resposta_cross), dm(x.data_saida_ambulancia, x.hora_solic_ambulancia)] },
-      { id: "ped_sai", de: "Pedido da ambulância", ate: "Saída", dono: "Santa Casa", cor: "#B45309",
-        tip: "Tempo mediano entre o pedido da ambulância e a saída dela. Com as duas datas, usa-as (pedido num dia, saída no outro); sem elas, assume o mesmo dia ou o dia seguinte.",
+      { id: "ped_sai", de: "Solicitação da ambulância", ate: "Saída", dono: "Santa Casa", cor: "#B45309",
+        tip: "Tempo mediano entre a solicitação da ambulância e a saída dela. Com as duas datas, usa-as (solicitação num dia, saída no outro); sem elas, assume o mesmo dia ou o dia seguinte.",
         calc: x => { const d = dSaidaDe(x);
           return (x.data_saida_ambulancia && x.data_saida_real)
             ? par(x.data_saida_ambulancia, x.hora_solic_ambulancia, x.data_saida_real, x.horario_saida_ambulancia, false)
