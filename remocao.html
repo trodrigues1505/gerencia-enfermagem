@@ -292,6 +292,15 @@ function calcTempoD(dIni, hIni, dFim, hFim) {
   return calcTempo(hIni,hFim);
 }
 
+// Datas/horários de uma linha da planilha → tempos. Um só lugar, usado pelo formulário, pela edição na tabela e pelas células.
+//  espera  = pedido da ambulância → saída   (só usa datas quando as DUAS existem; senão, só horários)
+//  duração = saída → retorno da ambulância  (sem data de retorno: mesmo dia, ou dia seguinte se o retorno for "menor")
+const dataSaidaEf = r => r.data_saida_real || r.data_saida_ambulancia || "";
+const tempoEsperaDe = r => calcTempoD(r.data_saida_ambulancia||"", r.hora_solic_ambulancia, r.data_saida_real||r.data_saida_ambulancia||"", r.horario_saida_ambulancia);
+const duracaoDe = r => calcTempoD(dataSaidaEf(r), r.horario_saida_ambulancia, r.data_retorno||dataSaidaEf(r), r.horario_retorno);
+// "UTI" conta como ambulância avançada (decisão da gestão; igual ao dashboard)
+const ehAvancada = v => (typeof Canon!=="undefined"&&Canon.classificar) ? Canon.classificar("tipo_ambulancia",v).canonico==="AVANÇADA" : v==="AVANÇADA";
+
 const GRAV_MAP = {
   emergencia:      {label:"EMERGÊNCIA",      bg:"#FEE2E2",fc:"#991B1B",bd:"#FCA5A5"},
   urgencia:        {label:"URGÊNCIA",        bg:"#FEF9C3",fc:"#713F12",bd:"#FDE047"},
@@ -336,13 +345,14 @@ const COLS = [
   ["enfermeiro",              "ENFERMEIRO",                             "ENFERMEIRO",        "—",           "text","",       "Enfermeiro responsável. Manual",110],
   ["tecnico_auxiliar",        "TÉCNICO/AUXILIAR ENFERMAGEM",            "TÉCNICO/AUX.",      "—",           "text","",       "Técnico/auxiliar. Manual",110],
   ["medico",                  "MÉDICO",                                 "MÉDICO",            "medico_escala","text","",      "Médico da escala. Fonte: Kanban 'medico_escala' (ou Livro de Saída ao vincular)",110],
-  ["horario_retorno",         "HORARIO DO RETORNO DO PACIENTE",         "HORA RETORNO",      "retorno",     "time","",       "Retorno do paciente. Fonte: Kanban 'retorno'",60],
-  ["duracao_remocao",         "DURAÇÃO DA REMOÇÃO",                     "DURAÇÃO",           "—",           "ro", "",        "Auto: Hora Retorno − Saída SCFM",60],
+  ["horario_retorno",         "HORÁRIO DO RETORNO DA AMBULÂNCIA",       "HORA RETORNO AMBULÂNCIA","retorno",   "time","",       "Hora em que a ambulância voltou à Santa Casa. Fonte: Livro de Saída / Kanban 'retorno'",80],
+  ["duracao_remocao",         "DURAÇÃO DA REMOÇÃO",                     "DURAÇÃO",           "—",           "ro", "",        "Auto: da saída ao retorno da ambulância. Usa as datas de saída e de retorno; sem elas, o retorno 'menor' que a saída conta como dia seguinte",60],
   ["finalizado",              "FINALIZADO",                             "FINALIZADO",        "—",           "bool","",       "Remoção finalizada? Sim / Não / vazio (não informado). Clique para alternar",70],
   ["permaneceu",              "PERMANECEU",                             "PERMANECEU",        "—",           "bool","",       "Paciente ficou no hospital de destino e não voltou à Santa Casa? Sim / Não / vazio (não informado)",80],
   ["data_aceite_cross",       "DATA DO ACEITE CROSS",                   "DATA ACEITE CROSS", "data_aceite", "date","",       "Data em que a CROSS aceitou a solicitação (vaga confirmada). Fonte: Kanban 'data_aceite'",80],
   ["horario_aceite_cross",    "HORÁRIO DO ACEITE CROSS",                "HOR. ACEITE CROSS", "hora_aceite", "time","",       "Hora em que a CROSS aceitou a solicitação. Fonte: Kanban 'hora_aceite'",60],
-  ["data_saida_real",         "DATA DA SAÍDA DA AMBULÂNCIA",            "DATA SAÍDA AMB.",   "—",           "date","",       "Dia em que a ambulância realmente SAIU (pode ser diferente do dia em que foi solicitada). Fonte: Livro de Saída",80],
+  ["data_retorno",            "DATA DO RETORNO DA AMBULÂNCIA",          "DATA RETORNO AMBULÂNCIA","—",      "date","",       "Dia em que a ambulância voltou (pode ser diferente do dia da saída). Fonte: Livro de Saída. \"≈\" = data deduzida pelo horário, não digitada",80],
+  ["data_saida_real",         "DATA DA SAÍDA DA AMBULÂNCIA",            "DATA SAÍDA AMB.",   "—",           "date","",       "Dia em que a ambulância realmente SAIU (pode ser diferente do dia em que foi solicitada). Fonte: Livro de Saída. \"≈\" = data deduzida pelo horário, não digitada",80],
 ];
 
 // "SEM MÉDICO" etc.: afirmação explícita de que não houve aquele profissional (definida em canon.js)
@@ -445,7 +455,7 @@ function navigateCell(currentTd, direction){
 }
 
 // Célula editável — texto quebra na célula
-function Cell({rowId,field,value,tipo,optsKey,onSave,fmtDisplay,colorStyle,sugestao}){
+function Cell({rowId,field,value,tipo,optsKey,onSave,fmtDisplay,colorStyle,sugestao,inferida}){
   const [ed,setEd]=useState(false);
   const [val,setVal]=useState(value||"");
   const [free,setFree]=useState(false);
@@ -455,7 +465,8 @@ function Cell({rowId,field,value,tipo,optsKey,onSave,fmtDisplay,colorStyle,suges
   const opts=optsKey?OPTS_MAP[optsKey]:null;
   useEffect(()=>{setVal(value||"");},[value]);
   useEffect(()=>{if(ed&&ref.current)ref.current.focus();},[ed]);
-  function commit(){setEd(false);setFree(false);if(val!==(value||""))onSave(rowId,field,val);}
+  // Data "deduzida": abrir e sair do campo com a data certa já a CONFIRMA (a marca "≈" some)
+  function commit(){setEd(false);setFree(false);if(val!==(value||"")||(inferida&&val))onSave(rowId,field,val);}
   function handleKeyNav(e){
     const el=wrapRef.current;
     if(e.key==="Tab"){e.preventDefault();commit();navigateCell(el,e.shiftKey?"left":"right");}
@@ -471,12 +482,12 @@ function Cell({rowId,field,value,tipo,optsKey,onSave,fmtDisplay,colorStyle,suges
   if(!ed) return(
     <div ref={wrapRef} data-nav="1" style={{padding:"2px 6px",minHeight:24,display:"flex",alignItems:"center",cursor:"pointer",fontSize:11,
       wordBreak:"break-word",whiteSpace:"normal",lineHeight:1.3,
-      color:colorStyle?.color||(val?"#374151":"#CBD5E1"),
+      color:colorStyle?.color||(inferida&&val?"#B45309":(val?"#374151":"#CBD5E1")),
       fontWeight:colorStyle?.fontWeight||(val?400:400),
-      fontStyle:val?"normal":"italic",whiteSpace:"nowrap",
+      fontStyle:(val&&!inferida)?"normal":"italic",whiteSpace:"nowrap",
       ...(colorStyle||{})}}
-      onClick={()=>setEd(true)} title={colorStyle?"Clique para editar (calculado — limpe para recalcular automático)":"Clique para editar"}>
-      {fmtDisplay&&val ? fmtDisplay(val) : (val||"—")}
+      onClick={()=>setEd(true)} title={inferida&&val?"Data DEDUZIDA pelo horário (ninguém digitou). Clique para corrigir; ao sair do campo com a data certa, ela fica confirmada.":(colorStyle?"Clique para editar (calculado — limpe para recalcular automático)":"Clique para editar")}>
+      {inferida&&val?"≈ ":""}{fmtDisplay&&val ? fmtDisplay(val) : (val||"—")}
     </div>
   );
   if(opts && !free) return(
@@ -615,10 +626,11 @@ function FormModal({row,onClose,onSave,saving}){
   const [form,setForm]=useState(row?{...EMPTY,...row}:{...EMPTY,data_solicitacao:new Date().toISOString().split("T")[0]});
   const set=(k,v)=>setForm(f=>{
     const n={...f,[k]:v};
-    if(k==="horario_saida_ambulancia"||k==="hora_solic_ambulancia"||k==="data_saida_ambulancia"||k==="data_saida_real")
-      n.tempo_espera=calcTempoD(n.data_saida_ambulancia,n.hora_solic_ambulancia,n.data_saida_real||n.data_saida_ambulancia,n.horario_saida_ambulancia);
-    if(k==="horario_retorno"||k==="horario_saida_ambulancia")
-      n.duracao_remocao=calcTempo(k==="horario_saida_ambulancia"?v:n.horario_saida_ambulancia,k==="horario_retorno"?v:n.horario_retorno);
+    if(["horario_saida_ambulancia","hora_solic_ambulancia","data_saida_ambulancia","data_saida_real"].includes(k)) n.tempo_espera=tempoEsperaDe(n);
+    if(["horario_retorno","horario_saida_ambulancia","data_saida_real","data_retorno","data_saida_ambulancia"].includes(k)) n.duracao_remocao=duracaoDe(n);
+    // quem digita/corrige a data confirma que ela deixou de ser "deduzida"
+    if(k==="data_saida_real") n.data_saida_real_inferida=false;
+    if(k==="data_retorno") n.data_retorno_inferida=false;
     return n;
   });
   const FD=({label,req:r,gc,ch})=>(
@@ -669,17 +681,18 @@ function FormModal({row,onClose,onSave,saving}){
               <div className="fd"><label>Tipo</label><SelOrFree value={form.tipo_ambulancia} onChange={v=>set("tipo_ambulancia",v)} opts={A_OPTS}/></div>
               <div className="fd"><label>Data Solic. Ambulância</label><input type="date" value={form.data_saida_ambulancia} onChange={e=>set("data_saida_ambulancia",e.target.value)}/></div>
               <div className="fd"><label>Hora Solic. Ambulância</label><input type="time" value={form.hora_solic_ambulancia} onChange={e=>set("hora_solic_ambulancia",e.target.value)}/></div>
-              <div className="fd"><label>Data da Saída</label><input type="date" value={form.data_saida_real||""} onChange={e=>set("data_saida_real",e.target.value)}/></div>
+              <div className="fd"><label>Data da Saída{form.data_saida_real_inferida===true&&<span style={{color:"#B45309",fontWeight:400,textTransform:"none"}}> (≈ deduzida)</span>}</label><input type="date" value={form.data_saida_real||""} onChange={e=>set("data_saida_real",e.target.value)}/></div>
               <div className="fd"><label>Hora da Saída (SCFM)</label><input type="time" value={form.horario_saida_ambulancia} onChange={e=>set("horario_saida_ambulancia",e.target.value)}/></div>
               <div className="fd"><label>Tempo Espera <span style={{color:"#7C3AED",fontWeight:400,textTransform:"none"}}>(auto)</span></label>
-                <input type="text" readOnly value={form.tempo_espera||calcTempoD(form.data_saida_ambulancia,form.hora_solic_ambulancia,form.data_saida_real||form.data_saida_ambulancia,form.horario_saida_ambulancia)} style={{background:"#F5F3FF",color:"#7C3AED",fontWeight:700}}/></div>
+                <input type="text" readOnly value={form.tempo_espera||tempoEsperaDe(form)} style={{background:"#F5F3FF",color:"#7C3AED",fontWeight:700}}/></div>
             </div>
           </div>
           <div className="fsc"><div className="fst">Retorno</div>
             <div className="fg fg3">
-              <div className="fd"><label>Hora Retorno Paciente</label><input type="time" value={form.horario_retorno} onChange={e=>set("horario_retorno",e.target.value)}/></div>
+              <div className="fd"><label>Data Retorno Ambulância{form.data_retorno_inferida===true&&<span style={{color:"#B45309",fontWeight:400,textTransform:"none"}}> (≈ deduzida)</span>}</label><input type="date" value={form.data_retorno||""} onChange={e=>set("data_retorno",e.target.value)}/></div>
+              <div className="fd"><label>Hora Retorno Ambulância</label><input type="time" value={form.horario_retorno} onChange={e=>set("horario_retorno",e.target.value)}/></div>
               <div className="fd"><label>Duração Remoção <span style={{color:"#0369A1",fontWeight:400,textTransform:"none"}}>(auto)</span></label>
-                <input type="text" readOnly value={form.duracao_remocao||calcTempo(form.horario_saida_ambulancia,form.horario_retorno)} style={{background:"#EFF6FF",color:"#0369A1",fontWeight:700}}/></div>
+                <input type="text" readOnly value={form.duracao_remocao||duracaoDe(form)} style={{background:"#EFF6FF",color:"#0369A1",fontWeight:700}}/></div>
             </div>
           </div>
           <div className="fsc"><div className="fst">Equipe</div>
@@ -1387,6 +1400,7 @@ function App(){
     ["data_aceite_cross","data_resposta_cross"],
     ["horario_aceite_cross","data_resposta_cross"],
     ["data_saida_real","horario_saida_ambulancia"],
+    ["data_retorno","horario_retorno"],
   ];
   const inserirNovas = (lista, quais) => {
     quais.forEach(([f,ancora])=>{
@@ -1473,9 +1487,9 @@ function App(){
     try{
       let p={...form};
       if(p.hora_solic_ambulancia&&p.horario_saida_ambulancia&&!p.tempo_espera)
-        p.tempo_espera=calcTempoD(p.data_saida_ambulancia,p.hora_solic_ambulancia,p.data_saida_real||p.data_saida_ambulancia,p.horario_saida_ambulancia);
+        p.tempo_espera=tempoEsperaDe(p);
       if(p.horario_saida_ambulancia&&p.horario_retorno&&!p.duracao_remocao)
-        p.duracao_remocao=calcTempo(p.horario_saida_ambulancia,p.horario_retorno);
+        p.duracao_remocao=duracaoDe(p);
       // normaliza gravidade e tipo_ambulancia para os valores aceitos pelo banco
       if(p.gravidade!==undefined&&p.gravidade!==null&&p.gravidade!=="")
         p.gravidade=normalizeGravValue(p.gravidade)||null;
@@ -1495,23 +1509,23 @@ function App(){
       const isBool = (value===true||value===false);
       const safeVal = isBool ? value : (value||null);
       const u={action:"update",id:rowId,[field]:safeVal};
+      // Digitou/confirmou uma data: ela deixa de ser "deduzida"
+      const flags={};
+      if(field==="data_saida_real"){u.data_saida_real_inferida=false;flags.data_saida_real_inferida=false;}
+      if(field==="data_retorno"){u.data_retorno_inferida=false;flags.data_retorno_inferida=false;}
       const row=rows.find(r=>r.id===rowId);
       if(row){
-        const hs=field==="hora_solic_ambulancia"?value:row.hora_solic_ambulancia;
-        const hsa=field==="horario_saida_ambulancia"?value:row.horario_saida_ambulancia;
-        const hr=field==="horario_retorno"?value:row.horario_retorno;
-        // Feature 3: se campo calculado foi limpo (value vazio), recalcula
+        const m={...row,[field]:safeVal};   // a linha como ficará depois desta edição
+        // se o campo calculado foi limpo (value vazio), recalcula; se foi digitado à mão, vale o digitado
         const teManual=field==="tempo_espera"?value:null;
         const durManual=field==="duracao_remocao"?value:null;
-        const dSol=field==="data_saida_ambulancia"?value:row.data_saida_ambulancia;
-        const dSai=(field==="data_saida_real"?value:row.data_saida_real)||dSol;
-        const te = teManual!==null ? (teManual||calcTempoD(dSol,hs,dSai,hsa)) : calcTempoD(dSol,hs,dSai,hsa);
-        const dur = durManual!==null ? (durManual||calcTempo(hsa,hr)) : calcTempo(hsa,hr);
+        const te = teManual!==null ? (teManual||tempoEsperaDe(m)) : tempoEsperaDe(m);
+        const dur = durManual!==null ? (durManual||duracaoDe(m)) : duracaoDe(m);
         if(te)u.tempo_espera=te;
         if(dur)u.duracao_remocao=dur;
       }
       await api(u);
-      setRows(r=>r.map(x=>x.id===rowId?{...x,[field]:safeVal,...(u.tempo_espera?{tempo_espera:u.tempo_espera}:{}),...(u.duracao_remocao?{duracao_remocao:u.duracao_remocao}:{})}:x));
+      setRows(r=>r.map(x=>x.id===rowId?{...x,[field]:safeVal,...flags,...(u.tempo_espera?{tempo_espera:u.tempo_espera}:{}),...(u.duracao_remocao?{duracao_remocao:u.duracao_remocao}:{})}:x));
     }catch(e){push(e.message,"err");}
   };
 
@@ -1741,7 +1755,7 @@ function App(){
         return String(v);
       })]);
       const xlsSheet=window.XLSX.utils.aoa_to_sheet([hdr,...data]);
-      const cw={data_saida_real:12,data_aceite_cross:12,horario_aceite_cross:10,data_solicitacao:12,horario_solicitacao:8,ficha_cross:18,nome_paciente:26,setor:18,procedimento:14,especialidade:18,diagnostico:24,status:28,gravidade:14,data_resposta_cross:12,horario_resposta_cross:8,instituicao_destino:20,tipo_ambulancia:12,data_saida_ambulancia:12,hora_solic_ambulancia:10,horario_saida_ambulancia:10,tempo_espera:10,observacao:28,enfermeiro:16,tecnico_auxiliar:16,medico:16,horario_retorno:10,duracao_remocao:12};
+      const cw={data_retorno:12,data_saida_real:12,data_aceite_cross:12,horario_aceite_cross:10,data_solicitacao:12,horario_solicitacao:8,ficha_cross:18,nome_paciente:26,setor:18,procedimento:14,especialidade:18,diagnostico:24,status:28,gravidade:14,data_resposta_cross:12,horario_resposta_cross:8,instituicao_destino:20,tipo_ambulancia:12,data_saida_ambulancia:12,hora_solic_ambulancia:10,horario_saida_ambulancia:10,tempo_espera:10,observacao:28,enfermeiro:16,tecnico_auxiliar:16,medico:16,horario_retorno:10,duracao_remocao:12};
       xlsSheet["!cols"]=[{wch:4},...COLS.map(([f])=>({wch:cw[f]||14}))];
       const wb=window.XLSX.utils.book_new();
       window.XLSX.utils.book_append_sheet(wb,"Remoções",xlsSheet);
@@ -1967,19 +1981,20 @@ function App(){
                   "data_resposta_cross":<td><Cell rowId={r.id} field="data_resposta_cross" value={r.data_resposta_cross} tipo="date" onSave={handleCell} fmtDisplay={fmtD}/></td>,
                   "horario_resposta_cross":<td><Cell rowId={r.id} field="horario_resposta_cross" value={r.horario_resposta_cross} tipo="time" onSave={handleCell}/></td>,
                   "instituicao_destino":<td><Cell rowId={r.id} field="instituicao_destino" value={r.instituicao_destino} onSave={handleCell}/></td>,
-                  "tipo_ambulancia":<td>{r.tipo_ambulancia?<div style={{padding:"2px 6px",cursor:"pointer"}} onClick={()=>handleCell(r.id,"tipo_ambulancia","")}><span className={`ab ${r.tipo_ambulancia==="AVANÇADA"?"aba":"abb"}`}>{r.tipo_ambulancia}</span></div>:<Cell rowId={r.id} field="tipo_ambulancia" value={r.tipo_ambulancia} tipo="sel" optsKey="A_OPTS" onSave={handleCell}/> }</td>,
+                  "tipo_ambulancia":<td>{r.tipo_ambulancia?<div style={{padding:"2px 6px",cursor:"pointer"}} onClick={()=>handleCell(r.id,"tipo_ambulancia","")}><span className={`ab ${ehAvancada(r.tipo_ambulancia)?"aba":"abb"}`}>{r.tipo_ambulancia}</span></div>:<Cell rowId={r.id} field="tipo_ambulancia" value={r.tipo_ambulancia} tipo="sel" optsKey="A_OPTS" onSave={handleCell}/> }</td>,
                   "data_saida_ambulancia":<td><Cell rowId={r.id} field="data_saida_ambulancia" value={r.data_saida_ambulancia} tipo="date" onSave={handleCell} fmtDisplay={fmtD}/></td>,
                   "hora_solic_ambulancia":<td><Cell rowId={r.id} field="hora_solic_ambulancia" value={r.hora_solic_ambulancia} tipo="time" onSave={handleCell}/></td>,
                   "horario_saida_ambulancia":<td><Cell rowId={r.id} field="horario_saida_ambulancia" value={r.horario_saida_ambulancia} tipo="time" onSave={handleCell}/></td>,
-                  "tempo_espera":<td><Cell rowId={r.id} field="tempo_espera" value={r.tempo_espera||calcTempoD(r.data_saida_ambulancia,r.hora_solic_ambulancia,r.data_saida_real||r.data_saida_ambulancia,r.horario_saida_ambulancia)||""} tipo="time" onSave={handleCell} colorStyle={{color:r.tempo_espera?"#7C3AED":"#6D28D9",fontWeight:700}}/></td>,
+                  "tempo_espera":<td><Cell rowId={r.id} field="tempo_espera" value={r.tempo_espera||tempoEsperaDe(r)||""} tipo="time" onSave={handleCell} colorStyle={{color:r.tempo_espera?"#7C3AED":"#6D28D9",fontWeight:700}}/></td>,
                   "observacao":<td><Cell rowId={r.id} field="observacao" value={r.observacao} onSave={handleCell}/></td>,
                   "enfermeiro":<td><Cell rowId={r.id} field="enfermeiro" value={r.enfermeiro} onSave={handleCell} fmtDisplay={fmtEquipe} sugestao={EQ_SEM.enfermeiro}/></td>,
                   "tecnico_auxiliar":<td><Cell rowId={r.id} field="tecnico_auxiliar" value={r.tecnico_auxiliar} onSave={handleCell} fmtDisplay={fmtEquipe} sugestao={EQ_SEM.tecnico_auxiliar}/></td>,
                   "medico":<td><Cell rowId={r.id} field="medico" value={r.medico} onSave={handleCell} fmtDisplay={fmtEquipe} sugestao={EQ_SEM.medico}/></td>,
                   "horario_retorno":<td><Cell rowId={r.id} field="horario_retorno" value={r.horario_retorno} tipo="time" onSave={handleCell}/></td>,
-                  "duracao_remocao":<td><Cell rowId={r.id} field="duracao_remocao" value={r.duracao_remocao||calcTempo(r.horario_saida_ambulancia,r.horario_retorno)||""} tipo="time" onSave={handleCell} colorStyle={{color:r.duracao_remocao?"#0369A1":"#0284C7",fontWeight:700}}/></td>,
+                  "duracao_remocao":<td><Cell rowId={r.id} field="duracao_remocao" value={r.duracao_remocao||duracaoDe(r)||""} tipo="time" onSave={handleCell} colorStyle={{color:r.duracao_remocao?"#0369A1":"#0284C7",fontWeight:700}}/></td>,
                   "finalizado":<td style={{textAlign:"center"}}><BoolCell rowId={r.id} field="finalizado" value={r.finalizado} onSave={handleCell}/></td>,
-                  "data_saida_real":<td><Cell rowId={r.id} field="data_saida_real" value={r.data_saida_real} tipo="date" onSave={handleCell} fmtDisplay={fmtD}/></td>,
+                  "data_saida_real":<td><Cell rowId={r.id} field="data_saida_real" value={r.data_saida_real} tipo="date" onSave={handleCell} fmtDisplay={fmtD} inferida={r.data_saida_real_inferida===true}/></td>,
+                  "data_retorno":<td><Cell rowId={r.id} field="data_retorno" value={r.data_retorno} tipo="date" onSave={handleCell} fmtDisplay={fmtD} inferida={r.data_retorno_inferida===true}/></td>,
                   "data_aceite_cross":<td><Cell rowId={r.id} field="data_aceite_cross" value={r.data_aceite_cross} tipo="date" onSave={handleCell} fmtDisplay={fmtD}/></td>,
                   "horario_aceite_cross":<td><Cell rowId={r.id} field="horario_aceite_cross" value={r.horario_aceite_cross} tipo="time" onSave={handleCell}/></td>,
                   "permaneceu":<td style={{textAlign:"center"}}><BoolCell rowId={r.id} field="permaneceu" value={r.permaneceu} onSave={handleCell}/></td>,
