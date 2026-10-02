@@ -370,8 +370,8 @@ const COLS = [
   ["diagnostico",             "DIAGNÓSTICO",                            "DIAGNÓSTICO",       "hd",          "text","",       "CID ou hipótese. Fonte: CROSS 'CID 1'/Kanban 'hd'",150],
   ["status",                  "STATUS",                                 "STATUS",            "—",           "sel", "S_OPTS", "Status da remoção. Manual",140],
   ["gravidade",               "GRAVIDADE",                              "GRAVIDADE",         "grav",        "sel", "G_OPTS", "Gravidade. CROSS 'Prioridade'/Kanban 'grav'",100],
-  ["data_resposta_cross",     "DATA DA FINALIZAÇÃO CROSS",              "DATA FINALIZ. CROSS","data_resolucao","date","",    "Data em que a ficha foi finalizada na CROSS. Fonte: Kanban 'data_resolucao'",80],
-  ["horario_resposta_cross",  "HORÁRIO DA FINALIZAÇÃO CROSS",           "HOR. FINALIZ. CROSS","hora_resolucao","time","",    "Hora em que a ficha foi finalizada na CROSS. Fonte: Kanban 'hora_resolucao'",60],
+  ["data_resposta_cross",     "DATA DA FINALIZAÇÃO CROSS",              "DATA FINALIZ. CROSS","data_resolucao","date","",    "Data em que a CROSS finalizou a ficha. É o mesmo momento do aceite (não há coluna separada). Fonte: ficha CROSS ou Kanban 'data_resolucao' (se vazio, 'data_aceite')",80],
+  ["horario_resposta_cross",  "HORÁRIO DA FINALIZAÇÃO CROSS",           "HOR. FINALIZ. CROSS","hora_resolucao","time","",    "Hora em que a CROSS finalizou a ficha. É o mesmo momento do aceite (não há coluna separada). Fonte: ficha CROSS ou Kanban 'hora_resolucao' (se vazio, 'hora_aceite')",60],
   ["instituicao_destino",     "INSTITUIÇÃO DESTINO",                    "INSTITUIÇÃO DEST.", "hosp",        "text","",       "Hospital receptor. Fonte: Kanban 'hosp'",130],
   ["tipo_ambulancia",         "TIPO DE AMBULÂNCIA",                     "TIPO AMB.",         "amb",         "sel", "A_OPTS", "BÁSICA (SBV) ou AVANÇADA (SAV). Fonte: Kanban 'amb'",80],
   ["data_saida_ambulancia",   "SOLICITAÇÃO BASE AMBULANCIA DATA",       "DATA SOLIC. AMB.",  "—",           "date","",       "Dia em que a ambulância foi SOLICITADA (pode ser diferente do dia da saída). Fonte: Livro de Saída",80],
@@ -386,11 +386,9 @@ const COLS = [
   ["duracao_remocao",         "DURAÇÃO DA REMOÇÃO",                     "DURAÇÃO",           "—",           "ro", "",        "Mostrado em horas e minutos (ex.: 5h 22min). Auto: da saída ao retorno da ambulância. Usa as datas de saída e de retorno; sem elas, o retorno 'menor' que a saída conta como dia seguinte",80],
   ["finalizado",              "FINALIZADO",                             "FINALIZADO",        "—",           "bool","",       "Remoção finalizada? Sim / Não / vazio (não informado). Clique para alternar",70],
   ["permaneceu",              "PERMANECEU",                             "PERMANECEU",        "—",           "bool","",       "Paciente ficou no hospital de destino e não voltou à Santa Casa? Sim / Não / vazio (não informado)",80],
-  ["data_aceite_cross",       "DATA DO ACEITE CROSS",                   "DATA ACEITE CROSS", "data_aceite", "date","",       "Data em que a CROSS aceitou a solicitação (vaga confirmada). Fonte: Kanban 'data_aceite'",80],
-  ["horario_aceite_cross",    "HORÁRIO DO ACEITE CROSS",                "HOR. ACEITE CROSS", "hora_aceite", "time","",       "Hora em que a CROSS aceitou a solicitação. Fonte: Kanban 'hora_aceite'",60],
   ["data_retorno",            "DATA DO RETORNO DA AMBULÂNCIA",          "DATA RETORNO AMBULÂNCIA","—",      "date","",       "Dia em que a ambulância voltou (pode ser diferente do dia da saída). Fonte: Livro de Saída. \"≈\" = data deduzida pelo horário, não digitada",80],
   ["data_saida_real",         "DATA DA SAÍDA DA AMBULÂNCIA",            "DATA SAÍDA AMB.",   "—",           "date","",       "Dia em que a ambulância realmente SAIU (pode ser diferente do dia em que foi solicitada). Fonte: Livro de Saída. \"≈\" = data deduzida pelo horário, não digitada",80],
-  ["min_finalizacao_pedido_amb","TEMPO DA FINALIZAÇÃO CROSS ATÉ O PEDIDO DA AMBULÂNCIA","T. FINALIZ. → PEDIDO AMB.","—","ro","","Auto (calculada pelo banco): tempo entre a finalização da ficha na CROSS e o pedido da ambulância pela Santa Casa. Negativo = pedido registrado ANTES da finalização. Vazio = falta data ou hora de um dos dois. Não é editável",90],
+  ["min_finalizacao_pedido_amb","TEMPO DA FINALIZAÇÃO CROSS ATÉ A SOLICITAÇÃO DA AMBULÂNCIA","T. FINALIZ. → SOLIC. AMB.","—","ro","","Auto (calculada pelo banco): tempo entre a finalização da ficha na CROSS e a solicitação da ambulância pela Santa Casa. Negativo = solicitação registrada ANTES da finalização. Vazio = falta data ou hora de um dos dois. Não é editável",90],
 ];
 
 // "SEM MÉDICO" etc.: afirmação explícita de que não houve aquele profissional (definida em canon.js)
@@ -458,10 +456,10 @@ function SelOrFree({value,onChange,opts,isGrav}){
 function CelulaMinFinPed({value}){
   const n=(value===null||value===undefined||value==="")?null:Number(value);
   const txt=fmtMinCol(n);
-  if(txt===null) return <div style={{padding:"2px 6px",fontSize:10,color:"#CBD5E1"}} title="Sem tempo: falta a data ou a hora da finalização da CROSS, ou do pedido da ambulância">—</div>;
+  if(txt===null) return <div style={{padding:"2px 6px",fontSize:10,color:"#CBD5E1"}} title="Sem tempo: falta a data ou a hora da finalização da CROSS, ou da solicitação da ambulância">—</div>;
   const antes=n<0;
   return <div style={{padding:"2px 6px",fontSize:10,fontWeight:700,whiteSpace:"nowrap",color:antes?"#B45309":"#7C3AED"}}
-    title={antes?`Pedido registrado ${fmtMinCol(Math.abs(n))} ANTES da finalização da CROSS (pedido antecipado ou horário digitado errado)`:`${txt} entre a finalização da CROSS e o pedido da ambulância`}>{txt}</div>;
+    title={antes?`Solicitação da ambulância registrada ${fmtMinCol(Math.abs(n))} ANTES da finalização da CROSS (solicitação antecipada ou horário digitado errado)`:`${txt} entre a finalização da CROSS e a solicitação da ambulância`}>{txt}</div>;
 }
 
 // Toggle Sim/Não para campos booleanos
@@ -724,8 +722,6 @@ function FormModal({row,onClose,onSave,saving}){
             <div className="fg fg2">
               <div className="fd"><label>Status</label><SelOrFree value={form.status} onChange={v=>set("status",v)} opts={S_OPTS}/></div>
               <div className="fd"><label>Instituição Destino</label><input type="text" placeholder="Hospital receptor" value={form.instituicao_destino} onChange={e=>set("instituicao_destino",e.target.value)}/></div>
-              <div className="fd"><label>Data Aceite CROSS</label><input type="date" value={form.data_aceite_cross||""} onChange={e=>set("data_aceite_cross",e.target.value)}/></div>
-              <div className="fd"><label>Horário Aceite CROSS</label><input type="time" value={form.horario_aceite_cross||""} onChange={e=>set("horario_aceite_cross",e.target.value)}/></div>
               <div className="fd"><label>Data Finalização CROSS</label><input type="date" value={form.data_resposta_cross||""} onChange={e=>set("data_resposta_cross",e.target.value)}/></div>
               <div className="fd"><label>Horário Finalização CROSS</label><input type="time" value={form.horario_resposta_cross||""} onChange={e=>set("horario_resposta_cross",e.target.value)}/></div>
             </div>
@@ -739,8 +735,8 @@ function FormModal({row,onClose,onSave,saving}){
               <div className="fd"><label>Hora da Saída (SCFM)</label><input type="time" value={form.horario_saida_ambulancia} onChange={e=>set("horario_saida_ambulancia",e.target.value)}/></div>
               <div className="fd"><label>Tempo Espera <span style={{color:"#7C3AED",fontWeight:400,textTransform:"none"}}>(auto)</span></label>
                 <input type="text" readOnly value={fmtHM(form.tempo_espera||tempoEsperaDe(form))} style={{background:"#F5F3FF",color:"#7C3AED",fontWeight:700}}/></div>
-              <div className="fd"><label>Finalização CROSS → Pedido <span style={{color:"#7C3AED",fontWeight:400,textTransform:"none"}}>(auto)</span></label>
-                <input type="text" readOnly value={fmtMinCol(minFinalPedidoDe(form))||""} placeholder="— falta data/hora" title="Minutos entre a finalização da ficha na CROSS e o pedido da ambulância. Negativo = pedido antes da finalização." style={{background:"#F5F3FF",color:"#7C3AED",fontWeight:700}}/></div>
+              <div className="fd"><label>Finalização CROSS → Solicitação amb. <span style={{color:"#7C3AED",fontWeight:400,textTransform:"none"}}>(auto)</span></label>
+                <input type="text" readOnly value={fmtMinCol(minFinalPedidoDe(form))||""} placeholder="— falta data/hora" title="Tempo entre a finalização da ficha na CROSS e a solicitação da ambulância. Negativo = solicitação antes da finalização." style={{background:"#F5F3FF",color:"#7C3AED",fontWeight:700}}/></div>
             </div>
           </div>
           <div className="fsc"><div className="fst">Retorno</div>
@@ -1006,13 +1002,14 @@ function parseFichaCross(txt){
     data_resposta_cross    = normalizeDateValue(mFinal[1]);
     horario_resposta_cross = mFinal[2];
   }
-  // ACEITE da CROSS ("Aceitou Solicitação") — coluna própria, independente da finalização
-  let data_aceite_cross = null;
-  let horario_aceite_cross = null;
-  const mAceitou = txt.match(/Aceitou\s+Solicita[çc][aã]o[\s\S]*?(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2})(?::\d{2})?/i);
-  if(mAceitou){
-    data_aceite_cross    = normalizeDateValue(mAceitou[1]);
-    horario_aceite_cross = mAceitou[2];
+  // ACEITE da CROSS ("Aceitou Solicitação") é o MESMO momento da finalização (decisão da gestão): não existe mais coluna
+  // de aceite. Vale o bloco FINALIZAÇÃO; se a ficha ainda não o tem, usa a data/hora do "Aceitou Solicitação".
+  if(!data_resposta_cross){
+    const mAceitou = txt.match(/Aceitou\s+Solicita[çc][aã]o[\s\S]*?(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2})(?::\d{2})?/i);
+    if(mAceitou){
+      data_resposta_cross    = normalizeDateValue(mAceitou[1]);
+      horario_resposta_cross = mAceitou[2];
+    }
   }
 
   // Instituição destino — Unidade Receptora do bloco Resolução quando existir.
@@ -1043,8 +1040,6 @@ function parseFichaCross(txt){
   if(diagnostico)            row.diagnostico             = diagnostico;
   row.gravidade = gravidade; // sempre inclui — tem fallback AMARELO validado
   if(status)                 row.status                  = status;
-  if(data_aceite_cross)      row.data_aceite_cross       = data_aceite_cross;
-  if(horario_aceite_cross)   row.horario_aceite_cross    = horario_aceite_cross;
   if(data_resposta_cross)    row.data_resposta_cross     = data_resposta_cross;
   if(horario_resposta_cross) row.horario_resposta_cross  = horario_resposta_cross;
   if(instituicao_destino)    row.instituicao_destino     = instituicao_destino;
@@ -1087,7 +1082,7 @@ function PasteModal({onClose,onImport}){
         <div className="mbd">
           <div style={{fontSize:11,color:"#64748B",marginBottom:8,lineHeight:1.6}}>
             Abra a ficha no sistema CROSS, selecione tudo (<b>Ctrl+A</b>), copie (<b>Ctrl+C</b>) e cole aqui.<br/>
-            O app extrai automaticamente: ficha, nome, data/hora, CID, recurso, gravidade, aceite e finalização da CROSS. Médico e observação ficam em branco (preenchimento manual).
+            O app extrai automaticamente: ficha, nome, data/hora, CID, recurso, gravidade e finalização da CROSS (o aceite é o mesmo momento). Médico e observação ficam em branco (preenchimento manual).
           </div>
           <div className="fsc">
             <textarea rows={10} value={txt} onChange={e=>setTxt(e.target.value)}
@@ -1447,7 +1442,10 @@ function App(){
   const LS_WMAP='remocoes_col_widths';
   // v2: a ordem padrão mudou (segue o fluxo da remoção). Trocar a chave faz todo mundo receber a ordem nova uma vez;
   // depois disso, quem arrastar colunas continua com a própria ordem salva neste navegador.
-  const LS_ORDER='remocoes_col_order_v2';
+  const LS_ORDER='remocoes_col_order_v3';
+  // v2 guardava POSIÇÕES da lista de colunas de antes de tirar as colunas de aceite. A v3 guarda as posições da lista atual.
+  const LS_ORDER_V2='remocoes_col_order_v2';
+  const COLS_V2=["data_solicitacao","horario_solicitacao","ficha_cross","nome_paciente","setor","procedimento","especialidade","diagnostico","status","gravidade","data_resposta_cross","horario_resposta_cross","instituicao_destino","tipo_ambulancia","data_saida_ambulancia","hora_solic_ambulancia","horario_saida_ambulancia","tempo_espera","observacao","enfermeiro","tecnico_auxiliar","medico","horario_retorno","duracao_remocao","finalizado","permaneceu","data_aceite_cross","horario_aceite_cross","data_retorno","data_saida_real","min_finalizacao_pedido_amb"];
   const LS_ORDER_ANTIGA='remocoes_col_order';
   const LS_QUEBRA='remocoes_quebra_texto';
   function loadLS(key,fallback){try{const v=localStorage.getItem(key);return v?JSON.parse(v):fallback;}catch{return fallback;}}
@@ -1459,8 +1457,6 @@ function App(){
   // Colunas acrescentadas depois (ficam no FIM do array COLS, para não deslocar a colagem do Excel) e a coluna
   // antes da qual aparecem na tela. Vale também para quem já tem uma ordem salva no navegador.
   const COL_NOVAS_ANTES_DE = [
-    ["data_aceite_cross","data_resposta_cross"],
-    ["horario_aceite_cross","data_resposta_cross"],
     ["data_saida_real","horario_saida_ambulancia"],
     ["min_finalizacao_pedido_amb","data_saida_real"],   // vem DEPOIS da linha acima, para cair logo após a hora do pedido
     ["data_retorno","horario_retorno"],
@@ -1474,11 +1470,11 @@ function App(){
     return lista;
   };
   // Ordem padrão = o caminho da remoção, da esquerda para a direita (as 4 primeiras colunas ficam fixas):
-  //  1) o pedido (clínico)   2) a CROSS (aceite → destino → finalização → status)
+  //  1) o pedido (clínico)   2) a CROSS (destino → finalização, que é o aceite → status)
   //  3) a ambulância (pedido → saída → espera → equipe → retorno → duração)   4) o desfecho (Finalizado, Permaneceu, Observação)
   const ORDEM_PADRAO = [
     "setor","procedimento","especialidade","diagnostico","gravidade",
-    "data_aceite_cross","horario_aceite_cross","instituicao_destino","data_resposta_cross","horario_resposta_cross","status",
+    "instituicao_destino","data_resposta_cross","horario_resposta_cross","status",
     "tipo_ambulancia","data_saida_ambulancia","hora_solic_ambulancia","min_finalizacao_pedido_amb","data_saida_real","horario_saida_ambulancia","tempo_espera",
     "medico","enfermeiro","tecnico_auxiliar","data_retorno","horario_retorno","duracao_remocao",
     "finalizado","permaneceu","observacao",
@@ -1490,8 +1486,13 @@ function App(){
     return l;
   })();
   const savedOrder=(()=>{
-    const sv=loadLS(LS_ORDER,null);
-    if(!Array.isArray(sv))return null;
+    let sv=loadLS(LS_ORDER,null);
+    if(!Array.isArray(sv)){
+      // sem ordem v3: aproveita a v2, convertendo cada posição antiga pelo NOME da coluna (a de aceite, que saiu, some da lista)
+      const v2=loadLS(LS_ORDER_V2,null);
+      if(!Array.isArray(v2))return null;
+      sv=v2.map(i=>COLS_V2[i]).map(f=>f?idxCol(f):-1).filter(i=>i>=0);
+    }
     const ok=sv.filter(i=>Number.isInteger(i)&&i>=0&&i<COLS.length&&!STK_COLS.includes(i));
     // as que a ordem salva ainda não conhece entram antes da sua âncora; qualquer outra faltante vai ao fim
     inserirNovas(ok, COL_NOVAS_ANTES_DE);
@@ -1694,7 +1695,11 @@ function App(){
         // Só cai para "hoje" se o card não tiver essa data.
         const hoje=normalizeDateValue(c.adm)||hojeLocal;
         const agora=new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
-        await api({action:"create",nome_paciente:c.nome||"",setor:c.setor||"",especialidade:c.rec||"",diagnostico:c.hd||"",instituicao_destino:c.hosp||c.unidade_receptora||"",tipo_ambulancia:AM[c.amb]||"",gravidade:normalizeKanbanGrav(c.grav),data_solicitacao:hoje,horario_solicitacao:c.hora_adm||agora,ficha_cross:c.ficha_cross||"",medico:c.medico_escala||"",horario_saida_ambulancia:c.saida||"",horario_retorno:c.retorno||"",data_aceite_cross:normalizeDateValue(c.data_aceite)||"",horario_aceite_cross:normalizeTimeValue(c.hora_aceite)||"",data_resposta_cross:normalizeDateValue(c.data_resolucao)||"",horario_resposta_cross:normalizeTimeValue(c.hora_resolucao)||"",status:"PACIENTE AGUARDANDO AMBULÂNCIA"});
+        // o aceite é o mesmo momento da finalização: vale o par de finalização do card; se ele não estiver completo, o par de aceite
+        const dR=normalizeDateValue(c.data_resolucao), hR=normalizeTimeValue(c.hora_resolucao);
+        const dA=normalizeDateValue(c.data_aceite),    hA=normalizeTimeValue(c.hora_aceite);
+        const fin=(dR&&hR)?{d:dR,h:hR}:(dA&&hA)?{d:dA,h:hA}:{d:dR||dA||"",h:hR||hA||""};
+        await api({action:"create",nome_paciente:c.nome||"",setor:c.setor||"",especialidade:c.rec||"",diagnostico:c.hd||"",instituicao_destino:c.hosp||c.unidade_receptora||"",tipo_ambulancia:AM[c.amb]||"",gravidade:normalizeKanbanGrav(c.grav),data_solicitacao:hoje,horario_solicitacao:c.hora_adm||agora,ficha_cross:c.ficha_cross||"",medico:c.medico_escala||"",horario_saida_ambulancia:c.saida||"",horario_retorno:c.retorno||"",data_resposta_cross:fin.d,horario_resposta_cross:fin.h,status:"PACIENTE AGUARDANDO AMBULÂNCIA"});
         ok++;
       }catch(e){fails.push({nome:c.nome||"(sem nome)",erro:e.message||"erro desconhecido"});}
     }
@@ -1721,6 +1726,9 @@ function App(){
         try{
           const p={};
           FIELDS.forEach(f=>{if(item[f]!==undefined&&item[f]!==null&&item[f]!=="")p[f]=item[f];});
+          // arquivo exportado antes: o aceite era coluna própria e é o mesmo momento da finalização
+          if(!p.data_resposta_cross&&item.data_aceite_cross)p.data_resposta_cross=item.data_aceite_cross;
+          if(!p.horario_resposta_cross&&item.horario_aceite_cross)p.horario_resposta_cross=item.horario_aceite_cross;
           if(Object.keys(p).length===0)continue;
           await api({action:"create",...normalizeRowValues(p)});
           ok++;
@@ -1846,7 +1854,7 @@ function App(){
       };
       // Na exportação o valor continua "HH:MM" (dá para somar/ordenar no Excel); o título passa a dizer que são horas:minutos.
       const hdr=["#",...COLS.map(([f,pl])=>String(pl||"")+((f==="tempo_espera"||f==="duracao_remocao")?" (horas:minutos)":(f==="min_finalizacao_pedido_amb"?" (minutos)":"")))];
-      hdr.push("TEMPO DA FINALIZAÇÃO CROSS ATÉ O PEDIDO DA AMBULÂNCIA (horas e minutos)");   // ao lado da coluna em minutos, só para leitura
+      hdr.push("TEMPO DA FINALIZAÇÃO CROSS ATÉ A SOLICITAÇÃO DA AMBULÂNCIA (horas e minutos)");   // ao lado da coluna em minutos, só para leitura
       const snapshot=[...filtered]; // captura o array neste momento
       const data=snapshot.map((r,i)=>[i+1,...COLS.map(([f])=>{
         const v=safe(r[f]);
@@ -1855,7 +1863,7 @@ function App(){
         return String(v);
       }),fmtMinCol(r.min_finalizacao_pedido_amb)||""]);
       const xlsSheet=window.XLSX.utils.aoa_to_sheet([hdr,...data]);
-      const cw={min_finalizacao_pedido_amb:14,data_retorno:12,data_saida_real:12,data_aceite_cross:12,horario_aceite_cross:10,data_solicitacao:12,horario_solicitacao:8,ficha_cross:18,nome_paciente:26,setor:18,procedimento:14,especialidade:18,diagnostico:24,status:28,gravidade:14,data_resposta_cross:12,horario_resposta_cross:8,instituicao_destino:20,tipo_ambulancia:12,data_saida_ambulancia:12,hora_solic_ambulancia:10,horario_saida_ambulancia:10,tempo_espera:10,observacao:28,enfermeiro:16,tecnico_auxiliar:16,medico:16,horario_retorno:10,duracao_remocao:12};
+      const cw={min_finalizacao_pedido_amb:14,data_retorno:12,data_saida_real:12,data_solicitacao:12,horario_solicitacao:8,ficha_cross:18,nome_paciente:26,setor:18,procedimento:14,especialidade:18,diagnostico:24,status:28,gravidade:14,data_resposta_cross:12,horario_resposta_cross:8,instituicao_destino:20,tipo_ambulancia:12,data_saida_ambulancia:12,hora_solic_ambulancia:10,horario_saida_ambulancia:10,tempo_espera:10,observacao:28,enfermeiro:16,tecnico_auxiliar:16,medico:16,horario_retorno:10,duracao_remocao:12};
       xlsSheet["!cols"]=[{wch:4},...COLS.map(([f])=>({wch:cw[f]||14})),{wch:18}];
       const wb=window.XLSX.utils.book_new();
       window.XLSX.utils.book_append_sheet(wb,"Remoções",xlsSheet);
@@ -1950,7 +1958,7 @@ function App(){
             <button className="btn btn-g btn-sm" onClick={()=>setQuebra(q=>!q)} aria-pressed={quebra}
               title={quebra?"Desligar: voltar a cortar o texto que não cabe na célula":"Ligar: o texto que não cabe na célula passa para a linha de baixo (fica salvo neste navegador)"}
               style={quebra?{background:"#DBEAFE",borderColor:"#93C5FD",color:"#1D4ED8",fontWeight:700}:undefined}>↵ Quebrar texto{quebra?": ligado":""}</button>
-            <button className="btn btn-g btn-sm" title="Restaurar ordem e largura original das colunas" onClick={()=>{setMovColOrder(MOV_COLS_DEFAULT);const base={'#':48,actions:36};COLS.forEach(([f,,,,,,,w])=>{base[f]=w||100;});setWmap(base);localStorage.removeItem(LS_WMAP);localStorage.removeItem(LS_ORDER);localStorage.removeItem(LS_ORDER_ANTIGA);setQuebra(false);}} style={{fontSize:11,padding:"4px 8px"}}>⚏ Colunas</button>
+            <button className="btn btn-g btn-sm" title="Restaurar ordem e largura original das colunas" onClick={()=>{setMovColOrder(MOV_COLS_DEFAULT);const base={'#':48,actions:36};COLS.forEach(([f,,,,,,,w])=>{base[f]=w||100;});setWmap(base);localStorage.removeItem(LS_WMAP);localStorage.removeItem(LS_ORDER);localStorage.removeItem(LS_ORDER_V2);localStorage.removeItem(LS_ORDER_ANTIGA);setQuebra(false);}} style={{fontSize:11,padding:"4px 8px"}}>⚏ Colunas</button>
             <button className="btn btn-g" style={{color:"#DC2626",borderColor:"#FCA5A5"}} disabled={rows.length===0} onClick={handleDeleteAll}><Ico n="trash" s={13}/> Excluir todos</button>
           </div>
         </div>
@@ -2099,8 +2107,6 @@ function App(){
                   "finalizado":<td style={{textAlign:"center"}}><BoolCell rowId={r.id} field="finalizado" value={r.finalizado} onSave={handleCell}/></td>,
                   "data_saida_real":<td><Cell rowId={r.id} field="data_saida_real" value={r.data_saida_real} tipo="date" onSave={handleCell} fmtDisplay={fmtD} inferida={r.data_saida_real_inferida===true}/></td>,
                   "data_retorno":<td><Cell rowId={r.id} field="data_retorno" value={r.data_retorno} tipo="date" onSave={handleCell} fmtDisplay={fmtD} inferida={r.data_retorno_inferida===true}/></td>,
-                  "data_aceite_cross":<td><Cell rowId={r.id} field="data_aceite_cross" value={r.data_aceite_cross} tipo="date" onSave={handleCell} fmtDisplay={fmtD}/></td>,
-                  "horario_aceite_cross":<td><Cell rowId={r.id} field="horario_aceite_cross" value={r.horario_aceite_cross} tipo="time" onSave={handleCell}/></td>,
                   "permaneceu":<td style={{textAlign:"center"}}><BoolCell rowId={r.id} field="permaneceu" value={r.permaneceu} onSave={handleCell}/></td>,
                 };
 
