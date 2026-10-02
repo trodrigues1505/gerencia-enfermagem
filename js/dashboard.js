@@ -238,13 +238,24 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       return isNaN(t) ? null : t.getTime();
     };
     const HORA = 60 * 60000;
-    const r = { total: 0, noHorario: 0, atrasoSantaCasa: 0, atrasoAmbulancia: 0, atrasoSemCausa: 0, semHorarios: 0 };
+    const r = { total: 0, noHorario: 0, atrasoSantaCasa: 0, atrasoAmbulancia: 0, atrasoSemCausa: 0, semHorarios: 0, semFinalizacao: 0, semSaida: 0, incompletos: [] };
+    const txt = (d, h) => [String(d || "").slice(0, 10), String(h || "").slice(0, 5)].filter(Boolean).join(" ") || "—";
     dados.forEach(x => {
       if (x.protocolo_avc !== true) return;
       r.total++;
       const fin = quando(x.data_resposta_cross, x.horario_resposta_cross);
-      const sai = quando(x.data_saida_real, x.horario_saida_ambulancia);
-      if (fin === null || sai === null) { r.semHorarios++; return; }
+      // Dia da saída: o mesmo critério do indicador "Espera pela ambulância" (data real > data do pedido da ambulância > data do pedido na CROSS)
+      const dSaida = x.data_saida_real || x.data_saida_ambulancia || x.data_solicitacao;
+      const sai = quando(dSaida, x.horario_saida_ambulancia);
+      if (fin === null || sai === null) {
+        r.semHorarios++;
+        if (fin === null) r.semFinalizacao++;
+        if (sai === null) r.semSaida++;
+        r.incompletos.push({ nome: x.nome_paciente || "(sem nome)", ficha: x.ficha_cross || "",
+          faltaFin: fin === null, faltaSaida: sai === null,
+          finTxt: txt(x.data_resposta_cross, x.horario_resposta_cross), saiTxt: txt(dSaida, x.horario_saida_ambulancia) });
+        return;
+      }
       if (sai - fin <= HORA) { r.noHorario++; return; }
       const ped = quando(x.data_saida_ambulancia, x.hora_solic_ambulancia);   // pedido da ambulância pela Santa Casa
       if (ped === null) { r.atrasoSemCausa++; return; }
@@ -610,7 +621,14 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
             (protocolos.semHorarios > 0 || protocolos.atrasoSemCausa > 0) && /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 11.5, color: "#64748B", lineHeight: 1.6, marginTop: 10 } },
               protocolos.semHorarios > 0 && /*#__PURE__*/React.createElement("div", null,
-                `${protocolos.semHorarios} protocolo${protocolos.semHorarios !== 1 ? "s" : ""} ainda sem finalização da CROSS ou sem saída registrada — contam no total, mas não entram nas três categorias.`),
+                `${protocolos.semHorarios} protocolo${protocolos.semHorarios !== 1 ? "s" : ""} sem horário para medir (contam no total, mas não entram nas três categorias): ${protocolos.semFinalizacao} sem finalização da CROSS · ${protocolos.semSaida} sem saída da ambulância.`,
+                protocolos.incompletos.map((p, i) => /*#__PURE__*/React.createElement("div", {
+                  key: i, style: { marginTop: 6, padding: "8px 10px", background: "#F8FAFC", border: "1px solid #E8EDF3", borderRadius: 8, color: "#334155" } },
+                  /*#__PURE__*/React.createElement("b", null, p.nome), p.ficha ? ` · ficha ${p.ficha}` : "",
+                  /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: p.faltaFin ? "#B45309" : "#64748B" } },
+                    "Finalização da CROSS: ", p.faltaFin ? "falta (ou está em formato que o painel não reconhece) — valor lido: " + p.finTxt : p.finTxt),
+                  /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: p.faltaSaida ? "#B45309" : "#64748B" } },
+                    "Saída da ambulância: ", p.faltaSaida ? "falta — valor lido: " + p.saiTxt : p.saiTxt)))),
               protocolos.atrasoSemCausa > 0 && /*#__PURE__*/React.createElement("div", null,
                 `${protocolos.atrasoSemCausa} saíram depois de 1h, mas sem o horário do pedido da ambulância — a causa do atraso não pôde ser apurada.`))
           )),
