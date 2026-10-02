@@ -310,6 +310,15 @@ const tempoEsperaDe = r => calcTempoD(r.data_saida_ambulancia||"", r.hora_solic_
 const duracaoDe = r => calcTempoD(dataSaidaEf(r), r.horario_saida_ambulancia, r.data_retorno||dataSaidaEf(r), r.horario_retorno);
 // Campos calculados pelo BANCO (gatilho): a tela só os mostra. Nunca são enviados ao salvar nem ao importar.
 const CAMPOS_CALCULADOS = new Set(["min_finalizacao_pedido_amb"]);
+// Filtro "Faltando…": remoções em que falta a data OU a hora de um momento do caminho da remoção (para completar à mão).
+// Saída e retorno só olham a hora: a data pode ser deduzida pelo horário. Remoção cancelada ou resolvida no local
+// nunca tem saída: o filtro lista, quem decide é você.
+const FALTA_OPCOES = [
+  ["fin",       "Sem finalização da CROSS",       ["data_resposta_cross","horario_resposta_cross"]],
+  ["solic_amb", "Sem solicitação da ambulância",  ["data_saida_ambulancia","hora_solic_ambulancia"]],
+  ["saida",     "Sem saída da ambulância",        ["horario_saida_ambulancia"]],
+  ["retorno",   "Sem retorno da ambulância",      ["horario_retorno"]],
+];
 // Os quatro campos de que ele depende: se um deles muda na tela, o valor é refeito na hora (o banco refaz do lado dele).
 const CAMPOS_BASE_MIN_FIN_PED = ["data_resposta_cross","horario_resposta_cross","data_saida_ambulancia","hora_solic_ambulancia"];
 // Minutos entre a FINALIZAÇÃO da ficha na CROSS e o PEDIDO da ambulância. Mesma regra do banco
@@ -1431,6 +1440,7 @@ function App(){
   const [fG,setFG]=useState("");
   const [fS,setFS]=useState("");
   const [fM,setFM]=useState("");
+  const [fF,setFF]=useState("");   // "Faltando…": ver FALTA_OPCOES
   const [sc,setSc]=useState("created_at");
   const [sd,setSd]=useState("desc");
   // Feature 4: seleção múltipla de linhas
@@ -1695,10 +1705,10 @@ function App(){
         // Só cai para "hoje" se o card não tiver essa data.
         const hoje=normalizeDateValue(c.adm)||hojeLocal;
         const agora=new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
-        // o aceite é o mesmo momento da finalização: vale o par de finalização do card; se ele não estiver completo, o par de aceite
-        const dR=normalizeDateValue(c.data_resolucao), hR=normalizeTimeValue(c.hora_resolucao);
-        const dA=normalizeDateValue(c.data_aceite),    hA=normalizeTimeValue(c.hora_aceite);
-        const fin=(dR&&hR)?{d:dR,h:hR}:(dA&&hA)?{d:dA,h:hA}:{d:dR||dA||"",h:hR||hA||""};
+        // A finalização da CROSS vem SÓ do par "Finalização CROSS" do card (data_resolucao / hora_resolucao).
+        // O "aceite" do Kanban não entra: o modal dele abre com a data e a hora de AGORA, ou seja, o momento em que alguém
+        // clicou no app, e não o da CROSS. Card sem finalização preenchida importa com a finalização vazia.
+        const fin={d:normalizeDateValue(c.data_resolucao)||"",h:normalizeTimeValue(c.hora_resolucao)||""};
         await api({action:"create",nome_paciente:c.nome||"",setor:c.setor||"",especialidade:c.rec||"",diagnostico:c.hd||"",instituicao_destino:c.hosp||c.unidade_receptora||"",tipo_ambulancia:AM[c.amb]||"",gravidade:normalizeKanbanGrav(c.grav),data_solicitacao:hoje,horario_solicitacao:c.hora_adm||agora,ficha_cross:c.ficha_cross||"",medico:c.medico_escala||"",horario_saida_ambulancia:c.saida||"",horario_retorno:c.retorno||"",data_resposta_cross:fin.d,horario_resposta_cross:fin.h,status:"PACIENTE AGUARDANDO AMBULÂNCIA"});
         ok++;
       }catch(e){fails.push({nome:c.nome||"(sem nome)",erro:e.message||"erro desconhecido"});}
@@ -1775,9 +1785,15 @@ function App(){
       const text=await navigator.clipboard.readText();
       if(!text||!text.trim()){push("Área de transferência vazia. Copie a linha no Excel primeiro (Ctrl+C).","err");return;}
       const cells=text.replace(/\r/g,"").split("\n")[0].split("\t");
-      const fieldOrder=COLS.map(([f])=>f);
+      // Layout FIXO do Excel (o mesmo de antes de tirar as colunas de aceite): a posição de cada coluna não muda,
+      // mesmo que a tela ganhe ou perca colunas. Quem manda a lista é COLS_V2.
+      const fieldOrder=COLS_V2;
       const p={};
       fieldOrder.forEach((f,i)=>{ if(!CAMPOS_CALCULADOS.has(f) && cells[i]!==undefined && cells[i]!=="") p[f]=cells[i].trim(); });
+      // o aceite (que não tem mais coluna) é o mesmo momento da finalização: só vale se a finalização veio vazia
+      if(!p.data_resposta_cross&&p.data_aceite_cross)p.data_resposta_cross=p.data_aceite_cross;
+      if(!p.horario_resposta_cross&&p.horario_aceite_cross)p.horario_resposta_cross=p.horario_aceite_cross;
+      delete p.data_aceite_cross;delete p.horario_aceite_cross;
       const norm=normalizeRowValues(p);
       if(Object.keys(norm).length===0){push("Nada reconhecível na área de transferência.","err");return;}
       await api({action:"update",id:rowId,...norm});
@@ -1804,6 +1820,7 @@ function App(){
     if(fG)d=d.filter(r=>r.gravidade===fG);
     if(fS)d=d.filter(r=>(r.status||"").includes(fS));
     if(fM)d=d.filter(r=>(r.data_solicitacao||"").startsWith(fM));
+    if(fF){const cs=(FALTA_OPCOES.find(o=>o[0]===fF)||[0,0,[]])[2];d=d.filter(r=>cs.some(k=>!String(r[k]??"").trim()));}
     return [...d].sort((a,b)=>{
       const av=a[sc];
       const bv=b[sc];
@@ -1828,7 +1845,7 @@ function App(){
       const bvs=(bv||"").toString().toLowerCase();
       return sd==="asc"?avs.localeCompare(bvs,"pt"):bvs.localeCompare(avs,"pt");
     });
-  },[rows,search,fG,fS,fM,sc,sd]);
+  },[rows,search,fG,fS,fM,fF,sc,sd]);
 
   const stats=useMemo(()=>{
     const total=filtered.length;
@@ -1926,7 +1943,11 @@ function App(){
             <option value="ENCERRADA">Encerrada</option>
           </select>
           <input type="month" className="fsel" value={fM} onChange={e=>setFM(e.target.value)} style={{width:"auto"}}/>
-          {(search||fG||fS||fM)&&<button className="btn btn-g btn-sm" onClick={()=>{setSearch("");setFG("");setFS("");setFM("");}}>✕ Filtros</button>}
+          <select className="fsel" value={fF} onChange={e=>setFF(e.target.value)} title="Mostra só as remoções em que falta a data ou a hora de um momento do caminho (para completar à mão). Saída e retorno só olham a hora.">
+            <option value="">Faltando…</option>
+            {FALTA_OPCOES.map(([k,rot])=><option key={k} value={k}>{rot}</option>)}
+          </select>
+          {(search||fG||fS||fM||fF)&&<button className="btn btn-g btn-sm" onClick={()=>{setSearch("");setFG("");setFS("");setFM("");setFF("");}}>✕ Filtros</button>}
           {sc!=="created_at"&&<button className="btn btn-g btn-sm" title="Voltar à ordem de inserção (mais recente primeiro)" onClick={resetSort} style={{color:"#F59E0B",borderColor:"#FCD34D"}}>⇅ Resetar ordem</button>}
           <div style={{marginLeft:"auto",display:"flex",gap:6,flexShrink:0,alignItems:"center"}}>
             <input type="file" accept=".json,application/json" ref={jsonFileRef} style={{display:"none"}}
