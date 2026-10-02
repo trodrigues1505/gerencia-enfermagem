@@ -324,6 +324,27 @@
 
   /* ══ API PÚBLICA ═════════════════════════════════════════════════════════ */
 
+  // ── AVC pela hipótese diagnóstica ──────────────────────────────────────────
+  // O campo "diagnostico" da planilha é texto livre OU CID (vem da CROSS "CID 1" ou do "hd" do Kanban).
+  // Conta como AVC: a sigla AVC/AVCI/AVCH/AVE, "acidente vascular", "derrame/infarto cerebral", "stroke"
+  // ou os CID I60 a I64. Não conta: AIT (ataque isquêmico transitório, G45) e as demais doenças cerebrovasculares.
+  // Citações de AVC ANTIGO (sequela de AVC, AVC prévio, histórico de AVC) ficam de fora e são devolvidas como
+  // "antigo", para poderem ser conferidas. É uma aproximação: depende de como o diagnóstico foi digitado.
+  var AVC_TERMO = "(?:AVC[IH]?|AVE|ACIDENTE VASCULAR(?: CEREBRAL| ENCEFALICO)?|DERRAME CEREBRAL|INFARTO CEREBRAL)";
+  var AVC_TEXTO = new RegExp("\\b(?:AVC[IH]?|AVE|STROKE)\\b|ACIDENTE VASCULAR|DERRAME CEREBRAL|INFARTO CEREBRAL");
+  var AVC_CID = /\bI6[0-4](?:\.?\d{1,2})?\b/;
+  var AVC_ANTIGO = new RegExp(
+    "(?:SEQUELAS?|PREVI[OA]|PREGRESS[OA]|ANTIG[OA]|HISTORIA|HISTORICO|HIST|HX|ANTECEDENTES?)(?:\\s+PREGRESS[OA])?\\s+(?:DE\\s+|DO\\s+)?" + AVC_TERMO +
+    "|" + AVC_TERMO + "\\s+(?:PREVI[OA]|PREGRESS[OA]|ANTIG[OA])\\b");
+  function classificarAVC(valor) {
+    if (valor === null || valor === undefined) return { avc: false, antigo: false, via: null };
+    var t = String(valor).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+    var via = AVC_TEXTO.test(t) ? "texto" : AVC_CID.test(t) ? "cid" : null;
+    if (!via) return { avc: false, antigo: false, via: null };
+    if (AVC_ANTIGO.test(t)) return { avc: false, antigo: true, via: via };
+    return { avc: true, antigo: false, via: via };
+  }
+
   function classificar(campo, valor) {
     if (isVazio(valor)) {
       return { canonico: NAO_INFORMADO, ok: false, motivo: "vazio", raw: valor };
@@ -406,7 +427,7 @@
 
   root.Canon = {
     norm: norm, isVazio: isVazio,
-    classificar: classificar, validarLinha: validarLinha,
+    classificar: classificar, classificarAVC: classificarAVC, validarLinha: validarLinha,
     agrupar: agrupar, parseSetor: parseSetor, ehVazamento: ehVazamento,
     EQUIPE_SEM: EQUIPE_SEM, ehSemEquipe: ehSemEquipe,
     NAO_CLASSIFICADO: NAO_CLASSIFICADO, NAO_INFORMADO: NAO_INFORMADO,
