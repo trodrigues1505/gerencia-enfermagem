@@ -222,6 +222,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   const [passoSaving,setPassoSaving]=useState(false);
   const [auditoria,setAuditoria]=useState(null);   // {registro, linhas|null, erro|null}
   const [loadingA,setLoadingA]=useState(false);
+  const [salvandoAVC,setSalvandoAVC]=useState(null);   // id do registro cuja marca de AVC está sendo gravada
 
   const notify=(tipo,texto)=>setToast({tipo,texto});
   useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(null),4500);return()=>clearTimeout(t);},[toast]);
@@ -418,6 +419,40 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
     }catch(e){console.error("[LivroSaida] falha ao marcar independente:",e);notify("erro",msgErro(e));}
   }
 
+  // Marca ou desmarca "Protocolo de AVC" num registro JÁ SALVO (esquecimento ao lançar o pedido). Só a administração.
+  // Se o registro já está vinculado à planilha, leva a marca para lá também (é de lá que o dashboard lê).
+  async function alternarAVC(p){
+    const novo=!(p.protocolo_avc===true);
+    setSalvandoAVC(p.id);
+    try{
+      const r=await fetch(`${SB_URL}/rest/v1/livro_saida?id=eq.${p.id}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=representation"},body:JSON.stringify({protocolo_avc:novo})});
+      if(!r.ok)throw new Error(await r.text());
+      const d=await r.json();
+      // o servidor devolve lista vazia (sem erro) quando a regra de acesso barra a alteração
+      if(!Array.isArray(d)||d.length===0)throw new Error("Sem permissão para alterar este registro, ou ele não existe mais.");
+      let extra="";
+      if(p.remocao_id){
+        let okPlan=false;
+        try{
+          const rp=await fetch(`${SB_URL}/rest/v1/remocoes?id=eq.${p.remocao_id}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=representation"},body:JSON.stringify({protocolo_avc:novo})});
+          const dp=rp.ok?await rp.json():null;
+          okPlan=Array.isArray(dp)&&dp.length>0;
+        }catch(_){}
+        extra=okPlan?" Planilha de remoção atualizada.":" Atenção: a planilha de remoção não foi atualizada, então o dashboard ainda não reflete a mudança.";
+      }else{
+        extra=" O dashboard passa a contar quando o registro for vinculado à planilha.";
+      }
+      if(novo&&(lsEhSem(p.medico)||lsEhSem(p.enfermeiro)))extra+=" Atenção: este registro consta como saída sem médico ou sem enfermeiro(a).";
+      notify("ok",(novo?"Marcado como protocolo de AVC.":"Marca de protocolo de AVC retirada.")+extra);
+      loadAndamento();loadPendentes();loadRemocoes();loadTodos();
+    }catch(e){
+      console.error("[LivroSaida] falha ao alterar a marca de AVC:",e);
+      const t=String(e&&e.message||"");
+      notify("erro",t.startsWith("Sem permiss")?t:(t.includes("protocolo_avc")||t.includes("PGRST204"))?"O banco ainda não tem a coluna do protocolo de AVC. Rode o avc-protocolo.sql no Supabase.":msgErro(e));
+    }
+    setSalvandoAVC(null);
+  }
+
   // Abre o formulário da PRÓXIMA etapa do registro: saída (se ainda não saiu) ou retorno.
   function abrirPasso(p){
     setPassoErros({});setPassoMsg("");
@@ -440,7 +475,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   // para os demais devolve "negado" e a administração atualiza depois (botão "Atualizar planilha" na aba Todos).
   async function sincronizarPlanilha(l,opts){
     const silencioso=!!(opts&&opts.silencioso);
-    if(!l.remocao_id||!(lsHora(l.hora_saida)||lsHora(l.hora_retorno)))return "nada";
+    if(!l.remocao_id||!(lsHora(l.hora_saida)||lsHora(l.hora_retorno)||l.protocolo_avc===true))return "nada";
     try{
       // compara com a linha ATUAL da planilha (e só envia o que realmente mudou)
       const rg=await fetch(`${SB_URL}/rest/v1/remocoes?id=eq.${l.remocao_id}&select=${LS_REM_SEL}`,{headers:LS_H()});
@@ -559,6 +594,11 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   // Selo de uma etapa: ✓ feita (com dia/hora) ou ○ aguardando
   const ETAPA=(feita,titulo,qd)=>React.createElement("span",{style:{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,padding:"2px 9px",borderRadius:99,fontWeight:700,background:feita?"#DCFCE7":"#F1F5F9",color:feita?"#15803D":"#94A3B8",border:`1px solid ${feita?"#86EFAC":"#E2E8F0"}`}},
     feita?"✓":"○"," ",titulo,qd?React.createElement("span",{style:{fontWeight:500,marginLeft:2}},qd):null);
+  // Botão (só administração) para marcar/desmarcar o protocolo de AVC de um registro já salvo
+  const BTN_AVC=p=>podeVincular?React.createElement("button",{key:"avc-"+p.id,onClick:()=>alternarAVC(p),disabled:salvandoAVC===p.id,
+    title:p.protocolo_avc?"Tirar a marca de protocolo de AVC deste registro":"Marcar este registro como protocolo de AVC (esqueceram de marcar ao lançar)",
+    style:{flexShrink:0,background:p.protocolo_avc?"#FFF1F2":"none",border:`1px solid ${p.protocolo_avc?"#FDA4AF":"#E2E8F0"}`,color:p.protocolo_avc?"#9F1239":"#475569",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:600,cursor:salvandoAVC===p.id?"not-allowed":"pointer",whiteSpace:"nowrap",opacity:salvandoAVC===p.id?.6:1}},
+    salvandoAVC===p.id?"Salvando…":(p.protocolo_avc?"Tirar marca de AVC":"Marcar protocolo de AVC")):null;
   // Selo de protocolo de AVC (aparece em todas as listas, junto da linha do tempo)
   const AVC_BADGE=React.createElement("span",{style:{display:"inline-flex",alignItems:"center",fontSize:10,padding:"2px 8px",borderRadius:99,fontWeight:800,letterSpacing:".04em",background:"#FFE4E6",color:"#9F1239",border:"1px solid #FDA4AF"}},"PROTOCOLO AVC");
   // Linha do tempo das três etapas, usada nas listas
@@ -750,8 +790,9 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                       ),
                       React.createElement("div",{style:{display:"flex",gap:6,flexShrink:0,alignItems:"center",flexWrap:"wrap",justifyContent:"flex-end"}},
                         (()=>{const rem=remocoes.find(x=>x.id===p.remocao_id);
-                          const desatual=podeVincular&&p.status_vinculo==="vinculado"&&(lsHora(p.hora_saida)||lsHora(p.hora_retorno))&&rem&&Object.keys(lsDiferencasPlanilha(p,rem)).length>0;
+                          const desatual=podeVincular&&p.status_vinculo==="vinculado"&&(lsHora(p.hora_saida)||lsHora(p.hora_retorno)||p.protocolo_avc===true)&&rem&&Object.keys(lsDiferencasPlanilha(p,rem)).length>0;
                           return desatual?React.createElement("button",{onClick:()=>sincronizarPlanilha(p),title:"A planilha de remoção está diferente do Livro (saída, retorno, equipe, Finalizado ou Permaneceu). Clique para copiar o que o Livro registrou.",style:{flexShrink:0,background:"#FFFBEB",border:"1px solid #FDE68A",color:"#92400E",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}},"⟳ Atualizar planilha"):null;})(),
+                        BTN_AVC(p),
                         React.createElement("button",{onClick:()=>abrirAuditoria(p),title:"Ver historico de auditoria",style:{background:"none",border:"1px solid #E2E8F0",color:"#475569",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}},"\u{1F5D2} Auditoria"),
                         podeVincular&&p.status_vinculo==="independente"&&React.createElement("button",{onClick:()=>handleReabrir(p.id),style:{flexShrink:0,background:"none",border:"1px solid #E2E8F0",color:"#1D4ED8",borderRadius:7,padding:"5px 11px",fontSize:11,fontWeight:600,cursor:"pointer"}},"↩ Reabrir")
                     )
@@ -785,7 +826,8 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                           LINHA_HORAS(p),
                           jaTemSaida&&React.createElement("div",{style:{fontSize:11,color:"#94A3B8",marginTop:2}},"Téc: ",nomeEq(p.tecnico_auxiliar)," · Méd: ",nomeEq(p.medico)),
                           LS_ASSINATURA(p),
-                          LS_ASSINATURA_SAIDA(p)
+                          LS_ASSINATURA_SAIDA(p),
+                          podeVincular&&React.createElement("div",{style:{marginTop:8}},BTN_AVC(p))
                         ),
                         !aberto&&React.createElement("button",{onClick:()=>abrirPasso(p),style:{flexShrink:0,background:jaTemSaida?"#16A34A":"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}},jaTemSaida?"↩ Registrar retorno":"🚑 Registrar saída")
                       ),
@@ -853,7 +895,8 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                       LS_ASSINATURA_RETORNO(p)
                     ),
                     React.createElement("div",{style:{display:"flex",gap:6,flexShrink:0,marginLeft:12,alignItems:"center"}},
-                      React.createElement("button",{onClick:()=>abrirAuditoria(p),title:"Ver historico de auditoria",style:{background:"none",border:"1px solid #E2E8F0",color:"#475569",borderRadius:7,padding:"5px 10px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}},"\u{1F5D2}"),
+                      BTN_AVC(p),
+                        React.createElement("button",{onClick:()=>abrirAuditoria(p),title:"Ver historico de auditoria",style:{background:"none",border:"1px solid #E2E8F0",color:"#475569",borderRadius:7,padding:"5px 10px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}},"\u{1F5D2}"),
                       podeVincular&&React.createElement("button",{onClick:()=>handleVincularPendente(p),style:{background:"#EFF6FF",border:"1px solid #BFDBFE",color:"#1D4ED8",borderRadius:7,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}},"🔗 Vincular"),
                       podeVincular&&React.createElement("button",{onClick:()=>setConfirmIgnorar(p),style:{background:"none",border:"1px solid #E2E8F0",color:"#64748B",borderRadius:7,padding:"5px 10px",fontSize:11,cursor:"pointer"}},"Sem vínculo"),
                       !podeVincular&&React.createElement("span",{style:{fontSize:10,fontWeight:700,color:"#B45309",background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:99,padding:"4px 10px",whiteSpace:"nowrap"}},"Aguardando confer\u00EAncia")
