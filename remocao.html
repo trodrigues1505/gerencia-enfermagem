@@ -390,7 +390,7 @@ const COLS = [
   ["horario_aceite_cross",    "HORÁRIO DO ACEITE CROSS",                "HOR. ACEITE CROSS", "hora_aceite", "time","",       "Hora em que a CROSS aceitou a solicitação. Fonte: Kanban 'hora_aceite'",60],
   ["data_retorno",            "DATA DO RETORNO DA AMBULÂNCIA",          "DATA RETORNO AMBULÂNCIA","—",      "date","",       "Dia em que a ambulância voltou (pode ser diferente do dia da saída). Fonte: Livro de Saída. \"≈\" = data deduzida pelo horário, não digitada",80],
   ["data_saida_real",         "DATA DA SAÍDA DA AMBULÂNCIA",            "DATA SAÍDA AMB.",   "—",           "date","",       "Dia em que a ambulância realmente SAIU (pode ser diferente do dia em que foi solicitada). Fonte: Livro de Saída. \"≈\" = data deduzida pelo horário, não digitada",80],
-  ["min_finalizacao_pedido_amb","TEMPO DA FINALIZAÇÃO CROSS ATÉ O PEDIDO DA AMBULÂNCIA","T. FINALIZ. → PEDIDO AMB.","—","ro","","Auto (calculada pelo banco): minutos entre a finalização da ficha na CROSS e o pedido da ambulância pela Santa Casa. Negativo = pedido registrado ANTES da finalização. Vazio = falta data ou hora de um dos dois. Não é editável",90],
+  ["min_finalizacao_pedido_amb","TEMPO DA FINALIZAÇÃO CROSS ATÉ O PEDIDO DA AMBULÂNCIA","T. FINALIZ. → PEDIDO AMB.","—","ro","","Auto (calculada pelo banco): tempo entre a finalização da ficha na CROSS e o pedido da ambulância pela Santa Casa. Negativo = pedido registrado ANTES da finalização. Vazio = falta data ou hora de um dos dois. Não é editável",90],
 ];
 
 // "SEM MÉDICO" etc.: afirmação explícita de que não houve aquele profissional (definida em canon.js)
@@ -461,7 +461,7 @@ function CelulaMinFinPed({value}){
   if(txt===null) return <div style={{padding:"2px 6px",fontSize:10,color:"#CBD5E1"}} title="Sem tempo: falta a data ou a hora da finalização da CROSS, ou do pedido da ambulância">—</div>;
   const antes=n<0;
   return <div style={{padding:"2px 6px",fontSize:10,fontWeight:700,whiteSpace:"nowrap",color:antes?"#B45309":"#7C3AED"}}
-    title={antes?`Pedido registrado ${Math.abs(n)} min ANTES da finalização da CROSS (pedido antecipado ou horário digitado errado)`:`${n} min entre a finalização da CROSS e o pedido da ambulância`}>{txt}</div>;
+    title={antes?`Pedido registrado ${fmtMinCol(Math.abs(n))} ANTES da finalização da CROSS (pedido antecipado ou horário digitado errado)`:`${txt} entre a finalização da CROSS e o pedido da ambulância`}>{txt}</div>;
 }
 
 // Toggle Sim/Não para campos booleanos
@@ -1846,16 +1846,17 @@ function App(){
       };
       // Na exportação o valor continua "HH:MM" (dá para somar/ordenar no Excel); o título passa a dizer que são horas:minutos.
       const hdr=["#",...COLS.map(([f,pl])=>String(pl||"")+((f==="tempo_espera"||f==="duracao_remocao")?" (horas:minutos)":(f==="min_finalizacao_pedido_amb"?" (minutos)":"")))];
+      hdr.push("TEMPO DA FINALIZAÇÃO CROSS ATÉ O PEDIDO DA AMBULÂNCIA (horas e minutos)");   // ao lado da coluna em minutos, só para leitura
       const snapshot=[...filtered]; // captura o array neste momento
       const data=snapshot.map((r,i)=>[i+1,...COLS.map(([f])=>{
         const v=safe(r[f]);
         if(f==="data_solicitacao"&&v){try{return new Date(v+"T12:00:00").toLocaleDateString("pt-BR");}catch{return String(v);}}
         if(f==="gravidade"&&v)return String(gravInfo(v).label||v);
         return String(v);
-      })]);
+      }),fmtMinCol(r.min_finalizacao_pedido_amb)||""]);
       const xlsSheet=window.XLSX.utils.aoa_to_sheet([hdr,...data]);
       const cw={min_finalizacao_pedido_amb:14,data_retorno:12,data_saida_real:12,data_aceite_cross:12,horario_aceite_cross:10,data_solicitacao:12,horario_solicitacao:8,ficha_cross:18,nome_paciente:26,setor:18,procedimento:14,especialidade:18,diagnostico:24,status:28,gravidade:14,data_resposta_cross:12,horario_resposta_cross:8,instituicao_destino:20,tipo_ambulancia:12,data_saida_ambulancia:12,hora_solic_ambulancia:10,horario_saida_ambulancia:10,tempo_espera:10,observacao:28,enfermeiro:16,tecnico_auxiliar:16,medico:16,horario_retorno:10,duracao_remocao:12};
-      xlsSheet["!cols"]=[{wch:4},...COLS.map(([f])=>({wch:cw[f]||14}))];
+      xlsSheet["!cols"]=[{wch:4},...COLS.map(([f])=>({wch:cw[f]||14})),{wch:18}];
       const wb=window.XLSX.utils.book_new();
       window.XLSX.utils.book_append_sheet(wb,"Remoções",xlsSheet);
       const fname=`remocoes_${new Date().toISOString().slice(0,10)}.xlsx`;
