@@ -11,10 +11,8 @@ function CalendarView({
   const [filterCol, setFilterCol] = useState("all");
   const [dateSources, setDateSources] = useState({
     adm: true,
-    aceite: true,
-    criado: false,
-    saida: false,
-    retorno: false
+    aceite: true,   // chave antiga mantida: agora é a Finalização CROSS (o aceite é o mesmo momento)
+    criado: false
   });
   const [rangeStart, setRangeStart] = useState(() => today.toISOString().split("T")[0]);
   const [rangeEnd, setRangeEnd] = useState(() => {
@@ -49,10 +47,8 @@ function CalendarView({
       });
     };
     if (dateSources.adm) push(parseDate(c.adm, year), "Admissão");
-    if (dateSources.aceite) push(parseDate(c.data_aceite, year), "Aceite");
+    if (dateSources.aceite) push(parseDate(c.data_resolucao, year), "Finalização CROSS");
     if (dateSources.criado && c.created_at) push(new Date(c.created_at), "Criado");
-    if (dateSources.saida) push(parseDate(c.saida, year), "Saída");
-    if (dateSources.retorno) push(parseDate(c.retorno, year), "Retorno");
     return dates;
   }
   const filteredCards = filterCol === "all" ? cards : cards.filter(c => c.col_id === filterCol);
@@ -79,20 +75,12 @@ function CalendarView({
     color: "#F59E0B"
   }, {
     k: "aceite",
-    label: "Aceite",
+    label: "Finalização CROSS",
     color: "#3B82F6"
   }, {
     k: "criado",
     label: "Criado",
     color: "#8B5CF6"
-  }, {
-    k: "saida",
-    label: "Saída",
-    color: "#16A34A"
-  }, {
-    k: "retorno",
-    label: "Retorno",
-    color: "#EC4899"
   }];
   const SRC_COLOR = SRC_OPTS.reduce((acc, o) => ({
     ...acc,
@@ -100,10 +88,8 @@ function CalendarView({
   }), {});
   const labelToSrc = {
     "Admissão": "adm",
-    "Aceite": "aceite",
-    "Criado": "criado",
-    "Saída": "saida",
-    "Retorno": "retorno"
+    "Finalização CROSS": "aceite",
+    "Criado": "criado"
   };
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstWeekday = new Date(year, month, 1).getDay();
