@@ -48,20 +48,16 @@ function lsCheckEquipeAVC(o){
   if(falta("enfermeiro"))return {campo:"enfermeiro",msg:"Protocolo de AVC: a ambulância tem que sair com enfermeiro(a). “Saiu sem enfermeiro(a)” não é aceito."};
   return null;
 }
-// Diferença entre dois momentos (data + hora) em "HH:MM". Com as duas datas, usa-as (o pedido pode ser num dia e a saída
-// no outro); sem elas, assume a virada de meia-noite (23:10 -> 01:40).
+// Diferença entre dois momentos (data + hora) em "HH:MM". SEM suposição: precisa das DUAS datas e dos DOIS horários, e o fim não pode
+// ser antes do início. Faltou algo, ou ficou fora de ordem: devolve "" (a planilha fica sem o tempo, em vez de um valor inventado).
+// O pedido pode ser num dia e a saída no outro (pedido 10:00 dia 1, saída 12:00 dia 2 = 26:00). Mesma regra de remocao.html.
 function lsDiff(dIni,hIni,dFim,hFim){
   const a=lsHora(hIni),b=lsHora(hFim);
-  if(!a||!b)return "";
-  let min=null;
-  if(dIni&&dFim){
-    const t1=new Date(`${String(dIni).slice(0,10)}T${a.padStart(5,"0")}:00`),t2=new Date(`${String(dFim).slice(0,10)}T${b.padStart(5,"0")}:00`);
-    if(!isNaN(t1)&&!isNaN(t2)&&t2>=t1)min=Math.round((t2-t1)/60000);
-  }
-  if(min===null){
-    const [h1,m1]=a.split(":").map(Number),[h2,m2]=b.split(":").map(Number);
-    min=(h2*60+m2)-(h1*60+m1);if(min<0)min+=1440;
-  }
+  const di=String(dIni||"").slice(0,10),df=String(dFim||"").slice(0,10);
+  if(!a||!b||!/^\d{4}-\d{2}-\d{2}$/.test(di)||!/^\d{4}-\d{2}-\d{2}$/.test(df))return "";
+  const t1=new Date(`${di}T${a.padStart(5,"0")}:00`),t2=new Date(`${df}T${b.padStart(5,"0")}:00`);
+  if(isNaN(t1)||isNaN(t2)||t2<t1)return "";
+  const min=Math.round((t2-t1)/60000);
   return String(Math.floor(min/60)).padStart(2,"0")+":"+String(min%60).padStart(2,"0");
 }
 // Tudo que o Livro sabe e a planilha tem coluna para receber. Só vai o que foi preenchido:
@@ -86,7 +82,7 @@ function lsLivroParaPlanilha(l){
   // tempos calculados (com as datas, porque cada etapa pode ser num dia diferente)
   const te=lsDiff(l.data_solic_ambulancia,l.hora_solic_ambulancia,l.data_saida,l.hora_saida);
   if(te)u.tempo_espera=te;
-  const du=lsDiff(l.data_saida,l.hora_saida,l.data_retorno||l.data_saida,l.hora_retorno);
+  const du=lsDiff(l.data_saida,l.hora_saida,l.data_retorno,l.hora_retorno);
   if(du)u.duracao_remocao=du;
   return u;
 }
@@ -113,7 +109,7 @@ function lsDiferencasPlanilha(l,rem){
   else if(u.data_retorno)u.data_retorno_inferida=false;
   if(u.data_saida_real||u.horario_saida_ambulancia||u.data_retorno||u.horario_retorno){
     const te=lsDiff(l.data_solic_ambulancia,l.hora_solic_ambulancia,l.data_saida,l.hora_saida);if(te)u.tempo_espera=te;
-    const du=lsDiff(l.data_saida,l.hora_saida,l.data_retorno||l.data_saida,l.hora_retorno);if(du)u.duracao_remocao=du;
+    const du=lsDiff(l.data_saida,l.hora_saida,l.data_retorno,l.hora_retorno);if(du)u.duracao_remocao=du;
   }
   return u;
 }
@@ -727,8 +723,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
               FLD("ambulancia","Tipo de Ambulância",React.createElement("select",{value:form.ambulancia,onChange:e=>set("ambulancia",e.target.value),style:sS("ambulancia")},
                 React.createElement("option",{value:""},"— selecione —"),
                 React.createElement("option",{value:"BÁSICA"},"🚑 BÁSICA (SBV)"),
-                React.createElement("option",{value:"AVANÇADA"},"🚨 AVANÇADA (SAV)"),
-                React.createElement("option",{value:"UTI"},"🏥 UTI Móvel")
+                React.createElement("option",{value:"AVANÇADA"},"🚨 AVANÇADA (SAV)")
               ))
             )
           ),
