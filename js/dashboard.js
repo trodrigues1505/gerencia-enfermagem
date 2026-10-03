@@ -156,7 +156,7 @@ function DashFilaKanban({ cols, cards, Card, Num, titulo }) {
           lista.length === 0
             ? h("div", { style: { padding: "24px 0", textAlign: "center", color: "#94A3B8", fontSize: 13 } }, "Nenhum paciente aqui agora.")
             : lista.map((c, i) => {
-                const g = GC[c.grav] || GC.urgencia;
+                const g = GC[c.grav] || (typeof GC_SEM !== "undefined" ? GC_SEM : GC.urgencia);
                 const cat = catRotulo(c);
                 const meta = [c.setor, c.rec, sel.chave === "__semhosp" ? rotuloCol(c.col_id) : (c.hosp ? "→ " + c.hosp : null)].filter(Boolean).join(" · ");
                 return h("div", { key: c.id, style: { padding: "11px 0", borderTop: i ? "1px solid #F1F5F9" : "none" } },
@@ -517,6 +517,8 @@ function DashVolume({ serie, escala, rotulo, rotuloLongo, entrou, totais, notas,
  *   "acompanhar" = pode ser normal (ainda aguardando), mas vale conferir
  * Componente próprio, fora do Dashboard, pelo mesmo motivo dos outros: abrir/fechar uma lista não refaz a tela.        */
 const DASH_SANEAMENTO_SECOES = [
+  { id: "fila",    titulo: "Fila e tarefas" },
+  { id: "livro",   titulo: "Livro de Saída" },
   { id: "datas",   titulo: "Datas e horários" },
   { id: "fichas",  titulo: "Fichas CROSS e tipo da remoção" },
   { id: "listas",  titulo: "Valores fora da lista" },
@@ -531,9 +533,9 @@ const DASH_CAMPOS_LISTA = [
 ];
 const DASH_PROBLEMAS_DEF = [
   { id: "sem_data_sol", secao: "datas", tipo: "corrigir", titulo: "Sem data de solicitação",
-    ajuda: "A linha não entra em nenhum período (só em “Tudo”) nem nas contagens por dia. Preencha DATA SOLIC. Em períodos curtos só aparecem as linhas que têm outra data dentro do período." },
-  { id: "sol_futuro", secao: "datas", tipo: "corrigir", titulo: "Data de solicitação no futuro",
-    ajuda: "Provável erro de digitação (dia, mês ou ano). A linha fica fora de todos os períodos." },
+    ajuda: "A linha não pertence a período nenhum e fica fora das contagens por dia. Preencha DATA SOLIC. Esta lista olha a base inteira, não só o período escolhido." },
+  { id: "data_impossivel", secao: "datas", tipo: "corrigir", titulo: "Data impossível (antes de 2020 ou depois de hoje)",
+    ajuda: "Provável erro de digitação no dia, no mês ou no ano (ex.: 0002 ou 1984). A linha não entra em período nenhum e distorce gráficos e tempos. Esta lista olha a base inteira, não só o período escolhido." },
   { id: "fin_incompleta", secao: "datas", tipo: "corrigir", titulo: "Finalização da CROSS incompleta",
     ajuda: "Tem a data ou o horário da finalização, falta o outro. Sem os dois, a finalização não conta." },
   { id: "ped_incompleto", secao: "datas", tipo: "corrigir", titulo: "Solicitação da ambulância incompleta",
@@ -560,7 +562,17 @@ const DASH_PROBLEMAS_DEF = [
   { id: "ficha_repetida", secao: "fichas", tipo: "corrigir", titulo: "Ficha CROSS repetida",
     ajuda: "A mesma ficha em mais de uma linha conta duas vezes. Se for duplicidade, apague uma; se forem remoções diferentes, confira o número." },
   { id: "fin_sem_ficha", secao: "fichas", tipo: "corrigir", titulo: "Finalização da CROSS, mas sem Nº da ficha",
-    ajuda: "A linha conta como “outra remoção”, mas tem data e hora de finalização da CROSS. Provavelmente falta o Nº da ficha." }
+    ajuda: "A linha conta como “outra remoção”, mas tem data e hora de finalização da CROSS. Provavelmente falta o Nº da ficha." },
+  { id: "emerg_pendente", secao: "fila", tipo: "atencao", titulo: "Emergências aguardando aceite",
+    ajuda: "Cards de gravidade Emergência na coluna Pendente de aceite." },
+  { id: "discrepancia_fila", secao: "fila", tipo: "atencao", titulo: "Discrepâncias de fila",
+    ajuda: "Paciente menos grave com aceite confirmado, na mesma especialidade de outro mais grave ainda pendente, sem avaliação médica registrada. Pode indicar inversão de fila. Quem tem permissão registra a razão clínica em “Justificar”." },
+  { id: "tarefas", secao: "fila", tipo: "acompanhar", titulo: "Tarefas de enfermagem pendentes",
+    ajuda: "Tarefas pendentes, iniciadas ou pausadas. Abra o painel de tarefas para atualizar." },
+  { id: "livro_pendente", secao: "livro", tipo: "corrigir", titulo: "Saídas no Livro aguardando vínculo com a planilha",
+    ajuda: "A ambulância saiu e o Livro de Saída registrou, mas a entrada ainda não foi ligada a uma linha da planilha. Enquanto isso o painel NÃO enxerga essa saída: ela não entra nas barras, nos tempos nem nos indicadores. Abra o Livro de Saída e vincule." },
+  { id: "livro_independente", secao: "livro", tipo: "acompanhar", titulo: "Saídas no Livro marcadas como “Sem vínculo”",
+    ajuda: "Alguém decidiu que a entrada não tem linha na planilha. O painel não conta essa saída. Confirme que é isso mesmo; se a remoção existe na planilha, desfaça o “Sem vínculo” e vincule." }
 ].concat(DASH_CAMPOS_LISTA.map(([campo, rot]) => ({
   id: "cls_" + campo, secao: "listas", tipo: "corrigir", titulo: rot + " fora da lista",
   ajuda: "O valor não está na lista oficial e aparece como “Não classificado” nos gráficos. Troque por um valor da lista, na planilha."
@@ -586,57 +598,73 @@ const DASH_PROBLEMAS_DEF = [
     ajuda: "Pedidos CROSS com finalização e ainda sem saída de ambulância. Normal enquanto a ambulância não sai; se já saiu, preencha a saída." }
 ]);
 
-function DashSaneamento({ grupos, total, Titulo }) {
+function DashSaneamento({ grupos, total, Titulo, onAbrirCard, onAbrirAcoes, onAbrirLivro, onJustificar, podeJustificar }) {
   const h = React.createElement;
-  const [aberto, setAberto] = useState(null);   // id do grupo com a lista aberta
+  const [expandido, setExpandido] = useState(false);   // começa recolhido: só o resumo por seção
+  const [aberto, setAberto] = useState(null);          // id do grupo com a lista aberta
   const LIMITE = 150;
   const comItens = grupos.filter(g => g.itens.length);
-  const nCorr = comItens.filter(g => g.tipo === "corrigir").reduce((t, g) => t + g.itens.length, 0);
-  const nAcomp = comItens.filter(g => g.tipo === "acompanhar").reduce((t, g) => t + g.itens.length, 0);
-  const alerta = nCorr > 0;
+  const soma = tipo => comItens.filter(g => g.tipo === tipo).reduce((t, g) => t + g.itens.length, 0);
+  const nCorr = soma("corrigir"), nAtenc = soma("atencao"), nAcomp = soma("acompanhar");
+  const alerta = nCorr + nAtenc > 0;
   const linhaAlerta = alerta ? "#FDE68A" : "#F1F5F9";
+  const COR = { corrigir: ["#92400E", "#FEF3C7"], atencao: ["#B91C1C", "#FEE2E2"], acompanhar: ["#475569", "#F1F5F9"] };
+  const resumo = [nCorr && `${nCorr} para corrigir`, nAtenc && `${nAtenc} para atender`, nAcomp && `${nAcomp} para acompanhar`].filter(Boolean).join(" · ");
 
   const grupo = g => {
-    const ab = aberto === g.id, corr = g.tipo === "corrigir";
+    const ab = aberto === g.id, [corTxt, corBg] = COR[g.tipo];
     return h("div", { key: g.id, style: { borderTop: "1px solid " + linhaAlerta } },
       h("button", {
         type: "button", "aria-expanded": ab, onClick: () => setAberto(ab ? null : g.id),
         style: { width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 2px", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }
       },
         h("span", { style: { flex: 1, fontSize: 12.5, fontWeight: 600, color: "#0F172A" } }, g.titulo),
-        h("span", { style: { fontSize: 11, fontWeight: 700, borderRadius: 99, padding: "1px 9px", color: corr ? "#92400E" : "#475569", background: corr ? "#FEF3C7" : "#F1F5F9" } }, g.itens.length),
+        h("span", { style: { fontSize: 11, fontWeight: 700, borderRadius: 99, padding: "1px 9px", color: corTxt, background: corBg } }, g.itens.length),
         h("span", { style: { fontSize: 11, color: "#94A3B8", width: 12 } }, ab ? "▾" : "▸")),
       ab && h("div", { style: { padding: "0 2px 12px" } },
         h("div", { style: { fontSize: 11, color: "#78716C", lineHeight: 1.55, marginBottom: 8 } }, g.ajuda),
         g.itens.slice(0, LIMITE).map((p, i) => {
+          const botoes = [];
+          if (p.justificar && podeJustificar && onJustificar) botoes.push(["Justificar", () => onJustificar(p.justificar), true]);
+          if (p.card && onAbrirCard) botoes.push(["abrir card →", () => onAbrirCard(p.card)]);
+          if (p.tarefas && onAbrirAcoes) botoes.push(["abrir tarefas →", () => onAbrirAcoes()]);
+          if (p.livro && onAbrirLivro) botoes.push(["abrir o Livro →", () => onAbrirLivro()]);
           const comLink = !!p.campo;
-          return h(comLink ? "a" : "div", Object.assign({
-            key: i,
-            style: { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", fontSize: 11.5, padding: "7px 8px", textDecoration: "none", borderRadius: 8, color: "#475569", transition: "background .15s" }
-          }, comLink ? {
-            href: `remocao.html?foco=${encodeURIComponent(p.id)}&campo=${encodeURIComponent(p.campo)}`,
-            onMouseEnter: e => { e.currentTarget.style.background = alerta ? "#FEF3C7" : "#F8FAFC"; },
-            onMouseLeave: e => { e.currentTarget.style.background = "transparent"; }
-          } : {}),
-            h("span", { style: { fontWeight: 600, color: "#0F172A" } }, p.nome),
-            p.ficha && h("span", { style: { color: "#94A3B8" } }, p.ficha),
-            h("span", { style: { flex: "1 1 220px" } }, p.motivo),
-            comLink && h("span", { style: { marginLeft: "auto", fontWeight: 700, color: corr ? "#B45309" : "#64748B", whiteSpace: "nowrap" } }, corr ? "corrigir →" : "abrir →"));
+          const corpo = [
+            h("span", { key: "n", style: { fontWeight: 600, color: "#0F172A" } }, p.nome),
+            p.ficha && h("span", { key: "f", style: { color: "#94A3B8" } }, p.ficha),
+            h("span", { key: "m", style: { flex: "1 1 220px" } }, p.motivo),
+            comLink && h("span", { key: "l", style: { marginLeft: "auto", fontWeight: 700, color: corTxt, whiteSpace: "nowrap" } }, g.tipo === "corrigir" ? "corrigir →" : "abrir →"),
+            botoes.map(([rot, fn, forte], k) => h("button", { key: "b" + k, type: "button", onClick: fn,
+              style: { marginLeft: k === 0 && !comLink ? "auto" : 0, padding: "3px 10px", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                       border: forte ? "none" : "1px solid #CBD5E1", background: forte ? "#0F172A" : "transparent", color: forte ? "#fff" : "#475569" } }, rot))
+          ];
+          const estilo = { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", fontSize: 11.5, padding: "7px 8px", textDecoration: "none", borderRadius: 8, color: "#475569", transition: "background .15s" };
+          return comLink
+            ? h("a", { key: i, href: `remocao.html?foco=${encodeURIComponent(p.id)}&campo=${encodeURIComponent(p.campo)}`, style: estilo,
+                onMouseEnter: e => { e.currentTarget.style.background = alerta ? "#FEF3C7" : "#F8FAFC"; },
+                onMouseLeave: e => { e.currentTarget.style.background = "transparent"; } }, corpo)
+            : h("div", { key: i, style: estilo }, corpo);
         }),
         g.itens.length > LIMITE && h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "6px 8px" } }, `Mostrando ${LIMITE} de ${g.itens.length}. Corrija estas e a lista avança.`)));
   };
 
-  return h("div", { style: { background: alerta ? "#FFFBEB" : "#fff", border: "1px solid " + (alerta ? "#FDE68A" : "#E8EDF3"), borderRadius: 14, padding: "16px 18px", marginBottom: 14 } },
-    h(Titulo, {
-      extra: alerta ? `${nCorr} para corrigir${nAcomp ? ` · ${nAcomp} para acompanhar` : ""}` : (nAcomp ? `${nAcomp} para acompanhar` : "nada a corrigir"),
-      tooltip: "Tudo o que, na planilha, está faltando, incompleto, fora de ordem, fora da lista ou suspeito e poderia distorcer os números. O painel não completa nem adivinha: o que está com problema fica fora da conta e aparece aqui, com link para abrir a linha na planilha. “Aguardando” é o que pode ser normal, mas vale conferir. Uma mesma linha pode aparecer em mais de uma lista."
-    }, "Saneamento de falhas"),
+  return h("div", { style: { background: alerta ? "#FFFBEB" : "#fff", border: "1px solid " + (alerta ? "#FDE68A" : "#E8EDF3"), borderRadius: 14, padding: "16px 18px", marginBottom: 18 } },
+    h("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, cursor: comItens.length ? "pointer" : "default" },
+        onClick: () => comItens.length && setExpandido(v => !v) },
+      h("div", { style: { flex: 1 } }, h(Titulo, {
+        extra: comItens.length ? "" : "nada a corrigir",
+        tooltip: "Tudo o que, na planilha, no Kanban, no Livro de Saída e nas tarefas, está faltando, incompleto, fora de ordem, fora da lista ou pedindo atenção, e poderia distorcer os números ou atrasar o paciente. O painel não completa nem adivinha: o que está com problema fica fora da conta e aparece aqui, com link ou botão para abrir o caso. “Para atender” é fila e emergência; “aguardando” é o que pode ser normal, mas vale conferir. Uma mesma linha pode aparecer em mais de uma lista."
+      }, "Saneamento de falhas")),
+      comItens.length > 0 && h("div", { style: { fontSize: 11, color: alerta ? "#B45309" : "#64748B", whiteSpace: "nowrap" } }, resumo + (expandido ? "  ▴" : "  ▾"))),
     comItens.length === 0
       ? h("div", { style: { fontSize: 12, color: "#15803D", padding: "4px 0 2px" } }, `Nenhuma falha encontrada nas ${total} linhas do período.`)
       : DASH_SANEAMENTO_SECOES.map(sec => {
           const gs = comItens.filter(g => g.secao === sec.id);
           if (!gs.length) return null;
           const n = gs.reduce((t, g) => t + g.itens.length, 0);
+          if (!expandido) return h("div", { key: sec.id, style: { display: "flex", justifyContent: "space-between", fontSize: 12, color: "#475569", padding: "4px 0" } },
+            h("span", null, sec.titulo), h("span", { style: { fontWeight: 700, color: "#0F172A" } }, n));
           return h("div", { key: sec.id, style: { marginTop: 12 } },
             h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 10.5, fontWeight: 700, color: sec.id === "aguarda" ? "#64748B" : "#92400E", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 2 } },
               h("span", null, sec.titulo), h("span", { style: { fontWeight: 600, opacity: 0.8 } }, n)),
@@ -644,18 +672,24 @@ function DashSaneamento({ grupos, total, Titulo }) {
         }));
 }
 
-function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, currentUser, discrepancias, showT: showTProp }) {
+function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, currentUser, discrepancias, onAbrirCard, onAbrirAcoes, onAbrirLivro, showT: showTProp }) {
   const showT = showTProp || function () {};
   const [remocoes, setRemocoes] = useState([]);
   const [carregando, setCarregando] = useState(true);   // só a 1ª carga troca a tela inteira por "Carregando…"
   const [atualizando, setAtualizando] = useState(false); // trocas de período: mantém a tela e mostra "atualizando…"
   const [erro, setErro] = useState("");
   const [escala, setEscala] = useState("dia");
-  // "90d" e não "tudo": a abertura não baixa mais o histórico inteiro. "Tudo" continua um clique de distância.
-  const [periodo, setPeriodo] = useState("90d");
+  // Períodos: "hoje" · "7d" (últimos 7 dias) · "mes" (mês e ano escolhidos) · "custom" (de dd/mm/aaaa a dd/mm/aaaa).
+  // Abre no mês atual. Não existe mais "Tudo": para ver a base inteira, use Período cobrindo todas as datas.
+  const [periodo, setPeriodo] = useState("mes");
+  const [mesSel, setMesSel] = useState(() => new Date().getMonth());
+  const [anoSel, setAnoSel] = useState(() => new Date().getFullYear());
   const [ini, setIni] = useState("");
   const [fim, setFim] = useState("");
-  const [verDiscrep, setVerDiscrep] = useState(false);
+  // Buscas à parte (independem do período escolhido). Se uma delas falhar (sem permissão, sem rede), o painel segue e só não lista aquele grupo.
+  const [anomalas, setAnomalas] = useState([]);          // linhas sem data de solicitação ou com data impossível, de TODA a base
+  const [tarefas, setTarefas] = useState([]);            // tarefas de enfermagem pendentes
+  const [livroSemVinculo, setLivroSemVinculo] = useState([]);   // saídas do Livro sem linha na planilha
   const [justModal, setJustModal] = useState(null);
   const [justTexto, setJustTexto] = useState("");
   const [justSaving, setJustSaving] = useState(false);
@@ -668,44 +702,52 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const hojeIso = iso(hoje);
   // "7 dias" = hoje + os 6 anteriores (7 datas). Antes pegava 8.
-  const diasJanela = { hoje: 1, "7d": 7, "30d": 30, "90d": 90 }[periodo] || 0;
-  const inicioJanela = diasJanela
-    ? iso(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - (diasJanela - 1))) : null;
+  // Faixa de datas do período escolhido. null = Período com datas faltando ou invertidas (nada é carregado até corrigir).
+  const faixa = periodo === "hoje" ? { ini: hojeIso, fim: hojeIso }
+    : periodo === "7d" ? { ini: iso(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 6)), fim: hojeIso }
+    : periodo === "mes" ? { ini: iso(new Date(anoSel, mesSel, 1)), fim: iso(new Date(anoSel, mesSel + 1, 0)) }
+    : (ini && fim && ini <= fim) ? { ini, fim } : null;
+  const fIni = faixa ? faixa.ini : "", fFim = faixa ? faixa.fim : "";
 
   /* ── Carga das remoções ───────────────────────────────────────────────────
    * O período vai para o SERVIDOR, então a tela baixa só o que vai mostrar, e a leitura é feita em páginas de 1.000
    * (sbGetTodas), então nada é cortado em silêncio. Como o gráfico conta saídas, pedidos e finalizações cada um no seu dia,
    * a linha vem se QUALQUER uma das três datas cair na janela (or=): um paciente pedido dia 27 que saiu dia 1º precisa vir.
    * O filtro do navegador (`dados`, mais abaixo) continua valendo para as demais seções: ele usa só a data do pedido.
-   * Linhas sem nenhuma data só vêm em "Tudo", como antes.
-   * Fica DEPOIS de inicioJanela porque usa esse valor na lista de dependências.                                         */
+   * Linhas sem data de solicitação não pertencem a período nenhum: aparecem em Saneamento de falhas (busca à parte, abaixo).
+   * Fica DEPOIS de `faixa` porque usa os limites dela na lista de dependências.                                          */
   useEffect(() => {
     let vivo = true;
+    if (!fIni || !fFim) { setCarregando(false); setAtualizando(false); return; }
     (async () => {
       setAtualizando(true);
       try {
-        let filtro = "";
-        if (periodo === "custom") {
-          if (ini && fim) filtro = `&or=(${DASH_CAMPOS_DATA.map(c => `and(${c}.gte.${ini},${c}.lte.${fim})`).join(",")})`;
-        } else if (inicioJanela) {
-          filtro = `&or=(${DASH_CAMPOS_DATA.map(c => `${c}.gte.${inicioJanela}`).join(",")})`;
-        }
+        const filtro = `&or=(${DASH_CAMPOS_DATA.map(c => `and(${c}.gte.${fIni},${c}.lte.${fFim})`).join(",")})`;
         const r = await sbGetTodas("remocoes?select=*&order=data_solicitacao.desc,id.asc" + filtro);
         if (vivo) { setRemocoes(r); setErro(""); }
       } catch (e) { if (vivo) setErro(e.message); }
       finally { if (vivo) { setCarregando(false); setAtualizando(false); } }
     })();
     return () => { vivo = false; };
-  }, [periodo, ini, fim, inicioJanela]);
+  }, [fIni, fFim]);
+
+  useEffect(() => {
+    let vivo = true;
+    const lim = "2020-01-01", campos = ["data_solicitacao", "data_resposta_cross", "data_saida_ambulancia", "data_saida_real", "data_retorno"];
+    const cond = ["data_solicitacao.is.null"].concat(campos.reduce((acc, c) => acc.concat([`${c}.lt.${lim}`, `${c}.gt.${hojeIso}`]), []));
+    sbGetTodas(`remocoes?select=id,nome_paciente,ficha_cross,${campos.join(",")}&or=(${cond.join(",")})&order=id.asc`)
+      .then(r => { if (vivo) setAnomalas(r); }).catch(() => {});
+    sbGetTodas("acoes_enfermagem?status=in.(pendente,iniciada,pausada)&select=id,titulo,status,prioridade,responsavel_nome,prazo&order=prioridade.asc.nullslast,created_at.asc")
+      .then(r => { if (vivo) setTarefas(r); }).catch(() => {});
+    sbGetTodas("livro_saida?status_vinculo=in.(pendente,independente)&select=id,nome_paciente,data_saida,hora_saida,destino,status_vinculo,created_at&order=created_at.desc")
+      .then(r => { if (vivo) setLivroSemVinculo(r.filter(x => x.hora_saida || x.data_saida)); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [hojeIso]);
 
   const dados = useMemo(() => {
-    if (periodo === "tudo") return remocoes;
-    if (periodo === "custom") {
-      if (!ini || !fim) return remocoes;
-      return remocoes.filter(r => r.data_solicitacao >= ini && r.data_solicitacao <= fim);
-    }
-    return remocoes.filter(r => { const d = r.data_solicitacao || ""; return d >= inicioJanela && d <= hojeIso; });
-  }, [remocoes, periodo, ini, fim, inicioJanela, hojeIso]);
+    if (!fIni || !fFim) return [];
+    return remocoes.filter(r => { const d = r.data_solicitacao || ""; return d >= fIni && d <= fFim; });
+  }, [remocoes, fIni, fFim]);
 
   /* ── Amplitude real da base: decide quais escalas fazem sentido ───────────
    * Calculada sobre `dados` (pedidos dentro do período), como antes, e não sobre tudo o que veio do servidor: a busca agora
@@ -722,13 +764,11 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
   // Quantos dias o período realmente cobre (denominador do "por dia").
   // Antes dividia pelo tamanho da BASE INTEIRA, subestimando em qualquer recorte.
-  const diasNoPeriodo = !amplitude.min ? 0
-    : periodo === "tudo" ? amplitude.dias
-    : periodo === "custom" ? ((ini && fim) ? Math.max(1, Math.round((new Date(fim) - new Date(ini)) / 86400000) + 1) : amplitude.dias)
-    : (() => {
-        const a = inicioJanela > amplitude.min ? inicioJanela : amplitude.min; // base mais curta que a janela
-        return Math.max(1, Math.round((new Date(hojeIso) - new Date(a)) / 86400000) + 1);
-      })();
+  const diasNoPeriodo = (!amplitude.min || !fIni) ? 0 : (() => {
+    const a = fIni > amplitude.min ? fIni : amplitude.min;   // base mais curta que o período
+    const b = fFim < hojeIso ? fFim : hojeIso;               // período em andamento: conta até hoje
+    return Math.max(1, Math.round((new Date(b) - new Date(a)) / 86400000) + 1);
+  })();
 
   const escalaLiberada = {
     dia: true,
@@ -743,11 +783,11 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
   /* ── Volume de remoções: três séries, cada uma no seu dia ─────────────────
    * Limites da janela (null = sem limite). Valem para as três séries, então um evento fora da janela não entra.        */
-  const limInf = periodo === "custom" ? ((ini && fim) ? ini : null) : inicioJanela;
-  const limSup = periodo === "custom" ? ((ini && fim) ? fim : null) : (inicioJanela ? hojeIso : null);
+  const limInf = fIni || "9999-12-31";   // sem período válido, nada entra
+  const limSup = fFim || "0000-01-01";
 
   const eventos = useMemo(() => {
-    const dentro = d => !!d && (!limInf || d >= limInf) && (!limSup || d <= limSup);
+    const dentro = d => !!d && d >= limInf && d <= limSup;
     const out = { saidas: [], pedidos: [], finalizacoes: [] };
     remocoes.forEach(r => {
       const p = dashDiaIso(r.data_solicitacao), f = dashDiaIso(r.data_resposta_cross), s = dashDiaDaSaida(r);
@@ -782,8 +822,8 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     if (!keys.length) return [];
     // Na escala diária o gráfico vai do primeiro ao último dia do período escolhido, mesmo que as pontas não tenham movimento;
     // sem isso o gráfico cortava o dia de hoje (e dias vazios no começo) e parecia menor que o período escolhido.
-    const ini0 = limInf && escalaEfetiva === "dia" ? limInf : keys[0];
-    const fim0 = limSup && escalaEfetiva === "dia" ? limSup : keys[keys.length - 1];
+    const ini0 = escalaEfetiva === "dia" ? limInf : keys[0];
+    const fim0 = escalaEfetiva === "dia" ? (limSup < hojeIso ? limSup : hojeIso) : keys[keys.length - 1];   // não desenha dias que ainda não chegaram
     const prox = k => {
       if (escalaEfetiva === "mes") {
         const [y, mo] = k.split("-").map(Number);
@@ -799,7 +839,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     let k = ini0, guarda = 0;
     while (k <= fim0 && guarda++ < 1000) { out.push({ k, ...(m[k] || vazio) }); k = prox(k); }
     return out;
-  }, [eventos, escalaEfetiva, limInf, limSup]);
+  }, [eventos, escalaEfetiva, limInf, limSup, hojeIso]);
 
   // Tipo da linha: CROSS (com ficha) + outras (sem ficha) = total de linhas do período. Divide `dados` em dois, então a soma fecha sempre.
   const tipos = useMemo(() => {
@@ -893,11 +933,14 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     const temData = v => !!dashDiaIso(v);
     const temHora = v => /^\d{1,2}:\d{2}/.test(String(v || "").trim());
 
-    // linhas que não entram em nenhum período
-    remocoes.forEach(r => {
-      const d = dashDiaIso(r.data_solicitacao);
-      if (!d) add("sem_data_sol", r, "data_solicitacao", "DATA SOLIC. vazia.");
-      else if (d > hojeIso) add("sol_futuro", r, "data_solicitacao", `Data de solicitação ${fmtBR(d)} é depois de hoje.`);
+    // linhas que não entram em período nenhum (busca à parte, da base inteira)
+    const ROT_DATA = { data_solicitacao: "Data da solicitação", data_resposta_cross: "Data da finalização da CROSS", data_saida_ambulancia: "Data da solicitação da ambulância", data_saida_real: "Data da saída", data_retorno: "Data do retorno" };
+    anomalas.forEach(r => {
+      if (!r.data_solicitacao) add("sem_data_sol", r, "data_solicitacao", "DATA SOLIC. vazia.");
+      Object.keys(ROT_DATA).forEach(c => {
+        const d = r[c];
+        if (d && (d < "2020-01-01" || d > hojeIso)) add("data_impossivel", r, c, `${ROT_DATA[c]} ${fmtBR(String(d).slice(0, 10))} é impossível.`);
+      });
     });
 
     // fichas repetidas: compara com tudo o que veio do servidor
@@ -979,18 +1022,31 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       }
     });
 
-    // Kanban: cards nas colunas de aceite sem hospital de destino (sem link direto para o card)
     const rotuloCol = id => (cols.find(x => x.id === id) || {}).label || id;
+    const gcRot = g => (GC[g] || (typeof GC_SEM !== "undefined" ? GC_SEM : { label: "Sem prioridade" })).label;
+    const addX = (id, o) => (G[id] || (G[id] = [])).push(o);
+    // Kanban: cards nas colunas de aceite sem hospital de destino (os pendentes ainda não têm destino, então não entram)
     cards.filter(x => !(x.hosp || "").trim() && DASH_COLUNAS_ACEITAS.includes(x.col_id)).forEach(x =>
-      (G.kanban_sem_hospital || (G.kanban_sem_hospital = [])).push({
-        id: x.id, campo: null, nome: x.nome || "(sem nome)", ficha: x.ficha_cross || "",
-        motivo: `Na coluna “${rotuloCol(x.col_id)}” sem hospital de destino. Abra o card no Kanban e preencha “Hospital de destino”.` }));
+      addX("kanban_sem_hospital", { id: x.id, card: x.id, nome: x.nome || "(sem nome)", ficha: x.ficha_cross || "",
+        motivo: `Na coluna “${rotuloCol(x.col_id)}” sem hospital de destino.` }));
+    // Fila: emergências pendentes e discrepâncias (o que o balão mostrava)
+    cards.filter(x => x.grav === "emergencia" && x.col_id === "pendente").forEach(x =>
+      addX("emerg_pendente", { id: x.id, card: x.id, nome: x.nome || "(sem nome)", ficha: x.ficha_cross || "",
+        motivo: `Emergência aguardando aceite${x.created_at ? " desde " + new Date(x.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : ""}.` }));
+    (discrepancias || []).forEach(d => addX("discrepancia_fila", { id: d.id, card: d.aceitado.id, justificar: d, nome: d.aceitado.nome || "(sem nome)", ficha: "",
+      motivo: `${gcRot(d.aceitado.grav)} aceito (${d.aceitado.rec || "sem recurso"}) antes de ${gcRot(d.pendente.grav)} ${d.pendente.nome || ""} que ainda aguarda.` }));
+    tarefas.forEach(t => addX("tarefas", { id: t.id, tarefas: true, nome: t.titulo || "(sem título)", ficha: "",
+      motivo: [t.status, t.responsavel_nome ? "responsável: " + t.responsavel_nome : "sem responsável",
+               t.prazo ? "prazo " + new Date(t.prazo).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) + (new Date(t.prazo) < new Date() ? " (vencido)" : "") : null].filter(Boolean).join(" · ") }));
+    // Livro de Saída: saídas que o painel não enxerga (sem linha na planilha)
+    livroSemVinculo.forEach(l => addX(l.status_vinculo === "pendente" ? "livro_pendente" : "livro_independente", { id: l.id, livro: true, nome: l.nome_paciente || "(sem nome)", ficha: "",
+      motivo: `Saída ${l.data_saida ? fmtBR(String(l.data_saida).slice(0, 10)) : "sem data"}${l.hora_saida ? " às " + String(l.hora_saida).slice(0, 5) : ""}${l.destino ? " → " + l.destino : ""}.` }));
 
     return {
       grupos: DASH_PROBLEMAS_DEF.map(def => Object.assign({}, def, { itens: G[def.id] || [] })),
       n: id => (G[id] || []).length
     };
-  }, [remocoes, dados, hojeIso, cards, cols]);
+  }, [remocoes, dados, hojeIso, cards, cols, discrepancias, tarefas, livroSemVinculo, anomalas]);
   const ag = campo => C ? C.agrupar(dados, campo)
     : { itens: [], total: dados.length, informados: 0, cobertura: 0, naoClassificados: [] };
 
@@ -1217,9 +1273,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   }, /*#__PURE__*/React.createElement("b", null, "Não foi possível carregar as remoções."), " ", erro);
 
   const fmtDia = d => new Date(d + "T00:00:00").toLocaleDateString("pt-BR");
-  const [deDia, ateDia] = periodo === "custom" && ini && fim ? [ini, fim]
-    : (periodo === "tudo" || periodo === "custom") ? [amplitude.min, amplitude.max]
-    : [inicioJanela, hojeIso];
+  const [deDia, ateDia] = [fIni, fFim];
   // Sempre com a unidade escrita: "5h 22min" (5 horas e 22 minutos) ou "22min". Nunca "5:22", que não diz se são horas ou minutos.
   const fmtMin = m => {
     if (m === null) return "—";
@@ -1266,12 +1320,19 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   };
 
   const btnPeriodo = (id, txt) => /*#__PURE__*/React.createElement("button", {
-    key: id, onClick: () => setPeriodo(id),
+    key: id,
+    onClick: () => {
+      setPeriodo(id);
+      if (id === "custom" && (!ini || !fim)) { setIni(iso(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 29))); setFim(hojeIso); }
+    },
     style: { padding: "5px 13px", borderRadius: 7, border: "none", fontSize: 12,
              fontWeight: periodo === id ? 650 : 450, cursor: "pointer",
              background: periodo === id ? "#E2E8F0" : "transparent",
              color: periodo === id ? "#0F172A" : "#64748B", fontFamily: "inherit" }
   }, txt);
+  const NOMES_MES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+  const anos = []; for (let y = 2025; y <= hoje.getFullYear(); y++) anos.push(y);
+  const estiloSel = { padding: "5px 9px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, background: "#fff", color: "#0F172A", fontFamily: "inherit" };
 
   return /*#__PURE__*/React.createElement("div", {
     // ao trocar de período a tela fica visível, só mais clara, até chegar o dado novo
@@ -1284,8 +1345,17 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     },
       /*#__PURE__*/React.createElement("div", {
         style: { display: "flex", gap: 2, background: "#F1F5F9", borderRadius: 9, padding: 3 }
-      }, ["tudo", "90d", "30d", "7d", "hoje"].map(p =>
-        btnPeriodo(p, p === "tudo" ? "Tudo" : p === "90d" ? "90 dias" : p === "30d" ? "30 dias" : p === "7d" ? "7 dias" : "Hoje"))),
+      }, [["hoje", "Hoje"], ["7d", "Últimos 7 dias"], ["mes", "Mês"], ["custom", "Período"]].map(([id, txt]) => btnPeriodo(id, txt))),
+
+      periodo === "mes" && /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6 } },
+        /*#__PURE__*/React.createElement("select", { "aria-label": "Mês", value: mesSel, onChange: e => setMesSel(Number(e.target.value)), style: estiloSel },
+          NOMES_MES.map((n, i) => /*#__PURE__*/React.createElement("option", { key: i, value: i }, n))),
+        /*#__PURE__*/React.createElement("select", { "aria-label": "Ano", value: anoSel, onChange: e => setAnoSel(Number(e.target.value)), style: estiloSel },
+          anos.map(y => /*#__PURE__*/React.createElement("option", { key: y, value: y }, y)))),
+
+      periodo === "custom" && /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: "#64748B" } },
+        "de", /*#__PURE__*/React.createElement("input", { type: "date", "aria-label": "Data inicial", value: ini, max: fim || undefined, onChange: e => setIni(e.target.value), style: estiloSel }),
+        "a", /*#__PURE__*/React.createElement("input", { type: "date", "aria-label": "Data final", value: fim, min: ini || undefined, onChange: e => setFim(e.target.value), style: estiloSel })),
 
       /*#__PURE__*/React.createElement("div", {
         style: { display: "flex", gap: 2, background: "#F1F5F9", borderRadius: 9, padding: 3 }
@@ -1297,12 +1367,23 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
         atualizando && " · atualizando…")
     ),
 
+    !faixa && /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 11.5, color: "#92400E", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 9, padding: "9px 13px", marginBottom: 16 }
+    }, "Escolha a data inicial e a final do período (a inicial não pode ser depois da final)."),
+
     /* Escala indisponível: diz o porquê em vez de esconder o botão */
     !escalaLiberada[escala] && escala !== "dia" && /*#__PURE__*/React.createElement("div", {
       style: { fontSize: 11.5, color: "#92400E", background: "#FFFBEB", border: "1px solid #FDE68A",
                borderRadius: 9, padding: "9px 13px", marginBottom: 16 }
     }, "Escala ", escala === "mes" ? "mensal" : "semanal", " ainda não disponível — ", motivoBloqueio[escala],
        ". Mostrando a diária."),
+
+    /* ══ Saneamento de falhas: substitui o balão. Tudo o que ficou fora da conta ou pede atenção, com link ou botão para abrir ══ */
+    /*#__PURE__*/React.createElement(DashSaneamento, {
+      grupos: problemas.grupos, total: dados.length, Titulo,
+      onAbrirCard, onAbrirAcoes, onAbrirLivro, podeJustificar,
+      onJustificar: d => { setJustModal(d); setJustTexto(""); }
+    }),
 
     /* ══ Pulso operacional — única seção que vem do Kanban (cartões clicáveis) ══ */
     /*#__PURE__*/React.createElement(DashFilaKanban, {
@@ -1314,7 +1395,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     /*#__PURE__*/React.createElement("div", { style: { marginBottom: 22 } },
       /*#__PURE__*/React.createElement(Titulo, {
         extra: "CROSS + outras = total de linhas",
-        tooltip: "Cada linha da planilha é uma remoção. Remoção CROSS é a linha com o Nº da ficha CROSS preenchido; outras remoções são as linhas sem ficha CROSS (altas, hemodiálise, exames etc.). A soma dos dois é sempre o total de linhas do período escolhido. Para comparar com o total da planilha inteira, escolha “Tudo”."
+        tooltip: "Cada linha da planilha é uma remoção. Remoção CROSS é a linha com o Nº da ficha CROSS preenchido; outras remoções são as linhas sem ficha CROSS (altas, hemodiálise, exames etc.). A soma dos dois é sempre o total de linhas do período escolhido. Para comparar com a planilha inteira, escolha Período cobrindo do primeiro ao último dia dos dados."
       }, "Remoções na planilha"),
       /*#__PURE__*/React.createElement("div", {
         style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 12 }
@@ -1333,7 +1414,9 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
         style: { display: "flex", height: 8, borderRadius: 99, overflow: "hidden", background: "#F1F5F9", marginTop: 12 }
       },
         /*#__PURE__*/React.createElement("div", { style: { width: entrou ? `${tipos.cross / tipos.total * 100}%` : "0%", background: "#0369A1", transition: "width .8s cubic-bezier(.22,.9,.3,1)" } }),
-        /*#__PURE__*/React.createElement("div", { style: { flex: 1, background: "#CBD5E1" } }))),
+        /*#__PURE__*/React.createElement("div", { style: { flex: 1, background: "#CBD5E1" } })),
+      anomalas.some(r => !r.data_solicitacao) && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#B45309", marginTop: 8 } },
+        `${anomalas.filter(r => !r.data_solicitacao).length} linha${anomalas.filter(r => !r.data_solicitacao).length !== 1 ? "s" : ""} da planilha sem data de solicitação não pertence${anomalas.filter(r => !r.data_solicitacao).length !== 1 ? "m" : ""} a período nenhum e não entra${anomalas.filter(r => !r.data_solicitacao).length !== 1 ? "m" : ""} nestes totais (veja Saneamento de falhas).`)),
 
     /* ══ KPIs do período (remocoes) ══ */
     /*#__PURE__*/React.createElement("div", {
@@ -1342,7 +1425,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Saídas de ambulância", valor: totaisGraf.saidas,
         sub: diasNoPeriodo ? `${(totaisGraf.saidas / diasNoPeriodo).toFixed(1)} por dia` : "no período",
-        tooltip: "Saídas de ambulância no período, de todas as linhas (CROSS e outras): conta o dia da saída (data e horário de saída preenchidos na planilha). Linha ainda sem saída não entra. A saída conta no dia da saída e as linhas, no dia do pedido; por isso, em períodos curtos, os dois números podem não coincidir (em “Tudo” coincidem). Fonte: planilha de remoções." }),
+        tooltip: "Saídas de ambulância no período, de todas as linhas (CROSS e outras): conta o dia da saída (data e horário de saída preenchidos na planilha). Linha ainda sem saída não entra. A saída conta no dia da saída e as linhas, no dia do pedido; por isso, nos períodos curtos, os dois números podem não coincidir (num período que cobre toda a base, coincidem). Fonte: planilha de remoções." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Ambulância avançada",
         valor: gAmb.informados ? `${((gAmb.itens.find(i => i.canonico === "AVANÇADA")?.n || 0) / gAmb.informados * 100).toFixed(0)}%` : "—",
@@ -1368,8 +1451,6 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       totais: totaisGraf, notas: notasGraf, Titulo, Vazio
     }),
 
-    /* ══ Saneamento de falhas: tudo o que ficou fora da conta, com link para corrigir ══ */
-    /*#__PURE__*/React.createElement(DashSaneamento, { grupos: problemas.grupos, total: dados.length, Titulo }),
 
     /* ══ Distribuições ══ */
     /*#__PURE__*/React.createElement("div", {
@@ -1455,55 +1536,6 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
         gAmb.itens.map(i => /*#__PURE__*/React.createElement(Barra, {
           key: i.canonico, label: i.canonico === (C && C.NAO_CLASSIFICADO) ? "Outro / não classificado" : i.canonico, n: i.n, pct: i.pct, max: gAmb.itens[0].n,
           cor: i.canonico === "AVANÇADA" ? "#F59E0B" : "#64748B" })))
-    ),
-
-    /* ══ Discrepâncias de fila ══ */
-    discrepancias && discrepancias.length > 0 && React.createElement("div", {
-      style:{marginTop:14,background:"#FEF2F2",border:"1px solid #FCA5A5",borderRadius:12,overflow:"hidden"}
-    },
-      React.createElement("div", {
-        onClick:function(){setVerDiscrep(function(v){return !v;});},
-        style:{padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}
-      },
-        React.createElement("div", {style:{display:"flex",alignItems:"center",gap:8}},
-          React.createElement("span", {style:{fontSize:13,fontWeight:700,color:"#B91C1C"}},
-            "\u26A0\uFE0F " + discrepancias.length + " discrepânci" + (discrepancias.length===1?"a":"as") + " de fila"),
-          React.createElement("span", {className:"tip"},
-            React.createElement("span", {style:{fontSize:10,color:"#EF4444",border:"1px solid #FCA5A5",borderRadius:99,padding:"1px 6px"}},"?"),
-            React.createElement("span", {className:"tipbox"}, "Paciente menos grave com aceite confirmado, mesma especialidade que outro mais grave ainda pendente, sem avaliação médica registrada. Pode indicar inversão de fila.")
-          )
-        ),
-        React.createElement("span", {style:{fontSize:11,color:"#94A3B8"}}, verDiscrep?"ocultar":"ver casos")
-      ),
-      verDiscrep && React.createElement("div", {style:{padding:"0 16px 14px"}},
-        React.createElement("div", {style:{fontSize:11,color:"#64748B",marginBottom:10,lineHeight:1.55}},
-          "Cada caso: paciente de menor gravidade teve aceite antes de um mais grave da mesma especialidade, sem prioridade médica definida. ",
-          podeJustificar?"Clique em Justificar para registrar a razão clínica.":"Peça ao coordenador médico para justificar."
-        ),
-        (discrepancias||[]).map(function(disc,i){
-          var a=disc.aceitado, b=disc.pendente;
-          var gcA=GC[a.grav]||GC.urgencia, gcB=GC[b.grav]||GC.urgencia;
-          return React.createElement("div", {
-            key:disc.id,
-            style:{padding:"10px 0",borderTop:i?"1px solid #FEE2E2":"none",display:"flex",gap:10,alignItems:"flex-start",flexWrap:"wrap"}
-          },
-            React.createElement("div", {style:{flex:1,minWidth:180}},
-              React.createElement("div", {style:{fontSize:11,color:"#374151",marginBottom:3}},
-                React.createElement("span", {style:{fontWeight:700,color:gcA.text,background:gcA.bg,border:"1px solid "+gcA.border,borderRadius:4,padding:"1px 5px",fontSize:10}}, gcA.label),
-                " ", a.nome, React.createElement("span", {style:{color:"#94A3B8",marginLeft:4,fontSize:10}}, "(aceito \u2022 "+a.rec+")")
-              ),
-              React.createElement("div", {style:{fontSize:11,color:"#374151"}},
-                "espera: ", React.createElement("span", {style:{fontWeight:700,color:gcB.text,background:gcB.bg,border:"1px solid "+gcB.border,borderRadius:4,padding:"1px 5px",fontSize:10}}, gcB.label),
-                " ", b.nome
-              )
-            ),
-            podeJustificar && React.createElement("button", {
-              onClick:function(){setJustModal(disc);setJustTexto("");},
-              style:{flexShrink:0,padding:"5px 14px",border:"none",borderRadius:7,background:"#0F172A",color:"#fff",fontWeight:700,fontSize:11,cursor:"pointer"}
-            }, "Justificar")
-          );
-        })
-      )
     ),
 
     /* ── Modal de justificativa ── */
