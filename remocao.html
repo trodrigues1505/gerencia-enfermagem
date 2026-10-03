@@ -985,13 +985,13 @@ function parseFichaCross(txt){
   const nome_paciente = mNome ? mNome[1].trim().replace(/\s+Nome\s+Social.*$/i, "").toUpperCase() : "";
 
   // Setor: campo "SETOR/LEITO" ou "SETOR" explícito se houver.
-  // Padrão: CLÍNICA MÉDICA (igual ao preenchimento manual da planilha).
+  // Sem "SETOR/LEITO" nem "SETOR" na ficha, o setor fica VAZIO (não se assume CLÍNICA MÉDICA).
   // NUNCA usar Unidade Solicitante.
   const mSetorLeito = txt.match(/SETOR\s*[\/]\s*LEITO\s*[:\-]?\s*[\r\n\t]*([^\r\n\t]+)/i);
   const mSetor      = txt.match(/\bSETOR\s*[:\-]?\s*[\r\n\t]*([^\r\n\t]+)/i);
   const setor = mSetorLeito
     ? mSetorLeito[1].trim().toUpperCase()
-    : mSetor ? mSetor[1].trim().toUpperCase() : "CLÍNICA MÉDICA";
+    : mSetor ? mSetor[1].trim().toUpperCase() : null;
 
   // 1º Recurso → deduz procedimento e especialidade
   const mRec = txt.match(/1[°º˚o]?\s*Recurso\s*[:\-]?\s*[\r\n\t]*([^\r\n]+)/i);
@@ -1039,7 +1039,7 @@ function parseFichaCross(txt){
   // Médico: NÃO vem da ficha CROSS (é o médico da escala, preenchido no Kanban/Livro).
 
   // Gravidade — campo explícito; fallback: varredura no texto
-  let gravidade = "AMARELO";   // padrão mantido por decisão: ficha sem prioridade = AMARELO
+  let gravidade = null;   // ficha sem prioridade: fica VAZIA (não se assume AMARELO); entra no Saneamento de falhas
   const prio = (typeof Canon!=="undefined"&&Canon.lerPrioridadeFicha) ? Canon.lerPrioridadeFicha(txt) : null;
   if(prio) gravidade = prio.db;   // prioridade da ficha CROSS (1 a 4), tabela única em canon.js (PRIORIDADE_CROSS)
 
@@ -1077,7 +1077,7 @@ function parseFichaCross(txt){
   if(procedimento)           row.procedimento            = procedimento;
   if(especialidade)          row.especialidade           = especialidade;
   if(diagnostico)            row.diagnostico             = diagnostico;
-  row.gravidade = gravidade; // sempre inclui — tem fallback AMARELO validado
+  if(gravidade)              row.gravidade               = gravidade;
   if(status)                 row.status                  = status;
   if(data_resposta_cross)    row.data_resposta_cross     = data_resposta_cross;
   if(horario_resposta_cross) row.horario_resposta_cross  = horario_resposta_cross;
@@ -1150,12 +1150,13 @@ function PasteModal({onClose,onImport}){
 function ImportResultModal({data,onClose}){
   // data = {tipo, ok, total, itens:[{nome,erro}]}
   const hasErrors = data.itens && data.itens.length > 0;
+  const avisos = data.avisos || [];
   return(
     <div className="mbk">
       <div className="mdl" style={{maxWidth:540}}>
         <div className="mhd">
           <div>
-            <h2>{hasErrors ? "⚠ Importação concluída com erros" : "✅ Importação concluída"}</h2>
+            <h2>{hasErrors ? "⚠ Importação concluída com erros" : avisos.length ? "⚠ Importação concluída com avisos" : "✅ Importação concluída"}</h2>
             <p style={{marginTop:4,fontSize:12,color:"#64748B"}}>{data.tipo}</p>
           </div>
           <button className="btn btn-g btn-sm" onClick={onClose}><Ico n="x" s={13}/></button>
@@ -1187,6 +1188,19 @@ function ImportResultModal({data,onClose}){
                   <div key={i} style={{padding:"8px 10px",border:"1px solid #FCA5A5",background:"#FEF2F2",borderRadius:8}}>
                     <div style={{fontWeight:700,fontSize:12,color:"#0F172A"}}>{it.nome}</div>
                     <div style={{fontSize:11,color:"#991B1B",marginTop:2,wordBreak:"break-word"}}>{it.erro}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {avisos.length>0&&(
+            <>
+              <div style={{fontSize:11,fontWeight:700,color:"#92400E",textTransform:"uppercase",letterSpacing:".05em",margin:hasErrors?"14px 0 8px":"0 0 8px"}}>Importados, mas para completar ({avisos.length})</div>
+              <div style={{maxHeight:220,overflowY:"auto",display:"flex",flexDirection:"column",gap:6}}>
+                {avisos.map((it,i)=>(
+                  <div key={i} style={{padding:"8px 10px",border:"1px solid #FDE68A",background:"#FFFBEB",borderRadius:8}}>
+                    <div style={{fontWeight:700,fontSize:12,color:"#0F172A"}}>{it.nome}</div>
+                    <div style={{fontSize:11,color:"#92400E",marginTop:2,wordBreak:"break-word"}}>{it.erro}</div>
                   </div>
                 ))}
               </div>
@@ -1737,33 +1751,31 @@ function App(){
     VERMELHO:"VERMELHO",AMARELO:"AMARELO",VERDE:"VERDE",CINZA:"CINZA",
   };
   function normalizeKanbanGrav(v){
-    if(!v)return "AMARELO";
-    return KANBAN_TO_DB_GRAV[v]||"AMARELO";
+    if(!v)return "";   // card sem prioridade: importa sem gravidade (não se assume AMARELO)
+    return KANBAN_TO_DB_GRAV[v]||"";
   }
 
   const handleImport=async(cards)=>{
     let ok=0;
-    const fails=[];
+    const fails=[], avisos=[];
     for(const c of cards){
       try{
-        // Data local (toISOString é UTC e, depois das 21h, devolve o dia seguinte)
-        const dl=new Date();
-        const hojeLocal=`${dl.getFullYear()}-${String(dl.getMonth()+1).padStart(2,"0")}-${String(dl.getDate()).padStart(2,"0")}`;
-        // Data do pedido = data de abertura da ficha na CROSS (campo "adm" do card, dd/mm/aaaa).
-        // Só cai para "hoje" se o card não tiver essa data.
-        const hoje=normalizeDateValue(c.adm)||hojeLocal;
-        const agora=new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+        // Data e hora da solicitação = abertura da ficha na CROSS (campos "adm" e "hora_adm" do card). Card sem elas ENTRA no
+        // banco com esses campos vazios (não se usa "hoje" nem "agora") e a importação mostra um aviso para completar.
+        const dSol=normalizeDateValue(c.adm)||"";
+        const hSol=normalizeTimeValue(c.hora_adm)||"";
+        if(!dSol||!hSol) avisos.push({nome:c.nome||"(sem nome)",erro:"Importado sem "+(!dSol&&!hSol?"data e hora":!dSol?"data":"hora")+" de solicitação. Abra a linha e preencha; enquanto isso ela aparece em Saneamento de falhas."});
         // A finalização da CROSS vem SÓ do par "Finalização CROSS" do card (data_resolucao / hora_resolucao).
         // O "aceite" do Kanban não entra: o modal dele abre com a data e a hora de AGORA, ou seja, o momento em que alguém
         // clicou no app, e não o da CROSS. Card sem finalização preenchida importa com a finalização vazia.
         const fin={d:normalizeDateValue(c.data_resolucao)||"",h:normalizeTimeValue(c.hora_resolucao)||""};
-        await api({action:"create",nome_paciente:c.nome||"",setor:c.setor||"",especialidade:c.rec||"",diagnostico:c.hd||"",instituicao_destino:c.hosp||"",tipo_ambulancia:AM[c.amb]||"",gravidade:normalizeKanbanGrav(c.grav),data_solicitacao:hoje,horario_solicitacao:c.hora_adm||agora,ficha_cross:c.ficha_cross||"",medico:c.medico_escala||"",data_resposta_cross:fin.d,horario_resposta_cross:fin.h,status:"PACIENTE AGUARDANDO AMBULÂNCIA"});
+        await api({action:"create",nome_paciente:c.nome||"",setor:c.setor||"",especialidade:c.rec||"",diagnostico:c.hd||"",instituicao_destino:c.hosp||"",tipo_ambulancia:AM[c.amb]||"",gravidade:normalizeKanbanGrav(c.grav),data_solicitacao:dSol,horario_solicitacao:hSol,ficha_cross:c.ficha_cross||"",medico:c.medico_escala||"",data_resposta_cross:fin.d,horario_resposta_cross:fin.h,status:"PACIENTE AGUARDANDO AMBULÂNCIA"});
         ok++;
       }catch(e){fails.push({nome:c.nome||"(sem nome)",erro:e.message||"erro desconhecido"});}
     }
     const total=ok+fails.length;
     push(`${ok}/${total} importado${ok!==1?"s":""}`,fails.length>0?"err":"ok");
-    setImportErrors({tipo:"Kanban",ok,total,itens:fails});
+    setImportErrors({tipo:"Kanban",ok,total,itens:fails,avisos});
     await load();
   };
 
@@ -1781,7 +1793,7 @@ function App(){
       else{push("JSON inválido: nenhum dado de remoção encontrado no arquivo.","err");return;}
       if(items.length===0){push("Nenhum registro encontrado no arquivo.","err");return;}
       let ok=0;
-      const fails=[];
+      const fails=[], avisos=[];
       for(const item of items){
         try{
           const p={};
@@ -1790,13 +1802,15 @@ function App(){
           if(!p.data_resposta_cross&&item.data_aceite_cross)p.data_resposta_cross=item.data_aceite_cross;
           if(!p.horario_resposta_cross&&item.horario_aceite_cross)p.horario_resposta_cross=item.horario_aceite_cross;
           if(Object.keys(p).length===0)continue;
-          await api({action:"create",...normalizeRowValues(p)});
+          const pn=normalizeRowValues(p);
+          if(!pn.data_solicitacao||!pn.horario_solicitacao) avisos.push({nome:item.nome_paciente||"(sem nome)",erro:"Importado sem "+(!pn.data_solicitacao&&!pn.horario_solicitacao?"data e hora":!pn.data_solicitacao?"data":"hora")+" de solicitação."});
+          await api({action:"create",...pn});
           ok++;
         }catch(e){fails.push({nome:item.nome_paciente||"(sem nome)",erro:e.message||"erro desconhecido"});}
       }
       const total=ok+fails.length;
       push(`${ok}/${total} importado${ok!==1?"s":""} do JSON`,fails.length>0?"err":"ok");
-      setImportErrors({tipo:"Importar JSON",ok,total,itens:fails});
+      setImportErrors({tipo:"Importar JSON",ok,total,itens:fails,avisos});
       await load();
     }catch(e){push("Erro ao ler arquivo JSON: "+e.message,"err");}
   };
@@ -1807,14 +1821,16 @@ function App(){
 
   const handleImportPaste=async(pastedRows)=>{
     let ok=0;
-    const fails=[];
+    const fails=[], avisos=[];
     for(const p of pastedRows){
-      try{await api({action:"create",...p});ok++;}
+      try{
+        if(!p.data_solicitacao||!p.horario_solicitacao) avisos.push({nome:p.nome_paciente||"(sem nome)",erro:"Importado sem "+(!p.data_solicitacao&&!p.horario_solicitacao?"data e hora":!p.data_solicitacao?"data":"hora")+" de solicitação."});
+        await api({action:"create",...p});ok++;}
       catch(e){fails.push({nome:p.nome_paciente||"(sem nome)",erro:e.message||"erro desconhecido"});}
     }
     const total=ok+fails.length;
     push(`${ok}/${total} importado${ok!==1?"s":""} da planilha`,fails.length>0?"err":"ok");
-    setImportErrors({tipo:"Colar do Excel",ok,total,itens:fails});
+    setImportErrors({tipo:"Colar do Excel",ok,total,itens:fails,avisos});
     setShowPaste(false);
     await load();
   };
@@ -1941,7 +1957,7 @@ function App(){
       const cw={min_finalizacao_pedido_amb:14,data_retorno:12,data_saida_real:12,data_solicitacao:12,horario_solicitacao:8,ficha_cross:18,nome_paciente:26,setor:18,procedimento:14,especialidade:18,diagnostico:24,status:28,gravidade:14,data_resposta_cross:12,horario_resposta_cross:8,instituicao_destino:20,tipo_ambulancia:12,data_saida_ambulancia:12,hora_solic_ambulancia:10,horario_saida_ambulancia:10,tempo_espera:10,observacao:28,enfermeiro:16,tecnico_auxiliar:16,medico:16,horario_retorno:10,duracao_remocao:12};
       xlsSheet["!cols"]=[{wch:4},...COLS.map(([f])=>({wch:cw[f]||14})),{wch:18},{wch:14}];
       const wb=window.XLSX.utils.book_new();
-      window.XLSX.utils.book_append_sheet(wb,"Remoções",xlsSheet);
+      window.XLSX.utils.book_append_sheet(wb,xlsSheet,"Remoções");   // ordem da biblioteca: (livro, planilha, nome)
       const fname=nomeArquivo("xlsx");
       window.XLSX.writeFile(wb,fname);
       setExportResult({tipo:"Excel",total:data.length,filename:fname});
