@@ -1,9 +1,3 @@
-// Ordem de finalização na CROSS (data + hora). O aceite da CROSS é o mesmo momento da finalização, então este é o
-// critério de ordem dentro do Aceite. Sem data/hora, vai para o fim da fila.
-function chaveFinalizacaoCross(c) {
-  const d = String(c.data_resolucao || "").split("/").reverse().join("-");
-  return (d.length === 10 ? d : "9999-99-99") + " " + (c.hora_resolucao || "99:99");
-}
 const {
   useState,
   useEffect,
@@ -60,7 +54,6 @@ function App() {
   const [importResult, setImportResult] = useState(null);
   const [showLivro, setShowLivro] = useState(false);
   const [pendentesCount, setPendentesCount] = useState(0);
-  const [acoesCount, setAcoesCount] = useState(0);
   const [bannerOpen, setBannerOpen] = useState(false);
   const [showAcoes, setShowAcoes] = useState(false);
   const dragId = useRef(null);
@@ -77,21 +70,6 @@ function App() {
 
   const displayCards = isAdmin ? cards : pubCards || [];
   const displayCols = isAdmin ? cols : pubCols || cols;
-
-  // ===== Contagem global de ações pendentes (para o balão) =====
-  useEffect(() => {
-    if (!currentUser) { setAcoesCount(0); return; }
-    let vivo = true;
-    async function fetchPendentes() {
-      try {
-        const rows = await sbGet("acoes_enfermagem", "status=in.(pendente,iniciada,pausada)&select=id");
-        if (vivo) setAcoesCount(Array.isArray(rows) ? rows.length : 0);
-      } catch(e) {}
-    }
-    fetchPendentes();
-    const iv = setInterval(fetchPendentes, 60000);
-    return () => { vivo = false; clearInterval(iv); };
-  }, [currentUser]);
 
   // ===== Funções de login/logout =====
   function handleLogin(user) {
@@ -869,7 +847,7 @@ function App() {
       const ws = window.XLSX.utils.json_to_sheet(rows);
       ws["!cols"] = [{wch:22},{wch:10},{wch:22},{wch:12},{wch:5},{wch:30},{wch:8},{wch:10},{wch:30},{wch:16},{wch:18},{wch:15},{wch:12},{wch:22},{wch:20},{wch:12},{wch:10},{wch:18},{wch:30},{wch:10},{wch:10},{wch:20}];
       const wb = window.XLSX.utils.book_new();
-      window.XLSX.utils.book_append_sheet(wb, "Kanban", ws);
+      window.XLSX.utils.book_append_sheet(wb, ws, "Kanban");   // ordem da biblioteca: (livro, planilha, nome)
       const dateStr = new Date().toLocaleDateString("pt-BR").replace(/\//g, "-");
       window.XLSX.writeFile(wb, "kanban-" + dateStr + ".xlsx");
       showT("Excel exportado!");
@@ -1067,7 +1045,7 @@ function App() {
       data_resolucao: "",
       hora_resolucao: "",
       amb: "Básica",
-      grav: "urgencia",
+      grav: "",
       obs: "",
       is_rn: false,
       categoria: "normal"
@@ -1320,7 +1298,10 @@ function App() {
       loading && /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", padding: 48, color: "#94A3B8", fontSize: 14 } }, "Carregando dados…"),
 
       !loading && view === "dashboard" && /*#__PURE__*/React.createElement("div", { id: "view-content" },
-        /*#__PURE__*/React.createElement(Dashboard, { cards: displayCards, showT: showT, cols: displayCols, dashMode: dashMode, setDashMode: setDashMode, isAdmin: isAdmin, lastPub: lastPub, currentUser: currentUser, discrepancias: discrepancias })
+        /*#__PURE__*/React.createElement(Dashboard, { cards: displayCards, showT: showT, cols: displayCols, dashMode: dashMode, setDashMode: setDashMode, isAdmin: isAdmin, lastPub: lastPub, currentUser: currentUser, discrepancias: discrepancias,
+          onAbrirCard: (id) => { const card = cards.find(c => c.id === id); if (card) { setView("kanban"); setSelected(card); } },
+          onAbrirAcoes: () => setShowAcoes(true),
+          onAbrirLivro: podeLivro ? () => setShowLivro(true) : null })
       ),
       !loading && view === "usuarios" && isAdmin && /*#__PURE__*/React.createElement(UsersPanel, { currentUser: currentUser, userId: userId, showT: showT, cards: cards, busca: search, onBusca: setSearch }),
       !loading && view === "historico" && isAdmin && /*#__PURE__*/React.createElement("div", { id: "view-content" },
@@ -1526,9 +1507,19 @@ function App() {
     showSettings && /*#__PURE__*/React.createElement(SettingsModal, { settings: settings, onClose: () => setShowSettings(false), onSave: saveSettings }),
     pendingMove && /*#__PURE__*/React.createElement(AceiteModal, {
       card: pendingMove.card,
-      onConfirm: aceite => {
-        moveCard(pendingMove.card.id, pendingMove.newColId, aceite);
+      onConfirm: async aceite => {
+        const alvo = pendingMove;
         setPendingMove(null);
+        const hospital = (aceite.receptor || "").trim();
+        // O destino fica em `hosp` (único campo de hospital do card). Se a gravação falhar, o card NÃO se move: assim não
+        // aparece em Aceite sem destino.
+        if (hospital && hospital !== (alvo.card.hosp || "").trim()) {
+          try {
+            const salvo = await fn("cards-write", { action: "update", id: alvo.card.id, body: { hosp: hospital } }, userId);
+            setCards(prev => { const next = prev.map(c => c.id === alvo.card.id ? { ...c, ...(salvo || {}), hosp: hospital } : c); window.__geCards = next; return next; });
+          } catch (ex) { showT("Não consegui salvar o hospital de destino: " + ex.message, "err"); return; }
+        }
+        moveCard(alvo.card.id, alvo.newColId, aceite);
       },
       onCancel: () => setPendingMove(null)
     }),
@@ -1580,13 +1571,6 @@ function App() {
       cols: cols,
       onClose: () => setShowDuplicates(false),
       onDel: onDelSilent
-    }),
-    isAdmin && React.createElement(FloatingActions, {
-      cards: cards,
-      discrepancias: discrepancias,
-      pendencias: 0,   // "valores a corrigir" saiu do balão: agora é o card Saneamento de falhas, no dashboard
-      acoes: acoesCount,
-      setView: setView
     }),
     /*#__PURE__*/React.createElement(Toast, { toast: toast })
   );
