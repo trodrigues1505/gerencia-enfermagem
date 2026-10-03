@@ -41,7 +41,7 @@ function lsCheckRetorno(dSai,hSai,dRet,hRet){
 const LS_SEM=(typeof Canon!=="undefined"&&Canon.EQUIPE_SEM)||{medico:"SEM MÉDICO",enfermeiro:"SEM ENFERMEIRO(A)",tecnico_auxiliar:"SEM TÉCNICO/AUXILIAR"};
 const lsEhSem=v=>(typeof Canon!=="undefined"&&Canon.ehSemEquipe)?Canon.ehSemEquipe(v):Object.values(LS_SEM).includes(String(v||"").trim().toUpperCase());
 // Protocolo de AVC: a ambulância tem que sair com médico E enfermeiro. "Saiu sem …" não vale.
-// (Esta conferência é da tela. O servidor ainda não recusa — ver avc-protocolo.sql.)
+// (Esta conferência é da tela. O servidor também recusa: gatilhos em livro_saida e remocoes, seção 5 de ajustes-2026-10-03.sql.)
 function lsCheckEquipeAVC(o){
   const falta=k=>!String(o[k]||"").trim()||lsEhSem(o[k]);
   if(falta("medico"))return {campo:"medico",msg:"Protocolo de AVC: a ambulância tem que sair com médico. “Saiu sem médico” não é aceito."};
