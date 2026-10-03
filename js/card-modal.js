@@ -78,12 +78,13 @@ function parseTSVToCard(txt){
   const mRec = txt.match(/1[°º˚o]?\s*Recurso\s*[:\-]?\s*[\r\n\t]*([^\r\n]+)/i);
   const rec = mRec ? mRec[1].trim().toUpperCase() : "";
 
-  // ── Hospital destino: somente se houver aceite explícito ─────────────────
-  // Regra: verificar se "Aceitou Solicitação" aparece no Histórico.
-  // Se houve apenas recusa, não preencher.
-  const temAceite = /Aceitou\s+Solicita[çc][aã]o/i.test(txt);
-  const mHosp = txt.match(/Unidade\s+Receptora\s*[:\-]?\s*[\r\n\t]*([^\r\n\t]+)/i);
-  const hosp = (temAceite && mHosp) ? mHosp[1].trim().toUpperCase() : "";
+  // ── Hospital destino = "Unidade Receptora" do bloco Resolução da ficha ──────
+  // Mesma regra da planilha (Canon.lerDestinoFicha). Recusa em "Busca de Recursos" não conta.
+  const hosp = (typeof Canon !== "undefined" && Canon.lerDestinoFicha) ? Canon.lerDestinoFicha(txt) : "";
+
+  // ── Finalização da CROSS = data e hora logo abaixo do título FINALIZAÇÃO ─────
+  // NÃO são as do "Médico Receptor". Mesma regra da planilha (Canon.lerFinalizacaoFicha). Sem o bloco, fica vazio.
+  const fin = (typeof Canon !== "undefined" && Canon.lerFinalizacaoFicha) ? Canon.lerFinalizacaoFicha(txt) : null;
 
   // ── CID / Diagnóstico ────────────────────────────────────────────────────
   // Regra: usar CID 1; se ausente/não informado, usar CID 2; se ambos ausentes → vazio.
@@ -153,6 +154,7 @@ function parseTSVToCard(txt){
   if(setor)        raw.setor        = setor;
   if(rec)          raw.rec          = rec;
   if(hosp)         raw.hosp         = hosp;
+  if(fin){ raw.data_resolucao = fin.data; raw.hora_resolucao = fin.hora; }
   if(grav)         raw.grav         = grav;
   if(medico_solic) raw.medico_solic = medico_solic;
   if(status)       raw.status       = status;
@@ -225,6 +227,8 @@ function CardModal({
         ficha_cross:  c.ficha_cross   || f.ficha_cross,
         medico_solic: c.medico_solic  || f.medico_solic,
         hosp:         c.hosp          || f.hosp,
+        data_resolucao: c.data_resolucao || f.data_resolucao,
+        hora_resolucao: c.hora_resolucao || f.hora_resolucao,
         amb:          c.amb           || f.amb,
         categoria:    novaCategoria,
       };
