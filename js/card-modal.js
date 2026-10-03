@@ -51,7 +51,7 @@ function parseTSVToCard(txt){
 
   // ── Nome do paciente ─────────────────────────────────────────────────────
   const mNome = txt.match(/Nome\s*(?:do\s*Paciente)?\s*[:\-]?\s*[\r\n\t]*([^\r\n\t]+)/i);
-  const nome = mNome ? mNome[1].trim().toUpperCase() : "";
+  const nome = mNome ? mNome[1].trim().replace(/\s+Nome\s+Social.*$/i, "").toUpperCase() : "";
 
   // ── Idade: apenas o número inteiro de anos ───────────────────────────────
   // Regra: extrair somente o inteiro. Ex: "40 anos 4 meses" → "40"
@@ -116,20 +116,9 @@ function parseTSVToCard(txt){
   // ── Gravidade ────────────────────────────────────────────────────────────
   // Regra: buscar o campo "Gravidade" ou "Prioridade" e mapear para chave interna.
   // Fallback padrão: urgencia (AMARELO).
-  let grav = "urgencia";
-  const mGrav = txt.match(/(?:Gravidade|Prioridade)\s*[:\-]?\s*[\r\n\t]*([^\r\n\t]+)/i);
-  if(mGrav){
-    const g = mGrav[1].trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
-    if(/PRIORIDADE\s*1|EMERGENCI/.test(g))      grav = "emergencia";
-    else if(/PRIORIDADE\s*2|URGENCI/.test(g))   grav = "urgencia";
-    else if(/PRIORIDADE\s*3|MENOR/.test(g))     grav = "menor_gravidade";
-    else if(/PRIORIDADE\s*4|AGENDAMENTO/.test(g)) grav = "agendamento";
-  } else {
-    // Fallback: varredura no texto para termos de prioridade explícitos
-    if(/Emerg[eê]ncia|Prioridade\s*1/i.test(txt))          grav = "emergencia";
-    else if(/Menor\s+urg[eê]ncia|Prioridade\s*3/i.test(txt)) grav = "menor_gravidade";
-    else if(/Agendamento|Prioridade\s*4/i.test(txt))         grav = "agendamento";
-  }
+  let grav = "urgencia";   // padrão mantido por decisão: ficha sem prioridade = AMARELO
+  const prio = (typeof Canon !== "undefined" && Canon.lerPrioridadeFicha) ? Canon.lerPrioridadeFicha(txt) : null;
+  if(prio) grav = prio.chave;   // prioridade da ficha CROSS (1 a 4), tabela única em canon.js (PRIORIDADE_CROSS)
 
   // ── Observação ───────────────────────────────────────────────────────────
   // Regra: campo "Observações" se existir; senão "Resumo Clínico".
@@ -258,7 +247,6 @@ function CardModal({
     v: o,
     t: o || "(sem status)"
   } : o);
-  const isAceite = form.col_id === "aceite";
   return /*#__PURE__*/React.createElement(ModalShell, {
     title: form.nome || "Paciente",
     subtitle: card.id === "new" ? "Novo Paciente" : "Card",
@@ -308,7 +296,7 @@ function CardModal({
       padding: 2
     }
   }, (() => {
-    const tabs = [["info", "📋 Informações"], ["aceite_info", "🟢 Aceite"], ["comments", "💬 Comentários" + (comments.length ? ` (${comments.length})` : "")]];
+    const tabs = [["info", "📋 Informações"], ["comments", "💬 Comentários" + (comments.length ? ` (${comments.length})` : "")]];
     const isAceiteCol = form.col_id === "aceite";
     const canPrioridade = currentUser?.can_prioridade || currentUser?.role === "admin";
     const canEscala = currentUser?.can_escala || currentUser?.role === "admin";
@@ -439,7 +427,7 @@ function CardModal({
     disabled: !isAdmin,
     placeholder: "Ortopedia"
   }), /*#__PURE__*/React.createElement(Field, {
-    label: "Hospital receptor",
+    label: "Hospital de destino (Unidade Receptora)",
     fieldKey: "hosp",
     value: form.hosp,
     onChange: upd,
@@ -496,69 +484,6 @@ function CardModal({
       t: c.label
     }))
   }), /*#__PURE__*/React.createElement(Field, {
-    label: "Finalizado Cross",
-    fieldKey: "cross_info",
-    value: form.cross_info,
-    onChange: upd,
-    disabled: !isAdmin,
-    full: true,
-    placeholder: "04/09 às 13:56"
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Horário de saída",
-    fieldKey: "saida",
-    value: form.saida,
-    onChange: upd,
-    disabled: !isAdmin
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Horário de retorno",
-    fieldKey: "retorno",
-    value: form.retorno,
-    onChange: upd,
-    disabled: !isAdmin
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Observações",
-    fieldKey: "obs",
-    value: form.obs,
-    onChange: upd,
-    disabled: !isAdmin,
-    as: "textarea",
-    full: true
-  })), tab === "aceite_info" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: isAceite ? "#F0FDF4" : "#F8FAFC",
-      border: `1px solid ${isAceite ? "#86EFAC" : "#E2E8F0"}`,
-      borderRadius: 10,
-      padding: "12px 14px",
-      marginBottom: 14
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: isAceite ? "#16A34A" : "#94A3B8",
-      fontWeight: 600
-    }
-  }, isAceite ? "✅ Paciente na coluna Aceite Confirmado" : "ℹ️ Preencher quando o aceite for confirmado")), /*#__PURE__*/React.createElement(Field, {
-    label: "Receptor *",
-    fieldKey: "receptor",
-    value: form.receptor,
-    onChange: upd,
-    disabled: !isAdmin,
-    placeholder: "Dr. João Silva / Hospital SCSP"
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Data do aceite",
-    fieldKey: "data_aceite",
-    value: form.data_aceite,
-    onChange: upd,
-    disabled: !isAdmin,
-    placeholder: "05/09/2026"
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Hora do aceite",
-    fieldKey: "hora_aceite",
-    value: form.hora_aceite,
-    onChange: upd,
-    disabled: !isAdmin,
-    placeholder: "14:35"
-  }), /*#__PURE__*/React.createElement(Field, {
     label: "Data Finalização CROSS",
     fieldKey: "data_resolucao",
     value: form.data_resolucao,
@@ -573,12 +498,13 @@ function CardModal({
     disabled: !isAdmin,
     placeholder: "16:19"
   }), /*#__PURE__*/React.createElement(Field, {
-    label: "Unidade Receptora (CROSS)",
-    fieldKey: "unidade_receptora",
-    value: form.unidade_receptora,
+    label: "Observações",
+    fieldKey: "obs",
+    value: form.obs,
     onChange: upd,
     disabled: !isAdmin,
-    placeholder: "Hospital Francisco Morato"
+    as: "textarea",
+    full: true
   })), tab === "prioridade" && React.createElement("div", null,
     (() => {
       const canEdit = (currentUser?.can_prioridade || currentUser?.role === "admin") && form.col_id === "aceite";
