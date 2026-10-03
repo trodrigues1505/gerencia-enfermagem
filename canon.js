@@ -463,6 +463,17 @@
     return achado;
   }
 
+  /* PRIORIDADE da ficha: "Prioridade de atendimento: 3" (ou "Prioridade: 3", ou "Definiu Prioridade 3" no Histórico).
+   * Devolve a linha de PRIORIDADE_CROSS ou null. Não adivinha por palavras soltas do texto ("Emergência" aparece em nomes de
+   * unidades). Quem chama decide o padrão quando vem null (hoje: AMARELO, decisão mantida). */
+  function lerPrioridadeFicha(txt) {
+    var t = String(txt || "");
+    var m = t.match(/Prioridade\s+de\s+atendimento\s*:?\s*([1-4])\b/i)
+         || t.match(/(?:Gravidade|Prioridade)\s*:?\s*([1-4])\b/i)
+         || t.match(/Definiu\s+Prioridade\s*([1-4])\b/i);
+    return m ? PRIORIDADE_CROSS[Number(m[1])] : null;
+  }
+
   root.Canon = {
     norm: norm, isVazio: isVazio,
     classificar: classificar, classificarAVC: classificarAVC, validarLinha: validarLinha,
@@ -472,7 +483,7 @@
     GRAVIDADE_ORDEM: GRAVIDADE_ORDEM, GRAVIDADE_COR: GRAVIDADE_COR,
     STATUS_FECHADOS: STATUS_FECHADOS, ESPEC_META: ESPEC_META,
     PRIORIDADE_CROSS: PRIORIDADE_CROSS, gravidadeDePrioridade: gravidadeDePrioridade,
-    lerFinalizacaoFicha: lerFinalizacaoFicha, lerDestinoFicha: lerDestinoFicha
+    lerFinalizacaoFicha: lerFinalizacaoFicha, lerDestinoFicha: lerDestinoFicha, lerPrioridadeFicha: lerPrioridadeFicha
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = root.Canon;
