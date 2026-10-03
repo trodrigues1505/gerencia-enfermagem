@@ -298,7 +298,7 @@ function DashTempos({ intervalos, Card, Kpi, Titulo, fmtMin }) {
     h("div", { style: { marginBottom: 22 } },
       h(Titulo, {
         extra: "clique em um card para ver por gravidade",
-        tooltip: "A ordem dos momentos é: solicitação (da Santa Casa à CROSS) → finalização (CROSS; o aceite é o mesmo momento) → solicitação da ambulância (Santa Casa) → saída da ambulância → retorno. Cada card é o intervalo entre dois momentos seguidos, pela mediana (para um caso extremo não distorcer). Só entram remoções com os dois horários. Se faltar data ou horário de um dos momentos, ou se estiverem fora de ordem (ou com 30 dias ou mais de diferença), o caso não entra e é contado no card; a lista com link está em “Problemas na planilha”. O painel não completa nem adivinha nenhum horário."
+        tooltip: "A ordem dos momentos é: solicitação (da Santa Casa à CROSS) → finalização (CROSS; o aceite é o mesmo momento) → solicitação da ambulância (Santa Casa) → saída da ambulância → retorno. Cada card é o intervalo entre dois momentos seguidos, pela mediana (para um caso extremo não distorcer). Só entram remoções com os dois horários. Se faltar data ou horário de um dos momentos, ou se estiverem fora de ordem (ou com 30 dias ou mais de diferença), o caso não entra e é contado no card; a lista com link está em “Saneamento de falhas”. O painel não completa nem adivinha nenhum horário."
       }, "Tempos do caminho da remoção"),
       h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 12 } },
         intervalos.map(i => h(Kpi, {
@@ -343,7 +343,7 @@ function DashTempos({ intervalos, Card, Kpi, Titulo, fmtMin }) {
           h("div", { style: { fontSize: 11, color: "#94A3B8", lineHeight: 1.55, margin: "8px 8px 0" } },
             "“Medidas” são as remoções com os dois horários deste intervalo, na ordem certa. Só elas entram na mediana e no maior tempo. Clique numa linha para ver os casos, do maior para o menor."),
           (it.nNeg > 0 || it.nSem > 0) && h("div", { style: { fontSize: 11.5, color: "#64748B", lineHeight: 1.6, margin: "8px 8px 0" } },
-            it.nNeg > 0 && h("div", { style: { color: "#B45309" } }, `${it.nNeg} remoç${it.nNeg !== 1 ? "ões" : "ão"} inconsistente${it.nNeg !== 1 ? "s" : ""} (um momento antes do anterior, ou 30 dias ou mais de diferença): conferir a digitação em “Problemas na planilha”. Não entra${it.nNeg !== 1 ? "m" : ""} na conta.`),
+            it.nNeg > 0 && h("div", { style: { color: "#B45309" } }, `${it.nNeg} remoç${it.nNeg !== 1 ? "ões" : "ão"} inconsistente${it.nNeg !== 1 ? "s" : ""} (um momento antes do anterior, ou 30 dias ou mais de diferença): conferir a digitação em “Saneamento de falhas”. Não entra${it.nNeg !== 1 ? "m" : ""} na conta.`),
             it.nSem > 0 && h("div", null, `${it.nSem} remoç${it.nSem !== 1 ? "ões" : "ão"} sem a data e o horário dos dois momentos: não entra${it.nSem !== 1 ? "m" : ""} na conta.`)),
 
           gSel && (() => {
@@ -509,62 +509,96 @@ function DashVolume({ serie, escala, rotulo, rotuloLongo, entrou, totais, notas,
       notas.map((t, i) => h("div", { key: i }, t))));
 }
 
-/* ─── Problemas na planilha ───────────────────────────────────────────────────
- * O painel não completa nem adivinha dado. Tudo o que está incompleto, fora de ordem ou suspeito fica FORA da conta e
- * aparece aqui, com o link que abre a linha na planilha (remocao.html?foco=<id>&campo=<campo>).
+/* ─── Saneamento de falhas ────────────────────────────────────────────────────
+ * Substitui o pequeno bloco "valores a corrigir" e a parte do balão que contava esses valores.
+ * O painel não completa nem adivinha dado. Tudo o que está incompleto, fora de ordem, fora da lista ou suspeito fica FORA da
+ * conta e aparece aqui, com o link que abre a linha na planilha (remocao.html?foco=<id>&campo=<campo>).
  *   "corrigir"   = dado errado ou faltando, que distorce algum número
  *   "acompanhar" = pode ser normal (ainda aguardando), mas vale conferir
  * Componente próprio, fora do Dashboard, pelo mesmo motivo dos outros: abrir/fechar uma lista não refaz a tela.        */
-const DASH_PROBLEMAS_DEF = [
-  { id: "sem_data_sol", tipo: "corrigir", titulo: "Sem data de solicitação",
-    ajuda: "A linha não entra em nenhum período (só em “Tudo”) nem nas contagens por dia. Preencha DATA SOLIC. Em períodos curtos só aparecem as linhas que têm outra data dentro do período." },
-  { id: "sol_futuro", tipo: "corrigir", titulo: "Data de solicitação no futuro",
-    ajuda: "Provável erro de digitação (dia, mês ou ano). A linha fica fora de todos os períodos." },
-  { id: "ficha_formato", tipo: "corrigir", titulo: "Nº da ficha CROSS fora do padrão",
-    ajuda: "O padrão é SS-número-número (ex.: SS-14774045-26). Mesmo assim a linha conta como remoção CROSS. Confira se é mesmo uma ficha." },
-  { id: "ficha_repetida", tipo: "corrigir", titulo: "Ficha CROSS repetida",
-    ajuda: "A mesma ficha em mais de uma linha conta duas vezes. Se for duplicidade, apague uma; se forem remoções diferentes, confira o número." },
-  { id: "fin_sem_ficha", tipo: "corrigir", titulo: "Finalização da CROSS, mas sem Nº da ficha",
-    ajuda: "A linha conta como “outra remoção”, mas tem data e hora de finalização da CROSS. Provavelmente falta o Nº da ficha." },
-  { id: "fin_incompleta", tipo: "corrigir", titulo: "Finalização da CROSS incompleta",
-    ajuda: "Tem a data ou o horário da finalização, falta o outro. Sem os dois, a finalização não conta." },
-  { id: "ped_incompleto", tipo: "corrigir", titulo: "Solicitação da ambulância incompleta",
-    ajuda: "Tem a data ou o horário (DATA/HORA SOLIC. AMB.), falta o outro. O tempo até a saída não pode ser medido." },
-  { id: "saida_sem_data", tipo: "corrigir", titulo: "Horário de saída sem data de saída",
-    ajuda: "A saída não conta nas barras nem nos tempos. Preencha DATA SAÍDA AMB." },
-  { id: "saida_sem_horario", tipo: "corrigir", titulo: "Data de saída sem horário de saída",
-    ajuda: "A saída não conta nas barras nem nos tempos. Preencha SAÍDA AMB. SCFM." },
-  { id: "saida_deduzida", tipo: "corrigir", titulo: "Data de saída deduzida (não confirmada)",
-    ajuda: "A planilha preencheu DATA SAÍDA AMB. por dedução: ela não foi digitada nem confirmada pelo Livro de Saída. A saída conta nesse dia porque está na planilha, mas confira. Ao confirmar no Livro de Saída, a marca de dedução some." },
-  { id: "retorno_deduzido", tipo: "corrigir", titulo: "Data de retorno deduzida (não confirmada)",
-    ajuda: "A planilha preencheu DATA RETORNO por dedução: ela não foi digitada nem confirmada pelo Livro de Saída. Confira a data. Ao confirmar no Livro de Saída, a marca de dedução some." },
-  { id: "saida_sem_pedido", tipo: "corrigir", titulo: "Saída da ambulância sem solicitação da ambulância",
-    ajuda: "Sem DATA/HORA SOLIC. AMB. não dá para medir a espera pela ambulância." },
-  { id: "ret_incompleto", tipo: "corrigir", titulo: "Retorno da ambulância incompleto",
-    ajuda: "Tem a data ou o horário do retorno, falta o outro. A duração da remoção não pode ser medida." },
-  { id: "cross_saida_sem_fin", tipo: "corrigir", titulo: "Ambulância saiu, mas a CROSS não finalizou",
-    ajuda: "Linha com ficha CROSS e saída registrada, mas sem data e hora de finalização. Falta preencher a finalização?" },
-  { id: "ordem", tipo: "corrigir", titulo: "Horários fora de ordem",
-    ajuda: "Um momento aparece antes do anterior, ou com mais de 30 dias de diferença. Provável erro de digitação; esse intervalo fica fora dos tempos." },
-  { id: "aguarda_cross", tipo: "acompanhar", titulo: "Aguardando a CROSS finalizar",
-    ajuda: "Pedidos à CROSS sem finalização e sem saída. Normal enquanto a CROSS não responde; se já respondeu, preencha a finalização." },
-  { id: "aguarda_amb", tipo: "acompanhar", titulo: "Finalizados, aguardando a ambulância",
-    ajuda: "Pedidos CROSS com finalização e ainda sem saída de ambulância. Normal enquanto a ambulância não sai; se já saiu, preencha a saída." }
+const DASH_SANEAMENTO_SECOES = [
+  { id: "datas",   titulo: "Datas e horários" },
+  { id: "fichas",  titulo: "Fichas CROSS e tipo da remoção" },
+  { id: "listas",  titulo: "Valores fora da lista" },
+  { id: "vazios",  titulo: "Campos vazios que distorcem indicadores" },
+  { id: "avc",     titulo: "Protocolo de AVC" },
+  { id: "kanban",  titulo: "Kanban" },
+  { id: "aguarda", titulo: "Aguardando · pode ser normal" }
 ];
+const DASH_CAMPOS_LISTA = [
+  ["especialidade", "Especialidade"], ["instituicao_destino", "Instituição de destino"], ["setor", "Setor"],
+  ["status", "Status"], ["gravidade", "Gravidade"], ["tipo_ambulancia", "Tipo de ambulância"]
+];
+const DASH_PROBLEMAS_DEF = [
+  { id: "sem_data_sol", secao: "datas", tipo: "corrigir", titulo: "Sem data de solicitação",
+    ajuda: "A linha não entra em nenhum período (só em “Tudo”) nem nas contagens por dia. Preencha DATA SOLIC. Em períodos curtos só aparecem as linhas que têm outra data dentro do período." },
+  { id: "sol_futuro", secao: "datas", tipo: "corrigir", titulo: "Data de solicitação no futuro",
+    ajuda: "Provável erro de digitação (dia, mês ou ano). A linha fica fora de todos os períodos." },
+  { id: "fin_incompleta", secao: "datas", tipo: "corrigir", titulo: "Finalização da CROSS incompleta",
+    ajuda: "Tem a data ou o horário da finalização, falta o outro. Sem os dois, a finalização não conta." },
+  { id: "ped_incompleto", secao: "datas", tipo: "corrigir", titulo: "Solicitação da ambulância incompleta",
+    ajuda: "Tem a data ou o horário (DATA/HORA SOLIC. AMB.), falta o outro. O tempo até a saída não pode ser medido." },
+  { id: "saida_sem_data", secao: "datas", tipo: "corrigir", titulo: "Horário de saída sem data de saída",
+    ajuda: "A saída não conta nas barras nem nos tempos. Preencha DATA SAÍDA AMB." },
+  { id: "saida_sem_horario", secao: "datas", tipo: "corrigir", titulo: "Data de saída sem horário de saída",
+    ajuda: "A saída não conta nas barras nem nos tempos. Preencha SAÍDA AMB. SCFM." },
+  { id: "saida_deduzida", secao: "datas", tipo: "corrigir", titulo: "Data de saída deduzida (não confirmada)",
+    ajuda: "A planilha preencheu DATA SAÍDA AMB. por dedução: ela não foi digitada nem confirmada pelo Livro de Saída. A saída conta nesse dia porque está na planilha, mas confira. Ao confirmar no Livro de Saída, a marca de dedução some." },
+  { id: "saida_sem_pedido", secao: "datas", tipo: "corrigir", titulo: "Saída da ambulância sem solicitação da ambulância",
+    ajuda: "Sem DATA/HORA SOLIC. AMB. não dá para medir a espera pela ambulância." },
+  { id: "ret_incompleto", secao: "datas", tipo: "corrigir", titulo: "Retorno da ambulância incompleto",
+    ajuda: "Tem a data ou o horário do retorno, falta o outro. A duração da remoção não pode ser medida." },
+  { id: "retorno_deduzido", secao: "datas", tipo: "corrigir", titulo: "Data de retorno deduzida (não confirmada)",
+    ajuda: "A planilha preencheu DATA RETORNO por dedução: ela não foi digitada nem confirmada pelo Livro de Saída. Confira a data. Ao confirmar no Livro de Saída, a marca de dedução some." },
+  { id: "cross_saida_sem_fin", secao: "datas", tipo: "corrigir", titulo: "Ambulância saiu, mas a CROSS não finalizou",
+    ajuda: "Linha com ficha CROSS e saída registrada, mas sem data e hora de finalização. Falta preencher a finalização?" },
+  { id: "ordem", secao: "datas", tipo: "corrigir", titulo: "Horários fora de ordem",
+    ajuda: "Um momento aparece antes do anterior, ou com mais de 30 dias de diferença. Provável erro de digitação; esse intervalo fica fora dos tempos." },
 
-function DashProblemas({ grupos, total, Titulo }) {
+  { id: "ficha_formato", secao: "fichas", tipo: "corrigir", titulo: "Nº da ficha CROSS fora do padrão",
+    ajuda: "O padrão é SS-número-número (ex.: SS-14774045-26). Mesmo assim a linha conta como remoção CROSS. Confira se é mesmo uma ficha." },
+  { id: "ficha_repetida", secao: "fichas", tipo: "corrigir", titulo: "Ficha CROSS repetida",
+    ajuda: "A mesma ficha em mais de uma linha conta duas vezes. Se for duplicidade, apague uma; se forem remoções diferentes, confira o número." },
+  { id: "fin_sem_ficha", secao: "fichas", tipo: "corrigir", titulo: "Finalização da CROSS, mas sem Nº da ficha",
+    ajuda: "A linha conta como “outra remoção”, mas tem data e hora de finalização da CROSS. Provavelmente falta o Nº da ficha." }
+].concat(DASH_CAMPOS_LISTA.map(([campo, rot]) => ({
+  id: "cls_" + campo, secao: "listas", tipo: "corrigir", titulo: rot + " fora da lista",
+  ajuda: "O valor não está na lista oficial e aparece como “Não classificado” nos gráficos. Troque por um valor da lista, na planilha."
+}))).concat([
+  { id: "vazio_tipo_amb", secao: "vazios", tipo: "corrigir", titulo: "Ambulância saiu sem tipo de ambulância",
+    ajuda: "Sem o tipo (Básica ou Avançada) a saída não entra no indicador de ambulância avançada. Preencha TIPO AMB." },
+  { id: "vazio_gravidade", secao: "vazios", tipo: "corrigir", titulo: "Sem gravidade",
+    ajuda: "A linha fica de fora dos gráficos de gravidade e dos tempos por gravidade. Preencha GRAVIDADE (prioridade da ficha: 1 Vermelho, 2 Amarelo, 3 Verde, 4 Cinza)." },
+  { id: "vazio_destino", secao: "vazios", tipo: "corrigir", titulo: "Finalizada pela CROSS, sem instituição de destino",
+    ajuda: "Linha CROSS com finalização, que não foi cancelada nem resolvida no local, e sem INSTITUIÇÃO DESTINO. A linha fica fora do gráfico de destinos." },
+
+  { id: "avc_sem_medida", secao: "avc", tipo: "corrigir", titulo: "Protocolo de AVC sem dados para medir a meta de 1h",
+    ajuda: "Para medir a meta é preciso a finalização da CROSS e a saída da ambulância, cada uma com data e horário." },
+  { id: "avc_sem_equipe", secao: "avc", tipo: "corrigir", titulo: "Protocolo de AVC que saiu sem médico ou enfermeiro(a)",
+    ajuda: "O protocolo exige médico e enfermeiro(a) na ambulância. “Sem médico” e “Sem enfermeiro(a)” contam como falta. Hoje essa conferência só existe na tela do Livro de Saída; o servidor ainda não recusa." },
+
+  { id: "kanban_sem_hospital", secao: "kanban", tipo: "corrigir", titulo: "Aceitos no Kanban sem hospital de destino",
+    ajuda: "Cards nas colunas de aceite sem “Hospital de destino”. Abra o card no Kanban e preencha. Não há link direto para o card." },
+
+  { id: "aguarda_cross", secao: "aguarda", tipo: "acompanhar", titulo: "Aguardando a CROSS finalizar",
+    ajuda: "Pedidos à CROSS sem finalização e sem saída. Normal enquanto a CROSS não responde; se já respondeu, preencha a finalização." },
+  { id: "aguarda_amb", secao: "aguarda", tipo: "acompanhar", titulo: "Finalizados, aguardando a ambulância",
+    ajuda: "Pedidos CROSS com finalização e ainda sem saída de ambulância. Normal enquanto a ambulância não sai; se já saiu, preencha a saída." }
+]);
+
+function DashSaneamento({ grupos, total, Titulo }) {
   const h = React.createElement;
   const [aberto, setAberto] = useState(null);   // id do grupo com a lista aberta
   const LIMITE = 150;
-  const corrigir = grupos.filter(g => g.tipo === "corrigir" && g.itens.length);
-  const acompanhar = grupos.filter(g => g.tipo === "acompanhar" && g.itens.length);
-  const nCorr = corrigir.reduce((t, g) => t + g.itens.length, 0);
-  const nAcomp = acompanhar.reduce((t, g) => t + g.itens.length, 0);
+  const comItens = grupos.filter(g => g.itens.length);
+  const nCorr = comItens.filter(g => g.tipo === "corrigir").reduce((t, g) => t + g.itens.length, 0);
+  const nAcomp = comItens.filter(g => g.tipo === "acompanhar").reduce((t, g) => t + g.itens.length, 0);
   const alerta = nCorr > 0;
+  const linhaAlerta = alerta ? "#FDE68A" : "#F1F5F9";
 
   const grupo = g => {
     const ab = aberto === g.id, corr = g.tipo === "corrigir";
-    return h("div", { key: g.id, style: { borderTop: "1px solid " + (alerta ? "#FDE68A" : "#F1F5F9") } },
+    return h("div", { key: g.id, style: { borderTop: "1px solid " + linhaAlerta } },
       h("button", {
         type: "button", "aria-expanded": ab, onClick: () => setAberto(ab ? null : g.id),
         style: { width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 2px", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }
@@ -574,35 +608,43 @@ function DashProblemas({ grupos, total, Titulo }) {
         h("span", { style: { fontSize: 11, color: "#94A3B8", width: 12 } }, ab ? "▾" : "▸")),
       ab && h("div", { style: { padding: "0 2px 12px" } },
         h("div", { style: { fontSize: 11, color: "#78716C", lineHeight: 1.55, marginBottom: 8 } }, g.ajuda),
-        g.itens.slice(0, LIMITE).map((p, i) => h("a", {
-          key: i,
-          href: `remocao.html?foco=${encodeURIComponent(p.id)}&campo=${encodeURIComponent(p.campo)}`,
-          style: { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", fontSize: 11.5, padding: "7px 8px", textDecoration: "none", borderRadius: 8, color: "#475569", transition: "background .15s" },
-          onMouseEnter: e => { e.currentTarget.style.background = alerta ? "#FEF3C7" : "#F8FAFC"; },
-          onMouseLeave: e => { e.currentTarget.style.background = "transparent"; }
-        },
-          h("span", { style: { fontWeight: 600, color: "#0F172A" } }, p.nome),
-          p.ficha && h("span", { style: { color: "#94A3B8" } }, p.ficha),
-          h("span", { style: { flex: "1 1 220px" } }, p.motivo),
-          h("span", { style: { marginLeft: "auto", fontWeight: 700, color: corr ? "#B45309" : "#64748B", whiteSpace: "nowrap" } }, corr ? "corrigir →" : "abrir →"))),
+        g.itens.slice(0, LIMITE).map((p, i) => {
+          const comLink = !!p.campo;
+          return h(comLink ? "a" : "div", Object.assign({
+            key: i,
+            style: { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", fontSize: 11.5, padding: "7px 8px", textDecoration: "none", borderRadius: 8, color: "#475569", transition: "background .15s" }
+          }, comLink ? {
+            href: `remocao.html?foco=${encodeURIComponent(p.id)}&campo=${encodeURIComponent(p.campo)}`,
+            onMouseEnter: e => { e.currentTarget.style.background = alerta ? "#FEF3C7" : "#F8FAFC"; },
+            onMouseLeave: e => { e.currentTarget.style.background = "transparent"; }
+          } : {}),
+            h("span", { style: { fontWeight: 600, color: "#0F172A" } }, p.nome),
+            p.ficha && h("span", { style: { color: "#94A3B8" } }, p.ficha),
+            h("span", { style: { flex: "1 1 220px" } }, p.motivo),
+            comLink && h("span", { style: { marginLeft: "auto", fontWeight: 700, color: corr ? "#B45309" : "#64748B", whiteSpace: "nowrap" } }, corr ? "corrigir →" : "abrir →"));
+        }),
         g.itens.length > LIMITE && h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "6px 8px" } }, `Mostrando ${LIMITE} de ${g.itens.length}. Corrija estas e a lista avança.`)));
   };
 
   return h("div", { style: { background: alerta ? "#FFFBEB" : "#fff", border: "1px solid " + (alerta ? "#FDE68A" : "#E8EDF3"), borderRadius: 14, padding: "16px 18px", marginBottom: 14 } },
     h(Titulo, {
       extra: alerta ? `${nCorr} para corrigir${nAcomp ? ` · ${nAcomp} para acompanhar` : ""}` : (nAcomp ? `${nAcomp} para acompanhar` : "nada a corrigir"),
-      tooltip: "Casos em que a planilha tem dado faltando, incompleto, fora de ordem ou suspeito e que poderiam distorcer os números. O painel não completa nem adivinha: o que está incompleto fica fora da conta e aparece aqui, com link para abrir a linha na planilha. “Para acompanhar” é o que pode ser normal (ainda aguardando), mas vale conferir. Uma mesma linha pode aparecer em mais de uma lista."
-    }, "Problemas na planilha"),
-    corrigir.length === 0 && acompanhar.length === 0
-      ? h("div", { style: { fontSize: 12, color: "#15803D", padding: "4px 0 2px" } }, `Nenhum problema encontrado nas ${total} linhas do período.`)
-      : h(React.Fragment, null,
-          corrigir.length > 0 && h("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#92400E", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 2 } }, "Para corrigir"),
-          corrigir.map(grupo),
-          acompanhar.length > 0 && h("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: ".05em", margin: corrigir.length ? "14px 0 2px" : "0 0 2px" } }, "Para acompanhar · pode ser normal"),
-          acompanhar.map(grupo)));
+      tooltip: "Tudo o que, na planilha, está faltando, incompleto, fora de ordem, fora da lista ou suspeito e poderia distorcer os números. O painel não completa nem adivinha: o que está com problema fica fora da conta e aparece aqui, com link para abrir a linha na planilha. “Aguardando” é o que pode ser normal, mas vale conferir. Uma mesma linha pode aparecer em mais de uma lista."
+    }, "Saneamento de falhas"),
+    comItens.length === 0
+      ? h("div", { style: { fontSize: 12, color: "#15803D", padding: "4px 0 2px" } }, `Nenhuma falha encontrada nas ${total} linhas do período.`)
+      : DASH_SANEAMENTO_SECOES.map(sec => {
+          const gs = comItens.filter(g => g.secao === sec.id);
+          if (!gs.length) return null;
+          const n = gs.reduce((t, g) => t + g.itens.length, 0);
+          return h("div", { key: sec.id, style: { marginTop: 12 } },
+            h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 10.5, fontWeight: 700, color: sec.id === "aguarda" ? "#64748B" : "#92400E", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 2 } },
+              h("span", null, sec.titulo), h("span", { style: { fontWeight: 600, opacity: 0.8 } }, n)),
+            gs.map(grupo));
+        }));
 }
 
-function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, currentUser, discrepancias, onPendenciasChange, showT: showTProp }) {
+function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, currentUser, discrepancias, showT: showTProp }) {
   const showT = showTProp || function () {};
   const [remocoes, setRemocoes] = useState([]);
   const [carregando, setCarregando] = useState(true);   // só a 1ª carga troca a tela inteira por "Carregando…"
@@ -613,7 +655,6 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const [periodo, setPeriodo] = useState("90d");
   const [ini, setIni] = useState("");
   const [fim, setFim] = useState("");
-  const [verPendencias, setVerPendencias] = useState(false);
   const [verDiscrep, setVerDiscrep] = useState(false);
   const [justModal, setJustModal] = useState(null);
   const [justTexto, setJustTexto] = useState("");
@@ -840,7 +881,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     r.ambulancia = resumo(r.lista.map(c => c.minAmb).filter(v => v !== null && v >= 0));
     return r;
   }, [dados]);
-  /* ── Problemas na planilha ────────────────────────────────────────────────
+  /* ── Saneamento de falhas ────────────────────────────────────────────────
    * Só LÊ os campos da planilha e aponta o que está incompleto, fora de ordem ou suspeito. Não corrige, não completa, não adivinha.
    * Cada grupo é uma lista com o link da linha. Definições e textos: DASH_PROBLEMAS_DEF.
    * Linhas olhadas: as do período (`dados`). Exceções: "sem data" e "data no futuro" olham tudo o que veio do servidor
@@ -872,6 +913,9 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       { nome: "retorno", campo: "data_retorno", d: r.data_retorno, h: r.horario_retorno }
     ];
 
+    const vazio = (campo, v) => C ? C.classificar(campo, v).canonico === C.NAO_INFORMADO : !String(v == null ? "" : v).trim();
+    const semEquipe = v => !String(v == null ? "" : v).trim() || !!(C && C.ehSemEquipe && C.ehSemEquipe(v));
+
     dados.forEach(r => {
       const cross = dashTemFicha(r);
       const finD = temData(r.data_resposta_cross), finH = temHora(r.horario_resposta_cross);
@@ -879,6 +923,28 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       const saiD = temData(r.data_saida_real), saiH = temHora(r.horario_saida_ambulancia);
       const retD = temData(r.data_retorno), retH = temHora(r.horario_retorno);
       const fin = finD && finH, sai = saiD && saiH;
+
+      // valores fora da lista (canon.js): vão para "Não classificado" nos gráficos
+      if (C) DASH_CAMPOS_LISTA.forEach(([campo, rot]) => {
+        const res = C.classificar(campo, r[campo]);
+        if (res.canonico === C.NAO_CLASSIFICADO)
+          add("cls_" + campo, r, campo, `“${String(r[campo]).trim()}” não está na lista${res.vazamento ? " — parece ser de " + res.vazamento.pertenceA.join(" ou ") : ""}.`);
+      });
+      // campos vazios que tiram a linha de um indicador
+      if (sai && vazio("tipo_ambulancia", r.tipo_ambulancia)) add("vazio_tipo_amb", r, "tipo_ambulancia", `Saiu em ${dm(r.data_saida_real, r.horario_saida_ambulancia)} sem tipo de ambulância.`);
+      if (vazio("gravidade", r.gravidade)) add("vazio_gravidade", r, "gravidade", "Gravidade vazia.");
+      if (cross && fin && vazio("instituicao_destino", r.instituicao_destino)) {
+        const st = C ? C.classificar("status", r.status).canonico : "";
+        if (st !== "Cancelada pelo solicitante" && st !== "Resolvido com recursos locais")
+          add("vazio_destino", r, "instituicao_destino", `Finalizada pela CROSS em ${dm(r.data_resposta_cross, r.horario_resposta_cross)}, sem instituição de destino.`);
+      }
+      // protocolo de AVC
+      if (r.protocolo_avc === true) {
+        if (!fin) add("avc_sem_medida", r, finD ? "horario_resposta_cross" : "data_resposta_cross", "Sem finalização da CROSS completa (data e horário): a meta de 1h não pode ser medida.");
+        else if (!sai) add("avc_sem_medida", r, saiD ? "horario_saida_ambulancia" : "data_saida_real", "Sem data e horário de saída da ambulância: não entra na meta de 1h.");
+        if (sai && semEquipe(r.medico)) add("avc_sem_equipe", r, "medico", "Saiu sem médico registrado.");
+        if (sai && semEquipe(r.enfermeiro)) add("avc_sem_equipe", r, "enfermeiro", "Saiu sem enfermeiro(a) registrado(a).");
+      }
 
       if (cross) {
         const f = norm(r.ficha_cross);
@@ -913,11 +979,18 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       }
     });
 
+    // Kanban: cards nas colunas de aceite sem hospital de destino (sem link direto para o card)
+    const rotuloCol = id => (cols.find(x => x.id === id) || {}).label || id;
+    cards.filter(x => !(x.hosp || "").trim() && DASH_COLUNAS_ACEITAS.includes(x.col_id)).forEach(x =>
+      (G.kanban_sem_hospital || (G.kanban_sem_hospital = [])).push({
+        id: x.id, campo: null, nome: x.nome || "(sem nome)", ficha: x.ficha_cross || "",
+        motivo: `Na coluna “${rotuloCol(x.col_id)}” sem hospital de destino. Abra o card no Kanban e preencha “Hospital de destino”.` }));
+
     return {
       grupos: DASH_PROBLEMAS_DEF.map(def => Object.assign({}, def, { itens: G[def.id] || [] })),
       n: id => (G[id] || []).length
     };
-  }, [remocoes, dados, hojeIso]);
+  }, [remocoes, dados, hojeIso, cards, cols]);
   const ag = campo => C ? C.agrupar(dados, campo)
     : { itens: [], total: dados.length, informados: 0, cobertura: 0, naoClassificados: [] };
 
@@ -951,7 +1024,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     // Minutos entre dois momentos. SEM suposição: cada momento precisa ter a SUA data e o SEU horário preenchidos; se faltar
     // um, o intervalo não é medido (conta em "sem os dois horários"). Fora de ordem, ou com 30 dias ou mais de diferença, é
     // provável erro de digitação: não entra na conta e é contado como "inconsistente". Os dois casos aparecem, com link, em
-    // "Problemas na planilha".
+    // "Saneamento de falhas".
     const par = (d1, h1, d2, h2) => {
       const a = quando(d1, h1), b = quando(d2, h2);
       if (a === null || b === null) return { v: null, neg: false };
@@ -969,11 +1042,11 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
         calc: x => { const m = minFinPed(x); return m === null ? { v: null, neg: false } : (m < 0 || m >= 43200) ? { v: null, neg: true } : { v: m, neg: false }; },
         pts: x => [dm(x.data_resposta_cross, x.horario_resposta_cross), dm(x.data_saida_ambulancia, x.hora_solic_ambulancia)] },
       { id: "ped_sai", de: "Solicitação da ambulância", ate: "Saída", dono: "Santa Casa", cor: "#B45309",
-        tip: "Tempo mediano entre a solicitação da ambulância e a saída dela, como está na coluna T. ESPERA da planilha. Se a célula estiver vazia, usa a mesma conta da planilha: data e horário dos dois momentos, sem supor dia. Se faltar algum, o caso fica de fora e aparece em “Problemas na planilha”.",
+        tip: "Tempo mediano entre a solicitação da ambulância e a saída dela, como está na coluna T. ESPERA da planilha. Se a célula estiver vazia, usa a mesma conta da planilha: data e horário dos dois momentos, sem supor dia. Se faltar algum, o caso fica de fora e aparece em “Saneamento de falhas”.",
         calc: x => { const g = dashHMemMin(x.tempo_espera); return g !== null ? { v: g, neg: false } : par(x.data_saida_ambulancia, x.hora_solic_ambulancia, x.data_saida_real, x.horario_saida_ambulancia); },
         pts: x => [dm(x.data_saida_ambulancia, x.hora_solic_ambulancia), dm(x.data_saida_real, x.horario_saida_ambulancia)] },
       { id: "sai_ret", de: "Saída", ate: "Retorno", dono: "Santa Casa", cor: "#0F766E",
-        tip: "Tempo mediano que a ambulância ficou fora: da saída ao retorno, como está na coluna DURAÇÃO da planilha. Se a célula estiver vazia, usa a mesma conta da planilha: data e horário dos dois momentos, sem supor dia. Se faltar algum, o caso fica de fora e aparece em “Problemas na planilha”.",
+        tip: "Tempo mediano que a ambulância ficou fora: da saída ao retorno, como está na coluna DURAÇÃO da planilha. Se a célula estiver vazia, usa a mesma conta da planilha: data e horário dos dois momentos, sem supor dia. Se faltar algum, o caso fica de fora e aparece em “Saneamento de falhas”.",
         calc: x => { const g = dashHMemMin(x.duracao_remocao); return g !== null ? { v: g, neg: false } : par(x.data_saida_real, x.horario_saida_ambulancia, x.data_retorno, x.horario_retorno); },
         pts: x => [dm(x.data_saida_real, x.horario_saida_ambulancia), dm(x.data_retorno, x.horario_retorno)] },
     ];
@@ -1014,25 +1087,6 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     const semInfo = dados.filter(r => r.permaneceu !== true && r.permaneceu !== false).length;
     return { n, sim, semInfo, pct: n ? sim / n * 100 : 0 };
   }, [dados]);
-
-  // Percorre os registros (nao os agregados) para levar o id junto: sem ele
-  // o aviso diz que existe um valor invalido mas nao onde corrigir.
-  const pendencias = useMemo(() => {
-    if (!C) return [];
-    const out = [];
-    ["especialidade", "instituicao_destino", "setor", "status", "gravidade", "tipo_ambulancia"].forEach(campo => {
-      dados.forEach(r => {
-        const res = C.classificar(campo, r[campo]);
-        if (res.canonico === C.NAO_CLASSIFICADO)
-          out.push({ id: r.id, campo, valor: r[campo],
-                     paciente: r.nome_paciente, ficha: r.ficha_cross,
-                     data: r.data_solicitacao,
-                     sugestao: res.vazamento ? res.vazamento.pertenceA.join(" ou ") : null });
-      });
-    });
-    return out;
-  }, [dados]);
-  useEffect(() => { if(onPendenciasChange) onPendenciasChange(pendencias.length); }, [pendencias.length]);
 
   /* ═══ Animação de entrada ═════════════════════════════════════════════
    * Números sobem até o valor e barras preenchem ao montar. easeOutCubic:
@@ -1191,7 +1245,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   if (nSaidaSemData > 0) notasGraf.push(`${nSaidaSemData} linha${nSaidaSemData !== 1 ? "s" : ""} com horário de saída mas sem data de saída: não entra${nSaidaSemData !== 1 ? "m" : ""} nas barras.`);
   const nSaidaDeduz = problemas.n("saida_deduzida");
   if (nSaidaDeduz > 0) notasGraf.push(`${nSaidaDeduz} saída${nSaidaDeduz !== 1 ? "s" : ""} com data deduzida pela planilha (entra${nSaidaDeduz !== 1 ? "m" : ""} nas barras, mas vale confirmar a data).`);
-  if (notasGraf.length > 0) notasGraf.push("As listas, com link para abrir cada linha na planilha, estão em “Problemas na planilha”, logo abaixo.");
+  if (notasGraf.length > 0) notasGraf.push("As listas, com link para abrir cada linha na planilha, estão em “Saneamento de falhas”, logo abaixo.");
   const pctCross = tipos.total ? Math.round(tipos.cross / tipos.total * 100) : 0;
   const pctOutras = tipos.total ? 100 - pctCross : 0;
 
@@ -1314,8 +1368,8 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       totais: totaisGraf, notas: notasGraf, Titulo, Vazio
     }),
 
-    /* ══ Problemas na planilha: tudo o que ficou fora da conta, com link para corrigir ══ */
-    /*#__PURE__*/React.createElement(DashProblemas, { grupos: problemas.grupos, total: dados.length, Titulo }),
+    /* ══ Saneamento de falhas: tudo o que ficou fora da conta, com link para corrigir ══ */
+    /*#__PURE__*/React.createElement(DashSaneamento, { grupos: problemas.grupos, total: dados.length, Titulo }),
 
     /* ══ Distribuições ══ */
     /*#__PURE__*/React.createElement("div", {
@@ -1402,48 +1456,6 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
           key: i.canonico, label: i.canonico === (C && C.NAO_CLASSIFICADO) ? "Outro / não classificado" : i.canonico, n: i.n, pct: i.pct, max: gAmb.itens[0].n,
           cor: i.canonico === "AVANÇADA" ? "#F59E0B" : "#64748B" })))
     ),
-
-    /* ══ Pendências de qualidade ══ */
-    pendencias.length > 0 && /*#__PURE__*/React.createElement(Card, {
-      style: { marginTop: 14, borderColor: "#FDE68A", background: "#FFFBEB" }
-    },
-      /*#__PURE__*/React.createElement("div", {
-        style: { display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" },
-        onClick: () => setVerPendencias(v => !v)
-      },
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#92400E" } },
-          pendencias.length, " valor", pendencias.length !== 1 ? "es" : "", " a corrigir"),
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: "#B45309" } },
-          verPendencias ? "ocultar" : "ver e corrigir")),
-      verPendencias && /*#__PURE__*/React.createElement("div", { style: { marginTop: 12 } },
-        /*#__PURE__*/React.createElement("div", {
-          style: { fontSize: 11, color: "#78350F", marginBottom: 10, lineHeight: 1.55 }
-        }, "Cada item abre a planilha na linha exata. Enquanto não forem corrigidos, ficam de fora dos indicadores."),
-        pendencias.map((p, i) => /*#__PURE__*/React.createElement("a", {
-          key: i,
-          href: `remocao.html?foco=${encodeURIComponent(p.id)}&campo=${encodeURIComponent(p.campo)}`,
-          style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
-                   fontSize: 11.5, color: "#92400E", padding: "8px 10px", textDecoration: "none",
-                   borderTop: i ? "1px solid #FDE68A" : "none", borderRadius: 6,
-                   transition: "background .15s" },
-          onMouseEnter: e => e.currentTarget.style.background = "#FEF3C7",
-          onMouseLeave: e => e.currentTarget.style.background = "transparent"
-        },
-          /*#__PURE__*/React.createElement("code", {
-            style: { background: "#FEF3C7", borderRadius: 4, padding: "2px 6px", fontSize: 11, fontWeight: 600 }
-          }, p.valor),
-          /*#__PURE__*/React.createElement("span", { style: { color: "#B45309" } }, "em ", p.campo),
-          p.sugestao && /*#__PURE__*/React.createElement("span", {
-            style: { fontSize: 10.5, color: "#9A3412", background: "#FFEDD5",
-                     border: "1px solid #FED7AA", borderRadius: 5, padding: "1px 6px" }
-          }, "parece ser de ", p.sugestao),
-          /*#__PURE__*/React.createElement("span", {
-            style: { marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", color: "#A16207", fontSize: 10.5 }
-          },
-            p.paciente && /*#__PURE__*/React.createElement("span", null, p.paciente),
-            p.ficha && /*#__PURE__*/React.createElement("span", { style: { color: "#CA8A04" } }, p.ficha),
-            /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, color: "#B45309" } }, "corrigir →"))))))
-    ,
 
     /* ══ Discrepâncias de fila ══ */
     discrepancias && discrepancias.length > 0 && React.createElement("div", {
