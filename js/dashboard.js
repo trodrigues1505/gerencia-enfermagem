@@ -66,6 +66,12 @@ function dashTemHorarioSaida(x) {
   return /^(\d{1,2}):(\d{2})/.test(String(x.horario_saida_ambulancia || "").trim());   // aceita "03:45" e "03:45:00"
 }
 
+// "05:22" (como a planilha guarda T. ESPERA e DURAÇÃO) -> minutos. Vazio ou fora do formato -> null.
+function dashHMemMin(v) {
+  const m = String(v == null ? "" : v).trim().match(/^(\d+):(\d{2})(?::\d{2})?$/);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
 function dashDiaDaSaida(x) {
   return dashTemHorarioSaida(x) ? dashDiaIso(x.data_saida_real) : null;
 }
@@ -963,12 +969,12 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
         calc: x => { const m = minFinPed(x); return m === null ? { v: null, neg: false } : (m < 0 || m >= 43200) ? { v: null, neg: true } : { v: m, neg: false }; },
         pts: x => [dm(x.data_resposta_cross, x.horario_resposta_cross), dm(x.data_saida_ambulancia, x.hora_solic_ambulancia)] },
       { id: "ped_sai", de: "Solicitação da ambulância", ate: "Saída", dono: "Santa Casa", cor: "#B45309",
-        tip: "Tempo mediano entre a solicitação da ambulância e a saída dela. Usa a data e o horário de cada momento, como estão na planilha (solicitação num dia, saída no outro). Se faltar algum, o caso fica de fora e aparece em “Problemas na planilha”.",
-        calc: x => par(x.data_saida_ambulancia, x.hora_solic_ambulancia, x.data_saida_real, x.horario_saida_ambulancia),
+        tip: "Tempo mediano entre a solicitação da ambulância e a saída dela, como está na coluna T. ESPERA da planilha. Se a célula estiver vazia, usa a mesma conta da planilha: data e horário dos dois momentos, sem supor dia. Se faltar algum, o caso fica de fora e aparece em “Problemas na planilha”.",
+        calc: x => { const g = dashHMemMin(x.tempo_espera); return g !== null ? { v: g, neg: false } : par(x.data_saida_ambulancia, x.hora_solic_ambulancia, x.data_saida_real, x.horario_saida_ambulancia); },
         pts: x => [dm(x.data_saida_ambulancia, x.hora_solic_ambulancia), dm(x.data_saida_real, x.horario_saida_ambulancia)] },
       { id: "sai_ret", de: "Saída", ate: "Retorno", dono: "Santa Casa", cor: "#0F766E",
-        tip: "Tempo mediano que a ambulância ficou fora: da saída ao retorno à Santa Casa. Usa a data e o horário de cada momento, como estão na planilha. Se faltar algum, o caso fica de fora e aparece em “Problemas na planilha”.",
-        calc: x => par(x.data_saida_real, x.horario_saida_ambulancia, x.data_retorno, x.horario_retorno),
+        tip: "Tempo mediano que a ambulância ficou fora: da saída ao retorno, como está na coluna DURAÇÃO da planilha. Se a célula estiver vazia, usa a mesma conta da planilha: data e horário dos dois momentos, sem supor dia. Se faltar algum, o caso fica de fora e aparece em “Problemas na planilha”.",
+        calc: x => { const g = dashHMemMin(x.duracao_remocao); return g !== null ? { v: g, neg: false } : par(x.data_saida_real, x.horario_saida_ambulancia, x.data_retorno, x.horario_retorno); },
         pts: x => [dm(x.data_saida_real, x.horario_saida_ambulancia), dm(x.data_retorno, x.horario_retorno)] },
     ];
     const novo = (chave, cor) => ({ chave, cor, total: 0, nPos: 0, mediana: null, max: null, casos: [], v: [] });
