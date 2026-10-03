@@ -116,7 +116,7 @@ function parseTSVToCard(txt){
   // ── Gravidade ────────────────────────────────────────────────────────────
   // Regra: buscar o campo "Gravidade" ou "Prioridade" e mapear para chave interna.
   // Fallback padrão: urgencia (AMARELO).
-  let grav = "urgencia";   // padrão mantido por decisão: ficha sem prioridade = AMARELO
+  let grav = "";   // ficha sem prioridade: fica VAZIA (não se assume AMARELO); entra no Saneamento de falhas
   const prio = (typeof Canon !== "undefined" && Canon.lerPrioridadeFicha) ? Canon.lerPrioridadeFicha(txt) : null;
   if(prio) grav = prio.chave;   // prioridade da ficha CROSS (1 a 4), tabela única em canon.js (PRIORIDADE_CROSS)
 
@@ -469,10 +469,10 @@ function CardModal({
     value: form.grav,
     onChange: upd,
     disabled: !isAdmin,
-    opts: Object.entries(GC).map(([k, v]) => ({
+    opts: [{ v: "", t: "— sem prioridade —" }].concat(Object.entries(GC).map(([k, v]) => ({
       v: k,
       t: v.label
-    }))
+    })))
   }), /*#__PURE__*/React.createElement(Field, {
     label: "Coluna",
     fieldKey: "col_id",
