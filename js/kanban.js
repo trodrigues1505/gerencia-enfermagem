@@ -103,7 +103,6 @@ function KCard({
   onDragEnd
 }) {
   const gc = GC[c.grav] || GC.urgencia;
-  const hasAceite = c.receptor || c.data_aceite;
   return /*#__PURE__*/React.createElement("div", {
     className: "k-card",
     "data-id": c.id,
@@ -250,13 +249,13 @@ function KCard({
     style: {
       color: "#0F172A"
     }
-  }, c.hosp)), c.cross_info && /*#__PURE__*/React.createElement("div", {
+  }, c.hosp)), (c.data_resolucao || c.hora_resolucao) && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 2,
       fontSize: 10,
       color: "#94A3B8"
     }
-  }, "Cross: ", c.cross_info), (() => {
+  }, "Finalizado na CROSS: ", [c.data_resolucao, c.hora_resolucao ? "às " + c.hora_resolucao : ""].filter(Boolean).join(" ")), (() => {
     if (!c.created_at) return null;
     const hrs = Math.floor((Date.now() - new Date(c.created_at).getTime()) / 3600000);
     if (hrs < 1) return null;
@@ -269,13 +268,7 @@ function KCard({
         fontWeight: hrs >= 12 ? 700 : 400
       }
     }, hrs >= 24 ? Math.floor(hrs / 24) + "d " : "", hrs % 24 > 0 ? hrs % 24 + "h " : "", "no sistema");
-  })(), hasAceite && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 3,
-      fontSize: 10,
-      color: "#16A34A"
-    }
-  }, "📥 ", c.receptor, c.hora_aceite ? " às " + c.hora_aceite : ""),
+  })(),
     c.prioridade_remocao && React.createElement("div", {
       style: { marginTop:3, display:"flex", alignItems:"center", gap:4 }
     },
