@@ -115,11 +115,21 @@
    * "urgencia" minúsculo é a chave interna do Kanban que pode vazar crua
    * pelo `gravidade: data.grav || "urgencia"` (index.html linha 5745).
    */
+  /* Prioridade da ficha CROSS (1 a 4) -> gravidade. ÚNICA tabela oficial: o painel, a planilha e o Kanban devem usar esta.
+   * Antes o painel aceitava "0" a "3" (um número a menos que a ficha) e a planilha não aceitava número nenhum.           */
+  var PRIORIDADE_CROSS = {
+    1: { db: "VERMELHO", chave: "emergencia",      nome: "Vermelho", rotulo: "Emergência" },
+    2: { db: "AMARELO",  chave: "urgencia",        nome: "Amarelo",  rotulo: "Urgência" },
+    3: { db: "VERDE",    chave: "menor_gravidade", nome: "Verde",    rotulo: "Menor gravidade" },
+    4: { db: "CINZA",    chave: "agendamento",     nome: "Cinza",    rotulo: "Agendamento" }
+  };
+  function gravidadeDePrioridade(n) { return PRIORIDADE_CROSS[Number(n)] || null; }
+
   var GRAVIDADE = idx({
-    "Vermelho":  ["VERMELHO", "EMERGENCIA", "EMERGENCIA VERMELHO", "0"],
-    "Amarelo":   ["AMARELO", "URGENCIA", "1"],
-    "Verde":     ["VERDE", "MENOR GRAVIDADE", "POUCO URGENTE", "2"],
-    "Cinza":     ["CINZA", "AGENDAMENTO", "AGENDADO", "ELETIVO", "RETORNO", "3"]
+    "Vermelho":  ["VERMELHO", "EMERGENCIA", "EMERGENCIA VERMELHO", "1", "PRIORIDADE 1"],
+    "Amarelo":   ["AMARELO", "URGENCIA", "2", "PRIORIDADE 2"],
+    "Verde":     ["VERDE", "MENOR GRAVIDADE", "MENOR URGENCIA", "POUCO URGENTE", "3", "PRIORIDADE 3"],
+    "Cinza":     ["CINZA", "AGENDAMENTO", "AGENDADO", "ELETIVO", "RETORNO", "4", "PRIORIDADE 4"]
   });
 
   var GRAVIDADE_ORDEM = ["Vermelho", "Amarelo", "Verde", "Cinza"];
@@ -133,7 +143,8 @@
    */
   var AMBULANCIA = idx({
     "BÁSICA":   ["BASICA", "BASICO", "SBV", "USB", "UNIDADE DE SUPORTE BASICO"],
-    // UTI (móvel) conta como Avançada — decisão da gestão (01/10/2026).
+    // UTI (móvel) é Avançada — decisão da gestão (01/10/2026). "UTI" deixou de ser opção nas listas; os apelidos abaixo ficam
+    // só para ler dado antigo e texto vindo de ficha/Excel.
     "AVANÇADA": ["AVANCADA", "AVANCADO", "SAV", "USA", "UTI", "UTI MOVEL", "UTI MOVEL ADULTO",
                  "UTI MOVEL NEONATAL", "UNIDADE DE SUPORTE AVANCADO"]
   });
@@ -425,6 +436,33 @@
     };
   }
 
+  /* ══ LEITURA DA FICHA CROSS (uma regra só, usada pelo Kanban e pela planilha) ═══════════════════════════════════
+   * FINALIZAÇÃO: data e hora que ficam LOGO ABAIXO do título "FINALIZAÇÃO". Não são as do "Médico Receptor", que ficam acima.
+   *   A regra olha cada ocorrência da palavra e só aceita a que tem "Data: dd/mm/aaaa  Hora: hh:mm" logo em seguida;
+   *   vale a ÚLTIMA (o bloco FINALIZAÇÃO é o último da ficha). Não completa nem adivinha: sem o bloco, devolve null.
+   * DESTINO: "Unidade Receptora" do bloco Resolução (A1/A8). Uma unidade que só aparece em "Busca de Recursos" (recusa) não vale. */
+  function lerFinalizacaoFicha(txt) {
+    var t = String(txt || ""), re = /FINALIZA[\u00c7C][A\u00c3]O/gi, m, achado = null;
+    while ((m = re.exec(t)) !== null) {
+      var trecho = t.slice(m.index + m[0].length, m.index + m[0].length + 170);
+      var p = trecho.match(/^[\s\S]{0,120}?Data\s*:?\s*(\d{2}\/\d{2}\/\d{4})\s*Hora\s*:?\s*(\d{1,2}:\d{2})(?::\d{2})?/i);
+      if (p) achado = { data: p[1], hora: ("0" + p[2]).slice(-5) };
+    }
+    return achado;
+  }
+  function lerDestinoFicha(txt) {
+    var t = String(txt || ""), re = /Resolu[\u00e7c][\u00e3a]o/gi, m, achado = "";
+    while ((m = re.exec(t)) !== null) {
+      var trecho = t.slice(m.index + m[0].length, m.index + m[0].length + 280);
+      var p = trecho.match(/^[\s\S]{0,160}?Unidade\s+Receptora\s*:?\s*[\r\n\t ]*([^\r\n\t]+)/i);
+      if (p) {
+        var v = p[1].trim().toUpperCase();
+        if (v && !/^(MUNIC[I\u00cd]PIO|M[E\u00c9]DICO|CRM|DATA|OBSERVA)/.test(v)) achado = v;   // rótulo seguinte = campo vazio
+      }
+    }
+    return achado;
+  }
+
   root.Canon = {
     norm: norm, isVazio: isVazio,
     classificar: classificar, classificarAVC: classificarAVC, validarLinha: validarLinha,
@@ -432,7 +470,9 @@
     EQUIPE_SEM: EQUIPE_SEM, ehSemEquipe: ehSemEquipe,
     NAO_CLASSIFICADO: NAO_CLASSIFICADO, NAO_INFORMADO: NAO_INFORMADO,
     GRAVIDADE_ORDEM: GRAVIDADE_ORDEM, GRAVIDADE_COR: GRAVIDADE_COR,
-    STATUS_FECHADOS: STATUS_FECHADOS, ESPEC_META: ESPEC_META
+    STATUS_FECHADOS: STATUS_FECHADOS, ESPEC_META: ESPEC_META,
+    PRIORIDADE_CROSS: PRIORIDADE_CROSS, gravidadeDePrioridade: gravidadeDePrioridade,
+    lerFinalizacaoFicha: lerFinalizacaoFicha, lerDestinoFicha: lerDestinoFicha
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = root.Canon;
