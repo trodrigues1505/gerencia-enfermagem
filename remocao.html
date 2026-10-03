@@ -333,30 +333,19 @@ async function dbGetTodas(path){
   return out;
 }
 
-function calcTempo(h1, h2) {
-  if(!h1||!h2) return "";
-  try {
-    const [a,b]=h1.split(":").map(Number);
-    const [c,d]=h2.split(":").map(Number);
-    let diff=(c*60+d)-(a*60+b);
-    if(diff<0) diff+=1440;
-    return `${String(Math.floor(diff/60)).padStart(2,"0")}:${String(diff%60).padStart(2,"0")}`;
-  } catch { return ""; }
-}
-
-// Diferença entre dois momentos (data + hora) no formato HH:MM. Se as duas datas existem, usa-as:
-// a ambulância pode ser pedida num dia e sair no outro (pedido 10:00 dia 1, saída 12:00 dia 2 = 26:00, não 02:00).
-// Sem as duas datas, cai no cálculo antigo só com horários (com virada de meia-noite).
+// Diferença entre dois momentos (data + hora) em HH:MM. SEM suposição: precisa das DUAS datas e dos DOIS horários, e o fim não
+// pode ser antes do início. Faltou algo, ou ficou fora de ordem: devolve "" (a célula fica vazia em vez de um valor inventado).
+// A ambulância pode ser pedida num dia e sair no outro (pedido 10:00 dia 1, saída 12:00 dia 2 = 26:00, não 02:00).
+// Mesma regra do Livro de Saída (livro.js, lsDiff).
 function calcTempoD(dIni, hIni, dFim, hFim) {
-  if(!hIni||!hFim) return "";
-  if(dIni&&dFim){
-    const a=new Date(`${dIni}T${String(hIni).padStart(5,"0")}:00`), b=new Date(`${dFim}T${String(hFim).padStart(5,"0")}:00`);
-    if(!isNaN(a)&&!isNaN(b)){
-      const diff=Math.round((b-a)/60000);
-      if(diff>=0) return `${String(Math.floor(diff/60)).padStart(2,"0")}:${String(diff%60).padStart(2,"0")}`;
-    }
-  }
-  return calcTempo(hIni,hFim);
+  const di=String(dIni||"").slice(0,10), df=String(dFim||"").slice(0,10);
+  const hi=String(hIni||"").trim().match(/^(\d{1,2}):(\d{2})/), hf=String(hFim||"").trim().match(/^(\d{1,2}):(\d{2})/);
+  if(!hi||!hf||!/^\d{4}-\d{2}-\d{2}$/.test(di)||!/^\d{4}-\d{2}-\d{2}$/.test(df)) return "";
+  const a=new Date(`${di}T${hi[1].padStart(2,"0")}:${hi[2]}:00`), b=new Date(`${df}T${hf[1].padStart(2,"0")}:${hf[2]}:00`);
+  if(isNaN(a)||isNaN(b)) return "";
+  const diff=Math.round((b-a)/60000);
+  if(diff<0) return "";
+  return `${String(Math.floor(diff/60)).padStart(2,"0")}:${String(diff%60).padStart(2,"0")}`;
 }
 
 // Tempos (espera, duração) ficam guardados como "HH:MM", mas são MOSTRADOS com a unidade escrita:
@@ -368,21 +357,21 @@ const fmtHM = v => {
   return h>0 ? `${h}h ${String(mi).padStart(2,"0")}min` : `${mi}min`;
 };
 // Datas/horários de uma linha da planilha → tempos. Um só lugar, usado pelo formulário, pela edição na tabela e pelas células.
-//  espera  = pedido da ambulância → saída   (só usa datas quando as DUAS existem; senão, só horários)
-//  duração = saída → retorno da ambulância  (sem data de retorno: mesmo dia, ou dia seguinte se o retorno for "menor")
-const dataSaidaEf = r => r.data_saida_real || r.data_saida_ambulancia || "";
-const tempoEsperaDe = r => calcTempoD(r.data_saida_ambulancia||"", r.hora_solic_ambulancia, r.data_saida_real||r.data_saida_ambulancia||"", r.horario_saida_ambulancia);
-const duracaoDe = r => calcTempoD(dataSaidaEf(r), r.horario_saida_ambulancia, r.data_retorno||dataSaidaEf(r), r.horario_retorno);
+//  espera  = pedido da ambulância → saída   (data do pedido + data da saída, cada uma com o seu horário)
+//  duração = saída → retorno da ambulância  (data da saída + data do retorno, cada uma com o seu horário)
+// Falta data ou horário de um dos lados: fica vazio. Não se supõe "mesmo dia" nem "dia seguinte".
+const tempoEsperaDe = r => calcTempoD(r.data_saida_ambulancia, r.hora_solic_ambulancia, r.data_saida_real, r.horario_saida_ambulancia);
+const duracaoDe = r => calcTempoD(r.data_saida_real, r.horario_saida_ambulancia, r.data_retorno, r.horario_retorno);
 // Campos calculados pelo BANCO (gatilho): a tela só os mostra. Nunca são enviados ao salvar nem ao importar.
 const CAMPOS_CALCULADOS = new Set(["min_finalizacao_pedido_amb"]);
 // Filtro "Faltando…": remoções em que falta a data OU a hora de um momento do caminho da remoção (para completar à mão).
-// Saída e retorno só olham a hora: a data pode ser deduzida pelo horário. Remoção cancelada ou resolvida no local
+// Saída e retorno exigem a data E o horário: o painel não deduz data nenhuma. Remoção cancelada ou resolvida no local
 // nunca tem saída: o filtro lista, quem decide é você.
 const FALTA_OPCOES = [
   ["fin",       "Sem finalização da CROSS",       ["data_resposta_cross","horario_resposta_cross"]],
   ["solic_amb", "Sem solicitação da ambulância",  ["data_saida_ambulancia","hora_solic_ambulancia"]],
-  ["saida",     "Sem saída da ambulância",        ["horario_saida_ambulancia"]],
-  ["retorno",   "Sem retorno da ambulância",      ["horario_retorno"]],
+  ["saida",     "Sem saída da ambulância",        ["data_saida_real","horario_saida_ambulancia"]],
+  ["retorno",   "Sem retorno da ambulância",      ["data_retorno","horario_retorno"]],
 ];
 // Os quatro campos de que ele depende: se um deles muda na tela, o valor é refeito na hora (o banco refaz do lado dele).
 const CAMPOS_BASE_MIN_FIN_PED = ["data_resposta_cross","horario_resposta_cross","data_saida_ambulancia","hora_solic_ambulancia"];
@@ -425,10 +414,10 @@ const GRAV_MAP = {
 function gravInfo(v) { return GRAV_MAP[v] || {label:v||"—",bg:"#F1F5F9",fc:"#475569",bd:"#E2E8F0"}; }
 
 const S_OPTS=["FICHA FINALIZADA","FICHA FINALIZADA VIA CROSS","FICHA FINALIZADA PELA CROSS","FICHA FINALIZADA PELA ORIGEM","FICHA ENCERRADA PELO CROSS","ENCERRADA PELO CROSS","REMOÇÃO CONCLUÍDA","REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA","ALTA HOSPITALAR","RESOLVIDO COM RECURSOS LOCAIS","CASO SEM ATUALIZAÇÃO MÉDICA HÁ 48 HORAS","EVASÃO/ALTA A PEDIDO","CANCELADA PELO CROSS","CANCELADA PELO SOLICITANTE","PACIENTE EM REMOÇÃO","PACIENTE AGUARDANDO AMBULÂNCIA","CONCLUIDO","AGENDAMENTO SECRETARIA DA SAÚDE","HEMODIÁLISE","OUTRO"];
-const G_OPTS=["emergencia","urgencia","menor_gravidade","agendamento","VERMELHO","AMARELO","VERDE","CINZA"];
+const G_OPTS=["VERMELHO","AMARELO","VERDE","CINZA"];   // prioridade CROSS 1,2,3,4 (canon.js, PRIORIDADE_CROSS)
 const ST_OPTS=["EMERGÊNCIA","CLÍNICA MÉDICA","OBSERVAÇÃO ADULTO","OBSERVAÇÃO INFANTIL","CLÍNICA PEDIÁTRICA","UTI","BLOCO MATERNO","EVASÃO","OUTRO"];
 const P_OPTS=["AVALIAÇÃO","EXAME","LEITO","BANCO","ALTA","OUTRO"];
-const A_OPTS=["BÁSICA","AVANÇADA","UTI"];
+const A_OPTS=["BÁSICA","AVANÇADA"];
 const S_CLS={"FICHA FINALIZADA":"sf","FICHA FINALIZADA VIA CROSS":"sf","FICHA FINALIZADA PELA CROSS":"sf","FICHA FINALIZADA PELA ORIGEM":"sf","REMOÇÃO CONCLUÍDA":"sc","CONCLUIDO":"sc","PACIENTE EM REMOÇÃO":"sa","PACIENTE AGUARDANDO AMBULÂNCIA":"sa","REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA":"sn","FICHA ENCERRADA PELO CROSS":"se","ENCERRADA PELO CROSS":"se","EVASÃO/ALTA A PEDIDO":"se","CANCELADA PELO CROSS":"se","CANCELADA PELO SOLICITANTE":"se"};
 const AM={"Básica":"BÁSICA","Avançada":"AVANÇADA"};
 
@@ -451,13 +440,13 @@ const COLS = [
   ["data_saida_ambulancia",   "SOLICITAÇÃO BASE AMBULANCIA DATA",       "DATA SOLIC. AMB.",  "—",           "date","",       "Dia em que a ambulância foi SOLICITADA (pode ser diferente do dia da saída). Fonte: Livro de Saída",80],
   ["hora_solic_ambulancia",   "HORÁRIO SOLICITAÇÃO AMBULÂNCIA",         "HORA SOLIC. AMB.",  "—",           "time","",       "Hora da solicitação à base. Manual",60],
   ["horario_saida_ambulancia","HORÁRIO DE SAÍDA DA AMBULÂNCIA DA SCFM", "SAÍDA AMB. SCFM",   "saida",       "time","",       "Hora saída ambulância. Fonte: Kanban 'saida'",60],
-  ["tempo_espera",            "TEMPO DE ESPERA DA AMBULÂNCIA",          "T. ESPERA",         "—",           "ro", "",        "Mostrado em horas e minutos (ex.: 5h 22min). Auto: Saída SCFM − Hora Solic. Ambulância",80],
+  ["tempo_espera",            "TEMPO DE ESPERA DA AMBULÂNCIA",          "T. ESPERA",         "—",           "ro", "",        "Mostrado em horas e minutos (ex.: 5h 22min). Auto: da solicitação da ambulância à saída. Precisa das datas e dos horários dos dois; faltando algum, fica vazio",80],
   ["observacao",              "OBSERVAÇÃO",                             "OBSERVAÇÃO",        "—",           "text","",       "Preenchimento manual (não vem da ficha CROSS). O Livro de Saída também pode preencher",160],
   ["enfermeiro",              "ENFERMEIRO",                             "ENFERMEIRO",        "—",           "text","",       "Enfermeiro responsável. Manual",110],
   ["tecnico_auxiliar",        "TÉCNICO/AUXILIAR ENFERMAGEM",            "TÉCNICO/AUX.",      "—",           "text","",       "Técnico/auxiliar. Manual",110],
   ["medico",                  "MÉDICO",                                 "MÉDICO",            "medico_escala","text","",      "Médico da escala. Fonte: Kanban 'medico_escala' (ou Livro de Saída ao vincular)",110],
   ["horario_retorno",         "HORÁRIO DO RETORNO DA AMBULÂNCIA",       "HORA RETORNO AMBULÂNCIA","retorno",   "time","",       "Hora em que a ambulância voltou à Santa Casa. Fonte: Livro de Saída / Kanban 'retorno'",80],
-  ["duracao_remocao",         "DURAÇÃO DA REMOÇÃO",                     "DURAÇÃO",           "—",           "ro", "",        "Mostrado em horas e minutos (ex.: 5h 22min). Auto: da saída ao retorno da ambulância. Usa as datas de saída e de retorno; sem elas, o retorno 'menor' que a saída conta como dia seguinte",80],
+  ["duracao_remocao",         "DURAÇÃO DA REMOÇÃO",                     "DURAÇÃO",           "—",           "ro", "",        "Mostrado em horas e minutos (ex.: 5h 22min). Auto: da saída ao retorno da ambulância. Precisa da data e do horário da saída e do retorno; faltando algum, fica vazio",80],
   ["finalizado",              "FINALIZADO",                             "FINALIZADO",        "—",           "bool","",       "Remoção finalizada? Sim / Não / vazio (não informado). Clique para alternar",70],
   ["permaneceu",              "PERMANECEU",                             "PERMANECEU",        "—",           "bool","",       "Paciente ficou no hospital de destino e não voltou à Santa Casa? Sim / Não / vazio (não informado)",80],
   ["data_retorno",            "DATA DO RETORNO DA AMBULÂNCIA",          "DATA RETORNO AMBULÂNCIA","—",      "date","",       "Dia em que a ambulância voltou (pode ser diferente do dia da saída). Fonte: Livro de Saída. \"≈\" = data deduzida pelo horário, não digitada",80],
@@ -893,6 +882,9 @@ const GRAV_TO_DB={
 };
 function normalizeGravValue(v){
   if(!v)return null;
+  // Número = prioridade da ficha CROSS (1 a 4; canon.js, PRIORIDADE_CROSS). Antes o número era descartado em silêncio.
+  const mPrio=String(v).trim().match(/^(?:prioridade\s*)?([1-4])$/i);
+  if(mPrio&&typeof Canon!=="undefined"&&Canon.gravidadeDePrioridade) return Canon.gravidadeDePrioridade(mPrio[1]).db;
   // 1) tenta label em portugues (ex: "EMERGENCIA" -> "emergencia")
   const intermediate=GRAV_LABEL_TO_KEY[normHdr(v)];
   const key=intermediate||v;
@@ -939,7 +931,7 @@ function normalizeAmbValue(v){
   // base, sem tipo de ambulancia.
   if(u==="BASICA"||u==="BASICO"||u==="SBV"||u==="USB")return "B\u00c1SICA";
   if(u==="AVANCADA"||u==="AVANCADO"||u==="SAV"||u==="USA")return "AVAN\u00c7ADA";
-  if(u==="UTI")return "UTI";
+  if(u==="UTI"||u.startsWith("UTI "))return "AVAN\u00c7ADA";   // UTI móvel é avançada (decisão da gestão); deixou de ser opção
   // ja veio com acento certo
   const orig=String(v).trim().toUpperCase();
   if(orig==="B\u00c1SICA")return "B\u00c1SICA";
@@ -1068,33 +1060,16 @@ function parseFichaCross(txt){
   else if(/Cancelou\s+Solicita[çc][aã]o|Cancelada\s+pelo\s+solicitante/i.test(txt))
     status = "CANCELADA PELO SOLICITANTE";
 
-  // FINALIZAÇÃO da ficha na CROSS (bloco FINALIZAÇÃO) — coluna "finalização"
-  let data_resposta_cross = null;
-  let horario_resposta_cross = null;
-  const mFinal = txt.match(/FINALIZA[ÇC][AÃ]O[\s\S]*?Data\s*:\s*(\d{2}\/\d{2}\/\d{4})[\s\S]*?Hora\s*:\s*(\d{2}:\d{2})(?::\d{2})?/i);
-  if(mFinal){
-    data_resposta_cross    = normalizeDateValue(mFinal[1]);
-    horario_resposta_cross = mFinal[2];
-  }
-  // ACEITE da CROSS ("Aceitou Solicitação") é o MESMO momento da finalização (decisão da gestão): não existe mais coluna
-  // de aceite. Vale o bloco FINALIZAÇÃO; se a ficha ainda não o tem, usa a data/hora do "Aceitou Solicitação".
-  if(!data_resposta_cross){
-    const mAceitou = txt.match(/Aceitou\s+Solicita[çc][aã]o[\s\S]*?(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2})(?::\d{2})?/i);
-    if(mAceitou){
-      data_resposta_cross    = normalizeDateValue(mAceitou[1]);
-      horario_resposta_cross = mAceitou[2];
-    }
-  }
+  // FINALIZAÇÃO da ficha na CROSS: data e hora LOGO ABAIXO do título "FINALIZAÇÃO" (não as do "Médico Receptor", que ficam acima).
+  // Regra única em canon.js (Canon.lerFinalizacaoFicha), a mesma do Kanban. Sem o bloco, fica vazio: não se usa a data do
+  // "Aceitou Solicitação" no lugar, porque ficha aceita ainda não é ficha finalizada.
+  const fin = (typeof Canon!=="undefined"&&Canon.lerFinalizacaoFicha) ? Canon.lerFinalizacaoFicha(txt) : null;
+  const data_resposta_cross    = fin ? normalizeDateValue(fin.data) : null;
+  const horario_resposta_cross = fin ? fin.hora : null;
 
-  // Instituição destino — Unidade Receptora do bloco Resolução quando existir.
-  // Cobre tanto aceites formais (A1) quanto encaminhamentos A8.
-  // Uma instituição que só aparece em "Busca de Recursos" com recusa NÃO entra aqui
-  // pois a regex pega a Unidade Receptora do bloco Resolução (após "Resolução\nA1/A8").
-  const mResolucao = txt.match(/Resolu[çc][aã]o\s*\n[\s\S]*?Unidade\s+Receptora\s*[\r\n\t]*([^\r\n\t]+)/i);
-  const mHosp = mResolucao || txt.match(/Unidade\s+Receptora\s*[:\-]?\s*[\r\n\t]*([^\r\n\t]+)/i);
-  // Só usa se houver Finalização (ficha encerrada com destino definido)
-  const temFinalizacao = /FINALIZA[ÇC][AÃ]O/i.test(txt);
-  const instituicao_destino = (temFinalizacao && mHosp) ? mHosp[1].trim().toUpperCase() : null;
+  // Instituição destino = "Unidade Receptora" do bloco Resolução (A1/A8), a mesma regra do Kanban (Canon.lerDestinoFicha).
+  // Uma unidade que só aparece em "Busca de Recursos" com recusa não vale.
+  const instituicao_destino = (typeof Canon!=="undefined"&&Canon.lerDestinoFicha) ? (Canon.lerDestinoFicha(txt)||null) : null;
 
   // Observação: NÃO vem da ficha CROSS — fica vazia para preenchimento manual.
 
