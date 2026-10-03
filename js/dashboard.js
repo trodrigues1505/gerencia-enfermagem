@@ -715,8 +715,10 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       if (x.protocolo_avc !== true) return;
       r.total++;
       const fin = quando(x.data_resposta_cross, x.horario_resposta_cross);
-      // Dia da saída: o mesmo critério do indicador "Espera pela ambulância" (data real > data do pedido da ambulância > data do pedido na CROSS)
-      const dSaida = x.data_saida_real || x.data_saida_ambulancia || x.data_solicitacao;
+      // Dia da saída: data real > data do pedido da ambulância > data do pedido na CROSS. Quando falta a data real e o horário
+      // da saída é menor que o do pedido da ambulância, a saída foi depois da meia-noite e vale o dia seguinte (dashDiaDaSaida).
+      // Antes a cadeia não tinha essa virada: a saída ficava ANTES do pedido, o tempo dava negativo e o caso entrava como "no horário".
+      const dSaida = dashDiaDaSaida(x);
       const sai = quando(dSaida, x.horario_saida_ambulancia);
       const ped = quando(x.data_saida_ambulancia, x.hora_solic_ambulancia);   // pedido da ambulância pela Santa Casa
       const caso = {
