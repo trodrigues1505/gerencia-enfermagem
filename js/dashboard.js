@@ -34,6 +34,44 @@ async function sbGetTodas(path) {
   return out;
 }
 
+/* ─── Datas do gráfico "Volume de remoções" ──────────────────────────────────
+ * O gráfico junta TRÊS séries, cada uma no SEU dia:
+ *   saídas        → dia em que a ambulância saiu            (esta é a "remoção" de fato)
+ *   pedidos       → dia da solicitação à CROSS              (data_solicitacao)
+ *   finalizações  → dia em que a CROSS finalizou a ficha    (data_resposta_cross)
+ *
+ * Nomes das colunas de ambulância na tabela `remocoes` (os nomes antigos enganam):
+ *   data_saida_ambulancia + hora_solic_ambulancia  = PEDIDO da ambulância   (planilha: DATA/HORA SOLIC. AMB.)
+ *   data_saida_real       + horario_saida_ambulancia = SAÍDA da ambulância  (planilha: DATA SAÍDA AMB. / SAÍDA AMB. SCFM)
+ *
+ * Só conta como saída quem tem HORÁRIO de saída preenchido. Sem horário, a ambulância ainda não saiu (ou ninguém registrou).
+ * Se faltar a data da saída (data_saida_real), usa-se a data do pedido da ambulância; e quando o horário da saída é menor
+ * que o do pedido, a saída foi depois da meia-noite, então vale o dia seguinte (mesma regra do indicador "pedido → saída"). */
+const DASH_CAMPOS_DATA = ["data_solicitacao", "data_resposta_cross", "data_saida_real", "data_saida_ambulancia"];
+
+function dashDiaIso(v) {
+  const s = String(v || "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+}
+
+function dashSomaDias(dia, n) {
+  const d = new Date(dia + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function dashDiaDaSaida(x) {
+  const hs = String(x.horario_saida_ambulancia || "").trim().match(/^(\d{1,2}):(\d{2})/);   // aceita "03:45" e "03:45:00"
+  if (!hs) return null;
+  const real = dashDiaIso(x.data_saida_real);
+  if (real) return real;
+  const base = dashDiaIso(x.data_saida_ambulancia) || dashDiaIso(x.data_solicitacao);
+  if (!base) return null;
+  const hp = String(x.hora_solic_ambulancia || "").trim().match(/^(\d{1,2}):(\d{2})/);
+  if (hp && Number(hs[1]) * 60 + Number(hs[2]) < Number(hp[1]) * 60 + Number(hp[2])) return dashSomaDias(base, 1);
+  return base;
+}
+
 /* ════════════════════════════════════════════════════════════════════════════
    DASHBOARD — indicadores de regulação
    ----------------------------------------------------------------------------
@@ -323,6 +361,150 @@ function DashTempos({ intervalos, Card, Kpi, Titulo, fmtMin }) {
           })()))));
 }
 
+/* ─── Volume de remoções: gráfico misto (barras + duas linhas) ────────────────
+ * Barras   = saídas da ambulância por dia (a remoção de fato)
+ * Linha    = pedidos à CROSS por dia            (demanda)
+ * Tracejada = finalizações da CROSS por dia     (quanto a CROSS libera)
+ * Componente próprio, fora do Dashboard, pelo mesmo motivo dos outros: o estado de "o que está escondido" e "qual dia está
+ * sob o cursor" fica aqui e não refaz a tela inteira. O contêiner é um <div> comum (não o Card do Dashboard, que muda de
+ * identidade a cada renderização) para a medição de largura não se perder.                                              */
+const DASH_VOL_SERIES = [
+  { id: "saidas", nome: "Saídas da ambulância", cor: "#3B82F6" },
+  { id: "pedidos", nome: "Pedidos à CROSS", cor: "#D97706" },
+  { id: "finalizacoes", nome: "Finalizações da CROSS", cor: "#0F766E", tracejada: true }
+];
+
+function DashVolume({ serie, escala, rotulo, rotuloLongo, entrou, totais, notas, Titulo, Vazio }) {
+  const h = React.createElement;
+  const [ocultas, setOcultas] = useState({});
+  const [hover, setHover] = useState(null);
+  const [larg, setLarg] = useState(720);
+  const ref = React.useRef(null);
+  const temDados = serie.length > 0;
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const medir = () => setLarg(Math.max(280, Math.round(el.getBoundingClientRect().width)));
+    medir();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", medir);
+      return () => window.removeEventListener("resize", medir);
+    }
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [temDados]);
+
+  useEffect(() => { setHover(null); }, [serie]);
+
+  const cartao = { background: "#fff", border: "1px solid #E8EDF3", borderRadius: 14, padding: "16px 18px", marginBottom: 14 };
+  const unidade = escala === "dia" ? "dia" : escala === "semana" ? "semana" : "mês";
+  const titulo = h(Titulo, {
+    extra: escala === "dia" ? "por dia" : escala === "semana" ? "por semana" : "por mês",
+    tooltip: "Barras: remoções, contadas pelo dia em que a ambulância saiu (data e horário de saída preenchidos na planilha). Linha laranja: pedidos feitos à CROSS, pelo dia da solicitação. Linha tracejada verde: finalizações da CROSS, pelo dia em que a ficha foi finalizada, ou seja, quanto a CROSS libera por dia. Cada série usa a própria data, então o mesmo paciente pode aparecer em dias diferentes. Clique na legenda para esconder uma série."
+  }, "Volume de remoções");
+
+  if (!temDados) return h("div", { style: cartao }, titulo, h(Vazio, null, "Sem movimentação no período"));
+
+  /* ── Geometria ── */
+  const ALT = 230, MT = 14, MB = 30, ML = 30, MR = 8;
+  const W = larg, innerW = W - ML - MR, innerH = ALT - MT - MB;
+  const n = serie.length;
+  const band = innerW / n;
+  const visiveis = DASH_VOL_SERIES.filter(s => !ocultas[s.id]);
+  const maxV = serie.reduce((m, pt) => visiveis.reduce((mm, s) => Math.max(mm, pt[s.id]), m), 0);
+  const topo = Math.max(4, Math.ceil(maxV / 4) * 4);                 // múltiplo de 4: as 5 marcas do eixo são números inteiros
+  const y = v => MT + innerH - (v / topo) * innerH;
+  const cx = i => ML + band * i + band / 2;
+  const barW = Math.max(4, Math.min(band * 0.62, 30));
+  const base = MT + innerH;
+  const p = hover !== null ? (serie[hover] || null) : null;
+  const passoRotulo = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(innerW / 46))));
+  const caminho = id => serie.map((pt, i) => `${i ? "L" : "M"}${cx(i).toFixed(1)},${y(pt[id]).toFixed(1)}`).join("");
+
+  const swatch = s => h("svg", { width: 20, height: 12, viewBox: "0 0 20 12", "aria-hidden": "true", style: { flexShrink: 0 } },
+    s.id === "saidas"
+      ? h("rect", { x: 5, y: 1, width: 10, height: 10, rx: 2.5, fill: s.cor })
+      : h("g", null,
+          h("line", { x1: 0, x2: 20, y1: 6, y2: 6, stroke: s.cor, strokeWidth: 2, strokeDasharray: s.tracejada ? "4 3" : undefined, strokeLinecap: "round" }),
+          s.tracejada
+            ? h("rect", { x: 7, y: 3, width: 6, height: 6, rx: 1, fill: "#fff", stroke: s.cor, strokeWidth: 1.75 })
+            : h("circle", { cx: 10, cy: 6, r: 3, fill: "#fff", stroke: s.cor, strokeWidth: 1.75 })));
+
+  /* ── Legenda que também é o painel de números: mostra o total do período, ou o do dia sob o cursor ── */
+  const legenda = h("div", null,
+    h("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
+      DASH_VOL_SERIES.map(s => {
+        const off = !!ocultas[s.id];
+        return h("button", {
+          key: s.id, type: "button", "aria-pressed": !off,
+          title: off ? "Mostrar no gráfico" : "Esconder do gráfico",
+          onClick: () => setOcultas(o => Object.assign({}, o, { [s.id]: !o[s.id] })),
+          style: { display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", border: "none", borderRadius: 10, cursor: "pointer",
+                   fontFamily: "inherit", background: off ? "transparent" : "#F8FAFC", opacity: off ? 0.5 : 1, transition: "background .15s, opacity .15s" }
+        },
+          swatch(s),
+          h("span", { style: { fontSize: 12, color: "#475569", textDecoration: off ? "line-through" : "none" } }, s.nome),
+          h("span", { style: { fontSize: 15, fontWeight: 700, color: "#0F172A", fontVariantNumeric: "tabular-nums" } }, p ? p[s.id] : totais[s.id]));
+      })),
+    h("div", { style: { fontSize: 11, color: "#94A3B8", margin: "8px 0 10px", minHeight: 15 } },
+      p ? rotuloLongo(p.k) : `Total do período · passe o mouse (ou toque) em um ${unidade} para ver os números dele`));
+
+  /* ── Grade e eixo ── */
+  const grade = [0, 1, 2, 3, 4].map(i => i * topo / 4).map(t => h("g", { key: "g" + t },
+    h("line", { x1: ML, x2: W - MR, y1: y(t), y2: y(t), stroke: t === 0 ? "#E2E8F0" : "#F1F5F9", strokeWidth: 1 }),
+    h("text", { x: ML - 6, y: y(t) + 3.5, textAnchor: "end", fontSize: 10, fill: "#94A3B8" }, t)));
+
+  /* ── Barras: saídas ── */
+  const barras = !ocultas.saidas && h("g", { key: "barras" },
+    h("g", { style: { transform: entrou ? "scaleY(1)" : "scaleY(0)", transformBox: "fill-box", transformOrigin: "50% 100%", transition: "transform .7s cubic-bezier(.22,.9,.3,1)" } },
+      serie.map((pt, i) => h("rect", {
+        key: i, x: cx(i) - barW / 2, y: pt.saidas ? y(pt.saidas) : base - 2, width: barW, height: pt.saidas ? base - y(pt.saidas) : 2,
+        rx: Math.min(4, barW / 2), fill: pt.saidas ? "#3B82F6" : "#E2E8F0", opacity: pt.saidas ? (hover === null || hover === i ? 0.9 : 0.55) : 1 }))),
+    band >= 26 && h("g", { style: { opacity: entrou ? 1 : 0, transition: "opacity .5s ease .3s" } },
+      serie.map((pt, i) => h("text", {
+        key: i, x: cx(i), y: (pt.saidas ? y(pt.saidas) : base - 2) - 5, textAnchor: "middle", fontSize: 10,
+        fill: pt.saidas ? "#64748B" : "#CBD5E1", style: { fontVariantNumeric: "tabular-nums" } }, pt.saidas))));
+
+  /* ── Linhas: pedidos e finalizações ── */
+  const linhas = DASH_VOL_SERIES.filter(s => s.id !== "saidas" && !ocultas[s.id]).map(s => h("g", {
+    key: s.id, style: { opacity: entrou ? 1 : 0, transition: "opacity .6s ease .25s" } },
+    h("path", { d: caminho(s.id), fill: "none", stroke: s.cor, strokeWidth: 2, strokeLinejoin: "round", strokeLinecap: "round", strokeDasharray: s.tracejada ? "5 4" : undefined }),
+    serie.map((pt, i) => {
+      if (band < 14 && i !== hover) return null;
+      const fill = i === hover ? s.cor : "#fff";
+      return s.tracejada
+        ? h("rect", { key: i, x: cx(i) - 3, y: y(pt[s.id]) - 3, width: 6, height: 6, rx: 1, fill, stroke: s.cor, strokeWidth: 1.75 })
+        : h("circle", { key: i, cx: cx(i), cy: y(pt[s.id]), r: 3, fill, stroke: s.cor, strokeWidth: 1.75 });
+    })));
+
+  const rotulosX = serie.map((pt, i) => i % passoRotulo === 0 && h("text", {
+    key: "x" + i, x: cx(i), y: ALT - 10, textAnchor: "middle", fontSize: 10, fill: hover === i ? "#0F172A" : "#94A3B8" }, rotulo(pt.k)));
+
+  const areas = serie.map((pt, i) => h("rect", {
+    key: "a" + i, x: ML + band * i, y: MT, width: band, height: innerH + MB - 6, fill: "transparent", style: { cursor: "pointer" },
+    onMouseEnter: () => setHover(i), onClick: () => setHover(hover === i ? null : i) },
+    h("title", null, `${rotuloLongo(pt.k)}: ${pt.saidas} saída${pt.saidas !== 1 ? "s" : ""} · ${pt.pedidos} pedido${pt.pedidos !== 1 ? "s" : ""} · ${pt.finalizacoes} finalizaç${pt.finalizacoes !== 1 ? "ões" : "ão"}`)));
+
+  return h("div", { style: cartao },
+    titulo,
+    legenda,
+    h("div", { ref, onMouseLeave: () => setHover(null), style: { width: "100%" } },
+      h("svg", {
+        width: "100%", height: ALT, viewBox: `0 0 ${W} ${ALT}`, role: "img",
+        "aria-label": `Volume de remoções por ${unidade}: ${totais.saidas} saídas, ${totais.pedidos} pedidos e ${totais.finalizacoes} finalizações da CROSS no período.`,
+        style: { display: "block", overflow: "visible" } },
+        grade,
+        hover !== null && h("rect", { x: ML + band * hover, y: MT, width: band, height: innerH, fill: "#F1F5F9", opacity: 0.7, rx: 6 }),
+        barras,
+        linhas,
+        rotulosX,
+        areas)),
+    notas && notas.length > 0 && h("div", { style: { fontSize: 11, color: "#94A3B8", lineHeight: 1.6, marginTop: 8 } },
+      notas.map((t, i) => h("div", { key: i }, t))));
+}
+
 function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, currentUser, discrepancias, onPendenciasChange, showT: showTProp }) {
   const showT = showTProp || function () {};
   const [remocoes, setRemocoes] = useState([]);
@@ -351,27 +533,39 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const diasJanela = { hoje: 1, "7d": 7, "30d": 30, "90d": 90 }[periodo] || 0;
   const inicioJanela = diasJanela
     ? iso(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - (diasJanela - 1))) : null;
+  // A busca no servidor começa 1 dia ANTES da janela: uma ambulância que sai logo depois da meia-noite do primeiro dia
+  // pode ter o pedido e a finalização no dia anterior. A janela exata é aplicada depois, no navegador.
+  const inicioBusca = diasJanela
+    ? iso(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - diasJanela)) : null;
 
   /* ── Carga das remoções ───────────────────────────────────────────────────
-   * O período vai para o SERVIDOR (data_solicitacao >= início), então a tela baixa só o que vai mostrar, e a leitura é feita
-   * em páginas de 1.000 (sbGetTodas), então nada é cortado em silêncio. O filtro do navegador (`dados`, mais abaixo) continua
-   * valendo: ele refina a janela e garante o limite superior. Linhas sem data de solicitação só vêm em "Tudo", como antes.
-   * Fica DEPOIS de inicioJanela porque usa esse valor na lista de dependências.                                          */
+   * O período vai para o SERVIDOR, então a tela baixa só o que vai mostrar, e a leitura é feita em páginas de 1.000
+   * (sbGetTodas), então nada é cortado em silêncio. Como o gráfico conta saídas, pedidos e finalizações cada um no seu dia,
+   * a linha vem se QUALQUER uma das quatro datas cair na janela (or=): um paciente pedido dia 27 que saiu dia 1º precisa vir.
+   * O filtro do navegador (`dados`, mais abaixo) continua valendo para as demais seções: ele usa só a data do pedido.
+   * Linhas sem nenhuma data só vêm em "Tudo", como antes.
+   * Fica DEPOIS de inicioBusca porque usa esse valor na lista de dependências.                                          */
   useEffect(() => {
     let vivo = true;
     (async () => {
       setAtualizando(true);
       try {
         let filtro = "";
-        if (periodo === "custom") { if (ini && fim) filtro = `&data_solicitacao=gte.${ini}&data_solicitacao=lte.${fim}`; }
-        else if (inicioJanela) filtro = `&data_solicitacao=gte.${inicioJanela}`;
+        if (periodo === "custom") {
+          if (ini && fim) {
+            const a = dashSomaDias(ini, -1);
+            filtro = `&or=(${DASH_CAMPOS_DATA.map(c => `and(${c}.gte.${a},${c}.lte.${fim})`).join(",")})`;
+          }
+        } else if (inicioBusca) {
+          filtro = `&or=(${DASH_CAMPOS_DATA.map(c => `${c}.gte.${inicioBusca}`).join(",")})`;
+        }
         const r = await sbGetTodas("remocoes?select=*&order=data_solicitacao.desc,id.asc" + filtro);
         if (vivo) { setRemocoes(r); setErro(""); }
       } catch (e) { if (vivo) setErro(e.message); }
       finally { if (vivo) { setCarregando(false); setAtualizando(false); } }
     })();
     return () => { vivo = false; };
-  }, [periodo, ini, fim, inicioJanela]);
+  }, [periodo, ini, fim, inicioBusca]);
 
   const dados = useMemo(() => {
     if (periodo === "tudo") return remocoes;
@@ -382,16 +576,18 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     return remocoes.filter(r => { const d = r.data_solicitacao || ""; return d >= inicioJanela && d <= hojeIso; });
   }, [remocoes, periodo, ini, fim, inicioJanela, hojeIso]);
 
-  /* ── Amplitude real da base: decide quais escalas fazem sentido ───────── */
+  /* ── Amplitude real da base: decide quais escalas fazem sentido ───────────
+   * Calculada sobre `dados` (pedidos dentro do período), como antes, e não sobre tudo o que veio do servidor: a busca agora
+   * traz também linhas de pedidos mais antigos que saíram dentro da janela, e elas não devem esticar a amplitude. */
   const amplitude = useMemo(() => {
-    const ds = remocoes.map(r => r.data_solicitacao).filter(Boolean).sort();
+    const ds = dados.map(r => r.data_solicitacao).filter(Boolean).sort();
     if (!ds.length) return { dias: 0, meses: 0, min: null, max: null };
     const min = ds[0], max = ds[ds.length - 1];
     const dias = Math.round((new Date(max) - new Date(min)) / 86400000) + 1;
     // Meses COMPLETOS: um mês parcial comparado a um completo distorce a leitura
     const mesesSet = new Set(ds.map(d => d.slice(0, 7)));
     return { dias, meses: mesesSet.size, min, max, mesesSet };
-  }, [remocoes]);
+  }, [dados]);
 
   // Quantos dias o período realmente cobre (denominador do "por dia").
   // Antes dividia pelo tamanho da BASE INTEIRA, subestimando em qualquer recorte.
@@ -414,10 +610,27 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   };
   const escalaEfetiva = escalaLiberada[escala] ? escala : "dia";
 
-  /* ── Série temporal ───────────────────────────────────────────────────── */
+  /* ── Volume de remoções: três séries, cada uma no seu dia ─────────────────
+   * Limites da janela (null = sem limite). Valem para as três séries, então um evento fora da janela não entra.        */
+  const limInf = periodo === "custom" ? ((ini && fim) ? ini : null) : inicioJanela;
+  const limSup = periodo === "custom" ? ((ini && fim) ? fim : null) : (inicioJanela ? hojeIso : null);
+
+  const eventos = useMemo(() => {
+    const dentro = d => !!d && (!limInf || d >= limInf) && (!limSup || d <= limSup);
+    const out = { saidas: [], pedidos: [], finalizacoes: [] };
+    remocoes.forEach(r => {
+      const p = dashDiaIso(r.data_solicitacao), f = dashDiaIso(r.data_resposta_cross), s = dashDiaDaSaida(r);
+      if (dentro(p)) out.pedidos.push(p);
+      if (dentro(f)) out.finalizacoes.push(f);
+      if (dentro(s)) out.saidas.push(s);
+    });
+    return out;
+  }, [remocoes, limInf, limSup]);
+
+  const totaisGraf = { saidas: eventos.saidas.length, pedidos: eventos.pedidos.length, finalizacoes: eventos.finalizacoes.length };
+
   const serie = useMemo(() => {
     const chave = d => {
-      if (!d) return null;
       if (escalaEfetiva === "mes") return d.slice(0, 7);
       if (escalaEfetiva === "semana") {
         const dt = new Date(d + "T00:00:00");
@@ -427,15 +640,19 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       return d;
     };
     const m = {};
-    dados.forEach(r => { const k = chave(r.data_solicitacao); if (k) m[k] = (m[k] || 0) + 1; });
-    // Preenche com zero os dias/semanas/meses sem remoção: uma pausa de dias
+    const somar = (lista, campo) => lista.forEach(d => {
+      const k = chave(d);
+      (m[k] || (m[k] = { saidas: 0, pedidos: 0, finalizacoes: 0 }))[campo]++;
+    });
+    somar(eventos.saidas, "saidas"); somar(eventos.pedidos, "pedidos"); somar(eventos.finalizacoes, "finalizacoes");
+    // Preenche com zero os dias/semanas/meses sem movimento: uma pausa de dias
     // não pode parecer volume contínuo.
     const keys = Object.keys(m).sort();
     if (!keys.length) return [];
-    // Janelas (Hoje, 7, 30, 90 dias) vão de inicioJanela até hoje, mesmo que os primeiros/últimos dias não tenham remoção;
+    // Na escala diária o gráfico vai do primeiro ao último dia do período escolhido, mesmo que as pontas não tenham movimento;
     // sem isso o gráfico cortava o dia de hoje (e dias vazios no começo) e parecia menor que o período escolhido.
-    const ini0 = inicioJanela && escalaEfetiva === "dia" ? inicioJanela : keys[0];
-    const fim0 = inicioJanela && escalaEfetiva === "dia" ? hojeIso : keys[keys.length - 1];
+    const ini0 = limInf && escalaEfetiva === "dia" ? limInf : keys[0];
+    const fim0 = limSup && escalaEfetiva === "dia" ? limSup : keys[keys.length - 1];
     const prox = k => {
       if (escalaEfetiva === "mes") {
         const [y, mo] = k.split("-").map(Number);
@@ -446,11 +663,18 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       d.setDate(d.getDate() + (escalaEfetiva === "semana" ? 7 : 1));
       return iso(d);
     };
+    const vazio = { saidas: 0, pedidos: 0, finalizacoes: 0 };
     const out = [];
     let k = ini0, guarda = 0;
-    while (k <= fim0 && guarda++ < 1000) { out.push({ k, n: m[k] || 0 }); k = prox(k); }
+    while (k <= fim0 && guarda++ < 1000) { out.push({ k, ...(m[k] || vazio) }); k = prox(k); }
     return out;
-  }, [dados, escalaEfetiva, inicioJanela, hojeIso]);
+  }, [eventos, escalaEfetiva, limInf, limSup]);
+
+  // Pedidos do período que ainda não têm saída / finalização: aparecem como aviso sob o gráfico
+  const lacunas = useMemo(() => ({
+    semSaida: dados.filter(r => !dashDiaDaSaida(r)).length,
+    semFinalizacao: dados.filter(r => !dashDiaIso(r.data_resposta_cross)).length
+  }), [dados]);
 
   /* ── Agregações canonicalizadas ───────────────────────────────────────── */
   const C = typeof Canon !== "undefined" ? Canon : null;
@@ -790,7 +1014,16 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const rotuloSerie = k => escalaEfetiva === "mes"
     ? new Date(k + "-01T00:00:00").toLocaleDateString("pt-BR", { month: "short" })
     : new Date(k + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-  const maxSerie = Math.max(...serie.map(s => s.n), 1);
+  const rotuloLongoSerie = k => escalaEfetiva === "mes"
+    ? new Date(k + "-01T00:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+    : escalaEfetiva === "semana"
+      ? "Semana de " + new Date(k + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+      : new Date(k + "T00:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
+
+  // Avisos sob o gráfico: pedidos do período que ainda não têm saída ou finalização (não aparecem nas barras/linhas)
+  const notasGraf = [];
+  if (lacunas.semSaida > 0) notasGraf.push(`${lacunas.semSaida} de ${dados.length} pedidos do período ainda sem saída de ambulância registrada (não entram nas barras).`);
+  if (lacunas.semFinalizacao > 0) notasGraf.push(`${lacunas.semFinalizacao} de ${dados.length} pedidos do período ainda sem finalização da CROSS.`);
 
   const clinicas = gEspec.itens.filter(i => i.grupo === "clinica");
   const recursos = gEspec.itens.filter(i => i.grupo === "recurso");
@@ -835,7 +1068,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       }, [["dia", "Diária"], ["semana", "Semanal"], ["mes", "Mensal"]].map(([i, t]) => btnEscala(i, t))),
 
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginLeft: "auto" } },
-        dados.length, " remoções",
+        totaisGraf.saidas, " remoções · ", dados.length, " pedidos",
         deDia && ` · ${fmtDia(deDia)}${ateDia && ateDia !== deDia ? " a " + fmtDia(ateDia) : ""}`,
         atualizando && " · atualizando…")
     ),
@@ -858,9 +1091,9 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 12, marginBottom: 22 }
     },
       /*#__PURE__*/React.createElement(Kpi, {
-        label: "Remoções", valor: dados.length,
-        sub: diasNoPeriodo ? `${(dados.length / diasNoPeriodo).toFixed(1)} por dia · ${diasNoPeriodo} dia${diasNoPeriodo !== 1 ? "s" : ""}` : null,
-        tooltip: "Total de saídas registradas na planilha no período selecionado. Fonte: planilha de remoções." }),
+        label: "Remoções", valor: totaisGraf.saidas,
+        sub: `${diasNoPeriodo ? `${(totaisGraf.saidas / diasNoPeriodo).toFixed(1)} por dia · ` : ""}${dados.length} pedido${dados.length !== 1 ? "s" : ""} à CROSS`,
+        tooltip: "Remoções realizadas no período: conta o dia em que a ambulância saiu (data e horário de saída preenchidos na planilha). Pedido ainda sem saída não entra. Abaixo, o total de pedidos feitos à CROSS no período. Fonte: planilha de remoções." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Ambulância avançada",
         valor: gAmb.informados ? `${((gAmb.itens.find(i => i.canonico === "AVANÇADA")?.n || 0) / gAmb.informados * 100).toFixed(0)}%` : "—",
@@ -869,9 +1102,9 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
         tooltip: "% de remoções que usaram SAV (Suporte Avançado de Vida). Calculado só sobre registros com tipo de ambulância preenchido — o denominador aparece abaixo." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Permaneceu no destino", valor: perm.n ? `${perm.pct.toFixed(0)}%` : "—",
-        sub: `${perm.sim} de ${perm.n} remoções · ${perm.semInfo} sem registro`,
+        sub: `${perm.sim} de ${perm.n} pedidos · ${perm.semInfo} sem registro`,
         alerta: perm.n > 0 && perm.semInfo / perm.n > 0.2,
-        tooltip: "% das remoções do período em que o paciente ficou no hospital de destino e não voltou à Santa Casa. O denominador é o total de remoções; as sem registro (campo vazio) contam como não-permaneceu, então o valor real pode ser maior." })
+        tooltip: "% dos pedidos do período em que o paciente ficou no hospital de destino e não voltou à Santa Casa. O denominador é o total de pedidos do período; os sem registro (campo vazio) contam como não-permaneceu, então o valor real pode ser maior." })
     ),
 
     /* ══ Tempos do caminho da remoção: 5 intervalos, clique para ver por gravidade ══ */
@@ -880,27 +1113,11 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     /* ══ Protocolo de AVC (Livro de Remoção): meta de saída em até 1h da finalização da CROSS ══ */
     /*#__PURE__*/React.createElement(DashProtocoloAVC, { protocolos, totalRemocoes: dados.length, Card, Kpi, Titulo, Vazio, fmtMin }),
 
-    /* ══ Série temporal ══ */
-    /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
-      /*#__PURE__*/React.createElement(Titulo, {
-        extra: escalaEfetiva === "dia" ? "por dia" : escalaEfetiva === "semana" ? "por semana" : "por mês"
-      }, "Volume de remoções"),
-      serie.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem remoções no período") :
-      /*#__PURE__*/React.createElement("div", {
-        style: { display: "flex", alignItems: "flex-end", gap: 3, height: 130, paddingTop: 8 }
-      }, serie.map(s => /*#__PURE__*/React.createElement("div", {
-        key: s.k, title: `${rotuloSerie(s.k)}: ${s.n}`,
-        style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, minWidth: 0 }
-      },
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 9.5, color: "#94A3B8", fontVariantNumeric: "tabular-nums" } }, s.n),
-        /*#__PURE__*/React.createElement("div", {
-          style: { width: "100%", height: entrou ? `${s.n / maxSerie * 92}px` : "0px", minHeight: entrou ? 3 : 0,
-                   background: "#3B82F6", borderRadius: "4px 4px 2px 2px", opacity: .85,
-                   transition: "height .7s cubic-bezier(.22,.9,.3,1)" } }),
-        /*#__PURE__*/React.createElement("div", {
-          style: { fontSize: 8.5, color: "#CBD5E1", whiteSpace: "nowrap", overflow: "hidden" }
-        }, rotuloSerie(s.k)))))
-    ),
+    /* ══ Volume: saídas (barras) + pedidos à CROSS e finalizações da CROSS (linhas) ══ */
+    /*#__PURE__*/React.createElement(DashVolume, {
+      serie, escala: escalaEfetiva, rotulo: rotuloSerie, rotuloLongo: rotuloLongoSerie, entrou,
+      totais: totaisGraf, notas: notasGraf, Titulo, Vazio
+    }),
 
     /* ══ Distribuições ══ */
     /*#__PURE__*/React.createElement("div", {
