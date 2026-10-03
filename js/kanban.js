@@ -1,3 +1,6 @@
+/* Card sem prioridade na ficha: aparece NEUTRO, com o rótulo "Sem prioridade" (antes caía em Urgência/amarelo). */
+const GC_SEM = { bg: "#F1F5F9", border: "#CBD5E1", text: "#334155", dot: "#94A3B8", label: "Sem prioridade", emoji: "⚪" };
+
 /* ─── SUBCATEGORIAS: especialidades que agrupam visualmente dentro de cada coluna ─── */
 const SUBCOL_SPECS = [{
   key: "psiquiatria",
@@ -102,7 +105,7 @@ function KCard({
   onDragStart,
   onDragEnd
 }) {
-  const gc = GC[c.grav] || GC.urgencia;
+  const gc = GC[c.grav] || GC_SEM;
   return /*#__PURE__*/React.createElement("div", {
     className: "k-card",
     "data-id": c.id,
@@ -394,7 +397,7 @@ function KanbanDuplicatesModal({ cards, cols, onClose, onDel }) {
             React.createElement("div", { style: { display: "flex", gap: 10, padding: 10, flexWrap: "wrap" } },
               visible.map(card => {
                 const isSel = selected.has(card.id);
-                const gc = GC[card.grav] || GC.urgencia;
+                const gc = GC[card.grav] || GC_SEM;
                 return React.createElement("div", {
                   key: card.id,
                   onClick: () => toggle(card.id),
