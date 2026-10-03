@@ -4,8 +4,11 @@ function AceiteModal({
   onConfirm,
   onCancel
 }) {
+  // O aceite da CROSS é o mesmo momento da finalização (vem da ficha). Aqui só se confirma o HOSPITAL DE DESTINO, que fica em
+  // `hosp` do card. receptor/data_aceite/hora_aceite continuam sendo enviados ao servidor (cards-move ainda os espera), mas não
+  // aparecem mais para ninguém: o receptor leva o mesmo hospital e data/hora são as de agora, como sempre foram.
   const [form, setForm] = useState({
-    receptor: "",
+    receptor: card.hosp || "",
     data_aceite: new Date().toLocaleDateString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
@@ -20,7 +23,7 @@ function AceiteModal({
   }));
   function confirm() {
     if (!form.receptor.trim()) {
-      setErr("Receptor é obrigatório.");
+      setErr("O hospital de destino é obrigatório.");
       return;
     }
     if (!form.data_aceite.trim()) {
@@ -74,7 +77,7 @@ function AceiteModal({
       color: "#0F172A",
       marginTop: 2
     }
-  }, "Registrar dados do aceite"), /*#__PURE__*/React.createElement("div", {
+  }, "Confirmar hospital de destino"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       color: "#64748B",
@@ -90,24 +93,12 @@ function AceiteModal({
       color: "#64748B",
       marginBottom: 14
     }
-  }, "Preencha os dados do aceite antes de mover o paciente para esta coluna."), /*#__PURE__*/React.createElement(Field, {
-    label: "Receptor *",
+  }, "Confirme o hospital de destino (Unidade Receptora da ficha CROSS) antes de mover o paciente para esta coluna."), /*#__PURE__*/React.createElement(Field, {
+    label: "Hospital de destino (Unidade Receptora) *",
     fieldKey: "receptor",
     value: form.receptor,
     onChange: upd,
-    placeholder: "Nome do médico, setor ou hospital"
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Data do aceite *",
-    fieldKey: "data_aceite",
-    value: form.data_aceite,
-    onChange: upd,
-    placeholder: "05/09/2026"
-  }), /*#__PURE__*/React.createElement(Field, {
-    label: "Hora do aceite *",
-    fieldKey: "hora_aceite",
-    value: form.hora_aceite,
-    onChange: upd,
-    placeholder: "14:35"
+    placeholder: "Ex.: HOSP DR ALBANO FRANCA ROCHA SOBRINHO"
   }), err && /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#FEE2E2",
