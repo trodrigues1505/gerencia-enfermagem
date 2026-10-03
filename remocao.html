@@ -433,19 +433,19 @@ const COLS = [
   ["diagnostico",             "DIAGNÓSTICO",                            "DIAGNÓSTICO",       "hd",          "text","",       "CID ou hipótese. Fonte: CROSS 'CID 1'/Kanban 'hd'",150],
   ["status",                  "STATUS",                                 "STATUS",            "—",           "sel", "S_OPTS", "Status da remoção. Manual",140],
   ["gravidade",               "GRAVIDADE",                              "GRAVIDADE",         "grav",        "sel", "G_OPTS", "Gravidade. CROSS 'Prioridade'/Kanban 'grav'",100],
-  ["data_resposta_cross",     "DATA DA FINALIZAÇÃO CROSS",              "DATA FINALIZ. CROSS","data_resolucao","date","",    "Data em que a CROSS finalizou a ficha. É o mesmo momento do aceite (não há coluna separada). Fonte: ficha CROSS ou Kanban 'data_resolucao' (se vazio, 'data_aceite')",80],
-  ["horario_resposta_cross",  "HORÁRIO DA FINALIZAÇÃO CROSS",           "HOR. FINALIZ. CROSS","hora_resolucao","time","",    "Hora em que a CROSS finalizou a ficha. É o mesmo momento do aceite (não há coluna separada). Fonte: ficha CROSS ou Kanban 'hora_resolucao' (se vazio, 'hora_aceite')",60],
+  ["data_resposta_cross",     "DATA DA FINALIZAÇÃO CROSS",              "DATA FINALIZ. CROSS","data_resolucao","date","",    "Data em que a CROSS finalizou a ficha. É o mesmo momento do aceite (não há coluna separada). Fonte: ficha CROSS ou Kanban 'data_resolucao'",80],
+  ["horario_resposta_cross",  "HORÁRIO DA FINALIZAÇÃO CROSS",           "HOR. FINALIZ. CROSS","hora_resolucao","time","",    "Hora em que a CROSS finalizou a ficha. É o mesmo momento do aceite (não há coluna separada). Fonte: ficha CROSS ou Kanban 'hora_resolucao'",60],
   ["instituicao_destino",     "INSTITUIÇÃO DESTINO",                    "INSTITUIÇÃO DEST.", "hosp",        "text","",       "Hospital receptor. Fonte: Kanban 'hosp'",130],
   ["tipo_ambulancia",         "TIPO DE AMBULÂNCIA",                     "TIPO AMB.",         "amb",         "sel", "A_OPTS", "BÁSICA (SBV) ou AVANÇADA (SAV). Fonte: Kanban 'amb'",80],
   ["data_saida_ambulancia",   "SOLICITAÇÃO BASE AMBULANCIA DATA",       "DATA SOLIC. AMB.",  "—",           "date","",       "Dia em que a ambulância foi SOLICITADA (pode ser diferente do dia da saída). Fonte: Livro de Saída",80],
   ["hora_solic_ambulancia",   "HORÁRIO SOLICITAÇÃO AMBULÂNCIA",         "HORA SOLIC. AMB.",  "—",           "time","",       "Hora da solicitação à base. Manual",60],
-  ["horario_saida_ambulancia","HORÁRIO DE SAÍDA DA AMBULÂNCIA DA SCFM", "SAÍDA AMB. SCFM",   "saida",       "time","",       "Hora saída ambulância. Fonte: Kanban 'saida'",60],
+  ["horario_saida_ambulancia","HORÁRIO DE SAÍDA DA AMBULÂNCIA DA SCFM", "SAÍDA AMB. SCFM",   "—",       "time","",       "Hora saída ambulância. Fonte: Livro de Saída",60],
   ["tempo_espera",            "TEMPO DE ESPERA DA AMBULÂNCIA",          "T. ESPERA",         "—",           "ro", "",        "Mostrado em horas e minutos (ex.: 5h 22min). Auto: da solicitação da ambulância à saída. Precisa das datas e dos horários dos dois; faltando algum, fica vazio",80],
   ["observacao",              "OBSERVAÇÃO",                             "OBSERVAÇÃO",        "—",           "text","",       "Preenchimento manual (não vem da ficha CROSS). O Livro de Saída também pode preencher",160],
   ["enfermeiro",              "ENFERMEIRO",                             "ENFERMEIRO",        "—",           "text","",       "Enfermeiro responsável. Manual",110],
   ["tecnico_auxiliar",        "TÉCNICO/AUXILIAR ENFERMAGEM",            "TÉCNICO/AUX.",      "—",           "text","",       "Técnico/auxiliar. Manual",110],
   ["medico",                  "MÉDICO",                                 "MÉDICO",            "medico_escala","text","",      "Médico da escala. Fonte: Kanban 'medico_escala' (ou Livro de Saída ao vincular)",110],
-  ["horario_retorno",         "HORÁRIO DO RETORNO DA AMBULÂNCIA",       "HORA RETORNO AMBULÂNCIA","retorno",   "time","",       "Hora em que a ambulância voltou à Santa Casa. Fonte: Livro de Saída / Kanban 'retorno'",80],
+  ["horario_retorno",         "HORÁRIO DO RETORNO DA AMBULÂNCIA",       "HORA RETORNO AMBULÂNCIA","—",   "time","",       "Hora em que a ambulância voltou à Santa Casa. Fonte: Livro de Saída",80],
   ["duracao_remocao",         "DURAÇÃO DA REMOÇÃO",                     "DURAÇÃO",           "—",           "ro", "",        "Mostrado em horas e minutos (ex.: 5h 22min). Auto: da saída ao retorno da ambulância. Precisa da data e do horário da saída e do retorno; faltando algum, fica vazio",80],
   ["finalizado",              "FINALIZADO",                             "FINALIZADO",        "—",           "bool","",       "Remoção finalizada? Sim / Não / vazio (não informado). Clique para alternar",70],
   ["permaneceu",              "PERMANECEU",                             "PERMANECEU",        "—",           "bool","",       "Paciente ficou no hospital de destino e não voltou à Santa Casa? Sim / Não / vazio (não informado)",80],
@@ -982,7 +982,7 @@ function parseFichaCross(txt){
 
   // Nome do paciente → maiúsculas
   const mNome = txt.match(/Nome\s*(?:do\s*Paciente)?\s*[:\-]?\s*[\r\n\t]*([^\r\n\t]+)/i);
-  const nome_paciente = mNome ? mNome[1].trim().toUpperCase() : "";
+  const nome_paciente = mNome ? mNome[1].trim().replace(/\s+Nome\s+Social.*$/i, "").toUpperCase() : "";
 
   // Setor: campo "SETOR/LEITO" ou "SETOR" explícito se houver.
   // Padrão: CLÍNICA MÉDICA (igual ao preenchimento manual da planilha).
@@ -1039,19 +1039,9 @@ function parseFichaCross(txt){
   // Médico: NÃO vem da ficha CROSS (é o médico da escala, preenchido no Kanban/Livro).
 
   // Gravidade — campo explícito; fallback: varredura no texto
-  let gravidade = "AMARELO";
-  const mGrav = txt.match(/(?:Gravidade|Prioridade)\s+(?:de\s+atendimento\s*:?\s*)?(\d+|[^\r\n\t]+)/i);
-  if(mGrav){
-    const g = mGrav[1].trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
-    if(/^1$|EMERGENCI/.test(g))       gravidade = "VERMELHO";
-    else if(/^2$|^URGENCI/.test(g))   gravidade = "AMARELO";
-    else if(/^3$|MENOR/.test(g))      gravidade = "VERDE";
-    else if(/^4$|AGENDAMENTO/.test(g)) gravidade = "CINZA";
-  } else {
-    if(/Emerg[eê]ncia|Prioridade\s*1/i.test(txt))           gravidade = "VERMELHO";
-    else if(/Menor\s+urg[eê]ncia|Prioridade\s*3/i.test(txt)) gravidade = "VERDE";
-    else if(/Agendamento|Prioridade\s*4/i.test(txt))          gravidade = "CINZA";
-  }
+  let gravidade = "AMARELO";   // padrão mantido por decisão: ficha sem prioridade = AMARELO
+  const prio = (typeof Canon!=="undefined"&&Canon.lerPrioridadeFicha) ? Canon.lerPrioridadeFicha(txt) : null;
+  if(prio) gravidade = prio.db;   // prioridade da ficha CROSS (1 a 4), tabela única em canon.js (PRIORIDADE_CROSS)
 
   // Status
   let status = null;
@@ -1767,7 +1757,7 @@ function App(){
         // O "aceite" do Kanban não entra: o modal dele abre com a data e a hora de AGORA, ou seja, o momento em que alguém
         // clicou no app, e não o da CROSS. Card sem finalização preenchida importa com a finalização vazia.
         const fin={d:normalizeDateValue(c.data_resolucao)||"",h:normalizeTimeValue(c.hora_resolucao)||""};
-        await api({action:"create",nome_paciente:c.nome||"",setor:c.setor||"",especialidade:c.rec||"",diagnostico:c.hd||"",instituicao_destino:c.hosp||c.unidade_receptora||"",tipo_ambulancia:AM[c.amb]||"",gravidade:normalizeKanbanGrav(c.grav),data_solicitacao:hoje,horario_solicitacao:c.hora_adm||agora,ficha_cross:c.ficha_cross||"",medico:c.medico_escala||"",horario_saida_ambulancia:c.saida||"",horario_retorno:c.retorno||"",data_resposta_cross:fin.d,horario_resposta_cross:fin.h,status:"PACIENTE AGUARDANDO AMBULÂNCIA"});
+        await api({action:"create",nome_paciente:c.nome||"",setor:c.setor||"",especialidade:c.rec||"",diagnostico:c.hd||"",instituicao_destino:c.hosp||"",tipo_ambulancia:AM[c.amb]||"",gravidade:normalizeKanbanGrav(c.grav),data_solicitacao:hoje,horario_solicitacao:c.hora_adm||agora,ficha_cross:c.ficha_cross||"",medico:c.medico_escala||"",data_resposta_cross:fin.d,horario_resposta_cross:fin.h,status:"PACIENTE AGUARDANDO AMBULÂNCIA"});
         ok++;
       }catch(e){fails.push({nome:c.nome||"(sem nome)",erro:e.message||"erro desconhecido"});}
     }
