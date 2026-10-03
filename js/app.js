@@ -1,3 +1,9 @@
+// Ordem de finalização na CROSS (data + hora). O aceite da CROSS é o mesmo momento da finalização, então este é o
+// critério de ordem dentro do Aceite. Sem data/hora, vai para o fim da fila.
+function chaveFinalizacaoCross(c) {
+  const d = String(c.data_resolucao || "").split("/").reverse().join("-");
+  return (d.length === 10 ? d : "9999-99-99") + " " + (c.hora_resolucao || "99:99");
+}
 const {
   useState,
   useEffect,
@@ -54,7 +60,6 @@ function App() {
   const [importResult, setImportResult] = useState(null);
   const [showLivro, setShowLivro] = useState(false);
   const [pendentesCount, setPendentesCount] = useState(0);
-  const [pendenciasCount, setPendenciasCount] = useState(0);
   const [acoesCount, setAcoesCount] = useState(0);
   const [bannerOpen, setBannerOpen] = useState(false);
   const [showAcoes, setShowAcoes] = useState(false);
@@ -84,9 +89,6 @@ function App() {
       } catch(e) {}
     }
     fetchPendentes();
-    // Restaurar pendenciasCount do cache local (calculado pelo Dashboard quando montado)
-    const cached = loadLS("ge_pend_count", 0);
-    if (cached) setPendenciasCount(cached);
     const iv = setInterval(fetchPendentes, 60000);
     return () => { vivo = false; clearInterval(iv); };
   }, [currentUser]);
@@ -767,9 +769,7 @@ function App() {
             const pa = a.prioridade_remocao ? parseInt(a.prioridade_remocao, 10) : 9999;
             const pb = b.prioridade_remocao ? parseInt(b.prioridade_remocao, 10) : 9999;
             if (pa !== pb) return pa - pb;
-            const ha = a.hora_aceite || "99:99";
-            const hb = b.hora_aceite || "99:99";
-            return ha.localeCompare(hb);
+            return chaveFinalizacaoCross(a).localeCompare(chaveFinalizacaoCross(b));
           }
           return 0;
         });
@@ -797,8 +797,7 @@ function App() {
             (c.setor ? "<span style='font-size:10px;background:#F1F5F9;color:#475569;padding:1px 5px;border-radius:3px;'>" + c.setor + "</span>" : "") +
             (c.rec ? "<span style='font-size:10px;background:#EFF6FF;color:#1E40AF;padding:1px 5px;border-radius:3px;'>" + c.rec + "</span>" : "") + "</div>";
           if (c.hosp) html += "<div style='font-size:10px;color:#64748B;'>→ <strong>" + c.hosp + "</strong></div>";
-          if (c.cross_info) html += "<div style='font-size:10px;color:#94A3B8;margin-top:2px;'>Cross: " + c.cross_info + "</div>";
-          if (c.receptor) html += "<div style='font-size:10px;color:#16A34A;margin-top:2px;'>Receptor: " + c.receptor + "</div>";
+          if (c.data_resolucao || c.hora_resolucao) html += "<div style='font-size:10px;color:#94A3B8;margin-top:2px;'>Finalizado na CROSS: " + [c.data_resolucao, c.hora_resolucao ? "às " + c.hora_resolucao : ""].filter(Boolean).join(" ") + "</div>";
           if (c.status) html += "<div style='font-size:9px;font-weight:700;color:#64748B;margin-top:3px;text-transform:uppercase;'>" + c.status + "</div>";
           card.innerHTML = html;
           body.appendChild(card);
@@ -861,14 +860,10 @@ function App() {
         "Recurso": str(c.rec),
         "Hospital": str(c.hosp),
         "Ambulância": str(c.amb),
-        "Cross": str(c.cross_info),
-        "Receptor": str(c.receptor),
-        "Data Aceite": str(c.data_aceite),
-        "Hora Aceite": str(c.hora_aceite),
+        "Finalização CROSS (data)": str(c.data_resolucao),
+        "Finalização CROSS (hora)": str(c.hora_resolucao),
         "Gravidade": str(GRAV_LABEL[c.grav] || c.grav),
         "Observações": str(c.obs),
-        "Saída": str(c.saida),
-        "Retorno": str(c.retorno),
         "Criado em": c.created_at ? new Date(c.created_at).toLocaleString("pt-BR") : ""
       }));
       const ws = window.XLSX.utils.json_to_sheet(rows);
@@ -955,8 +950,7 @@ function App() {
             const ambTxt = c.amb ? c.amb.includes("Av") ? "Amb. Avancada" : "Amb. Basica" : "";
             if (c.rec && c.hosp) addLine("Enc: " + c.rec + " -> " + c.hosp + (ambTxt ? " | " + ambTxt : ""), { size:8, indent:4 });
             else if (c.rec) addLine("Rec: " + c.rec + (ambTxt ? " | " + ambTxt : ""), { size:8, indent:4 });
-            if (c.cross_info) addLine("Cross: " + c.cross_info, { size:8, color:[100,116,139], indent:4 });
-            if (c.receptor) addLine("Receptor: " + c.receptor + (c.data_aceite ? " | " + c.data_aceite : "") + (c.hora_aceite ? " as " + c.hora_aceite : ""), { size:8, color:[22,163,74], indent:4 });
+            if (c.data_resolucao || c.hora_resolucao) addLine("Finalizado na CROSS: " + [c.data_resolucao, c.hora_resolucao ? "as " + c.hora_resolucao : ""].filter(Boolean).join(" "), { size:8, color:[100,116,139], indent:4 });
             if (c.status) addLine(c.status, { size:8, bold:true, color:[100,116,139], indent:4 });
             doc.setFillColor(...gravColor);
             doc.rect(10, cardStartY, 2, y-cardStartY, "F");
@@ -998,7 +992,6 @@ function App() {
             if (c.hd) html += "<div style='font-size:9px;color:#374151;margin-bottom:2px;'>" + c.hd + "</div>";
             if (c.setor || c.rec) html += "<div style='font-size:8px;color:#64748B;'>" + [c.setor,c.rec].filter(Boolean).join(" | ") + "</div>";
             if (c.hosp) html += "<div style='font-size:8px;color:#64748B;'>→ " + c.hosp + "</div>";
-            if (c.receptor) html += "<div style='font-size:8px;color:#16A34A;'>Receptor: " + c.receptor + "</div>";
             if (c.status) html += "<div style='font-size:8px;font-weight:700;color:#475569;text-transform:uppercase;margin-top:2px;'>" + c.status + "</div>";
             card.innerHTML = html;
             body.appendChild(card);
@@ -1071,16 +1064,12 @@ function App() {
       setor: "",
       rec: "",
       hosp: "",
-      cross_info: "",
+      data_resolucao: "",
+      hora_resolucao: "",
       amb: "Básica",
-      saida: "",
-      retorno: "",
       grav: "urgencia",
       obs: "",
       is_rn: false,
-      receptor: "",
-      data_aceite: "",
-      hora_aceite: "",
       categoria: "normal"
     });
   }
@@ -1331,7 +1320,7 @@ function App() {
       loading && /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", padding: 48, color: "#94A3B8", fontSize: 14 } }, "Carregando dados…"),
 
       !loading && view === "dashboard" && /*#__PURE__*/React.createElement("div", { id: "view-content" },
-        /*#__PURE__*/React.createElement(Dashboard, { cards: displayCards, showT: showT, cols: displayCols, dashMode: dashMode, setDashMode: setDashMode, isAdmin: isAdmin, lastPub: lastPub, currentUser: currentUser, discrepancias: discrepancias, onPendenciasChange: (n) => { setPendenciasCount(n); saveLS("ge_pend_count", n); } })
+        /*#__PURE__*/React.createElement(Dashboard, { cards: displayCards, showT: showT, cols: displayCols, dashMode: dashMode, setDashMode: setDashMode, isAdmin: isAdmin, lastPub: lastPub, currentUser: currentUser, discrepancias: discrepancias })
       ),
       !loading && view === "usuarios" && isAdmin && /*#__PURE__*/React.createElement(UsersPanel, { currentUser: currentUser, userId: userId, showT: showT, cards: cards, busca: search, onBusca: setSearch }),
       !loading && view === "historico" && isAdmin && /*#__PURE__*/React.createElement("div", { id: "view-content" },
@@ -1360,17 +1349,13 @@ function App() {
                 const pa = a.pr ? parseInt(a.pr) : 9999;
                 const pb = b.pr ? parseInt(b.pr) : 9999;
                 if (pa !== pb) return pa - pb;
-                const ha = a.hora_aceite || "99:99";
-                const hb = b.hora_aceite || "99:99";
-                return ha.localeCompare(hb);
+                return chaveFinalizacaoCross(a).localeCompare(chaveFinalizacaoCross(b));
               }
               if (col.id === "aceite") {
                 const pa = a.prioridade_remocao ? parseInt(a.prioridade_remocao,10) : 9999;
                 const pb = b.prioridade_remocao ? parseInt(b.prioridade_remocao,10) : 9999;
                 if (pa !== pb) return pa - pb;
-                const ha = a.hora_aceite || "99:99";
-                const hb = b.hora_aceite || "99:99";
-                return ha.localeCompare(hb);
+                return chaveFinalizacaoCross(a).localeCompare(chaveFinalizacaoCross(b));
               }
               return 0;
             });
@@ -1473,7 +1458,7 @@ function App() {
           /*#__PURE__*/React.createElement("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
             /*#__PURE__*/React.createElement("thead", null,
               /*#__PURE__*/React.createElement("tr", { style: { background: "#F8FAFC" } },
-                [["pr", "#"], ["nome", "Paciente"], ["status", "Status"], ["adm", "Adm."], ["hd", "HD"], ["setor", "Setor"], ["rec", "Recurso"], ["hosp", "Hospital"], ["col_id", "Coluna"], ["grav", "Gravidade"], ["amb", "Amb."], ["receptor", "Receptor"]].map(([key, h]) => /*#__PURE__*/React.createElement("th", {
+                [["pr", "#"], ["nome", "Paciente"], ["status", "Status"], ["adm", "Adm."], ["hd", "HD"], ["setor", "Setor"], ["rec", "Recurso"], ["hosp", "Hospital"], ["col_id", "Coluna"], ["grav", "Gravidade"], ["amb", "Amb."]].map(([key, h]) => /*#__PURE__*/React.createElement("th", {
                   key: key,
                   onClick: () => toggleSort(key),
                   style: { padding: "9px 11px", textAlign: "left", fontWeight: 600, color: "#64748B", fontSize: 10, textTransform: "uppercase", letterSpacing: ".04em", borderBottom: "1px solid #E2E8F0", whiteSpace: "nowrap", cursor: "pointer", userSelect: "none" }
@@ -1500,8 +1485,7 @@ function App() {
                   /*#__PURE__*/React.createElement("td", { style: { padding: "8px 11px", borderBottom: "1px solid #F1F5F9", color: "#374151", whiteSpace: "nowrap" } }, card.hosp),
                   /*#__PURE__*/React.createElement("td", { style: { padding: "8px 11px", borderBottom: "1px solid #F1F5F9", whiteSpace: "nowrap" } }, /*#__PURE__*/React.createElement("span", { style: { background: "#F1F5F9", color: "#475569", padding: "1px 5px", borderRadius: 3, fontSize: 10 } }, c?.emoji, " ", c?.label)),
                   /*#__PURE__*/React.createElement("td", { style: { padding: "8px 11px", borderBottom: "1px solid #F1F5F9", whiteSpace: "nowrap" } }, /*#__PURE__*/React.createElement(Badge, { grav: card.grav })),
-                  /*#__PURE__*/React.createElement("td", { style: { padding: "8px 11px", borderBottom: "1px solid #F1F5F9", whiteSpace: "nowrap" } }, /*#__PURE__*/React.createElement(AmbBadge, { amb: card.amb })),
-                  /*#__PURE__*/React.createElement("td", { style: { padding: "8px 11px", borderBottom: "1px solid #F1F5F9", color: "#64748B", whiteSpace: "nowrap", fontSize: 11 } }, card.receptor || "")
+                  /*#__PURE__*/React.createElement("td", { style: { padding: "8px 11px", borderBottom: "1px solid #F1F5F9", whiteSpace: "nowrap" } }, /*#__PURE__*/React.createElement(AmbBadge, { amb: card.amb }))
                 );
               }),
               sortedFiltered.length === 0 && /*#__PURE__*/React.createElement("tr", null,
@@ -1600,7 +1584,7 @@ function App() {
     isAdmin && React.createElement(FloatingActions, {
       cards: cards,
       discrepancias: discrepancias,
-      pendencias: pendenciasCount,
+      pendencias: 0,   // "valores a corrigir" saiu do balão: agora é o card Saneamento de falhas, no dashboard
       acoes: acoesCount,
       setView: setView
     }),
