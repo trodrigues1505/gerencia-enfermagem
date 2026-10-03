@@ -1,4 +1,10 @@
 /* ─── UTILS ─── */
+// Ordem de finalização na CROSS (data + hora). O aceite da CROSS é o mesmo momento da finalização, então este é o critério
+// de ordem dentro do Aceite. Sem data/hora, vai para o fim da fila. (Usada também por app.js.)
+function chaveFinalizacaoCross(c) {
+  const d = String(c.data_resolucao || "").split("/").reverse().join("-");
+  return (d.length === 10 ? d : "9999-99-99") + " " + (c.hora_resolucao || "99:99");
+}
 const todayStr = () => new Date().toLocaleDateString("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric" });
 const nowStr   = () => new Date().toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" });
 
@@ -20,9 +26,7 @@ function buildText(cards, cols, settings) {
       const pa = a.prioridade_remocao && a.prioridade_remocao !== "" ? parseInt(a.prioridade_remocao, 10) : 9999;
       const pb = b.prioridade_remocao && b.prioridade_remocao !== "" ? parseInt(b.prioridade_remocao, 10) : 9999;
       if (pa !== pb) return pa - pb;
-      const ha = a.hora_aceite || "99:99";
-      const hb = b.hora_aceite || "99:99";
-      return ha.localeCompare(hb);
+      return chaveFinalizacaoCross(a).localeCompare(chaveFinalizacaoCross(b));
     });
     if (!cc.length) return;
     const colLabel = COL_LABEL[col.id] || col.label.toUpperCase();
@@ -40,8 +44,7 @@ function buildText(cards, cols, settings) {
       if (c.rec && c.hosp)       { lines.push("Enc: " + c.rec + " -> " + c.hosp); if (ambTxt) lines.push(ambTxt); }
       else if (c.rec)            { lines.push("Rec: " + c.rec + (ambTxt ? " | " + ambTxt : "")); }
       else if (ambTxt)           { lines.push(ambTxt); }
-      if (c.cross_info) lines.push("Cross: " + c.cross_info);
-      if (c.receptor)   lines.push("Receptor: " + c.receptor + (c.data_aceite ? " | " + c.data_aceite : "") + (c.hora_aceite ? " as " + c.hora_aceite : ""));
+      if (c.data_resolucao || c.hora_resolucao) lines.push("Finalizado na CROSS: " + [c.data_resolucao, c.hora_resolucao ? "as " + c.hora_resolucao : ""].filter(Boolean).join(" "));
       if (c.status)     lines.push(STATUS_EMOJI[c.status] + " *" + c.status + "*");
     });
     lines.push("");
