@@ -34,42 +34,40 @@ async function sbGetTodas(path) {
   return out;
 }
 
-/* ─── Datas do gráfico "Volume de remoções" ──────────────────────────────────
- * O gráfico junta TRÊS séries, cada uma no SEU dia:
- *   saídas        → dia em que a ambulância saiu            (esta é a "remoção" de fato)
- *   pedidos       → dia da solicitação à CROSS              (data_solicitacao)
- *   finalizações  → dia em que a CROSS finalizou a ficha    (data_resposta_cross)
+/* ─── Regras de leitura da planilha: o dashboard NÃO inventa dado ────────────
+ * Cada número vem de um campo preenchido na planilha. O que não está preenchido não é completado nem adivinhado:
+ * a linha simplesmente não entra naquela conta, e o painel avisa quantas ficaram de fora.
  *
- * Nomes das colunas de ambulância na tabela `remocoes` (os nomes antigos enganam):
+ * TIPO DA LINHA (a soma dos dois é sempre o total de linhas):
+ *   remoção CROSS   = linha com o Nº da ficha CROSS preenchido (ficha_cross)
+ *   outras remoções = linha sem ficha CROSS (altas, hemodiálise, exames etc.)
+ *
+ * GRÁFICO "Volume de remoções": três séries, cada uma no SEU dia:
+ *   saídas        → data_saida_real (planilha: DATA SAÍDA AMB.), só se o horário de saída (SAÍDA AMB. SCFM) também estiver preenchido
+ *   pedidos       → data_solicitacao, só das linhas CROSS (pedido à CROSS exige ficha)
+ *   finalizações  → data_resposta_cross
+ *
+ * Colunas de ambulância na tabela `remocoes` (os nomes antigos enganam):
  *   data_saida_ambulancia + hora_solic_ambulancia  = PEDIDO da ambulância   (planilha: DATA/HORA SOLIC. AMB.)
  *   data_saida_real       + horario_saida_ambulancia = SAÍDA da ambulância  (planilha: DATA SAÍDA AMB. / SAÍDA AMB. SCFM)
- *
- * Só conta como saída quem tem HORÁRIO de saída preenchido. Sem horário, a ambulância ainda não saiu (ou ninguém registrou).
- * Se faltar a data da saída (data_saida_real), usa-se a data do pedido da ambulância; e quando o horário da saída é menor
- * que o do pedido, a saída foi depois da meia-noite, então vale o dia seguinte (mesma regra do indicador "pedido → saída"). */
-const DASH_CAMPOS_DATA = ["data_solicitacao", "data_resposta_cross", "data_saida_real", "data_saida_ambulancia"];
+ * Horário de saída sem data de saída: a linha NÃO entra nas barras (não se usa a data do pedido nem se soma um dia).     */
+const DASH_CAMPOS_DATA = ["data_solicitacao", "data_resposta_cross", "data_saida_real"];
 
 function dashDiaIso(v) {
   const s = String(v || "").slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
 }
 
-function dashSomaDias(dia, n) {
-  const d = new Date(dia + "T00:00:00");
-  d.setDate(d.getDate() + n);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function dashTemFicha(x) {
+  return String(x.ficha_cross == null ? "" : x.ficha_cross).trim() !== "";
+}
+
+function dashTemHorarioSaida(x) {
+  return /^(\d{1,2}):(\d{2})/.test(String(x.horario_saida_ambulancia || "").trim());   // aceita "03:45" e "03:45:00"
 }
 
 function dashDiaDaSaida(x) {
-  const hs = String(x.horario_saida_ambulancia || "").trim().match(/^(\d{1,2}):(\d{2})/);   // aceita "03:45" e "03:45:00"
-  if (!hs) return null;
-  const real = dashDiaIso(x.data_saida_real);
-  if (real) return real;
-  const base = dashDiaIso(x.data_saida_ambulancia) || dashDiaIso(x.data_solicitacao);
-  if (!base) return null;
-  const hp = String(x.hora_solic_ambulancia || "").trim().match(/^(\d{1,2}):(\d{2})/);
-  if (hp && Number(hs[1]) * 60 + Number(hs[2]) < Number(hp[1]) * 60 + Number(hp[2])) return dashSomaDias(base, 1);
-  return base;
+  return dashTemHorarioSaida(x) ? dashDiaIso(x.data_saida_real) : null;
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -191,7 +189,7 @@ function DashProtocoloAVC({ protocolos, totalRemocoes, Card, Kpi, Titulo, Vazio,
             },
               /*#__PURE__*/React.createElement(Kpi, {
                 label: "Protocolos de AVC", valor: protocolos.total, cor: "#BE123C",
-                sub: totalRemocoes ? `${(protocolos.total / totalRemocoes * 100).toFixed(1).replace(".", ",")}% das remoções do período · clique para ver` : "clique para ver",
+                sub: totalRemocoes ? `${(protocolos.total / totalRemocoes * 100).toFixed(1).replace(".", ",")}% das linhas do período · clique para ver` : "clique para ver",
                 ativo: avcSel === "total", onClick: () => setAvcSel(avcSel === "total" ? null : "total"),
                 tooltip: "Total de remoções marcadas como Protocolo de AVC no período selecionado. Clique para ver todos os casos." }),
               /*#__PURE__*/React.createElement(Kpi, {
@@ -269,7 +267,7 @@ function DashProtocoloAVC({ protocolos, totalRemocoes, Card, Kpi, Titulo, Vazio,
             (protocolos.semHorarios > 0 || protocolos.atrasoSemCausa > 0) && /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 11.5, color: "#64748B", lineHeight: 1.6, marginTop: 10 } },
               protocolos.semHorarios > 0 && /*#__PURE__*/React.createElement("div", null,
-                `${protocolos.semHorarios} protocolo${protocolos.semHorarios !== 1 ? "s" : ""} sem horário para medir (contam no total, mas não entram nas três categorias): ${protocolos.semFinalizacao} sem finalização da CROSS · ${protocolos.semSaida} sem saída da ambulância. Clique em “Protocolos de AVC” para ver quais.`),
+                `${protocolos.semHorarios} protocolo${protocolos.semHorarios !== 1 ? "s" : ""} sem horário para medir (contam no total, mas não entram nas três categorias): ${protocolos.semFinalizacao} sem finalização da CROSS · ${protocolos.semSaida} sem data ou horário de saída da ambulância. Clique em “Protocolos de AVC” para ver quais.`),
               protocolos.atrasoSemCausa > 0 && /*#__PURE__*/React.createElement("div", null,
                 `${protocolos.atrasoSemCausa} saíram depois de 1h, mas sem o horário da solicitação da ambulância — a causa do atraso não pôde ser apurada.`))
           ));
@@ -402,7 +400,7 @@ function DashVolume({ serie, escala, rotulo, rotuloLongo, entrou, totais, notas,
   const unidade = escala === "dia" ? "dia" : escala === "semana" ? "semana" : "mês";
   const titulo = h(Titulo, {
     extra: escala === "dia" ? "por dia" : escala === "semana" ? "por semana" : "por mês",
-    tooltip: "Barras: remoções, contadas pelo dia em que a ambulância saiu (data e horário de saída preenchidos na planilha). Linha laranja: pedidos feitos à CROSS, pelo dia da solicitação. Linha tracejada verde: finalizações da CROSS, pelo dia em que a ficha foi finalizada, ou seja, quanto a CROSS libera por dia. Cada série usa a própria data, então o mesmo paciente pode aparecer em dias diferentes. Clique na legenda para esconder uma série."
+    tooltip: "Barras: saídas de ambulância (CROSS e outras), contadas pelo dia da saída (data e horário de saída preenchidos na planilha). Linha laranja: pedidos feitos à CROSS (só linhas com ficha CROSS), pelo dia da solicitação. Linha tracejada verde: finalizações da CROSS, pelo dia em que a ficha foi finalizada, ou seja, quanto a CROSS libera por dia. Cada série usa a própria data, então o mesmo paciente pode aparecer em dias diferentes. Clique na legenda para esconder uma série."
   }, "Volume de remoções");
 
   if (!temDados) return h("div", { style: cartao }, titulo, h(Vazio, null, "Sem movimentação no período"));
@@ -533,18 +531,14 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const diasJanela = { hoje: 1, "7d": 7, "30d": 30, "90d": 90 }[periodo] || 0;
   const inicioJanela = diasJanela
     ? iso(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - (diasJanela - 1))) : null;
-  // A busca no servidor começa 1 dia ANTES da janela: uma ambulância que sai logo depois da meia-noite do primeiro dia
-  // pode ter o pedido e a finalização no dia anterior. A janela exata é aplicada depois, no navegador.
-  const inicioBusca = diasJanela
-    ? iso(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - diasJanela)) : null;
 
   /* ── Carga das remoções ───────────────────────────────────────────────────
    * O período vai para o SERVIDOR, então a tela baixa só o que vai mostrar, e a leitura é feita em páginas de 1.000
    * (sbGetTodas), então nada é cortado em silêncio. Como o gráfico conta saídas, pedidos e finalizações cada um no seu dia,
-   * a linha vem se QUALQUER uma das quatro datas cair na janela (or=): um paciente pedido dia 27 que saiu dia 1º precisa vir.
+   * a linha vem se QUALQUER uma das três datas cair na janela (or=): um paciente pedido dia 27 que saiu dia 1º precisa vir.
    * O filtro do navegador (`dados`, mais abaixo) continua valendo para as demais seções: ele usa só a data do pedido.
    * Linhas sem nenhuma data só vêm em "Tudo", como antes.
-   * Fica DEPOIS de inicioBusca porque usa esse valor na lista de dependências.                                          */
+   * Fica DEPOIS de inicioJanela porque usa esse valor na lista de dependências.                                         */
   useEffect(() => {
     let vivo = true;
     (async () => {
@@ -552,12 +546,9 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       try {
         let filtro = "";
         if (periodo === "custom") {
-          if (ini && fim) {
-            const a = dashSomaDias(ini, -1);
-            filtro = `&or=(${DASH_CAMPOS_DATA.map(c => `and(${c}.gte.${a},${c}.lte.${fim})`).join(",")})`;
-          }
-        } else if (inicioBusca) {
-          filtro = `&or=(${DASH_CAMPOS_DATA.map(c => `${c}.gte.${inicioBusca}`).join(",")})`;
+          if (ini && fim) filtro = `&or=(${DASH_CAMPOS_DATA.map(c => `and(${c}.gte.${ini},${c}.lte.${fim})`).join(",")})`;
+        } else if (inicioJanela) {
+          filtro = `&or=(${DASH_CAMPOS_DATA.map(c => `${c}.gte.${inicioJanela}`).join(",")})`;
         }
         const r = await sbGetTodas("remocoes?select=*&order=data_solicitacao.desc,id.asc" + filtro);
         if (vivo) { setRemocoes(r); setErro(""); }
@@ -565,7 +556,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       finally { if (vivo) { setCarregando(false); setAtualizando(false); } }
     })();
     return () => { vivo = false; };
-  }, [periodo, ini, fim, inicioBusca]);
+  }, [periodo, ini, fim, inicioJanela]);
 
   const dados = useMemo(() => {
     if (periodo === "tudo") return remocoes;
@@ -620,7 +611,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     const out = { saidas: [], pedidos: [], finalizacoes: [] };
     remocoes.forEach(r => {
       const p = dashDiaIso(r.data_solicitacao), f = dashDiaIso(r.data_resposta_cross), s = dashDiaDaSaida(r);
-      if (dentro(p)) out.pedidos.push(p);
+      if (dashTemFicha(r) && dentro(p)) out.pedidos.push(p);   // pedido à CROSS exige ficha CROSS
       if (dentro(f)) out.finalizacoes.push(f);
       if (dentro(s)) out.saidas.push(s);
     });
@@ -670,11 +661,23 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     return out;
   }, [eventos, escalaEfetiva, limInf, limSup]);
 
-  // Pedidos do período que ainda não têm saída / finalização: aparecem como aviso sob o gráfico
-  const lacunas = useMemo(() => ({
-    semSaida: dados.filter(r => !dashDiaDaSaida(r)).length,
-    semFinalizacao: dados.filter(r => !dashDiaIso(r.data_resposta_cross)).length
-  }), [dados]);
+  // Tipo da linha: CROSS (com ficha) + outras (sem ficha) = total de linhas do período. Divide `dados` em dois, então a soma fecha sempre.
+  const tipos = useMemo(() => {
+    const cross = dados.filter(dashTemFicha).length;
+    return { total: dados.length, cross, outras: dados.length - cross };
+  }, [dados]);
+
+  // Avisos sob o gráfico, só para o que está VISÍVEL na planilha:
+  //   pedidos CROSS sem horário de saída / sem finalização, e linhas com horário de saída mas SEM data de saída (ficam fora das barras)
+  const lacunas = useMemo(() => {
+    const cross = dados.filter(dashTemFicha);
+    return {
+      crossTotal: cross.length,
+      semSaida: cross.filter(r => !dashTemHorarioSaida(r)).length,
+      semFinalizacao: cross.filter(r => !dashDiaIso(r.data_resposta_cross)).length,
+      saidaSemData: dados.filter(r => dashTemHorarioSaida(r) && !dashDiaIso(r.data_saida_real)).length
+    };
+  }, [dados]);
 
   /* ── Agregações canonicalizadas ───────────────────────────────────────── */
   const C = typeof Canon !== "undefined" ? Canon : null;
@@ -715,9 +718,9 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       if (x.protocolo_avc !== true) return;
       r.total++;
       const fin = quando(x.data_resposta_cross, x.horario_resposta_cross);
-      // Dia da saída: data real > data do pedido da ambulância > data do pedido na CROSS. Quando falta a data real e o horário
-      // da saída é menor que o do pedido da ambulância, a saída foi depois da meia-noite e vale o dia seguinte (dashDiaDaSaida).
-      // Antes a cadeia não tinha essa virada: a saída ficava ANTES do pedido, o tempo dava negativo e o caso entrava como "no horário".
+      // Dia da saída: só a data de saída preenchida na planilha (data_saida_real), e só com o horário de saída. Sem uma das duas,
+      // o caso fica em "sem horário para medir" em vez de o painel adivinhar o dia (antes caía na data do pedido e, se a saída foi
+      // depois da meia-noite, o tempo dava negativo e o caso entrava como "no horário").
       const dSaida = dashDiaDaSaida(x);
       const sai = quando(dSaida, x.horario_saida_ambulancia);
       const ped = quando(x.data_saida_ambulancia, x.hora_solic_ambulancia);   // pedido da ambulância pela Santa Casa
@@ -1024,8 +1027,11 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
   // Avisos sob o gráfico: pedidos do período que ainda não têm saída ou finalização (não aparecem nas barras/linhas)
   const notasGraf = [];
-  if (lacunas.semSaida > 0) notasGraf.push(`${lacunas.semSaida} de ${dados.length} pedidos do período ainda sem saída de ambulância registrada (não entram nas barras).`);
-  if (lacunas.semFinalizacao > 0) notasGraf.push(`${lacunas.semFinalizacao} de ${dados.length} pedidos do período ainda sem finalização da CROSS.`);
+  if (lacunas.semSaida > 0) notasGraf.push(`${lacunas.semSaida} de ${lacunas.crossTotal} pedidos à CROSS do período ainda sem saída de ambulância registrada.`);
+  if (lacunas.semFinalizacao > 0) notasGraf.push(`${lacunas.semFinalizacao} de ${lacunas.crossTotal} pedidos à CROSS do período ainda sem finalização.`);
+  if (lacunas.saidaSemData > 0) notasGraf.push(`${lacunas.saidaSemData} linha${lacunas.saidaSemData !== 1 ? "s" : ""} com horário de saída mas sem data de saída: não entra${lacunas.saidaSemData !== 1 ? "m" : ""} nas barras. Confira a coluna DATA SAÍDA AMB. na planilha.`);
+  const pctCross = tipos.total ? Math.round(tipos.cross / tipos.total * 100) : 0;
+  const pctOutras = tipos.total ? 100 - pctCross : 0;
 
   const clinicas = gEspec.itens.filter(i => i.grupo === "clinica");
   const recursos = gEspec.itens.filter(i => i.grupo === "recurso");
@@ -1070,7 +1076,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       }, [["dia", "Diária"], ["semana", "Semanal"], ["mes", "Mensal"]].map(([i, t]) => btnEscala(i, t))),
 
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginLeft: "auto" } },
-        totaisGraf.saidas, " remoções · ", dados.length, " pedidos",
+        totaisGraf.saidas, " saídas de ambulância · ", dados.length, " linhas",
         deDia && ` · ${fmtDia(deDia)}${ateDia && ateDia !== deDia ? " a " + fmtDia(ateDia) : ""}`,
         atualizando && " · atualizando…")
     ),
@@ -1088,14 +1094,39 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       titulo: isAdmin ? "Agora · fila do Kanban" : "Última publicação · fila do Kanban"
     }),
 
+    /* ══ Remoções na planilha: CROSS + outras = total de linhas ══ */
+    /*#__PURE__*/React.createElement("div", { style: { marginBottom: 22 } },
+      /*#__PURE__*/React.createElement(Titulo, {
+        extra: "CROSS + outras = total de linhas",
+        tooltip: "Cada linha da planilha é uma remoção. Remoção CROSS é a linha com o Nº da ficha CROSS preenchido; outras remoções são as linhas sem ficha CROSS (altas, hemodiálise, exames etc.). A soma dos dois é sempre o total de linhas do período escolhido. Para comparar com o total da planilha inteira, escolha “Tudo”."
+      }, "Remoções na planilha"),
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 12 }
+      },
+        /*#__PURE__*/React.createElement(Kpi, {
+          label: "Total de linhas", valor: tipos.total, sub: "remoções CROSS + outras remoções",
+          tooltip: "Todas as linhas da planilha no período escolhido. Sempre igual à soma dos dois cards ao lado." }),
+        /*#__PURE__*/React.createElement(Kpi, {
+          label: "Remoções CROSS", valor: tipos.cross, cor: "#0369A1", sub: `${pctCross}% do total · com ficha CROSS`,
+          tooltip: "Linhas com o Nº da ficha CROSS preenchido." }),
+        /*#__PURE__*/React.createElement(Kpi, {
+          label: "Outras remoções", valor: tipos.outras, cor: "#475569", sub: `${pctOutras}% do total · sem ficha CROSS`,
+          tooltip: "Linhas sem ficha CROSS: altas, hemodiálise, exames etc." })),
+      tipos.total > 0 && /*#__PURE__*/React.createElement("div", {
+        title: `${tipos.cross} com ficha CROSS · ${tipos.outras} sem ficha`,
+        style: { display: "flex", height: 8, borderRadius: 99, overflow: "hidden", background: "#F1F5F9", marginTop: 12 }
+      },
+        /*#__PURE__*/React.createElement("div", { style: { width: entrou ? `${tipos.cross / tipos.total * 100}%` : "0%", background: "#0369A1", transition: "width .8s cubic-bezier(.22,.9,.3,1)" } }),
+        /*#__PURE__*/React.createElement("div", { style: { flex: 1, background: "#CBD5E1" } }))),
+
     /* ══ KPIs do período (remocoes) ══ */
     /*#__PURE__*/React.createElement("div", {
       style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 12, marginBottom: 22 }
     },
       /*#__PURE__*/React.createElement(Kpi, {
-        label: "Remoções", valor: totaisGraf.saidas,
-        sub: `${diasNoPeriodo ? `${(totaisGraf.saidas / diasNoPeriodo).toFixed(1)} por dia · ` : ""}${dados.length} pedido${dados.length !== 1 ? "s" : ""} à CROSS`,
-        tooltip: "Remoções realizadas no período: conta o dia em que a ambulância saiu (data e horário de saída preenchidos na planilha). Pedido ainda sem saída não entra. Abaixo, o total de pedidos feitos à CROSS no período. Fonte: planilha de remoções." }),
+        label: "Saídas de ambulância", valor: totaisGraf.saidas,
+        sub: diasNoPeriodo ? `${(totaisGraf.saidas / diasNoPeriodo).toFixed(1)} por dia` : "no período",
+        tooltip: "Saídas de ambulância no período, de todas as linhas (CROSS e outras): conta o dia da saída (data e horário de saída preenchidos na planilha). Linha ainda sem saída não entra. Fonte: planilha de remoções." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Ambulância avançada",
         valor: gAmb.informados ? `${((gAmb.itens.find(i => i.canonico === "AVANÇADA")?.n || 0) / gAmb.informados * 100).toFixed(0)}%` : "—",
@@ -1104,9 +1135,9 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
         tooltip: "% de remoções que usaram SAV (Suporte Avançado de Vida). Calculado só sobre registros com tipo de ambulância preenchido — o denominador aparece abaixo." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Permaneceu no destino", valor: perm.n ? `${perm.pct.toFixed(0)}%` : "—",
-        sub: `${perm.sim} de ${perm.n} pedidos · ${perm.semInfo} sem registro`,
+        sub: `${perm.sim} de ${perm.n} linhas · ${perm.semInfo} sem registro`,
         alerta: perm.n > 0 && perm.semInfo / perm.n > 0.2,
-        tooltip: "% dos pedidos do período em que o paciente ficou no hospital de destino e não voltou à Santa Casa. O denominador é o total de pedidos do período; os sem registro (campo vazio) contam como não-permaneceu, então o valor real pode ser maior." })
+        tooltip: "% das linhas do período em que o paciente ficou no hospital de destino e não voltou à Santa Casa. O denominador é o total de linhas do período; os sem registro (campo vazio) contam como não-permaneceu, então o valor real pode ser maior." })
     ),
 
     /* ══ Tempos do caminho da remoção: 5 intervalos, clique para ver por gravidade ══ */
