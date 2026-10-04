@@ -9,13 +9,17 @@ const GC = {
   retorno:         { bg:"#FDF2F8", border:"#F9A8D4", text:"#831843", dot:"#EC4899", label:"Retorno",          emoji:"🔵" }
 };
 
-const STATUS_OPTIONS = ["", "REINSERIR", "EVADIU", "EVASÃO", "ALTA", "ALTA MÉDICA", "RESOLVIDO COM RECURSOS LOCAIS", "FINALIZADO VIA CROSS", "ENCAMINHAR AMANHÃ"];
+/* Card sem prioridade na ficha: aparece NEUTRO, com o rótulo "Sem prioridade" (antes caía em Urgência/amarelo). */
+const GC_SEM = { bg:"#F1F5F9", border:"#CBD5E1", text:"#334155", dot:"#94A3B8", label:"Sem prioridade", emoji:"⚪" };
+
+const STATUS_OPTIONS = ["", "REINSERIR", "REINSERIDA", "EVADIU", "EVASÃO", "ALTA", "ALTA MÉDICA", "RESOLVIDO COM RECURSOS LOCAIS", "FINALIZADO VIA CROSS", "ENCAMINHAR AMANHÃ", "PACIENTE INSTÁVEL, REMOÇÃO NÃO LIBERADA"];
 
 const STATUS_EMOJI = {
   "EVADIU": "[!]", "EVASÃO": "[!]",
   "ALTA": "[ALTA]", "ALTA MÉDICA": "[ALTA]",
   "FINALIZADO VIA CROSS": "[OK]", "RESOLVIDO COM RECURSOS LOCAIS": "[OK]",
-  "REINSERIR": "[>>]", "ENCAMINHAR AMANHÃ": "[>>]"
+  "REINSERIR": "[>>]", "ENCAMINHAR AMANHÃ": "[>>]",
+  "REINSERIDA": "[>>]", "PACIENTE INSTÁVEL, REMOÇÃO NÃO LIBERADA": "[!]"
 };
 
 const PR_EMOJI = { "01":"[P1]", "02":"[P2]", "03":"[P3]", "04":"[P4]" };
