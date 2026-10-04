@@ -485,7 +485,21 @@
     return m ? PRIORIDADE_CROSS[Number(m[1])] : null;
   }
 
+  /* Motivos da espera entre a finalização da CROSS e o pedido da ambulância (tempo interno da Santa Casa).
+   * Lista inicial proposta em out/2026: ajuste os textos aqui e a planilha e o painel passam a usar a nova lista. */
+  var MOTIVOS_TEMPO_INTERNO = [
+    "Paciente em estabilização clínica",
+    "Aguardando exames ou documentação",
+    "Aguardando família ou acompanhante",
+    "Aguardando equipe de transporte",
+    "Aguardando confirmação do hospital de destino",
+    "Ambulância ocupada em outra remoção",
+    "Falha de comunicação ou de atualização interna",
+    "Outro (descrever na observação)"
+  ];
+
   root.Canon = {
+    MOTIVOS_TEMPO_INTERNO: MOTIVOS_TEMPO_INTERNO,
     norm: norm, isVazio: isVazio,
     classificar: classificar, classificarAVC: classificarAVC, validarLinha: validarLinha,
     agrupar: agrupar, parseSetor: parseSetor, ehVazamento: ehVazamento,
