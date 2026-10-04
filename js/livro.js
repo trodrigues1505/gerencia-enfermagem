@@ -16,7 +16,7 @@ function strSim(a, b) {
 //   3) RETORNO — quando a ambulância volta        (aba "Em andamento")
 // Cada etapa tem os seus campos obrigatórios; quem registra a etapa é carimbado pelo servidor.
 const LS_EMPTY={data_solic_ambulancia:"",hora_solic_ambulancia:"",nome_paciente:"",idade:"",especialidade:"",destino:"",ambulancia:"",observacao:"",
-  data_saida:"",hora_saida:"",medico:"",enfermeiro:"",tecnico_auxiliar:"",protocolo_avc:false};
+  data_saida:"",hora_saida:"",medico:"",enfermeiro:"",tecnico_auxiliar:"",prefixo_ambulancia:"",protocolo_avc:false};
 const LS_SAIDA_EMPTY={data_saida:"",hora_saida:"",medico:"",enfermeiro:"",tecnico_auxiliar:"",observacao:"",prefixo_ambulancia:""};
 const LS_RET_EMPTY={data_retorno:"",hora_retorno:"",finalizado:null,permaneceu:null,observacao:""};
 // Obrigatórios do PEDIDO. Os da saída só valem quando a saída é registrada (LS_REQ_SAIDA); os do retorno, no retorno.
@@ -367,6 +367,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
       const campos=[...LS_REQ_PEDIDO,"observacao",...(jaSaiu?LS_REQ_SAIDA:[])];
       const payload={preenchido_por:userId||null,status_vinculo:"pendente"};
       campos.forEach(k=>{payload[k]=form[k];});
+      if(jaSaiu&&String(form.prefixo_ambulancia||"").trim())payload.prefixo_ambulancia=String(form.prefixo_ambulancia).trim();   // qual ambulância saiu (opcional)
       if(form.protocolo_avc===true)payload.protocolo_avc=true;
       const r=await fetch(`${SB_URL}/rest/v1/livro_saida`,{method:"POST",headers:{...LS_H(),Prefer:"return=representation"},body:JSON.stringify(payload)});
       if(!r.ok)throw new Error(await r.text());
@@ -757,7 +758,10 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                 FLD("hora_saida","Hora da saída",React.createElement("input",{type:"time",value:form.hora_saida,onChange:e=>set("hora_saida",e.target.value),style:iS("hora_saida")}),true)
               ),
               React.createElement("div",{style:{marginTop:12}},EQUIPE3(form,set,errors,form.protocolo_avc===true)),
-              NOTA_SEM)
+              NOTA_SEM,
+              React.createElement("div",{style:{marginTop:10}},
+                LBL("Prefixo / identificação da ambulância",false),
+                React.createElement("input",{type:"text",value:form.prefixo_ambulancia||"",onChange:e=>set("prefixo_ambulancia",e.target.value),placeholder:"Opcional — ex.: USB 01, USA 02 ou a placa",style:{...iSR(false)}})))
           ),
           React.createElement("div",{className:"ls-section"},
             React.createElement("div",{className:"ls-section-title"},"Observação"),
