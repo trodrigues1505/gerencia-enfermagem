@@ -72,7 +72,7 @@ function Btn({
 function Badge({
   grav
 }) {
-  const c = GC[grav] || GC.urgencia;
+  const c = GC[grav] || GC_SEM;   // sem prioridade: neutro, não amarelo
   return /*#__PURE__*/React.createElement("span", {
     style: {
       display: "inline-flex",
@@ -109,6 +109,8 @@ function StatusPill({
     "FINALIZADO VIA CROSS": "#F3E8FF|#581C87",
     "RESOLVIDO COM RECURSOS LOCAIS": "#DCFCE7|#14532D",
     "REINSERIR": "#FEF3C7|#92400E",
+    "REINSERIDA": "#FFEDD5|#9A3412",
+    "PACIENTE INSTÁVEL, REMOÇÃO NÃO LIBERADA": "#F3E8FF|#6D28D9",
     "ENCAMINHAR AMANHÃ": "#EFF6FF|#1E40AF"
   };
   const [bg, color] = (m[status] || "#F1F5F9|#475569").split("|");
