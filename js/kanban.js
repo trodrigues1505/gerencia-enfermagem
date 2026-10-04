@@ -1,6 +1,3 @@
-/* Card sem prioridade na ficha: aparece NEUTRO, com o rótulo "Sem prioridade" (antes caía em Urgência/amarelo). */
-const GC_SEM = { bg: "#F1F5F9", border: "#CBD5E1", text: "#334155", dot: "#94A3B8", label: "Sem prioridade", emoji: "⚪" };
-
 /* ─── SUBCATEGORIAS: especialidades que agrupam visualmente dentro de cada coluna ─── */
 const SUBCOL_SPECS = [{
   key: "psiquiatria",
