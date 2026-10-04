@@ -279,7 +279,7 @@ function DashProtocoloAVC({ protocolos, totalRemocoes, Card, Kpi, Titulo, Vazio,
           ));
 }
 
-function DashTempos({ intervalos, Card, Kpi, Titulo, fmtMin }) {
+function DashTempos({ intervalos, total, Card, Kpi, Titulo, fmtMin }) {
   const h = React.createElement;
   const [sel, setSel] = useState(null);     // id do intervalo aberto no modal
   const [gSel, setGSel] = useState(null);   // linha de gravidade aberta dentro do modal ("todas" ou o nome da gravidade)
@@ -295,18 +295,22 @@ function DashTempos({ intervalos, Card, Kpi, Titulo, fmtMin }) {
   const cel = (txt, extra) => h("span", { style: { textAlign: "right", fontSize: 12, color: "#64748B", fontVariantNumeric: "tabular-nums", ...extra } }, txt);
 
   return h(React.Fragment, null,
-    h("div", { style: { marginBottom: 22 } },
+    h("div", { id: "bloco-tempos", style: { marginBottom: 22 } },
       h(Titulo, {
-        extra: "clique em um card para ver por gravidade",
-        tooltip: "A ordem dos momentos é: solicitação (da Santa Casa à CROSS) → finalização (CROSS; o aceite é o mesmo momento) → solicitação da ambulância (Santa Casa) → saída da ambulância → retorno. Cada card é o intervalo entre dois momentos seguidos, pela mediana (para um caso extremo não distorcer). Só entram remoções com os dois horários. Se faltar data ou horário de um dos momentos, ou se estiverem fora de ordem (ou com 30 dias ou mais de diferença), o caso não entra e é contado no card; a lista com link está em “Saneamento de falhas”. O painel não completa nem adivinha nenhum horário."
-      }, "Tempos do caminho da remoção"),
+        extra: "medianas · clique em um card para ver por gravidade",
+        tooltip: "A ordem dos momentos é: solicitação (da Santa Casa à CROSS) → finalização (CROSS; o aceite é o mesmo momento) → solicitação da ambulância (Santa Casa) → saída da ambulância → retorno. Cada card é o intervalo entre dois momentos seguidos, pela mediana (para um caso extremo não distorcer); a soma das etapas não é, necessariamente, o tempo total, porque cada etapa usa as remoções que têm os horários dela. O tempo total (faixa escura) é medido à parte, remoção por remoção, da solicitação ao retorno. A etapa ④ (saída → retorno) é também a permanência fora da Santa Casa. Só entram remoções com os dois horários. Se faltar data ou horário de um dos momentos, ou se estiverem fora de ordem (ou com 30 dias ou mais de diferença), o caso não entra e é contado no card; a lista com link está em “Saneamento de falhas”. O painel não completa nem adivinha nenhum horário."
+      }, "Onde o tempo é gasto"),
       h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 12 } },
         intervalos.map(i => h(Kpi, {
           key: i.id, label: i.rotulo, valor: fmtMin(i.todas.mediana), cor: i.cor,
           sub: (i.todas.nPos ? `${i.dono} · mediana · ${i.todas.nPos} com horário · maior ${fmtMin(i.todas.max)} · ${i.todas.acima2h} acima de 2h` : `${i.dono} · sem remoções com os dois horários`) + (i.nNeg ? ` · ${i.nNeg} inconsistente${i.nNeg !== 1 ? "s" : ""}` : ""),
           alerta: i.nNeg > 0,
-          onClick: () => setSel(i.id),
-          tooltip: i.tip + " Clique para ver por gravidade." })))),
+          onClick: () => setSel(i.id), topo: i.cor,
+          tooltip: i.tip + " Clique para ver por gravidade." }))),
+      h("div", { style: { marginTop: 12, padding: "10px 14px", background: "#0F172A", borderRadius: 12, color: "#F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" } },
+        h("div", null, h("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em" } }, "Tempo total · solicitação → retorno da ambulância"),
+          h("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 2 } }, total.n ? `mediana de ${total.n} remoç${total.n !== 1 ? "ões" : "ão"} com todos os momentos preenchidos` : "nenhuma remoção com todos os momentos preenchidos")),
+        h("div", { style: { fontSize: 26, fontWeight: 700, fontVariantNumeric: "tabular-nums" } }, fmtMin(total.mediana)))),
 
     it && h("div", {
       onClick: e => { if (e.target === e.currentTarget) fechar(); },
@@ -808,29 +812,6 @@ function DashSituacao({ classes, total, Titulo }) {
     aberta && h(DashListaModal, { titulo: aberta.rotulo, subtitulo: aberta.ajuda, itens: aberta.itens, onClose: () => setSel(null) }));
 }
 
-/* ─── Árvore do atraso: onde o tempo é gasto ───────────────────────────────── */
-function DashArvore({ etapas, total, Titulo, fmtMin }) {
-  const h = React.createElement;
-  const soma = etapas.reduce((t, e) => t + (e.mediana || 0), 0);
-  return h("div", { id: "bloco-arvore", style: DASH_CARTAO },
-    h(Titulo, {
-      extra: "medianas · só remoções com os dois horários de cada etapa",
-      tooltip: "Mostra em qual etapa o tempo é gasto: ① CROSS (solicitação → finalização), ② tempo interno (finalização → pedido da ambulância), ③ espera pela ambulância (pedido → saída), ④ ambulância fora da Santa Casa (saída → retorno; é também a permanência no destino, nos casos com retorno). Cada etapa usa a mediana das remoções que têm data e horário dos dois momentos, por isso a soma das etapas não é, necessariamente, o tempo total. O tempo total é medido à parte, remoção por remoção (solicitação → retorno)."
-    }, "Onde o tempo é gasto"),
-    h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(175px,1fr))", gap: 12 } },
-      etapas.map((e, i) => h("div", { key: e.id, style: { background: "#F8FAFC", borderRadius: 12, padding: "12px 14px", borderTop: `3px solid ${e.cor}` } },
-        h("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em" } }, `${["①", "②", "③", "④"][i]} ${e.quem}`),
-        h("div", { style: { fontSize: 12, color: "#475569", margin: "3px 0 6px", minHeight: 30 } }, e.nome),
-        h("div", { style: { fontSize: 24, fontWeight: 700, color: e.cor, lineHeight: 1, fontVariantNumeric: "tabular-nums" } }, fmtMin(e.mediana)),
-        h("div", { style: { fontSize: 10.5, color: "#94A3B8", marginTop: 6 } }, e.nPos ? `${e.nPos} remoç${e.nPos !== 1 ? "ões" : "ão"} · ${soma && e.mediana ? Math.round(e.mediana / soma * 100) + "% da soma das etapas" : ""}` : "sem remoções com os dois horários"),
-        h("div", { style: { height: 5, background: "#E2E8F0", borderRadius: 99, overflow: "hidden", marginTop: 6 } },
-          h("div", { style: { height: "100%", width: `${soma && e.mediana ? e.mediana / soma * 100 : 0}%`, background: e.cor, borderRadius: 99 } }))))),
-    h("div", { style: { marginTop: 12, padding: "10px 14px", background: "#0F172A", borderRadius: 12, color: "#F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" } },
-      h("div", null, h("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em" } }, "Tempo total · solicitação → retorno da ambulância"),
-        h("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 2 } }, total.n ? `mediana de ${total.n} remoç${total.n !== 1 ? "ões" : "ão"} com todos os momentos preenchidos` : "nenhuma remoção com todos os momentos preenchidos")),
-      h("div", { style: { fontSize: 26, fontWeight: 700, fontVariantNumeric: "tabular-nums" } }, fmtMin(total.mediana))));
-}
-
 /* ─── Frota e capacidade ─────────────────────────────────────────────────────── */
 function DashFrota({ frota, fora, cobertura, Titulo, fmtMin }) {
   const h = React.createElement;
@@ -920,14 +901,15 @@ function DashPermanece({ tempos, C, Titulo, fmtMin }) {
 }
 
 /* ─── Pacientes aguardando (Kanban, ao vivo) ─────────────────────────────────── */
-function DashAguardando({ cards, cfg, hojeIso, onAbrirCard, aoVivo, Titulo, fmtMin }) {
+function DashAguardando({ cards, cfg, hojeIso, onAbrirCard, aoVivo, aberto, onToggle, filtro, onFiltro, Titulo, fmtMin }) {
   const h = React.createElement;
   const [agora, setAgora] = useState(() => Date.now());
   useEffect(() => { const iv = setInterval(() => setAgora(Date.now()), 30000); return () => clearInterval(iv); }, []);
   const a = dashAguardando(cards, agora, cfg, hojeIso);
   const GRAVS = [["emergencia", "Vermelho", "#EF4444"], ["urgencia", "Amarelo", "#EAB308"], ["menor_gravidade", "Verde", "#22C55E"], ["agendamento", "Cinza", "#94A3B8"], ["", "Sem prioridade", "#CBD5E1"]];
   const conta = k => a.itens.filter(i => (k === "" ? !GRAVS.slice(0, 4).some(g => g[0] === i.c.grav) : i.c.grav === k)).length;
-  const ordenados = [...a.itens].sort((x, y) => (y.min === null ? -1 : y.min) - (x.min === null ? -1 : x.min));
+  const soVerm = filtro === "vermelhos";
+  const ordenados = [...a.itens].filter(i => !soVerm || i.vermelho).sort((x, y) => (y.min === null ? -1 : y.min) - (x.min === null ? -1 : x.min));
   const maior = a.itens.reduce((m, i) => (i.min !== null && i.min > m ? i.min : m), 0);
   const gravRot = k => (GRAVS.find(g => g[0] === (GRAVS.slice(0, 4).some(x => x[0] === k) ? k : "")) || GRAVS[4]);
   return h("div", { id: "bloco-aguardando", style: DASH_CARTAO },
@@ -945,7 +927,14 @@ function DashAguardando({ cards, cfg, hojeIso, onAbrirCard, aoVivo, Titulo, fmtM
         a.acima !== null && ` · ${a.acima.length} acima de ${a.limEspera} min`,
         a.acimaVerm !== null && ` · ${a.acimaVerm.length} vermelho${a.acimaVerm.length !== 1 ? "s" : ""} acima de ${a.limVerm} min`,
         a.limEspera === null && a.limVerm === null && " · sem limite de alerta cadastrado"),
-      ordenados.slice(0, 10).map((i, k) => {
+      h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", margin: "2px 0 6px" } },
+        h("button", { type: "button", "aria-expanded": !!aberto, onClick: onToggle,
+          style: { padding: "5px 12px", borderRadius: 8, border: "1px solid #CBD5E1", background: aberto ? "#F1F5F9" : "#fff", color: "#334155", fontSize: 12, fontWeight: 650, cursor: "pointer", fontFamily: "inherit" } },
+          aberto ? "▾ Ocultar a lista" : `▸ Mostrar a lista (${a.itens.length})`),
+        aberto && [["todos", `Todos (${a.itens.length})`], ["vermelhos", `Só vermelhos (${a.itens.filter(i => i.vermelho).length})`]].map(([f, rot]) => h("button", { key: f, type: "button", "aria-pressed": (filtro || "todos") === f, onClick: () => onFiltro(f),
+          style: { padding: "5px 12px", borderRadius: 8, border: "none", fontSize: 12, fontFamily: "inherit", cursor: "pointer", fontWeight: (filtro || "todos") === f ? 650 : 450, background: (filtro || "todos") === f ? "#0F172A" : "#F1F5F9", color: (filtro || "todos") === f ? "#fff" : "#64748B" } }, rot))),
+      aberto && ordenados.length === 0 && h("div", { style: { fontSize: 12, color: "#15803D", padding: "4px 0" } }, "Nenhum vermelho aguardando."),
+      aberto && ordenados.slice(0, 10).map((i, k) => {
         const [, grot, gcor] = gravRot(i.c.grav);
         const estouro = (a.limEspera !== null && i.min !== null && i.min > a.limEspera) || (i.vermelho && a.limVerm !== null && i.min !== null && i.min > a.limVerm);
         return h("div", { key: i.c.id, style: { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", padding: "8px 4px", borderTop: k ? "1px solid #F1F5F9" : "none", fontSize: 12 } },
@@ -955,7 +944,7 @@ function DashAguardando({ cards, cfg, hojeIso, onAbrirCard, aoVivo, Titulo, fmtM
           h("span", { style: { marginLeft: "auto", fontWeight: 700, color: estouro ? "#B91C1C" : "#475569", fontVariantNumeric: "tabular-nums" } }, i.min === null ? "sem horário" : fmtMin(i.min)),
           onAbrirCard && h("button", { type: "button", onClick: () => onAbrirCard(i.c.id), style: { padding: "3px 10px", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: "1px solid #CBD5E1", background: "transparent", color: "#475569" } }, "abrir card →"));
       }),
-      a.itens.length > 10 && h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "6px 4px" } }, `Mostrando os 10 que esperam há mais tempo, de ${a.itens.length}.`)));
+      aberto && ordenados.length > 10 && h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "6px 4px" } }, `Mostrando os 10 que esperam há mais tempo, de ${ordenados.length}.`)));
 }
 
 /* ─── Cumprimento da meta de tempo por gravidade ─────────────────────────────── */
@@ -984,6 +973,16 @@ function DashSLA({ sla, semGrav, Titulo, fmtMin }) {
       s.fora.length ? h("button", { type: "button", onClick: () => setSel(s.grav), style: { background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "right", fontSize: 12, fontWeight: 700, color: "#B91C1C", fontVariantNumeric: "tabular-nums", padding: 0 } }, `${s.fora.length} (${Math.round(s.fora.length / s.avaliadas * 100)}%)`)
         : cel(s.avaliadas ? "0" : "—"),
       cel(fmtMin(s.mediana)))),
+    h("dl", { style: { margin: "12px 6px 0", padding: "12px 14px", background: "#F8FAFC", borderRadius: 12, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))", gap: "10px 22px" } },
+      [["Meta", "o tempo máximo aceito, para aquela gravidade, entre a finalização da ficha na CROSS e a saída da ambulância. Você define em Configurações."],
+       ["Medidas", "quantas remoções daquela gravidade entram na conta: as que têm data e horário da finalização e da saída."],
+       ["Dentro", "a porcentagem das remoções que saíram dentro da meta (no tempo da meta ou antes)."],
+       ["Fora", "quantas saíram depois da meta, e a porcentagem. Clique no número para ver quais foram."],
+       ["Mediana", "o tempo do meio: metade das remoções levou menos que isso e metade levou mais. Um caso muito demorado não distorce."]
+      ].map(([t, d]) => h("div", { key: t },
+        h("dt", { style: { fontSize: 11, fontWeight: 700, color: "#0F172A", textTransform: "uppercase", letterSpacing: ".04em" } }, t),
+        h("dd", { style: { margin: "2px 0 0", fontSize: 11.5, color: "#64748B", lineHeight: 1.5 } }, d)))),
+    sla.some(x => x.avaliadas < x.n) && h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "8px 6px 0" } }, "Dentro e Fora só contam as remoções julgadas pela meta que valia no dia do pedido; por isso podem ser menos que as Medidas quando a meta foi cadastrada depois de algumas remoções."),
     semGrav > 0 && h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "8px 6px 0" } }, `${semGrav} remoç${semGrav !== 1 ? "ões" : "ão"} com os dois horários, mas sem gravidade, ficaram fora desta conta (veja Saneamento de falhas).`),
     aberto && h(DashListaModal, { titulo: `Fora da meta · ${aberto.grav}`, subtitulo: `meta de ${fmtMin(aberto.alvo)}`, itens: aberto.fora, onClose: () => setSel(null) }));
 }
@@ -1013,7 +1012,32 @@ function DashReinsercao({ rein, Titulo }) {
 }
 
 /* ─── Alertas do gestor + qualidade dos registros ─────────────────────────────── */
-function DashAlertas({ cards, cfg, hojeIso, sla, rein, qualidade, nCorrigir, emRemocao, naoAtendidas }) {
+/* Painel que se abre logo abaixo dos números (aba): lista curta dos casos por trás do número. */
+function DashPainelLista({ titulo, sub, linhas, vazio, rodape, onFechar }) {
+  const h = React.createElement;
+  const LIM = 10;
+  const ir = alvo => { const el = document.getElementById(alvo); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  return h("div", { role: "region", "aria-label": titulo, style: Object.assign({}, DASH_CARTAO, { marginBottom: 14, borderColor: "#CBD5E1" }) },
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 6 } },
+      h("div", null, h("div", { style: { fontSize: 13, fontWeight: 700, color: "#0F172A" } }, titulo), sub && h("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 2 } }, sub)),
+      h("button", { type: "button", onClick: onFechar, "aria-label": "Fechar", style: { background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 18, lineHeight: 1, padding: 2 } }, "✕")),
+    linhas.length === 0 ? h("div", { style: { fontSize: 12, color: "#15803D", padding: "4px 0" } }, vazio)
+      : linhas.slice(0, LIM).map((l, i) => {
+          const estilo = { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", padding: "8px 2px", borderTop: i ? "1px solid #F1F5F9" : "none", fontSize: 12, color: "#475569", textDecoration: "none" };
+          const corpo = [
+            h("span", { key: "n", style: { fontWeight: 600, color: "#0F172A" } }, l.nome),
+            l.ficha && h("span", { key: "f", style: { color: "#94A3B8", fontSize: 11 } }, l.ficha),
+            h("span", { key: "t", style: { flex: "1 1 220px" } }, l.texto),
+            l.fn && h("button", { key: "b", type: "button", onClick: l.fn, style: { marginLeft: "auto", padding: "3px 10px", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: "1px solid #CBD5E1", background: "transparent", color: "#475569" } }, l.rotFn || "abrir →"),
+            l.href && h("span", { key: "l", style: { marginLeft: "auto", fontWeight: 700, color: "#B45309", whiteSpace: "nowrap" } }, "abrir linha →")
+          ];
+          return l.href ? h("a", { key: i, href: l.href, style: estilo }, corpo) : h("div", { key: i, style: estilo }, corpo);
+        }),
+    linhas.length > LIM && h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "6px 2px" } }, `Mostrando ${LIM} de ${linhas.length}.`),
+    rodape && h("button", { type: "button", onClick: () => ir(rodape.alvo), style: { marginTop: 8, background: "none", border: "1px solid #E2E8F0", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, color: "#64748B", cursor: "pointer", fontFamily: "inherit" } }, rodape.rot));
+}
+
+function DashAlertas({ cards, cfg, hojeIso, sla, rein, qualidade, nCorrigir, emRemocao, naoAtendidas, aba, agAberto, agFiltro, onTile, painel }) {
   const h = React.createElement;
   const [agora, setAgora] = useState(() => Date.now());
   useEffect(() => { const iv = setInterval(() => setAgora(Date.now()), 30000); return () => clearInterval(iv); }, []);
@@ -1033,33 +1057,36 @@ function DashAlertas({ cards, cfg, hojeIso, sla, rein, qualidade, nCorrigir, emR
   const nAlertas = chips.filter(c => c.n !== null && c.n > 0 && !c.neutro).length;
   const maiorVerm = a.itens.filter(i => i.vermelho && i.min !== null).reduce((m, i) => Math.max(m, i.min), 0);
   const faixa = [
-    { rot: "Aguardando", n: a.itens.length, sub: `${a.itens.filter(i => i.c.col_id === "pendente").length} aceite · ${a.itens.filter(i => i.c.col_id === "aceite").length} ambulância`, alvo: "bloco-aguardando", cor: "#0F172A" },
-    { rot: "Vermelhos aguardando", n: nVerm, sub: nVerm && maiorVerm ? "maior espera " + dashFmtMin(maiorVerm) : "ninguém esperando", alvo: "bloco-aguardando", cor: nVerm ? "#B91C1C" : "#0F172A" },
-    { rot: "Em remoção", n: emRemocao, sub: "ambulância na rua (Kanban)", alvo: "bloco-fila", cor: "#0F172A" },
-    { rot: "Não atendidas", n: naoAtendidas, sub: "no período, pelo status", alvo: "bloco-situacao", cor: naoAtendidas ? "#C2410C" : "#0F172A" },
-    { rot: "Alertas ativos", n: nAlertas, sub: nAlertas ? "veja os chips abaixo" : "tudo dentro dos limites", alvo: "bloco-excecoes", cor: nAlertas ? "#B91C1C" : "#15803D" },
-    { rot: "Falhas a corrigir", n: nCorrigir, sub: "nos registros", alvo: "bloco-saneamento", cor: nCorrigir ? "#B45309" : "#15803D" }
+    { id: "aguardando", rot: "Aguardando", n: a.itens.length, sub: `${a.itens.filter(i => i.c.col_id === "pendente").length} aceite · ${a.itens.filter(i => i.c.col_id === "aceite").length} ambulância`, cor: "#0F172A", ativa: agAberto && agFiltro === "todos" },
+    { id: "verm", rot: "Vermelhos aguardando", n: nVerm, sub: nVerm && maiorVerm ? "maior espera " + dashFmtMin(maiorVerm) : "ninguém esperando", cor: nVerm ? "#B91C1C" : "#0F172A", ativa: agAberto && agFiltro === "vermelhos" },
+    { id: "remocao", rot: "Em remoção", n: emRemocao, sub: "ambulância na rua (Kanban)", cor: "#0F172A", ativa: aba === "remocao" },
+    { id: "nao", rot: "Não atendidas", n: naoAtendidas, sub: "no período, pelo status", cor: naoAtendidas ? "#C2410C" : "#0F172A", ativa: aba === "nao" },
+    { id: "alertas", rot: "Alertas ativos", n: nAlertas, sub: nAlertas ? "clique para ver quais" : "tudo dentro dos limites", cor: nAlertas ? "#B91C1C" : "#15803D", ativa: aba === "alertas" },
+    { id: "falhas", rot: "Falhas a corrigir", n: nCorrigir, sub: "nos registros", cor: nCorrigir ? "#B45309" : "#15803D", ativa: aba === "falhas" }
   ];
   return h("div", { id: "bloco-alertas", style: { marginBottom: 18 } },
-    h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 14 } },
-      faixa.map(f => h("button", { key: f.rot, type: "button", onClick: () => ir(f.alvo), title: "Ir para o bloco",
-        style: { textAlign: "left", background: "#fff", border: "1px solid #E8EDF3", borderRadius: 14, padding: "14px 16px", cursor: "pointer", fontFamily: "inherit" } },
-        h("div", { style: { fontSize: 10.5, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 6 } }, f.rot),
+    h("div", { role: "tablist", "aria-label": "Situação agora", style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 8 } },
+      faixa.map(f => h("button", { key: f.id, type: "button", role: "tab", "aria-selected": f.ativa, onClick: () => onTile(f.id), title: f.ativa ? "Clique para fechar" : "Clique para ver os casos aqui embaixo",
+        style: { textAlign: "left", background: f.ativa ? "#F8FAFC" : "#fff", border: "1px solid " + (f.ativa ? "#0F172A" : "#E8EDF3"), boxShadow: f.ativa ? "0 0 0 1px #0F172A" : "none", borderRadius: 14, padding: "14px 16px", cursor: "pointer", fontFamily: "inherit" } },
+        h("div", { style: { fontSize: 10.5, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 6, display: "flex", justifyContent: "space-between" } }, f.rot, h("span", { "aria-hidden": "true", style: { fontSize: 9 } }, f.ativa ? "▲" : "▼")),
         h("div", { style: { fontSize: 28, fontWeight: 700, color: f.cor, lineHeight: 1, fontVariantNumeric: "tabular-nums" } }, f.n),
         h("div", { style: { fontSize: 10.5, color: "#94A3B8", marginTop: 6 } }, f.sub)))),
-    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 8 } },
-      h("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".06em" } }, "Alertas do gestor"),
-      h("div", { style: { fontSize: 11.5, color: qualidade.pct === null ? "#94A3B8" : qualidade.pct >= 95 ? "#15803D" : "#B45309" }, title: "Linhas do período sem nenhuma falha de dados a corrigir (as com falha ficam fora de parte das contas)" },
-        qualidade.pct === null ? "" : `Qualidade dos registros: ${qualidade.pct.toFixed(0)}% das linhas sem falha · ${qualidade.comFalha} com falha`)),
-    h("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
-      chips.map(c => {
-        const semLimite = c.n === null, ativo = !semLimite && c.n > 0 && !c.neutro;
-        const cor = semLimite ? ["#94A3B8", "#F8FAFC"] : ativo ? ["#B91C1C", "#FEE2E2"] : c.neutro && c.n > 0 ? ["#C2410C", "#FFEDD5"] : ["#15803D", "#F0FDF4"];
-        return h("button", { key: c.id, type: "button", onClick: () => ir(c.alvo), title: semLimite ? "Cadastre o limite em Configurações (no fim da página)" : "Ir para o bloco",
-          style: { display: "flex", alignItems: "baseline", gap: 8, padding: "8px 12px", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", background: cor[1], color: cor[0] } },
-          !semLimite && h("span", { style: { fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" } }, c.n),
-          h("span", { style: { fontSize: 12, fontWeight: 600 } }, c.rot));
-      })));
+    qualidade.pct !== null && h("div", { style: { textAlign: "right", fontSize: 11.5, marginBottom: 10, color: qualidade.pct >= 95 ? "#15803D" : "#B45309" }, title: "Linhas do período sem nenhuma falha de dados a corrigir (as com falha ficam fora de parte das contas)" },
+      `Qualidade dos registros: ${qualidade.pct.toFixed(0)}% das linhas sem falha · ${qualidade.comFalha} com falha`),
+    aba === "alertas" && h("div", { role: "region", "aria-label": "Alertas do gestor", style: Object.assign({}, DASH_CARTAO, { marginBottom: 14, borderColor: "#CBD5E1" }) },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 } },
+        h("div", { style: { fontSize: 13, fontWeight: 700, color: "#0F172A" } }, "Alertas do gestor"),
+        h("button", { type: "button", onClick: () => onTile("alertas"), "aria-label": "Fechar", style: { background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 18, lineHeight: 1, padding: 2 } }, "✕")),
+      h("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
+        chips.map(c => {
+          const semLimite = c.n === null, ativo = !semLimite && c.n > 0 && !c.neutro;
+          const cor = semLimite ? ["#94A3B8", "#F8FAFC"] : ativo ? ["#B91C1C", "#FEE2E2"] : c.neutro && c.n > 0 ? ["#C2410C", "#FFEDD5"] : ["#15803D", "#F0FDF4"];
+          return h("button", { key: c.id, type: "button", onClick: () => ir(c.alvo), title: semLimite ? "Cadastre o limite em Configurações (no fim da página)" : "Ir para o bloco com os casos",
+            style: { display: "flex", alignItems: "baseline", gap: 8, padding: "8px 12px", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", background: cor[1], color: cor[0] } },
+            !semLimite && h("span", { style: { fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" } }, c.n),
+            h("span", { style: { fontSize: 12, fontWeight: 600 } }, c.rot));
+        }))),
+    painel);
 }
 
 /* ─── Configurações do painel: frota, metas e limites, cada valor com a data em que passa a valer ─── */
@@ -1253,6 +1280,9 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const [justModal, setJustModal] = useState(null);
   const [justTexto, setJustTexto] = useState("");
   const [justSaving, setJustSaving] = useState(false);
+  const [aba, setAba] = useState(null);              // aba aberta logo abaixo dos números: remocao | nao | alertas | falhas
+  const [agAberto, setAgAberto] = useState(false);     // lista dos pacientes aguardando: COMEÇA minimizada
+  const [agFiltro, setAgFiltro] = useState("todos");   // todos | vermelhos
   const [cfg, setCfg] = useState([]);   // frota, metas e limites (tabela painel_config), cada um com a data em que passa a valer
   async function recarregarCfg() {
     try { setCfg(await sbGetTodas("painel_config?select=*&order=vigente_desde.asc,criado_em.asc")); }
@@ -1677,7 +1707,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
         tip: "Tempo mediano entre a finalização da ficha na CROSS e a solicitação da ambulância pela Santa Casa. Vem da coluna min_finalizacao_pedido_amb da planilha de remoção.",
         calc: x => { const m = minFinPed(x); return m === null ? { v: null, neg: false } : (m < 0 || m >= 43200) ? { v: null, neg: true } : { v: m, neg: false }; },
         pts: x => [dm(x.data_resposta_cross, x.horario_resposta_cross), dm(x.data_saida_ambulancia, x.hora_solic_ambulancia)] },
-      { id: "ped_sai", de: "Solicitação da ambulância", ate: "Saída", dono: "Santa Casa", cor: "#B45309",
+      { id: "ped_sai", de: "Solicitação da ambulância", ate: "Saída", dono: "Santa Casa", cor: "#BE123C",
         tip: "Tempo mediano entre a solicitação da ambulância e a saída dela, como está na coluna T. ESPERA da planilha. Se a célula estiver vazia, usa a mesma conta da planilha: data e horário dos dois momentos, sem supor dia. Se faltar algum, o caso fica de fora e aparece em “Saneamento de falhas”.",
         calc: x => { const g = dashHMemMin(x.tempo_espera); return g !== null ? { v: g, neg: false } : par(x.data_saida_ambulancia, x.hora_solic_ambulancia, x.data_saida_real, x.horario_saida_ambulancia); },
         pts: x => [dm(x.data_saida_ambulancia, x.hora_solic_ambulancia), dm(x.data_saida_real, x.horario_saida_ambulancia)] },
@@ -1740,16 +1770,10 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     };
   }), [dados]);
 
-  const arvore = useMemo(() => {
-    const por = intervalos.reduce((a, i) => { a[i.id] = i; return a; }, {});
-    const etapa = (id, quem, nome, cor) => ({ id, quem, nome, cor, mediana: por[id].todas.mediana, nPos: por[id].todas.nPos });
+  const tempoTotal = useMemo(() => {   // solicitação → retorno, remoção por remoção (não é a soma das medianas)
     const tot = temposLinha.map(t => t.total).filter(x => x !== null);
-    return { total: { mediana: dashMediana(tot), n: tot.length }, etapas: [
-      etapa("sol_fin", "CROSS", "Solicitação → finalização da ficha", "#0369A1"),
-      etapa("fin_ped", "Tempo interno", "Finalização → pedido da ambulância", "#B45309"),
-      etapa("ped_sai", "Espera pela ambulância", "Pedido da ambulância → saída", "#BE123C"),
-      etapa("sai_ret", "Ambulância fora", "Saída → retorno (permanência fora da Santa Casa)", "#0F766E")] };
-  }, [intervalos, temposLinha]);
+    return { mediana: dashMediana(tot), n: tot.length };
+  }, [temposLinha]);
 
   const foraStats = useMemo(() => {
     const v = temposLinha.map(t => t.fora).filter(x => x !== null);
@@ -1949,9 +1973,9 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     return React.createElement("span", {className:"tip", style:{marginLeft:4,color:"#CBD5E1",fontSize:10,fontWeight:700,verticalAlign:"middle",userSelect:"none"}},
       "?", React.createElement("span", {className:"tipbox"}, props.texto));
   }
-  const Kpi = ({ label, valor, sub, cor, alerta, tooltip, onClick, ativo }) => /*#__PURE__*/React.createElement(Card, {
+  const Kpi = ({ label, valor, sub, cor, alerta, tooltip, onClick, ativo, topo }) => /*#__PURE__*/React.createElement(Card, {
     onClick,
-    style: { ...(alerta ? { borderColor: "#FDE68A", background: "#FFFBEB" } : null), ...(ativo ? { borderColor: cor || "#0F172A", boxShadow: `0 0 0 1px ${cor || "#0F172A"}` } : null) }
+    style: { ...(alerta ? { borderColor: "#FDE68A", background: "#FFFBEB" } : null), ...(ativo ? { borderColor: cor || "#0F172A", boxShadow: `0 0 0 1px ${cor || "#0F172A"}` } : null), ...(topo ? { borderTop: `3px solid ${topo}` } : null) }
   },
     /*#__PURE__*/React.createElement("div", {
       style: { fontSize: 10.5, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 8, display:"flex", alignItems:"center", gap:2 }
@@ -1986,6 +2010,20 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       : new Date(k + "T00:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
 
   // Avisos sob o gráfico: pedidos do período que ainda não têm saída ou finalização (não aparecem nas barras/linhas)
+  const GRAV_NOME = { emergencia: "Vermelho", urgencia: "Amarelo", menor_gravidade: "Verde", agendamento: "Cinza" };
+  const fecharAba = () => setAba(null);
+  const painelAba = aba === "remocao" ? React.createElement(DashPainelLista, {
+      titulo: "Em remoção agora", sub: "cards na coluna “Remoção em andamento” do Kanban", onFechar: fecharAba, vazio: "Nenhuma remoção em andamento.",
+      linhas: cards.filter(c => c.col_id === "andamento").map(c => ({ nome: c.nome || "(sem nome)", ficha: c.ficha_cross || "", texto: `${GRAV_NOME[c.grav] || "Sem prioridade"} · ${c.hosp ? "→ " + c.hosp : "sem hospital de destino"}`, fn: onAbrirCard ? () => onAbrirCard(c.id) : null, rotFn: "abrir card →" })) })
+    : aba === "nao" ? React.createElement(DashPainelLista, {
+      titulo: "Não atendidas no período", sub: "linhas cujo status diz que a remoção não aconteceu, com o motivo", onFechar: fecharAba, vazio: "Nenhuma remoção não atendida no período.",
+      rodape: { rot: "ver a situação de todas as remoções ↓", alvo: "bloco-situacao" },
+      linhas: situacao.filter(c => c.id.startsWith("st:")).flatMap(c => c.itens.map(it => ({ nome: it.nome, ficha: it.ficha, texto: `${c.rotulo} — ${it.texto}`, href: `remocao.html?foco=${encodeURIComponent(it.id)}&campo=${encodeURIComponent(it.campo || "status")}` }))) })
+    : aba === "falhas" ? React.createElement(DashPainelLista, {
+      titulo: "Falhas a corrigir", sub: "o que está errado ou faltando nos registros, por tipo", onFechar: fecharAba, vazio: "Nenhuma falha a corrigir.",
+      rodape: { rot: "ver os casos, com link para corrigir ↓", alvo: "bloco-saneamento" },
+      linhas: problemas.grupos.filter(g => g.tipo === "corrigir" && g.itens.length).sort((x, y) => y.itens.length - x.itens.length).map(g => ({ nome: g.titulo, ficha: "", texto: `${g.itens.length} caso${g.itens.length !== 1 ? "s" : ""}` })) })
+    : null;
   const notasGraf = [];
   const nSemSaida = problemas.n("aguarda_cross") + problemas.n("aguarda_amb");
   const nSemFin = problemas.n("aguarda_cross") + problemas.n("cross_saida_sem_fin");
@@ -2076,10 +2114,18 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     /*#__PURE__*/React.createElement(DashSecao, { id: "sec-agora" },
     /* ══ Alertas do gestor + qualidade dos registros: cada chip leva ao bloco ══ */
     /*#__PURE__*/React.createElement(DashAlertas, {
+      aba, agAberto, agFiltro, painel: painelAba,
+      onTile: id => {
+        if (id === "aguardando" || id === "verm") {   // estes dois abrem a lista de aguardando, que fica logo abaixo
+          const f = id === "verm" ? "vermelhos" : "todos";
+          if (agAberto && agFiltro === f) setAgAberto(false); else { setAgAberto(true); setAgFiltro(f); }
+          setAba(null);
+        } else setAba(x => x === id ? null : id);
+      },
       cards, cfg, hojeIso, sla, rein: reinsercao, qualidade, nCorrigir: qualidade.nCorrigir, emRemocao: cards.filter(c => c.col_id === "andamento").length, naoAtendidas: situacao.filter(c => c.id.startsWith("st:")).reduce((t, c) => t + c.itens.length, 0)
     }),
     /* ══ Pacientes aguardando agora (Kanban): aceite pendente e aceitos sem ambulância ══ */
-    /*#__PURE__*/React.createElement(DashAguardando, { cards, cfg, hojeIso, onAbrirCard, aoVivo: isAdmin, Titulo, fmtMin }),
+    /*#__PURE__*/React.createElement(DashAguardando, { cards, cfg, hojeIso, onAbrirCard, aoVivo: isAdmin, aberto: agAberto, onToggle: () => setAgAberto(v => !v), filtro: agFiltro, onFiltro: setAgFiltro, Titulo, fmtMin }),
     /* ══ Pulso operacional — única seção que vem do Kanban (cartões clicáveis) ══ */
     /*#__PURE__*/React.createElement("div", { id: "bloco-fila" }, /*#__PURE__*/React.createElement(DashFilaKanban, {
       cols, cards, Card, Num,
@@ -2088,11 +2134,11 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     ),
     /*#__PURE__*/React.createElement(DashSecao, { id: "sec-atrasos" },
     /* ══ Onde o tempo é gasto: as etapas do caminho e o tempo total ══ */
-    /*#__PURE__*/React.createElement(DashArvore, { etapas: arvore.etapas, total: arvore.total, Titulo, fmtMin }),
+    
     /* ══ Cumprimento da meta de tempo por gravidade (metas em Configurações) ══ */
     /*#__PURE__*/React.createElement(DashSLA, { sla, semGrav: slaSemGrav, Titulo, fmtMin }),
     /* ══ Tempos do caminho da remoção: 5 intervalos, clique para ver por gravidade ══ */
-    /*#__PURE__*/React.createElement(DashTempos, { intervalos, Card, Kpi, Titulo, fmtMin }),
+    /*#__PURE__*/React.createElement(DashTempos, { intervalos, total: tempoTotal, Card, Kpi, Titulo, fmtMin }),
     /* ══ Protocolo de AVC (Livro de Remoção): meta de saída em até 1h da finalização da CROSS ══ */
     /*#__PURE__*/React.createElement(DashProtocoloAVC, { protocolos, totalRemocoes: dados.length, Card, Kpi, Titulo, Vazio, fmtMin }),
     ),
@@ -2154,9 +2200,9 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Ambulância avançada",
         valor: gAmb.informados ? `${((gAmb.itens.find(i => i.canonico === "AVANÇADA")?.n || 0) / gAmb.informados * 100).toFixed(0)}%` : "—",
-        sub: `${gAmb.informados} de ${gAmb.total} informados`,
+        sub: (() => { const nAv = gAmb.itens.find(i => i.canonico === "AVANÇADA")?.n || 0; return `${nAv} avançada${nAv !== 1 ? "s" : ""} de ${gAmb.informados} com tipo informado · ${gAmb.total - gAmb.informados} sem tipo`; })(),
         alerta: gAmb.cobertura < 80,
-        tooltip: "% de remoções que usaram SAV (Suporte Avançado de Vida). Inclui UTI móvel, que a gestão decidiu contar como Avançada (01/10/2026): na planilha o valor pode aparecer como UTI. Calculado só sobre registros com tipo de ambulância preenchido — o denominador aparece abaixo." }),
+        tooltip: "A porcentagem é: ambulâncias avançadas ÷ linhas que têm o tipo de ambulância preenchido (não ÷ o total de linhas). As linhas sem tipo ficam fora da conta, e o número delas aparece abaixo. SAV = Suporte Avançado de Vida; inclui UTI móvel, que a gestão decidiu contar como Avançada (01/10/2026): na planilha o valor pode aparecer como UTI." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Permaneceu no destino", valor: perm.n ? `${perm.pct.toFixed(0)}%` : "—",
         sub: `${perm.sim} de ${perm.n} linhas · ${perm.semInfo} sem registro`,
