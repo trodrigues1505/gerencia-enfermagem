@@ -103,7 +103,18 @@
     "Resolvido com recursos locais": [
       "RESOLVIDO COM RECURSOS LOCAIS", "RESOLVIDO LOCALMENTE",
       "NAO REALIZADA", "REMOCAO NAO REALIZADA"
-    ]
+    ],
+    /* Os demais status que a lista da planilha oferece (S_OPTS em remocao.html). Antes caíam em "Não classificado". */
+    "Cancelada pela CROSS": ["CANCELADA PELO CROSS", "CANCELADA PELA CROSS", "FICHA CANCELADA PELO CROSS"],
+    "Alta hospitalar": ["ALTA HOSPITALAR", "ALTA HOSPITAL", "ALTA", "ALTA MEDICA"],
+    "Evasão / alta a pedido": ["EVASAO ALTA A PEDIDO", "EVASAO", "EVADIU", "EVASAO ALTA PEDIDO"],
+    "Não realizada (ambulância indisponível)": ["REMOCAO NAO REALIZADA POR INDISPONIBILIDADE DE AMBULANCIA"],
+    "Sem atualização médica há 48 horas": ["CASO SEM ATUALIZACAO MEDICA HA 48 HORAS"],
+    "Reinserida": ["REINSERIDA", "REINSERIDO", "FICHA REINSERIDA"],
+    "Paciente instável / remoção não liberada": ["PACIENTE INSTAVEL REMOCAO NAO LIBERADA", "PACIENTE INSTAVEL"],
+    "Hemodiálise": ["HEMODIALISE"],
+    "Agendamento (Secretaria da Saúde)": ["AGENDAMENTO SECRETARIA DA SAUDE"],
+    "Outro": ["OUTRO"]
   });
 
   /* Status que contam como desfecho fechado (para taxa de conclusão). */
