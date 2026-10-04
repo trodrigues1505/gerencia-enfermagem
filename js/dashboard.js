@@ -407,9 +407,8 @@ const DASH_VOL_SERIES = [
   { id: "finalizacoes", nome: "Finalizações da CROSS", cor: "#0F766E", tracejada: true }
 ];
 
-function DashVolume({ serie, escala, rotulo, rotuloLongo, entrou, totais, notas, reconc, Titulo, Vazio }) {
+function DashVolume({ serie, escala, rotulo, rotuloLongo, entrou, totais, notas, Titulo, Vazio }) {
   const h = React.createElement;
-  const [lista, setLista] = useState(null);
   const [ocultas, setOcultas] = useState({});
   const [hover, setHover] = useState(null);
   const [larg, setLarg] = useState(720);
@@ -537,27 +536,6 @@ function DashVolume({ serie, escala, rotulo, rotuloLongo, entrou, totais, notas,
         areas)),
     notas && notas.length > 0 && h("div", { style: { fontSize: 11, color: "#94A3B8", lineHeight: 1.6, marginTop: 8 } },
       notas.map((t, i) => h("div", { key: i }, t))),
-    reconc && totais.pedidos !== totais.finalizacoes && (() => {
-      const A = reconc.A, B = reconc.B, nA = A.semFicha.length + A.semDataSol.length + A.solImpossivel.length + A.solForaPeriodo, nB = B.semFinalizacao + B.finImpossivel.length + B.finForaPeriodo;
-      const linha = (n, texto, itens, titulo) => n > 0 && h("li", { key: titulo || String(texto), style: { margin: "3px 0" } }, h("b", null, n), " ", Array.isArray(texto) ? (n === 1 ? texto[0] : texto[1]) : texto,
-        itens && itens.length > 0 && h("button", { type: "button", onClick: () => setLista({ titulo, itens }), style: { marginLeft: 8, background: "none", border: "none", color: "#B45309", fontWeight: 700, fontSize: 11.5, cursor: "pointer", padding: 0, fontFamily: "inherit" } }, "ver quais →"));
-      return h("div", { style: { marginTop: 12, padding: "12px 14px", background: "#F8FAFC", borderRadius: 12, fontSize: 12, color: "#475569", lineHeight: 1.6 } },
-        h("div", { style: { fontWeight: 700, color: "#0F172A", marginBottom: 4 } }, `Por que há ${totais.pedidos} pedidos à CROSS e ${totais.finalizacoes} finalizações?`),
-        h("div", null, "Os dois números não precisam ser iguais, porque cada um é contado pelo seu próprio dia: o pedido pelo dia em que foi feito e a finalização pelo dia em que a CROSS respondeu. Um pedido do fim do período pode ser finalizado depois dele, e uma finalização do começo pode ser de um pedido feito antes. Além disso, só conta como pedido a linha que tem o número da ficha CROSS e uma data de solicitação válida; já a finalização conta qualquer linha com data de finalização."),
-        nA > 0 && h("div", { style: { marginTop: 8, fontWeight: 600, color: "#0F172A" } }, `Finalizações cujo pedido não está entre os ${totais.pedidos} (+${nA}):`),
-        nA > 0 && h("ul", { style: { margin: "2px 0 0", paddingLeft: 18 } },
-          linha(A.semFicha.length, ["finalizada em linha sem ficha CROSS (não conta como pedido)", "finalizadas em linhas sem ficha CROSS (não contam como pedido)"], A.semFicha, "Finalizadas, mas sem ficha CROSS"),
-          linha(A.semDataSol.length, ["finalizada em linha sem data de solicitação", "finalizadas em linhas sem data de solicitação"], A.semDataSol, "Finalizadas, mas sem data de solicitação"),
-          linha(A.solImpossivel.length, ["finalizada em linha com data de solicitação impossível", "finalizadas em linhas com data de solicitação impossível"], A.solImpossivel, "Data de solicitação impossível"),
-          linha(A.solForaPeriodo, ["é de um pedido feito fora do período escolhido (é normal)", "são de pedidos feitos fora do período escolhido (é normal)"])),
-        nB > 0 && h("div", { style: { marginTop: 8, fontWeight: 600, color: "#0F172A" } }, `Pedidos cuja finalização não está entre as ${totais.finalizacoes} (−${nB}):`),
-        nB > 0 && h("ul", { style: { margin: "2px 0 0", paddingLeft: 18 } },
-          linha(B.semFinalizacao, ["pedido ainda sem data de finalização (a CROSS ainda não respondeu, ou falta preencher)", "pedidos ainda sem data de finalização (a CROSS ainda não respondeu, ou falta preencher)"]),
-          linha(B.finImpossivel.length, ["pedido com data de finalização impossível", "pedidos com data de finalização impossível"], B.finImpossivel, "Data de finalização impossível"),
-          linha(B.finForaPeriodo, ["foi finalizado fora do período escolhido (é normal)", "foram finalizados fora do período escolhido (é normal)"])),
-        h("div", { style: { marginTop: 8, color: "#0F172A" } }, `Conta: ${totais.pedidos} ${nA ? "+ " + nA + " " : ""}${nB ? "− " + nB + " " : ""}= ${totais.finalizacoes}.`),
-        lista && h(DashListaModal, { titulo: lista.titulo, subtitulo: "linhas que explicam a diferença, com link para corrigir na planilha", itens: lista.itens, onClose: () => setLista(null) }));
-    })(),
     h(DashLegenda, { titulo: "O que cada série quer dizer", itens: [
       ["Saídas (barras)", "Quantas vezes a ambulância saiu da Santa Casa, contadas pelo dia da saída. Conta qualquer linha, CROSS ou outras."],
       ["Pedidos à CROSS (linha laranja)", "Quantos pedidos foram feitos à CROSS, contados pelo dia do pedido. Só linhas com o número da ficha CROSS."],
@@ -641,7 +619,7 @@ const DASH_PROBLEMAS_DEF = [
   ajuda: "O valor não está na lista oficial e aparece como “Não classificado” nos gráficos. Troque por um valor da lista, na planilha."
 }))).concat([
   { id: "vazio_tipo_amb", secao: "vazios", tipo: "corrigir", titulo: "Ambulância saiu sem tipo de ambulância",
-    ajuda: "Sem o tipo (Básica ou Avançada) a saída não entra no indicador de ambulância avançada. Preencha TIPO AMB." },
+    ajuda: "Sem o tipo (Básica ou Avançada) a saída não entra no gráfico de tipo de ambulância. Preencha TIPO AMB." },
   { id: "vazio_gravidade", secao: "vazios", tipo: "corrigir", titulo: "Sem gravidade",
     ajuda: "A linha fica de fora dos gráficos de gravidade e dos tempos por gravidade. Preencha GRAVIDADE (prioridade da ficha: 1 Vermelho, 2 Amarelo, 3 Verde, 4 Cinza)." },
   { id: "vazio_destino", secao: "vazios", tipo: "corrigir", titulo: "Finalizada pela CROSS, sem instituição de destino",
@@ -955,7 +933,7 @@ function DashDestinos({ destinos, Titulo, fmtMin }) {
 }
 
 /* ─── Permaneceu no destino, cruzado com outros campos ───────────────────────── */
-function DashPermanece({ tempos, C, Titulo, fmtMin }) {
+function DashPermanece({ tempos, C, geral, Titulo, fmtMin }) {
   const h = React.createElement;
   const [dim, setDim] = useState("destino");
   const DIMS = [["destino", "Destino", "instituicao_destino", "Sem destino informado"], ["especialidade", "Especialidade", "especialidade", "Sem especialidade"],
@@ -978,6 +956,9 @@ function DashPermanece({ tempos, C, Titulo, fmtMin }) {
       extra: "campo “Permaneceu” da planilha",
       tooltip: "Quantos pacientes ficaram no destino, por categoria (destino, especialidade, tipo de ambulância ou gravidade). Linha sem resposta Sim/Não aparece como “sem registro”. O tempo fora é o do meio (mediana), da saída até a volta, separado entre quem ficou e quem voltou."
     }, "Permaneceu no destino, por categoria"),
+    geral && geral.n > 0 && h("div", { style: { fontSize: 12, color: "#475569", marginBottom: 10, lineHeight: 1.6 } },
+      "No total do período: ", h("b", { style: { color: "#0F172A" } }, `${geral.pct.toFixed(0)}%`), ` permaneceram no destino (${geral.sim} de ${geral.n} linhas)`,
+      geral.semInfo > 0 && h("span", { style: { color: geral.semInfo / geral.n > 0.2 ? "#B45309" : "#94A3B8" } }, ` · ${geral.semInfo} sem registro, que não contam como Sim nem como Não`), "."),
     h("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 } },
       DIMS.map(([id, rot]) => h("button", { key: id, type: "button", "aria-pressed": dim === id, onClick: () => setDim(id),
         style: { padding: "5px 12px", borderRadius: 8, border: "none", fontSize: 12, fontFamily: "inherit", cursor: "pointer", fontWeight: dim === id ? 650 : 450, background: dim === id ? "#0F172A" : "#F1F5F9", color: dim === id ? "#fff" : "#64748B" } }, rot))),
@@ -988,8 +969,7 @@ function DashPermanece({ tempos, C, Titulo, fmtMin }) {
         h("span", { style: { fontSize: 12.5, fontWeight: 600, color: "#0F172A", minWidth: 0 } }, g.nome),
         cel(g.n), cel(g.sim), cel(g.n ? Math.round(g.sim / g.n * 100) + "%" : "—", { fontWeight: 700 }),
         cel(fmtMin(dashMediana(g.foraSim)), { color: "#0F766E" }), cel(fmtMin(dashMediana(g.foraNao)), { color: "#0F766E" }))),
-      lista.length > 15 && h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "8px 6px 0" } }, `Mostrando as 15 maiores de ${lista.length} categorias.`),
-      h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "8px 6px 0" } }, `Sem registro de permanência: ${lista.reduce((t, g) => t + g.sem, 0)} de ${tempos.length} linhas.`)),
+      lista.length > 15 && h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "8px 6px 0" } }, `Mostrando as 15 maiores de ${lista.length} categorias.`)),
     lista.length > 0 && h(DashLegenda, { itens: [
       ["Destino, Especialidade, Tipo de ambulância, Gravidade", "Os botões de cima escolhem como agrupar as remoções. Cada linha da tabela é uma categoria do grupo escolhido."],
       ["Linhas", "Quantas remoções há na categoria."],
@@ -1148,8 +1128,7 @@ function DashAlertas({ cards, cfg, hojeIso, sla, rein, qualidade, nCorrigir, emR
     { id: "verm", alvo: "bloco-aguardando", n: a.acimaVerm === null ? null : a.acimaVerm.length, rot: a.acimaVerm === null ? "Vermelhos: limite não cadastrado" : `vermelho aguardando há mais de ${a.limVerm} min` },
     { id: "sla", alvo: "bloco-sla", n: algumaMeta ? foraSla : null, rot: algumaMeta ? "fora da meta de tempo" : "Metas de tempo não cadastradas" },
     { id: "rein", alvo: "bloco-reinsercao", n: reinTotal, rot: reinTotal === 1 ? "reinserção no período" : "reinserções no período", neutro: true },
-    { id: "parado", alvo: "bloco-aguardando", n: a.semAtualizacao === null ? null : a.semAtualizacao.length, rot: a.semAtualizacao === null ? "Card parado: limite não cadastrado" : `card sem atualização há mais de ${a.limAtual} h` },
-    { id: "dados", alvo: "bloco-saneamento", n: nCorrigir, rot: nCorrigir === 1 ? "falha de dados a corrigir" : "falhas de dados a corrigir" }
+    { id: "parado", alvo: "bloco-aguardando", n: a.semAtualizacao === null ? null : a.semAtualizacao.length, rot: a.semAtualizacao === null ? "Card parado: limite não cadastrado" : `card sem atualização há mais de ${a.limAtual} h` }
   ];
   const ir = onIr || (alvo => { const el = document.getElementById(alvo); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" }); });
   const nVerm = a.itens.filter(i => i.vermelho).length;
@@ -1678,31 +1657,6 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   }, [remocoes, limInf, limSup]);
 
   const totaisGraf = { saidas: eventos.saidas.length, pedidos: eventos.pedidos.length, finalizacoes: eventos.finalizacoes.length };
-  // Pedido à CROSS = linha COM ficha e com data de solicitação dentro do período. Finalização = qualquer linha com data de finalização no
-  // período. Aqui se separa, linha por linha, o que faz um número diferir do outro.
-  const reconc = useMemo(() => {
-    const dentro = d => !!d && d >= limInf && d <= limSup;
-    const A = { semFicha: [], semDataSol: [], solImpossivel: [], solForaPeriodo: 0 };      // finalizações cujo pedido não está contado
-    const B = { semFinalizacao: 0, finImpossivel: [], finForaPeriodo: 0 };                 // pedidos cuja finalização não está contada
-    remocoes.forEach(r => {
-      const p = dashDiaIso(r.data_solicitacao), f = dashDiaIso(r.data_resposta_cross), ficha = dashTemFicha(r);
-      const contaPed = ficha && dentro(p), contaFin = dentro(f);
-      const item = (campo, texto) => ({ id: r.id, campo, nome: r.nome_paciente || "(sem nome)", ficha: r.ficha_cross || "", texto });
-      const imp = d => d < DASH_DATA_MIN || d > hojeIso;
-      if (contaFin && !contaPed) {
-        if (!ficha) A.semFicha.push(item("ficha_cross", `Finalizada em ${dashFmtBR(f)}, mas a linha não tem ficha CROSS: não conta como pedido à CROSS.`));
-        else if (!p) A.semDataSol.push(item("data_solicitacao", `Finalizada em ${dashFmtBR(f)}, mas sem data de solicitação: o pedido não tem dia.`));
-        else if (imp(p)) A.solImpossivel.push(item("data_solicitacao", `Finalizada em ${dashFmtBR(f)}, mas a data de solicitação (${dashFmtBR(p)}) é impossível.`));
-        else A.solForaPeriodo++;
-      }
-      if (contaPed && !contaFin) {
-        if (!f) B.semFinalizacao++;
-        else if (imp(f)) B.finImpossivel.push(item("data_resposta_cross", `Pedido em ${dashFmtBR(p)}, mas a data de finalização (${dashFmtBR(f)}) é impossível.`));
-        else B.finForaPeriodo++;
-      }
-    });
-    return { A, B };
-  }, [remocoes, limInf, limSup, hojeIso]);
 
   const serie = useMemo(() => {
     const chave = d => {
@@ -1987,7 +1941,6 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
   const gGrav   = useMemo(() => ag("gravidade"),           [dados]);
   const gEspec  = useMemo(() => ag("especialidade"),       [dados]);
-  const gHosp   = useMemo(() => ag("instituicao_destino"), [dados]);
   const gAmb    = useMemo(() => ag("tipo_ambulancia"),     [dados]);
   const gStatus = useMemo(() => ag("status"),              [dados]);
 
@@ -2356,8 +2309,8 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const nSemSaida = problemas.n("aguarda_cross") + problemas.n("aguarda_amb");
   const nSemFin = problemas.n("aguarda_cross") + problemas.n("cross_saida_sem_fin");
   const nSaidaSemData = problemas.n("saida_sem_data");
-  if (nSemSaida > 0) notasGraf.push(`${nSemSaida} de ${tipos.cross} pedidos à CROSS do período ainda sem saída de ambulância registrada.`);
-  if (nSemFin > 0) notasGraf.push(`${nSemFin} de ${tipos.cross} pedidos à CROSS do período sem finalização da CROSS.`);
+  if (nSemSaida > 0) notasGraf.push(`${nSemSaida} de ${tipos.cross} remoções CROSS do período (linhas com ficha) ainda sem saída de ambulância registrada.`);
+  if (nSemFin > 0) notasGraf.push(`${nSemFin} de ${tipos.cross} remoções CROSS do período (linhas com ficha) sem finalização da CROSS.`);
   if (nSaidaSemData > 0) notasGraf.push(`${nSaidaSemData} linha${nSaidaSemData !== 1 ? "s" : ""} com horário de saída mas sem data de saída: não entra${nSaidaSemData !== 1 ? "m" : ""} nas barras.`);
   const nSaidaDeduz = problemas.n("saida_deduzida");
   if (nSaidaDeduz > 0) notasGraf.push(`${nSaidaDeduz} saída${nSaidaDeduz !== 1 ? "s" : ""} com data deduzida pela planilha (entra${nSaidaDeduz !== 1 ? "m" : ""} nas barras, mas vale confirmar a data).`);
@@ -2407,7 +2360,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     /*#__PURE__*/React.createElement("div", { className: "dash-print-only", style: { marginBottom: 14, paddingBottom: 8, borderBottom: "2px solid #0F172A" } },
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#0F172A" } }, "Gerência de Enfermagem · Santa Casa de Francisco Morato — Painel de regulação"),
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11.5, color: "#475569", marginTop: 3 } },
-        `${periodo === "tudo" ? "Todos os registros" : "Período"}${deDia ? ": " + fmtDia(deDia) + (ateDia && ateDia !== deDia ? " a " + fmtDia(ateDia) : "") : ""} · ${totaisGraf.saidas} saídas de ambulância · ${dados.length} linhas · gerado em ${new Date().toLocaleString("pt-BR")}`)),
+        `${periodo === "tudo" ? "Todos os registros" : "Período"}${deDia ? ": " + fmtDia(deDia) + (ateDia && ateDia !== deDia ? " a " + fmtDia(ateDia) : "") : ""} · ${totaisGraf.saidas} saídas de ambulância${diasNoPeriodo ? " (" + (totaisGraf.saidas / diasNoPeriodo).toFixed(1).replace(".", ",") + " por dia)" : ""} · ${dados.length} linhas · gerado em ${new Date().toLocaleString("pt-BR")}`)),
 
     /* ══ Controles ══ */
     /*#__PURE__*/React.createElement("div", {
@@ -2433,7 +2386,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       }, [["dia", "Diária"], ["semana", "Semanal"], ["mes", "Mensal"]].map(([i, t]) => btnEscala(i, t))),
 
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginLeft: "auto" } },
-        totaisGraf.saidas, " saídas de ambulância · ", dados.length, " linhas",
+        totaisGraf.saidas, " saídas de ambulância", diasNoPeriodo ? " (" + (totaisGraf.saidas / diasNoPeriodo).toFixed(1).replace(".", ",") + " por dia)" : "", " · ", dados.length, " linhas",
         deDia && ` · ${fmtDia(deDia)}${ateDia && ateDia !== deDia ? " a " + fmtDia(ateDia) : ""}`,
         atualizando && " · atualizando…"),
       /*#__PURE__*/React.createElement("button", { type: "button", onClick: () => setVerGlossario(true), title: "Explica, em palavras simples, cada termo do painel (mediana, P95, fora da unidade…).",
@@ -2492,7 +2445,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     /* ══ Volume: saídas (barras) + pedidos à CROSS e finalizações da CROSS (linhas) ══ */
     /*#__PURE__*/React.createElement(DashVolume, {
       serie, escala: escalaEfetiva, rotulo: rotuloSerie, rotuloLongo: rotuloLongoSerie, entrou,
-      totais: totaisGraf, notas: notasGraf, reconc, Titulo, Vazio
+      totais: totaisGraf, notas: notasGraf, Titulo, Vazio
     }),
     ),
     /*#__PURE__*/React.createElement(DashSecao, { id: "sec-problemas", ativa: ativaSec("sec-problemas") },
@@ -2531,28 +2484,8 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
         /*#__PURE__*/React.createElement("div", { style: { flex: 1, background: "#CBD5E1" } })),
       !tudo && anomalas.some(r => !r.data_solicitacao) && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#B45309", marginTop: 8 } },
         `${anomalas.filter(r => !r.data_solicitacao).length} linha${anomalas.filter(r => !r.data_solicitacao).length !== 1 ? "s" : ""} da planilha sem data de solicitação não pertence${anomalas.filter(r => !r.data_solicitacao).length !== 1 ? "m" : ""} a período nenhum e não entra${anomalas.filter(r => !r.data_solicitacao).length !== 1 ? "m" : ""} nestes totais (veja Saneamento de falhas).`)),
-    /* ══ KPIs do período (remocoes) ══ */
-    /*#__PURE__*/React.createElement("div", {
-      style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 12, marginBottom: 22 }
-    },
-      /*#__PURE__*/React.createElement(Kpi, {
-        label: "Saídas de ambulância", valor: totaisGraf.saidas,
-        sub: diasNoPeriodo ? `${(totaisGraf.saidas / diasNoPeriodo).toFixed(1)} por dia` : "no período",
-        tooltip: "Quantas vezes a ambulância saiu da Santa Casa no período, em qualquer linha (CROSS ou outras). Conta no dia da saída; linha sem saída registrada não entra. Como os pedidos contam no dia do pedido e as saídas no dia da saída, em períodos curtos os dois números podem não ser iguais (em Tudo, são)." }),
-      /*#__PURE__*/React.createElement(Kpi, {
-        label: "Ambulância avançada",
-        valor: gAmb.informados ? `${((gAmb.itens.find(i => i.canonico === "AVANÇADA")?.n || 0) / gAmb.informados * 100).toFixed(0)}%` : "—",
-        sub: (() => { const nAv = gAmb.itens.find(i => i.canonico === "AVANÇADA")?.n || 0; return `${nAv} avançada${nAv !== 1 ? "s" : ""} de ${gAmb.informados} com tipo informado · ${gAmb.total - gAmb.informados} sem tipo`; })(),
-        alerta: gAmb.cobertura < 80,
-        tooltip: "Das saídas em que o tipo de ambulância foi anotado, qual a porcentagem de ambulâncias avançadas (com médico a bordo, para casos graves). Conta só as linhas com o tipo preenchido; as sem tipo ficam de fora e aparecem no cartão. A UTI móvel conta como avançada." }),
-      /*#__PURE__*/React.createElement(Kpi, {
-        label: "Permaneceu no destino", valor: perm.n ? `${perm.pct.toFixed(0)}%` : "—",
-        sub: `${perm.sim} de ${perm.n} linhas · ${perm.semInfo} sem registro`,
-        alerta: perm.n > 0 && perm.semInfo / perm.n > 0.2,
-        tooltip: "De todas as linhas do período, a porcentagem em que o paciente ficou no hospital de destino e não voltou à Santa Casa. Linha sem resposta (Sim/Não) conta como “não permaneceu”, então o valor real pode ser maior." })
-    ),
     /*#__PURE__*/React.createElement(DashDestinos, { destinos, Titulo, fmtMin }),
-    /*#__PURE__*/React.createElement(DashPermanece, { tempos: temposLinha, C, Titulo, fmtMin }),
+    /*#__PURE__*/React.createElement(DashPermanece, { tempos: temposLinha, C, geral: perm, Titulo, fmtMin }),
     /* ══ Distribuições ══ */
     /*#__PURE__*/React.createElement("div", {
       style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(310px,1fr))", gap: 14 }
@@ -2597,16 +2530,6 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
             key: "nc", label: "Não classificado", n: i.n, pct: i.pct,
             max: Math.max(...gEspec.itens.map(x => x.n)), cor: "#CBD5E1" })))),
 
-      /* Hospitais */
-      /*#__PURE__*/React.createElement(Card, null,
-        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gHosp }), tooltip: "Para onde a Santa Casa mais encaminha os pacientes: os hospitais e unidades de destino." }, "Instituições de destino"),
-        gHosp.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
-        gHosp.itens.map(i => /*#__PURE__*/React.createElement(Barra, {
-          key: i.canonico,
-          label: i.canonico === (C && C.NAO_CLASSIFICADO) ? "Não classificado" : i.canonico,
-          n: i.n, pct: i.pct, max: gHosp.itens[0].n,
-          cor: i.canonico === (C && C.NAO_CLASSIFICADO) ? "#CBD5E1" : "#0EA5E9" }))),
-
       /* Status */
       /*#__PURE__*/React.createElement("div", { id: "bloco-desfecho", style: { display: "contents" } }, /*#__PURE__*/React.createElement(Card, null,
         /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gStatus }), tooltip: "O que aconteceu com cada pedido, segundo o status da planilha: finalizada pela CROSS, cancelada, paciente evadiu, resolvido no próprio hospital etc." }, "Desfecho"),
@@ -2619,11 +2542,13 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
       /* Ambulância */
       /*#__PURE__*/React.createElement(Card, null,
-        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gAmb }), tooltip: "Básica: técnico e motorista. Avançada: tem médico a bordo, usada em casos graves. Uma porcentagem alta de avançadas indica uma demanda de pacientes mais graves." }, "Tipo de ambulância"),
+        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gAmb }), tooltip: "Básica: técnico e motorista. Avançada: tem médico a bordo, usada em casos graves; a UTI móvel conta como avançada. A porcentagem é sobre as linhas que têm o tipo preenchido (o número aparece no canto do cartão); as linhas sem tipo ficam de fora." }, "Tipo de ambulância"),
         gAmb.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
         gAmb.itens.map(i => /*#__PURE__*/React.createElement(Barra, {
           key: i.canonico, label: i.canonico === (C && C.NAO_CLASSIFICADO) ? "Outro / não classificado" : i.canonico, n: i.n, pct: i.pct, max: gAmb.itens[0].n,
-          cor: i.canonico === "AVANÇADA" ? "#F59E0B" : "#64748B" })))
+          cor: i.canonico === "AVANÇADA" ? "#F59E0B" : "#64748B" })),
+        gAmb.total - gAmb.informados > 0 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: gAmb.cobertura < 80 ? "#B45309" : "#94A3B8", marginTop: 8, lineHeight: 1.5 } },
+          `${gAmb.total - gAmb.informados} linha${gAmb.total - gAmb.informados !== 1 ? "s" : ""} sem tipo de ambulância ficam fora desta conta${gAmb.cobertura < 80 ? ", então a porcentagem de avançadas pode estar subestimada" : ""}.`))
     ),
     ),
     /*#__PURE__*/React.createElement(DashSecao, { id: "sec-excecoes", ativa: ativaSec("sec-excecoes") },
