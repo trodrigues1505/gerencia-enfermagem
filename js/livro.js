@@ -198,6 +198,13 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   const [loadingT,setLoadingT]=useState(false);
   const [erroT,setErroT]=useState(null);
   const [confirmIgnorar,setConfirmIgnorar]=useState(null);
+  const [confirmApagar,setConfirmApagar]=useState(null);   // registro que a administração está prestes a apagar
+  const [apagarMotivo,setApagarMotivo]=useState("");
+  const [apagarErro,setApagarErro]=useState("");
+  const [apagando,setApagando]=useState(false);
+  const [mostrarApagados,setMostrarApagados]=useState(false);   // aba Todos: lista dos apagados (só administração)
+  const [apagados,setApagados]=useState([]);
+  const [restaurando,setRestaurando]=useState(null);
   const [match,setMatch]=useState(null);
   const [vinculando,setVinculando]=useState(false);
   const [remocoes,setRemocoes]=useState([]);
@@ -225,7 +232,30 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(null),4500);return()=>clearTimeout(t);},[toast]);
 
   // Traduz o erro cru do PostgREST numa mensagem util para quem esta no plantao.
-  function msgErro(e){
+  // Mensagem de erro do apagar/restaurar: mostra a regra do banco (quem pode, motivo obrigatório, registro já apagado) em vez da genérica.
+function msgErroApagar(e){
+  const t=String(e&&e.message||e||"");
+  console.error("[LivroSaida] apagar/restaurar:",t);
+  try{const o=JSON.parse(t);if(o&&typeof o.message==="string"&&/apaga|apagado|motivo|administra/i.test(o.message))return o.message;}catch(_){}
+  if(/^O servidor não confirmou/.test(t))return t;
+  if(t.includes("Failed to fetch")||t.includes("NetworkError"))return "Sem conexão com o servidor. Tente de novo.";
+  if(/apagado_em|apagado_motivo/.test(t)&&/does not exist|PGRST204|column/i.test(t))return "O banco ainda não foi atualizado para apagar registros (falta rodar o SQL de 04/10, seção 9). Avise a coordenação.";
+  if(t.includes("42501")||t.includes("row-level security"))return "Sem permissão: só a administração apaga ou restaura registros do Livro.";
+  return "Não foi possível concluir. Detalhe técnico no console.";
+}
+// Filtro "não apagado". Se o banco ainda não tem a coluna `apagado_em` (SQL de 04/10 não rodado), repete a consulta sem o filtro,
+// para o Livro não parar de funcionar.
+const LS_ATIVOS="apagado_em=is.null";
+async function lsBuscar(caminho,extra){
+  const sep=caminho.includes("?")?"&":"?";
+  let r=await fetch(`${SB_URL}/rest/v1/${caminho}${sep}${LS_ATIVOS}${extra||""}`,{headers:LS_H()});
+  if(!r.ok){
+    const t=await r.clone().text();
+    if(/apagado_em/.test(t))r=await fetch(`${SB_URL}/rest/v1/${caminho}${extra?sep+extra.replace(/^&/,""):""}`,{headers:LS_H()});
+  }
+  return r;
+}
+function msgErro(e){
     const t=String(e&&e.message||e||"");
     // Regra de negócio do banco (ex.: protocolo de AVC sem médico/enfermeiro): mostra a mensagem dela, não a genérica.
     try{const o=JSON.parse(t);if(o&&typeof o.message==="string"&&o.message.startsWith("Protocolo de AVC"))return o.message;}catch(_){}
@@ -252,7 +282,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   async function loadPendentes(){
     setLoadingP(true);setErroP(null);
     try{
-      const r=await fetch(`${SB_URL}/rest/v1/livro_saida?status_vinculo=eq.pendente&order=created_at.desc`,{headers:LS_H()});
+      const r=await lsBuscar("livro_saida?status_vinculo=eq.pendente","&order=created_at.desc");
       if(!r.ok)throw new Error(await r.text());
       const d=await r.json();
       if(!Array.isArray(d))throw new Error("Resposta inesperada do servidor.");
@@ -265,7 +295,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   async function loadAndamento(){
     setLoadingAnd(true);setErroAnd(null);
     try{
-      const r=await fetch(`${SB_URL}/rest/v1/livro_saida?hora_retorno=is.null&order=created_at.asc`,{headers:LS_H()});
+      const r=await lsBuscar("livro_saida?hora_retorno=is.null","&order=created_at.asc");
       if(!r.ok)throw new Error(await r.text());
       const d=await r.json();
       if(!Array.isArray(d))throw new Error("Resposta inesperada do servidor.");
@@ -279,7 +309,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   async function loadTodos(){
     setLoadingT(true);setErroT(null);
     try{
-      const r=await fetch(`${SB_URL}/rest/v1/livro_saida?order=created_at.desc&limit=500`,{headers:LS_H()});
+      const r=await lsBuscar("livro_saida?select=*","&order=created_at.desc&limit=500");
       if(!r.ok)throw new Error(await r.text());
       const d=await r.json();
       if(!Array.isArray(d))throw new Error("Resposta inesperada do servidor.");
@@ -287,6 +317,47 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
     }catch(e){console.error("[LivroSaida] falha ao carregar histórico:",e);setErroT(msgErro(e));}
     setLoadingT(false);
   }
+
+  // Apagar: o registro some do Livro, das filas e do painel, mas fica guardado (quem apagou, quando e por quê) e a administração
+  // pode restaurar. Quem grava a autoria é o banco (gatilho), e só administrador aprovado consegue.
+  async function handleApagar(){
+    const p=confirmApagar;if(!p)return;
+    const motivo=apagarMotivo.trim();
+    if(motivo.length<3){setApagarErro("Escreva o motivo (pelo menos 3 letras).");return;}
+    setApagando(true);setApagarErro("");
+    try{
+      const r=await fetch(`${SB_URL}/rest/v1/livro_saida?id=eq.${p.id}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=representation"},body:JSON.stringify({apagado_em:new Date().toISOString(),apagado_motivo:motivo})});
+      if(!r.ok)throw new Error(await r.text());
+      const d=await r.json();
+      if(!Array.isArray(d)||d.length===0)throw new Error("O servidor não confirmou: o registro não foi apagado (sem permissão?).");
+      setConfirmApagar(null);setApagarMotivo("");
+      setPendentes(x=>x.filter(y=>y.id!==p.id));setAndamento(x=>x.filter(y=>y.id!==p.id));setTodos(x=>x.filter(y=>y.id!==p.id));
+      if(mostrarApagados)loadApagados();
+      notify("ok",`Registro de ${p.nome_paciente} apagado. A administração pode restaurar na aba Todos.`);
+    }catch(e){setApagarErro(msgErroApagar(e));}
+    setApagando(false);
+  }
+  async function loadApagados(){
+    try{
+      const r=await fetch(`${SB_URL}/rest/v1/livro_saida?apagado_em=not.is.null&order=apagado_em.desc&limit=200`,{headers:LS_H()});
+      if(!r.ok)throw new Error(await r.text());
+      const d=await r.json();setApagados(Array.isArray(d)?d:[]);
+    }catch(e){notify("erro",msgErroApagar(e));}
+  }
+  async function handleRestaurar(p){
+    setRestaurando(p.id);
+    try{
+      const r=await fetch(`${SB_URL}/rest/v1/livro_saida?id=eq.${p.id}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=representation"},body:JSON.stringify({apagado_em:null})});
+      if(!r.ok)throw new Error(await r.text());
+      const d=await r.json();
+      if(!Array.isArray(d)||d.length===0)throw new Error("O servidor não confirmou a restauração.");
+      setApagados(x=>x.filter(y=>y.id!==p.id));
+      notify("ok",`Registro de ${p.nome_paciente} restaurado.`);
+      loadTodos();loadPendentes();loadAndamento();
+    }catch(e){notify("erro",msgErroApagar(e));}
+    setRestaurando(null);
+  }
+  useEffect(()=>{if(mostrarApagados&&podeVincular)loadApagados();},[mostrarApagados]);
 
   // Devolve um registro para a fila de pendentes (desfaz "sem vínculo").
   async function handleReabrir(livroId){
@@ -603,6 +674,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
   const ETAPA=(feita,titulo,qd)=>React.createElement("span",{style:{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,padding:"2px 9px",borderRadius:99,fontWeight:700,background:feita?"#DCFCE7":"#F1F5F9",color:feita?"#15803D":"#94A3B8",border:`1px solid ${feita?"#86EFAC":"#E2E8F0"}`}},
     feita?"✓":"○"," ",titulo,qd?React.createElement("span",{style:{fontWeight:500,marginLeft:2}},qd):null);
   // Botão (só administração) para marcar/desmarcar o protocolo de AVC de um registro já salvo
+  const BTN_APAGAR=p=>podeVincular?React.createElement("button",{key:"del-"+p.id,type:"button",onClick:()=>{setApagarMotivo("");setApagarErro("");setConfirmApagar(p);},title:"Apagar este registro do Livro. Fica guardado e a administração pode restaurar.",style:{background:"none",border:"1px solid #FCA5A5",color:"#B91C1C",borderRadius:7,padding:"5px 10px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}},"Apagar"):null;
   const BTN_AVC=p=>podeVincular?React.createElement("button",{key:"avc-"+p.id,onClick:()=>alternarAVC(p),disabled:salvandoAVC===p.id,
     title:p.protocolo_avc?"Tirar a marca de protocolo de AVC deste registro":"Marcar este registro como protocolo de AVC (esqueceram de marcar ao lançar)",
     style:{flexShrink:0,background:p.protocolo_avc?"#FFF1F2":"none",border:`1px solid ${p.protocolo_avc?"#FDA4AF":"#E2E8F0"}`,color:p.protocolo_avc?"#9F1239":"#475569",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:600,cursor:salvandoAVC===p.id?"not-allowed":"pointer",whiteSpace:"nowrap",opacity:salvandoAVC===p.id?.6:1}},
@@ -620,7 +692,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
     React.createElement("div",{style:{fontSize:11,color:"#94A3B8",marginTop:4}},p.ambulancia||"—",lsHora(p.hora_saida)?React.createElement(React.Fragment,null," · Enf: ",nomeEq(p.enfermeiro)):null));
   const iSR=erro=>({border:`1.5px solid ${erro?"#EF4444":"#E2E8F0"}`,borderRadius:8,padding:"8px 10px",fontSize:13,fontFamily:"inherit",color:"#0F172A",outline:"none",background:"#fff",width:"100%",boxShadow:erro?"0 0 0 3px rgba(239,68,68,.1)":"none"});
 
-  return React.createElement("div",{className:"ls-overlay",onClick:e=>{if(e.target!==e.currentTarget)return;if(match||confirmClose||confirmIgnorar)return;pedirFechar();}},
+  return React.createElement("div",{className:"ls-overlay",onClick:e=>{if(e.target!==e.currentTarget)return;if(match||confirmClose||confirmIgnorar||confirmApagar)return;pedirFechar();}},
     React.createElement("div",{className:"ls-modal",style:{position:"relative"}},
 
       // ── Confirmacao de fechamento (so quando ha texto digitado) ──
@@ -636,6 +708,23 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
       ),
 
       // ── Confirmacao de "Sem vinculo" ──
+      confirmApagar&&React.createElement("div",{className:"ls-match-overlay"},
+        React.createElement("div",{className:"ls-match-box",style:{maxWidth:440},role:"dialog","aria-modal":"true","aria-label":"Apagar registro do Livro"},
+          React.createElement("div",{style:{fontWeight:700,fontSize:15,marginBottom:6,color:"#B91C1C"}},"Apagar este registro do Livro?"),
+          React.createElement("div",{style:{fontSize:12,color:"#475569",lineHeight:1.55,marginBottom:10}},
+            React.createElement("b",null,confirmApagar.nome_paciente),` sai do Livro, das filas e do painel. O registro fica guardado (com quem apagou, quando e o motivo) e a administração pode restaurar na aba Todos.`),
+          confirmApagar.remocao_id&&React.createElement("div",{style:{background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:8,padding:"8px 10px",fontSize:11.5,color:"#92400E",lineHeight:1.5,marginBottom:10}},
+            "Este registro está vinculado a uma linha da planilha de remoção. Apagar aqui NÃO apaga a linha da planilha nem desfaz o que já foi copiado para ela (horários, equipe)."),
+          React.createElement("label",{htmlFor:"ls-apagar-motivo",style:{display:"block",fontSize:11,fontWeight:700,color:"#374151",marginBottom:4}},"Motivo (obrigatório)"),
+          React.createElement("input",{id:"ls-apagar-motivo",type:"text",autoFocus:true,value:apagarMotivo,onChange:e=>{setApagarMotivo(e.target.value);setApagarErro("");},placeholder:"Ex.: lançado em duplicidade, paciente errado, teste",style:{width:"100%",boxSizing:"border-box",border:"1.5px solid "+(apagarErro?"#EF4444":"#E2E8F0"),borderRadius:8,padding:"8px 10px",fontSize:13,fontFamily:"inherit"}}),
+          apagarErro&&React.createElement("div",{role:"alert",style:{fontSize:11.5,color:"#B91C1C",marginTop:6}},apagarErro),
+          React.createElement("div",{style:{display:"flex",gap:8,justifyContent:"flex-end",marginTop:16}},
+            React.createElement("button",{onClick:()=>setConfirmApagar(null),disabled:apagando,style:{background:"none",border:"1px solid #E2E8F0",color:"#374151",borderRadius:8,padding:"8px 18px",fontSize:12,cursor:"pointer"}},"Cancelar"),
+            React.createElement("button",{onClick:handleApagar,disabled:apagando,style:{background:"#B91C1C",color:"#fff",border:"none",borderRadius:8,padding:"8px 18px",fontSize:12,fontWeight:700,cursor:apagando?"default":"pointer",opacity:apagando?0.7:1}},apagando?"Apagando…":"Apagar")
+          )
+        )
+      ),
+
       confirmIgnorar&&React.createElement("div",{className:"ls-match-overlay"},
         React.createElement("div",{className:"ls-match-box",style:{maxWidth:420}},
           React.createElement("div",{style:{fontWeight:700,fontSize:15,marginBottom:6}},"Marcar como sem vínculo?"),
@@ -774,6 +863,16 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
 
         // TAB PENDENTES
         tab==="todos"&&React.createElement("div",null,
+          podeVincular&&React.createElement("div",{style:{display:"flex",justifyContent:"flex-end",marginBottom:8}},
+            React.createElement("label",{style:{fontSize:11.5,color:"#64748B",display:"flex",alignItems:"center",gap:6,cursor:"pointer"}},
+              React.createElement("input",{type:"checkbox",checked:mostrarApagados,onChange:e=>setMostrarApagados(e.target.checked)}),"Mostrar registros apagados")),
+          podeVincular&&mostrarApagados&&React.createElement("div",{style:{background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:10,padding:"10px 12px",marginBottom:12}},
+            React.createElement("div",{style:{fontSize:12,fontWeight:700,color:"#991B1B",marginBottom:6}},`Apagados (${apagados.length})`),
+            apagados.length===0?React.createElement("div",{style:{fontSize:12,color:"#94A3B8"}},"Nenhum registro apagado."):apagados.map(p=>React.createElement("div",{key:p.id,style:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,padding:"7px 0",borderTop:"1px solid #FEE2E2"}},
+              React.createElement("div",{style:{minWidth:0,fontSize:11.5,color:"#7F1D1D",lineHeight:1.5}},
+                React.createElement("b",null,p.nome_paciente)," · ",datasTxt(p)," → ",p.destino,React.createElement("br"),
+                `Apagado${p.apagado_por_nome?" por "+p.apagado_por_nome:""} em ${p.apagado_em?new Date(p.apagado_em).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"?"} — ${p.apagado_motivo||"sem motivo"}`),
+              React.createElement("button",{onClick:()=>handleRestaurar(p),disabled:restaurando===p.id,style:{flexShrink:0,background:"#fff",border:"1px solid #FCA5A5",color:"#B91C1C",borderRadius:7,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}},restaurando===p.id?"Restaurando…":"Restaurar")))),
           loadingT
             ?React.createElement("div",{style:{textAlign:"center",padding:32,color:"#94A3B8"}},"Carregando…")
             :erroT
@@ -804,6 +903,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                           return desatual?React.createElement("button",{onClick:()=>sincronizarPlanilha(p),title:"A planilha de remoção está diferente do Livro (saída, retorno, equipe, Finalizado ou Permaneceu). Clique para copiar o que o Livro registrou.",style:{flexShrink:0,background:"#FFFBEB",border:"1px solid #FDE68A",color:"#92400E",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}},"⟳ Atualizar planilha"):null;})(),
                         BTN_AVC(p),
                         React.createElement("button",{onClick:()=>abrirAuditoria(p),title:"Ver historico de auditoria",style:{background:"none",border:"1px solid #E2E8F0",color:"#475569",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}},"\u{1F5D2} Auditoria"),
+                        BTN_APAGAR(p),
                         podeVincular&&p.status_vinculo==="independente"&&React.createElement("button",{onClick:()=>handleReabrir(p.id),style:{flexShrink:0,background:"none",border:"1px solid #E2E8F0",color:"#1D4ED8",borderRadius:7,padding:"5px 11px",fontSize:11,fontWeight:600,cursor:"pointer"}},"↩ Reabrir")
                     )
                     )
@@ -837,7 +937,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                           jaTemSaida&&React.createElement("div",{style:{fontSize:11,color:"#94A3B8",marginTop:2}},"Téc: ",nomeEq(p.tecnico_auxiliar)," · Méd: ",nomeEq(p.medico)),
                           LS_ASSINATURA(p),
                           LS_ASSINATURA_SAIDA(p),
-                          podeVincular&&React.createElement("div",{style:{marginTop:8}},BTN_AVC(p))
+                          podeVincular&&React.createElement("div",{style:{marginTop:8,display:"flex",gap:6,flexWrap:"wrap"}},BTN_AVC(p),BTN_APAGAR(p))
                         ),
                         !aberto&&React.createElement("button",{onClick:()=>abrirPasso(p),style:{flexShrink:0,background:jaTemSaida?"#16A34A":"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}},jaTemSaida?"↩ Registrar retorno":"🚑 Registrar saída")
                       ),
@@ -912,6 +1012,7 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                         React.createElement("button",{onClick:()=>abrirAuditoria(p),title:"Ver historico de auditoria",style:{background:"none",border:"1px solid #E2E8F0",color:"#475569",borderRadius:7,padding:"5px 10px",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}},"\u{1F5D2}"),
                       podeVincular&&React.createElement("button",{onClick:()=>handleVincularPendente(p),style:{background:"#EFF6FF",border:"1px solid #BFDBFE",color:"#1D4ED8",borderRadius:7,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}},"🔗 Vincular"),
                       podeVincular&&React.createElement("button",{onClick:()=>setConfirmIgnorar(p),style:{background:"none",border:"1px solid #E2E8F0",color:"#64748B",borderRadius:7,padding:"5px 10px",fontSize:11,cursor:"pointer"}},"Sem vínculo"),
+                      BTN_APAGAR(p),
                       !podeVincular&&React.createElement("span",{style:{fontSize:10,fontWeight:700,color:"#B45309",background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:99,padding:"4px 10px",whiteSpace:"nowrap"}},"Aguardando confer\u00EAncia")
                     )
                   )
