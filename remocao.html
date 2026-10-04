@@ -1453,7 +1453,8 @@ function useColResize(initMap){
       if(isNaN(nw))return;
       setWmap(m=>({...m,[field]:nw}));
     }
-    function up(){drag.current=null;window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);}
+    function up(){drag.current=null;window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);
+      window.dispatchEvent(new window.Event("rt-largura-final"));}   // soltou: o App grava agora, sem esperar
     window.addEventListener("mousemove",mv);
     window.addEventListener("mouseup",up);
   }
@@ -1661,10 +1662,25 @@ function App(){
 
   // Salvar larguras no localStorage quando mudam
   const wmapTimer=useRef(null);
+  const wmapAtual=useRef(wmap);
   useEffect(()=>{
+    wmapAtual.current=wmap;
     clearTimeout(wmapTimer.current);
     wmapTimer.current=setTimeout(()=>saveLS(LS_WMAP,wmap),300);
   },[wmap]);
+  // Grava já ao soltar o mouse e quando a página vai fechar, recarregar ou ficar escondida (troca de aba, "Atualizar agora"):
+  // com o atraso de 300 ms, uma largura mexida logo antes de recarregar se perdia.
+  useEffect(()=>{
+    const gravaAgora=()=>{clearTimeout(wmapTimer.current);
+      try{localStorage.setItem(LS_WMAP,JSON.stringify(wmapAtual.current));}
+      catch(e){if(!window.__avisouLargura){window.__avisouLargura=true;push("O navegador não deixou guardar a largura das colunas (armazenamento bloqueado ou cheio). Ela volta ao padrão ao recarregar.","err");}}};
+    const aoEsconder=()=>{if(document.visibilityState==="hidden")gravaAgora();};
+    window.addEventListener("rt-largura-final",gravaAgora);
+    window.addEventListener("pagehide",gravaAgora);
+    window.addEventListener("beforeunload",gravaAgora);
+    document.addEventListener("visibilitychange",aoEsconder);
+    return()=>{window.removeEventListener("rt-largura-final",gravaAgora);window.removeEventListener("pagehide",gravaAgora);window.removeEventListener("beforeunload",gravaAgora);document.removeEventListener("visibilitychange",aoEsconder);};
+  },[]);
 
   // stkLefts calculado matematicamente — determinístico, nunca desalinha
   const STK_FIELDS=['data_solicitacao','horario_solicitacao','ficha_cross','nome_paciente'];
@@ -1690,6 +1706,7 @@ function App(){
     span.style.whiteSpace=prev;
     const newW=Math.max(50,Math.min(400,needed));
     setWmap(m=>({...m,[field]:newW}));
+    setTimeout(()=>window.dispatchEvent(new window.Event("rt-largura-final")),50);
   }
 
   // ── Carga por período ──
