@@ -413,7 +413,7 @@ const GRAV_MAP = {
 };
 function gravInfo(v) { return GRAV_MAP[v] || {label:v||"—",bg:"#F1F5F9",fc:"#475569",bd:"#E2E8F0"}; }
 
-const S_OPTS=["FICHA FINALIZADA","FICHA FINALIZADA VIA CROSS","FICHA FINALIZADA PELA CROSS","FICHA FINALIZADA PELA ORIGEM","FICHA ENCERRADA PELO CROSS","ENCERRADA PELO CROSS","REMOÇÃO CONCLUÍDA","REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA","ALTA HOSPITALAR","RESOLVIDO COM RECURSOS LOCAIS","CASO SEM ATUALIZAÇÃO MÉDICA HÁ 48 HORAS","EVASÃO/ALTA A PEDIDO","CANCELADA PELO CROSS","CANCELADA PELO SOLICITANTE","PACIENTE EM REMOÇÃO","PACIENTE AGUARDANDO AMBULÂNCIA","CONCLUIDO","AGENDAMENTO SECRETARIA DA SAÚDE","HEMODIÁLISE","OUTRO"];
+const S_OPTS=["FICHA FINALIZADA","FICHA FINALIZADA VIA CROSS","FICHA FINALIZADA PELA CROSS","FICHA FINALIZADA PELA ORIGEM","FICHA ENCERRADA PELO CROSS","ENCERRADA PELO CROSS","REMOÇÃO CONCLUÍDA","REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA","ALTA HOSPITALAR","RESOLVIDO COM RECURSOS LOCAIS","CASO SEM ATUALIZAÇÃO MÉDICA HÁ 48 HORAS","EVASÃO/ALTA A PEDIDO","CANCELADA PELO CROSS","CANCELADA PELO SOLICITANTE","PACIENTE EM REMOÇÃO","PACIENTE AGUARDANDO AMBULÂNCIA","CONCLUIDO","AGENDAMENTO SECRETARIA DA SAÚDE","HEMODIÁLISE","REINSERIDA","PACIENTE INSTÁVEL, REMOÇÃO NÃO LIBERADA","OUTRO"];
 const G_OPTS=["VERMELHO","AMARELO","VERDE","CINZA"];   // prioridade CROSS 1,2,3,4 (canon.js, PRIORIDADE_CROSS)
 const ST_OPTS=["EMERGÊNCIA","CLÍNICA MÉDICA","OBSERVAÇÃO ADULTO","OBSERVAÇÃO INFANTIL","CLÍNICA PEDIÁTRICA","UTI","BLOCO MATERNO","EVASÃO","OUTRO"];
 const P_OPTS=["AVALIAÇÃO","EXAME","LEITO","BANCO","ALTA","OUTRO"];
@@ -452,6 +452,7 @@ const COLS = [
   ["data_retorno",            "DATA DO RETORNO DA AMBULÂNCIA",          "DATA RETORNO AMBULÂNCIA","—",      "date","",       "Dia em que a ambulância voltou (pode ser diferente do dia da saída). Fonte: Livro de Saída. \"≈\" = data deduzida pelo horário, não digitada",80],
   ["data_saida_real",         "DATA DA SAÍDA DA AMBULÂNCIA",            "DATA SAÍDA AMB.",   "—",           "date","",       "Dia em que a ambulância realmente SAIU (pode ser diferente do dia em que foi solicitada). Fonte: Livro de Saída. \"≈\" = data deduzida pelo horário, não digitada",80],
   ["min_finalizacao_pedido_amb","TEMPO DA FINALIZAÇÃO CROSS ATÉ A SOLICITAÇÃO DA AMBULÂNCIA","T. FINALIZ. → SOLIC. AMB.","—","ro","","Auto (calculada pelo banco): tempo entre a finalização da ficha na CROSS e a solicitação da ambulância pela Santa Casa. Negativo = solicitação registrada ANTES da finalização. Vazio = falta data ou hora de um dos dois. Não é editável",90],
+  ["prefixo_ambulancia",        "PREFIXO / IDENTIFICAÇÃO DA AMBULÂNCIA",  "PREFIXO AMB.",       "—",           "text","",       "Qual ambulância fez a remoção (prefixo ou placa). Campo novo: ainda sem dados; base para medir uso da frota. Fonte: Livro de Saída"],
 ];
 
 // "SEM MÉDICO" etc.: afirmação explícita de que não houve aquele profissional (definida em canon.js)
@@ -1954,7 +1955,7 @@ function App(){
         return String(v);
       }),fmtMinCol(r.min_finalizacao_pedido_amb)||"",safe(r.protocolo_avc)]);   // Sim / Não / vazio (sem registro)
       const xlsSheet=window.XLSX.utils.aoa_to_sheet([hdr,...data]);
-      const cw={min_finalizacao_pedido_amb:14,data_retorno:12,data_saida_real:12,data_solicitacao:12,horario_solicitacao:8,ficha_cross:18,nome_paciente:26,setor:18,procedimento:14,especialidade:18,diagnostico:24,status:28,gravidade:14,data_resposta_cross:12,horario_resposta_cross:8,instituicao_destino:20,tipo_ambulancia:12,data_saida_ambulancia:12,hora_solic_ambulancia:10,horario_saida_ambulancia:10,tempo_espera:10,observacao:28,enfermeiro:16,tecnico_auxiliar:16,medico:16,horario_retorno:10,duracao_remocao:12};
+      const cw={prefixo_ambulancia:14,min_finalizacao_pedido_amb:14,data_retorno:12,data_saida_real:12,data_solicitacao:12,horario_solicitacao:8,ficha_cross:18,nome_paciente:26,setor:18,procedimento:14,especialidade:18,diagnostico:24,status:28,gravidade:14,data_resposta_cross:12,horario_resposta_cross:8,instituicao_destino:20,tipo_ambulancia:12,data_saida_ambulancia:12,hora_solic_ambulancia:10,horario_saida_ambulancia:10,tempo_espera:10,observacao:28,enfermeiro:16,tecnico_auxiliar:16,medico:16,horario_retorno:10,duracao_remocao:12};
       xlsSheet["!cols"]=[{wch:4},...COLS.map(([f])=>({wch:cw[f]||14})),{wch:18},{wch:14}];
       const wb=window.XLSX.utils.book_new();
       window.XLSX.utils.book_append_sheet(wb,xlsSheet,"Remoções");   // ordem da biblioteca: (livro, planilha, nome)
