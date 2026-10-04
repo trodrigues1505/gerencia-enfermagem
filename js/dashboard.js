@@ -184,7 +184,7 @@ function DashProtocoloAVC({ protocolos, totalRemocoes, Card, Kpi, Titulo, Vazio,
   return /*#__PURE__*/React.createElement("div", { style: { marginBottom: 22 } },
       /*#__PURE__*/React.createElement(Titulo, {
         extra: "meta: sair com médico e enfermeiro em até 1h da finalização da CROSS",
-        tooltip: "Só entram remoções marcadas como Protocolo de AVC no Livro de Remoção (a partir de outubro/2026; antes disso não há registro). O tempo conta da finalização da ficha na CROSS até a saída da ambulância. Cada protocolo aparece em uma categoria só: no horário; atraso porque a Santa Casa demorou a solicitar a ambulância (solicitação feita mais de 1h depois da finalização); ou atraso da ambulância (a Santa Casa solicitou em até 1h, mas a saída passou de 1h). O protocolo só aparece aqui depois que a administração vincula o registro do Livro à planilha de remoção. Clique em um card para ver os casos."
+        tooltip: "O protocolo de AVC (derrame) tem uma meta: a ambulância precisa sair em até 1 hora depois que a CROSS finaliza a ficha. Aqui entram só os pacientes marcados como Protocolo de AVC no Livro de Saída (desde outubro/2026) e que já foram ligados à planilha. Cada paciente cai em um só grupo: saiu no horário; atraso porque a Santa Casa demorou a pedir a ambulância; ou atraso porque a ambulância demorou a sair depois de pedida. Clique em um cartão para ver os pacientes."
       }, "Protocolo de AVC"),
       protocolos.total === 0
         ? /*#__PURE__*/React.createElement(Card, null,
@@ -197,24 +197,24 @@ function DashProtocoloAVC({ protocolos, totalRemocoes, Card, Kpi, Titulo, Vazio,
                 label: "Protocolos de AVC", valor: protocolos.total, cor: "#BE123C",
                 sub: totalRemocoes ? `${(protocolos.total / totalRemocoes * 100).toFixed(1).replace(".", ",")}% das linhas do período · clique para ver` : "clique para ver",
                 ativo: avcSel === "total", onClick: () => setAvcSel(avcSel === "total" ? null : "total"),
-                tooltip: "Total de remoções marcadas como Protocolo de AVC no período selecionado. Clique para ver todos os casos." }),
+                tooltip: "Quantos pacientes de AVC (derrame) houve no período. Clique para ver todos." }),
               /*#__PURE__*/React.createElement(Kpi, {
                 label: "Saíram no horário", valor: protocolos.noHorario, cor: "#15803D",
                 sub: `${(protocolos.noHorario / protocolos.total * 100).toFixed(0)}% dos protocolos · até 1h`,
                 ativo: avcSel === "noHorario", onClick: protocolos.noHorario ? () => setAvcSel(avcSel === "noHorario" ? null : "noHorario") : undefined,
-                tooltip: "A ambulância saiu em até 1 hora depois da finalização da ficha na CROSS." }),
+                tooltip: "A ambulância saiu em até 1 hora depois que a CROSS finalizou a ficha. Cumpriu a meta." }),
               /*#__PURE__*/React.createElement(Kpi, {
                 label: "Atraso · Santa Casa", valor: protocolos.atrasoSantaCasa, cor: "#B45309",
                 sub: "demorou a pedir a ambulância",
                 alerta: protocolos.atrasoSantaCasa > 0,
                 ativo: avcSel === "atrasoSantaCasa", onClick: protocolos.atrasoSantaCasa ? () => setAvcSel(avcSel === "atrasoSantaCasa" ? null : "atrasoSantaCasa") : undefined,
-                tooltip: "Saíram depois de 1h porque a solicitação da ambulância foi feita mais de 1 hora depois da finalização da CROSS." }),
+                tooltip: "Passou de 1 hora porque a Santa Casa demorou mais de 1 hora, depois da finalização da CROSS, para pedir a ambulância." }),
               /*#__PURE__*/React.createElement(Kpi, {
                 label: "Atraso · ambulância", valor: protocolos.atrasoAmbulancia, cor: "#BE123C",
                 sub: "chegou depois de 1h",
                 alerta: protocolos.atrasoAmbulancia > 0,
                 ativo: avcSel === "atrasoAmbulancia", onClick: protocolos.atrasoAmbulancia ? () => setAvcSel(avcSel === "atrasoAmbulancia" ? null : "atrasoAmbulancia") : undefined,
-                tooltip: "Saíram depois de 1h mesmo com a solicitação feita em até 1 hora da finalização da CROSS: o atraso foi do setor de ambulância." })),
+                tooltip: "Passou de 1 hora mesmo com a ambulância pedida em até 1 hora: quem demorou foi a saída da ambulância." })),
 
             /* ── A hora dividida: quanto levou cada lado ── */
             /*#__PURE__*/React.createElement("div", {
@@ -223,11 +223,11 @@ function DashProtocoloAVC({ protocolos, totalRemocoes, Card, Kpi, Titulo, Vazio,
               /*#__PURE__*/React.createElement(Kpi, {
                 label: "Santa Casa · finalização → solicitação", valor: fmtMin(protocolos.santaCasa.mediana), cor: "#B45309",
                 sub: protocolos.santaCasa.n ? `mediana · ${protocolos.santaCasa.n} com horário · maior: ${fmtMin(protocolos.santaCasa.max)}` : "sem protocolos com os dois horários",
-                tooltip: "Tempo mediano entre a finalização da ficha na CROSS e a solicitação da ambulância pela Santa Casa. É a parte da hora que depende da Santa Casa. Solicitação registrada antes da finalização não entra. Só entram protocolos com os dois horários." }),
+                tooltip: "O tempo do meio (mediana) entre a CROSS finalizar a ficha e a Santa Casa pedir a ambulância. É a parte da hora que depende da Santa Casa. Entram só os pacientes que têm os dois horários." }),
               /*#__PURE__*/React.createElement(Kpi, {
                 label: "Ambulância · solicitação → saída", valor: fmtMin(protocolos.ambulancia.mediana), cor: "#BE123C",
                 sub: protocolos.ambulancia.n ? `mediana · ${protocolos.ambulancia.n} com horário · maior: ${fmtMin(protocolos.ambulancia.max)}` : "sem protocolos com os dois horários",
-                tooltip: "Tempo mediano entre a solicitação da ambulância e a saída dela. É a parte da hora que depende do setor de ambulância. A meta de 1h é a soma das duas partes: se a Santa Casa gasta 45 min para solicitar, sobram 15 min para a ambulância sair. Só entram protocolos com os dois horários." })),
+                tooltip: "O tempo do meio (mediana) entre o pedido da ambulância e a saída dela. É a parte da hora que depende do setor de ambulância. A meta de 1 hora é a soma das duas partes: se a Santa Casa levou 45 minutos para pedir, sobram 15 para a ambulância sair." })),
 
             /* ── Casos do card selecionado ── */
             avcSel && (() => {
@@ -280,6 +280,7 @@ function DashProtocoloAVC({ protocolos, totalRemocoes, Card, Kpi, Titulo, Vazio,
 }
 
 function DashTempos({ intervalos, total, Card, Kpi, Titulo, fmtMin }) {
+  const [verTotal, setVerTotal] = useState(false);
   const h = React.createElement;
   const [sel, setSel] = useState(null);     // id do intervalo aberto no modal
   const [gSel, setGSel] = useState(null);   // linha de gravidade aberta dentro do modal ("todas" ou o nome da gravidade)
@@ -298,19 +299,29 @@ function DashTempos({ intervalos, total, Card, Kpi, Titulo, fmtMin }) {
     h("div", { id: "bloco-tempos", style: { marginBottom: 22 } },
       h(Titulo, {
         extra: "medianas · clique em um card para ver por gravidade",
-        tooltip: "A ordem dos momentos é: solicitação (da Santa Casa à CROSS) → finalização (CROSS; o aceite é o mesmo momento) → solicitação da ambulância (Santa Casa) → saída da ambulância → retorno. Cada card é o intervalo entre dois momentos seguidos, pela mediana (para um caso extremo não distorcer); a soma das etapas não é, necessariamente, o tempo total, porque cada etapa usa as remoções que têm os horários dela. O tempo total (faixa escura) é medido à parte, remoção por remoção, da solicitação ao retorno. A etapa ④ (saída → retorno) é também a permanência fora da Santa Casa. Só entram remoções com os dois horários. Se faltar data ou horário de um dos momentos, ou se estiverem fora de ordem (ou com 30 dias ou mais de diferença), o caso não entra e é contado no card; a lista com link está em “Saneamento de falhas”. O painel não completa nem adivinha nenhum horário."
+        tooltip: "Mostra em que parte do caminho o tempo é gasto. O caminho de uma remoção tem cinco momentos: pedido à CROSS → CROSS finaliza a ficha → Santa Casa pede a ambulância → ambulância sai → ambulância volta. Cada cartão é o tempo entre dois momentos seguidos, pelo tempo do meio (mediana). A faixa escura é o tempo do pedido até a volta, calculado remoção por remoção. As etapas não somam exatamente o total, porque cada uma usa só as remoções que têm os horários dela. Só entram remoções com data e horário dos dois momentos; se faltar algum, ou estiverem fora de ordem, o caso não entra e fica listado em Saneamento de falhas. O painel nunca completa nem adivinha um horário."
       }, "Onde o tempo é gasto"),
       h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 12 } },
         intervalos.map(i => h(Kpi, {
           key: i.id, label: i.rotulo, valor: fmtMin(i.todas.mediana), cor: i.cor,
-          sub: (i.todas.nPos ? `${i.dono} · mediana · ${i.todas.nPos} com horário · maior ${fmtMin(i.todas.max)} · ${i.todas.acima2h} acima de 2h` : `${i.dono} · sem remoções com os dois horários`) + (i.nNeg ? ` · ${i.nNeg} inconsistente${i.nNeg !== 1 ? "s" : ""}` : ""),
+          sub: (i.todas.nPos ? `${i.dono} · mediana · ${i.todas.nPos} com horário · maior ${fmtMin(i.todas.max)} (clique para ver) · ${i.todas.acima2h} acima de 2h` : `${i.dono} · sem remoções com os dois horários`) + (i.nNeg ? ` · ${i.nNeg} inconsistente${i.nNeg !== 1 ? "s" : ""}` : ""),
           alerta: i.nNeg > 0,
           onClick: () => setSel(i.id), topo: i.cor,
-          tooltip: i.tip + " Clique para ver por gravidade." }))),
+          tooltip: i.tip + " Clique no cartão para ver a remoção mais longa e os tempos por gravidade." }))),
       h("div", { style: { marginTop: 12, padding: "10px 14px", background: "#0F172A", borderRadius: 12, color: "#F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" } },
         h("div", null, h("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em" } }, "Tempo total · solicitação → retorno da ambulância"),
           h("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 2 } }, total.n ? `mediana de ${total.n} remoç${total.n !== 1 ? "ões" : "ão"} com todos os momentos preenchidos` : "nenhuma remoção com todos os momentos preenchidos")),
-        h("div", { style: { fontSize: 26, fontWeight: 700, fontVariantNumeric: "tabular-nums" } }, fmtMin(total.mediana)))),
+        h("div", { style: { display: "flex", alignItems: "center", gap: 14 } },
+          total.top && total.top.length > 0 && h("button", { type: "button", onClick: () => setVerTotal(true), title: "Mostra as remoções mais longas, da solicitação até a volta da ambulância",
+            style: { padding: "5px 11px", borderRadius: 8, border: "1px solid #475569", background: "transparent", color: "#E2E8F0", fontSize: 11.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" } }, "Ver as mais longas"),
+          h("div", { style: { fontSize: 26, fontWeight: 700, fontVariantNumeric: "tabular-nums" } }, fmtMin(total.mediana)))),
+      h(DashLegenda, { titulo: "Como ler esta parte", itens: [
+        ["Mediana (o número grande)", "O tempo do meio: metade das remoções levou menos que isso e metade levou mais. Um caso muito demorado não distorce."],
+        ["Com horário", "Quantas remoções têm data e horário dos dois momentos da etapa. Só elas entram na conta."],
+        ["Maior", "A remoção mais demorada daquela etapa. Clique no cartão para ver qual foi."],
+        ["Acima de 2h", "Quantas remoções passaram de 2 horas naquela etapa."],
+        ["Tempo total", "Da solicitação à CROSS até a ambulância voltar, remoção por remoção. Não é a soma das etapas."]] })),
+    verTotal && h(DashListaModal, { titulo: "Remoções mais longas (solicitação → retorno)", subtitulo: "as 10 maiores do período, da mais longa para a menor", itens: total.top, onClose: () => setVerTotal(false) }),
 
     it && h("div", {
       onClick: e => { if (e.target === e.currentTarget) fechar(); },
@@ -325,6 +336,17 @@ function DashTempos({ intervalos, total, Card, Kpi, Titulo, fmtMin }) {
               `Quanto tempo levou, por gravidade · ${it.dono} · mediana geral `, h("b", null, fmtMin(it.todas.mediana)), ` · ${it.todas.nPos} remoç${it.todas.nPos !== 1 ? "ões" : "ão"} medida${it.todas.nPos !== 1 ? "s" : ""}`)),
           h("button", { onClick: fechar, "aria-label": "Fechar", style: { background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 22, lineHeight: 1, padding: 4 } }, "×")),
         h("div", { style: { overflowY: "auto", padding: "14px 20px 18px" } },
+          it.todas.casos[0] && h("div", { style: { background: "#FFF7ED", border: "1px solid #FED7AA", borderRadius: 12, padding: "11px 14px", marginBottom: 14 } },
+            h("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#9A3412", textTransform: "uppercase", letterSpacing: ".05em" } }, "A remoção mais longa desta etapa"),
+            h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginTop: 4 } },
+              h("div", { style: { minWidth: 0 } },
+                h("span", { style: { fontSize: 13.5, fontWeight: 700, color: "#0F172A" } }, it.todas.casos[0].nome),
+                it.todas.casos[0].ficha && h("span", { style: { fontSize: 11, color: "#94A3B8", marginLeft: 6 } }, "ficha " + it.todas.casos[0].ficha),
+                h("div", { style: { fontSize: 11.5, color: "#64748B", marginTop: 2 } }, `${it.de} ${it.todas.casos[0].de} → ${it.ate} ${it.todas.casos[0].ate} · ${it.todas.casos[0].grav}`)),
+              h("div", { style: { textAlign: "right" } },
+                h("div", { style: { fontSize: 20, fontWeight: 700, color: "#9A3412", fontVariantNumeric: "tabular-nums" } }, fmtMin(it.todas.casos[0].min)),
+                it.todas.casos[0].id && h("a", { href: `remocao.html?foco=${encodeURIComponent(it.todas.casos[0].id)}&campo=${encodeURIComponent(it.campo || "nome_paciente")}`, style: { fontSize: 11.5, fontWeight: 700, color: "#B45309", textDecoration: "none" } }, "abrir a linha na planilha →"))),
+            it.todas.casos[0].min >= 2880 && h("div", { style: { fontSize: 11, color: "#9A3412", marginTop: 6 } }, "Mais de 2 dias nesta etapa: vale conferir se não é erro de digitação em alguma data.")),
           h("div", { style: { display: "grid", gridTemplateColumns: COLS_GRID, gap: "0 10px", alignItems: "center", fontSize: 10, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", padding: "0 8px 6px" } },
             h("span", null, "Gravidade"), cel("Remoções"), cel("Medidas"), cel("Mediana"), cel("Maior"), cel("> 2h")),
           [it.todas, ...it.grupos].map(g => {
@@ -365,7 +387,9 @@ function DashTempos({ intervalos, total, Card, Kpi, Titulo, fmtMin }) {
                   c.avc && h("span", { style: { fontSize: 9.5, fontWeight: 800, marginLeft: 7, padding: "1px 7px", borderRadius: 99, background: "#FFE4E6", color: "#9F1239" } }, "AVC"),
                   gSel === "todas" && h("span", { style: { fontSize: 10, marginLeft: 7, color: "#64748B" } }, c.grav),
                   h("div", { style: { fontSize: 11, color: "#64748B", marginTop: 1 } }, `${it.de} ${c.de} → ${it.ate} ${c.ate}`)),
-                h("span", { style: { fontSize: 13, fontWeight: 700, color: "#0F172A", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" } }, fmtMin(c.min)))),
+                h("span", { style: { textAlign: "right" } },
+                  h("span", { style: { fontSize: 13, fontWeight: 700, color: "#0F172A", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" } }, fmtMin(c.min)),
+                  c.id && h("a", { href: `remocao.html?foco=${encodeURIComponent(c.id)}&campo=${encodeURIComponent(it.campo || "nome_paciente")}`, style: { display: "block", fontSize: 10.5, fontWeight: 700, color: "#B45309", textDecoration: "none" } }, "abrir linha →")))),
               g.casos.length > 60 && h("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 6 } }, `e mais ${g.casos.length - 60} casos`));
           })()))));
 }
@@ -383,8 +407,9 @@ const DASH_VOL_SERIES = [
   { id: "finalizacoes", nome: "Finalizações da CROSS", cor: "#0F766E", tracejada: true }
 ];
 
-function DashVolume({ serie, escala, rotulo, rotuloLongo, entrou, totais, notas, Titulo, Vazio }) {
+function DashVolume({ serie, escala, rotulo, rotuloLongo, entrou, totais, notas, reconc, Titulo, Vazio }) {
   const h = React.createElement;
+  const [lista, setLista] = useState(null);
   const [ocultas, setOcultas] = useState({});
   const [hover, setHover] = useState(null);
   const [larg, setLarg] = useState(720);
@@ -411,7 +436,7 @@ function DashVolume({ serie, escala, rotulo, rotuloLongo, entrou, totais, notas,
   const unidade = escala === "dia" ? "dia" : escala === "semana" ? "semana" : "mês";
   const titulo = h(Titulo, {
     extra: escala === "dia" ? "por dia" : escala === "semana" ? "por semana" : "por mês",
-    tooltip: "Barras: saídas de ambulância (CROSS e outras), contadas pelo dia da saída (data e horário de saída preenchidos na planilha). Linha laranja: pedidos feitos à CROSS (só linhas com ficha CROSS), pelo dia da solicitação. Linha tracejada verde: finalizações da CROSS, pelo dia em que a ficha foi finalizada, ou seja, quanto a CROSS libera por dia. Cada série usa a própria data, então o mesmo paciente pode aparecer em dias diferentes. Clique na legenda para esconder uma série."
+    tooltip: "Três contagens, cada uma pelo seu próprio dia. Barras: quantas vezes a ambulância saiu da Santa Casa (pelo dia da saída). Linha laranja: quantos pedidos foram feitos à CROSS (pelo dia do pedido; só linhas com ficha CROSS). Linha verde tracejada: quantas fichas a CROSS finalizou (pelo dia da finalização), ou seja, quanto a CROSS libera por dia. Como cada série usa o seu dia, o mesmo paciente aparece em dias diferentes. Clique na legenda para esconder uma série; passe o mouse num dia para ver os números dele."
   }, "Volume de remoções");
 
   if (!temDados) return h("div", { style: cartao }, titulo, h(Vazio, null, "Sem movimentação no período"));
@@ -511,7 +536,32 @@ function DashVolume({ serie, escala, rotulo, rotuloLongo, entrou, totais, notas,
         rotulosX,
         areas)),
     notas && notas.length > 0 && h("div", { style: { fontSize: 11, color: "#94A3B8", lineHeight: 1.6, marginTop: 8 } },
-      notas.map((t, i) => h("div", { key: i }, t))));
+      notas.map((t, i) => h("div", { key: i }, t))),
+    reconc && totais.pedidos !== totais.finalizacoes && (() => {
+      const A = reconc.A, B = reconc.B, nA = A.semFicha.length + A.semDataSol.length + A.solImpossivel.length + A.solForaPeriodo, nB = B.semFinalizacao + B.finImpossivel.length + B.finForaPeriodo;
+      const linha = (n, texto, itens, titulo) => n > 0 && h("li", { key: titulo || String(texto), style: { margin: "3px 0" } }, h("b", null, n), " ", Array.isArray(texto) ? (n === 1 ? texto[0] : texto[1]) : texto,
+        itens && itens.length > 0 && h("button", { type: "button", onClick: () => setLista({ titulo, itens }), style: { marginLeft: 8, background: "none", border: "none", color: "#B45309", fontWeight: 700, fontSize: 11.5, cursor: "pointer", padding: 0, fontFamily: "inherit" } }, "ver quais →"));
+      return h("div", { style: { marginTop: 12, padding: "12px 14px", background: "#F8FAFC", borderRadius: 12, fontSize: 12, color: "#475569", lineHeight: 1.6 } },
+        h("div", { style: { fontWeight: 700, color: "#0F172A", marginBottom: 4 } }, `Por que há ${totais.pedidos} pedidos à CROSS e ${totais.finalizacoes} finalizações?`),
+        h("div", null, "Os dois números não precisam ser iguais, porque cada um é contado pelo seu próprio dia: o pedido pelo dia em que foi feito e a finalização pelo dia em que a CROSS respondeu. Um pedido do fim do período pode ser finalizado depois dele, e uma finalização do começo pode ser de um pedido feito antes. Além disso, só conta como pedido a linha que tem o número da ficha CROSS e uma data de solicitação válida; já a finalização conta qualquer linha com data de finalização."),
+        nA > 0 && h("div", { style: { marginTop: 8, fontWeight: 600, color: "#0F172A" } }, `Finalizações cujo pedido não está entre os ${totais.pedidos} (+${nA}):`),
+        nA > 0 && h("ul", { style: { margin: "2px 0 0", paddingLeft: 18 } },
+          linha(A.semFicha.length, ["finalizada em linha sem ficha CROSS (não conta como pedido)", "finalizadas em linhas sem ficha CROSS (não contam como pedido)"], A.semFicha, "Finalizadas, mas sem ficha CROSS"),
+          linha(A.semDataSol.length, ["finalizada em linha sem data de solicitação", "finalizadas em linhas sem data de solicitação"], A.semDataSol, "Finalizadas, mas sem data de solicitação"),
+          linha(A.solImpossivel.length, ["finalizada em linha com data de solicitação impossível", "finalizadas em linhas com data de solicitação impossível"], A.solImpossivel, "Data de solicitação impossível"),
+          linha(A.solForaPeriodo, ["é de um pedido feito fora do período escolhido (é normal)", "são de pedidos feitos fora do período escolhido (é normal)"])),
+        nB > 0 && h("div", { style: { marginTop: 8, fontWeight: 600, color: "#0F172A" } }, `Pedidos cuja finalização não está entre as ${totais.finalizacoes} (−${nB}):`),
+        nB > 0 && h("ul", { style: { margin: "2px 0 0", paddingLeft: 18 } },
+          linha(B.semFinalizacao, ["pedido ainda sem data de finalização (a CROSS ainda não respondeu, ou falta preencher)", "pedidos ainda sem data de finalização (a CROSS ainda não respondeu, ou falta preencher)"]),
+          linha(B.finImpossivel.length, ["pedido com data de finalização impossível", "pedidos com data de finalização impossível"], B.finImpossivel, "Data de finalização impossível"),
+          linha(B.finForaPeriodo, ["foi finalizado fora do período escolhido (é normal)", "foram finalizados fora do período escolhido (é normal)"])),
+        h("div", { style: { marginTop: 8, color: "#0F172A" } }, `Conta: ${totais.pedidos} ${nA ? "+ " + nA + " " : ""}${nB ? "− " + nB + " " : ""}= ${totais.finalizacoes}.`),
+        lista && h(DashListaModal, { titulo: lista.titulo, subtitulo: "linhas que explicam a diferença, com link para corrigir na planilha", itens: lista.itens, onClose: () => setLista(null) }));
+    })(),
+    h(DashLegenda, { titulo: "O que cada série quer dizer", itens: [
+      ["Saídas (barras)", "Quantas vezes a ambulância saiu da Santa Casa, contadas pelo dia da saída. Conta qualquer linha, CROSS ou outras."],
+      ["Pedidos à CROSS (linha laranja)", "Quantos pedidos foram feitos à CROSS, contados pelo dia do pedido. Só linhas com o número da ficha CROSS."],
+      ["Finalizações da CROSS (linha verde tracejada)", "Quantas fichas a CROSS finalizou, contadas pelo dia em que finalizou. Mostra o quanto a CROSS libera por dia."]] }));
 }
 
 /* ─── Saneamento de falhas ────────────────────────────────────────────────────
@@ -706,6 +756,19 @@ const DASH_CFG_CHAVES = [
   { chave: "motivo_obrigatorio_acima_min", grupo: "dados", rotulo: "Tempo interno acima de (exige motivo)", unid: "min" },
   { chave: "limite_suspeito_h",          grupo: "dados",  rotulo: "Etapa acima de (confira a digitação)",  unid: "h" }
 ];
+const DASH_CFG_DICA = {
+  frota_basica: "Quantas ambulâncias básicas (técnico e motorista) a Santa Casa tem a partir da data escolhida lá em cima. Quando a quantidade mudar, registre a nova com a nova data: o histórico fica guardado.",
+  frota_avancada: "Quantas ambulâncias avançadas (com médico a bordo) a Santa Casa tem a partir da data escolhida lá em cima.",
+  sla_vermelho_min: "Tempo máximo aceito, em minutos, entre a CROSS finalizar a ficha e a ambulância sair, para pacientes vermelhos. O painel usa para dizer quantas remoções saíram dentro ou fora da meta.",
+  sla_amarelo_min: "Tempo máximo aceito, em minutos, entre a CROSS finalizar a ficha e a ambulância sair, para pacientes amarelos.",
+  sla_verde_min: "Tempo máximo aceito, em minutos, entre a CROSS finalizar a ficha e a ambulância sair, para pacientes verdes.",
+  sla_cinza_min: "Tempo máximo aceito, em minutos, entre a CROSS finalizar a ficha e a ambulância sair, para pacientes cinza (agendamento).",
+  alerta_espera_min: "Se um paciente do Kanban esperar mais do que isso (em minutos), o painel acende o alerta de espera.",
+  alerta_espera_vermelho_min: "O mesmo alerta, só para pacientes vermelhos, que costumam ter um limite menor.",
+  alerta_sem_atualizacao_h: "Se o card de um paciente que aguarda ficar parado, sem ninguém mexer, por mais horas do que isso, o painel avisa.",
+  motivo_obrigatorio_acima_min: "Se a espera entre a CROSS finalizar a ficha e a Santa Casa pedir a ambulância passar disto (em minutos), o painel cobra que o motivo seja preenchido na planilha. Sem valor, não cobra.",
+  limite_suspeito_h: "Se alguma etapa de uma remoção passar de tantas horas, o painel avisa para conferir se não é erro de digitação. A remoção continua entrando na conta. Sem valor, não avisa."
+};
 const DASH_CFG_ROTULO = DASH_CFG_CHAVES.reduce((a, c) => { a[c.chave] = c.rotulo + (c.unid ? " (" + c.unid + ")" : ""); return a; }, {});
 
 function dashFmtBR(d) { const m = String(d || "").match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : String(d || ""); }
@@ -805,7 +868,7 @@ function DashMotivos({ linhas, limMotivo, Titulo, fmtMin }) {
   return h("div", { id: "bloco-motivos", style: DASH_CARTAO },
     h(Titulo, {
       extra: com.length ? `${informados} de ${com.length} com motivo` : "",
-      tooltip: "Tempo interno é o tempo entre a finalização da ficha na CROSS e o pedido da ambulância: a parte que depende só da Santa Casa. Aqui ele é separado pelo MOTIVO que a equipe registrou na planilha. “% do tempo” é a parte de cada motivo no total de tempo interno do período; os motivos estão ordenados do que mais consome tempo para o que menos consome. Linhas sem motivo aparecem juntas para você enxergar o quanto ainda falta preencher."
+      tooltip: "Tempo interno é o que passa entre a CROSS finalizar a ficha e a Santa Casa pedir a ambulância: depende só da Santa Casa. Aqui ele é separado pelo motivo anotado na planilha. “% do tempo” é a parte de cada motivo no total de tempo interno do período. Linhas sem motivo aparecem juntas, para você ver quanto falta preencher."
     }, "Tempo interno por motivo"),
     com.length === 0 ? h("div", { style: { fontSize: 11.5, color: "#CBD5E1", padding: "14px 0", textAlign: "center" } }, "Sem remoções com o tempo interno medido no período") : h(React.Fragment, null,
       h("div", { style: { display: "grid", gridTemplateColumns: GRID, gap: "0 10px", fontSize: 10, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", padding: "0 6px 6px" } },
@@ -816,33 +879,48 @@ function DashMotivos({ linhas, limMotivo, Titulo, fmtMin }) {
         cel(total ? Math.round(r.soma / total * 100) + "%" : "—", { fontWeight: 700 }))),
       h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "8px 6px 0", lineHeight: 1.5 } },
         limMotivo === null ? "Para o painel cobrar o motivo quando o tempo interno ficar longo, defina o limite em Configurações (“Tempo interno acima de”)."
-          : `Linhas com tempo interno acima de ${fmtMin(limMotivo)} e sem motivo aparecem em Saneamento de falhas.`)));
+          : `Linhas com tempo interno acima de ${fmtMin(limMotivo)} e sem motivo aparecem em Saneamento de falhas.`)),
+    com.length > 0 && h(DashLegenda, { itens: [
+      ["Motivo", "A razão anotada na planilha para a espera entre a CROSS finalizar a ficha e a Santa Casa pedir a ambulância. “Sem motivo informado” são as linhas ainda não preenchidas."],
+      ["Casos", "Quantas remoções têm esse motivo."],
+      ["Mediana", "O tempo do meio dessa espera, nas remoções com esse motivo. Metade esperou menos, metade esperou mais."],
+      ["Maior", "A espera mais longa entre as remoções com esse motivo."],
+      ["% do tempo", "A parte do tempo interno total do período que esse motivo consumiu. Os motivos estão ordenados do que mais consome ao que menos consome."]] }));
 }
 
 /* ─── Frota e capacidade ─────────────────────────────────────────────────────── */
-function DashFrota({ frota, fora, cobertura, Titulo, fmtMin }) {
+function DashFrota({ frota, fora, longas, cobertura, Titulo, fmtMin }) {
   const h = React.createElement;
+  const [ver, setVer] = useState(false);
   const pct = (a, b) => b ? Math.round(a / b * 100) + "%" : "—";
-  const Item = (rot, val, sub, cor) => h("div", { style: { background: "#F8FAFC", borderRadius: 12, padding: "12px 14px" } },
-    h("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em" } }, rot),
+  const G = Object.fromEntries(DASH_GLOSSARIO);
+  const Item = (rot, dica, val, sub, cor, aoClicar) => h(aoClicar ? "button" : "div", Object.assign({ key: rot, style: { background: "#F8FAFC", borderRadius: 12, padding: "12px 14px", textAlign: "left", border: aoClicar ? "1px solid #CBD5E1" : "none", cursor: aoClicar ? "pointer" : "default", fontFamily: "inherit" } },
+    aoClicar ? { type: "button", onClick: aoClicar, title: "Clique para ver qual foi" } : {}),
+    h("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", display: "flex", alignItems: "center" } }, rot, h(DashDica, { texto: dica, rotulo: rot })),
     h("div", { style: { fontSize: 22, fontWeight: 700, color: cor || "#0F172A", margin: "4px 0 2px", fontVariantNumeric: "tabular-nums" } }, val),
     h("div", { style: { fontSize: 10.5, color: "#94A3B8" } }, sub));
   return h("div", { id: "bloco-frota", style: DASH_CARTAO },
     h(Titulo, {
       extra: "frota cadastrada em Configurações",
-      tooltip: "Ambulância fora da unidade = tempo da saída ao retorno, nas remoções com retorno registrado (é também a permanência no destino). O P95 só aparece com 20 ou mais remoções: com menos, ele não diz nada. A frota é a cadastrada em Configurações, com a data em que passou a valer."
+      tooltip: "A frota é o que você cadastrou em Configurações, com a data em que cada quantidade passou a valer. “Fora da unidade” é quanto tempo a ambulância fica fora da Santa Casa em cada remoção, da saída até a volta. Os três números abaixo resumem esse tempo: o do meio (mediana), o “quase pior caso” (P95) e o maior."
     }, "Frota e capacidade"),
     h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(175px,1fr))", gap: 12 } },
-      Item("Frota hoje", frota ? `${frota.basica ?? "?"} básica${frota.basica === 1 ? "" : "s"} · ${frota.avancada ?? "?"} avançada${frota.avancada === 1 ? "" : "s"}` : "não cadastrada",
+      Item("Frota hoje", G["Frota"], frota ? `${frota.basica ?? "?"} básica${frota.basica === 1 ? "" : "s"} · ${frota.avancada ?? "?"} avançada${frota.avancada === 1 ? "" : "s"}` : "não cadastrada",
         frota ? (frota.desde ? "vale desde " + dashFmtBR(frota.desde) : "") : "cadastre em Configurações (no fim da página)", frota ? "#0F172A" : "#B45309"),
-      Item("Fora da unidade · mediana", fmtMin(fora.mediana), fora.n ? `${fora.n} remoç${fora.n !== 1 ? "ões" : "ão"} com retorno` : "nenhuma remoção com retorno", "#0F766E"),
-      Item("Fora da unidade · P95", fora.p95 === null ? "—" : fmtMin(fora.p95), fora.n >= 20 ? "95% voltam em até esse tempo" : `precisa de 20 remoções (tem ${fora.n})`, "#0F766E"),
-      Item("Fora da unidade · maior", fmtMin(fora.max), "a remoção mais longa do período", "#0F766E")),
+      Item("Fora da unidade · mediana", G["Fora da unidade"] + " " + G["Mediana"], fmtMin(fora.mediana), fora.n ? `${fora.n} remoç${fora.n !== 1 ? "ões" : "ão"} com retorno` : "nenhuma remoção com retorno", "#0F766E"),
+      Item("Fora da unidade · P95", G["P95"], fora.p95 === null ? "—" : fmtMin(fora.p95), fora.n >= 20 ? "95% voltam em até esse tempo" : `precisa de 20 remoções (tem ${fora.n})`, "#0F766E"),
+      Item("Fora da unidade · maior", G["Maior"], fmtMin(fora.max), longas && longas.length ? "a remoção mais longa · clique para ver" : "a remoção mais longa do período", "#0F766E", longas && longas.length ? () => setVer(true) : null)),
+    h(DashLegenda, { itens: [
+      ["Frota hoje", "Quantas ambulâncias existem hoje, separadas em básicas e avançadas. Você cadastra em Configurações, com a data em que a quantidade passou a valer."],
+      ["Fora da unidade · mediana", "O tempo do meio que a ambulância fica fora da Santa Casa em uma remoção (da saída até a volta). Metade das remoções levou menos, metade levou mais."],
+      ["Fora da unidade · P95", "Quase o pior caso: 95 de cada 100 remoções voltam em até esse tempo; só 5 demoram mais. Só aparece com 20 remoções ou mais."],
+      ["Fora da unidade · maior", "A remoção em que a ambulância ficou mais tempo fora no período. Clique para ver qual foi."]] }),
     h("div", { style: { marginTop: 12, padding: "10px 14px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12, fontSize: 11.5, color: "#78350F", lineHeight: 1.6 } },
-      h("b", null, "Ainda não calculados: "), "ambulância ocupada na hora do pedido, utilização da frota e demanda × capacidade por hora. ",
+      h("b", null, "Ainda não calculados: "), "ambulância ocupada na hora do pedido, uso da frota e demanda × capacidade por hora. ",
       "Faltam dados: a planilha não dizia qual ambulância fez cada remoção (o campo “Prefixo da ambulância” é novo e começa vazio), ",
       `e o tipo de ambulância está preenchido em ${pct(cobertura.comTipo, cobertura.saidas)} das saídas do período (${cobertura.comTipo} de ${cobertura.saidas}); o prefixo, em ${pct(cobertura.comPrefixo, cobertura.saidas)}. `,
-      "Com tipo e prefixo preenchidos, esses indicadores passam a ser calculados."));
+      "Com tipo e prefixo preenchidos, esses indicadores passam a ser calculados."),
+    ver && h(DashListaModal, { titulo: "Remoções em que a ambulância ficou mais tempo fora", subtitulo: "as 10 maiores do período (saída → retorno), da maior para a menor", itens: longas, onClose: () => setVer(false) }));
 }
 
 /* ─── Destinos ───────────────────────────────────────────────────────────────── */
@@ -855,7 +933,7 @@ function DashDestinos({ destinos, Titulo, fmtMin }) {
   return h("div", { id: "bloco-destinos", style: DASH_CARTAO },
     h(Titulo, {
       extra: `${destinos.length} destino${destinos.length !== 1 ? "s" : ""}`,
-      tooltip: "Para onde vão os pacientes e quanto tempo isso consome. Espera = do pedido da ambulância à saída; fora = da saída ao retorno (só remoções com retorno). Cada número é a mediana. Destinos com menos de 5 remoções têm número instável: leia como indício, não como regra. O nome do destino é o da lista oficial; o que não está na lista aparece como “(fora da lista)”."
+      tooltip: "Para onde vão os pacientes e quanto tempo cada destino consome. Espera: do pedido da ambulância até ela sair. Fora: da saída até a volta. Cada tempo é o do meio (mediana). Destinos com menos de 5 remoções têm número instável: leia como indício, não como regra."
     }, "Destinos e tempo da remoção"),
     destinos.length === 0 ? h("div", { style: { fontSize: 11.5, color: "#CBD5E1", padding: "14px 0", textAlign: "center" } }, "Sem dados no período") : h(React.Fragment, null,
       h("div", { style: { display: "grid", gridTemplateColumns: GRID, gap: "0 10px", fontSize: 10, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", padding: "0 6px 6px" } },
@@ -866,7 +944,14 @@ function DashDestinos({ destinos, Titulo, fmtMin }) {
         cel(d.n), cel(d.saidas), cel(fmtMin(d.espera), { fontWeight: 700, color: "#B45309" }), cel(fmtMin(d.fora), { fontWeight: 700, color: "#0F766E" }))),
       destinos.length > 10 && h("button", { type: "button", onClick: () => setTodos(v => !v),
         style: { marginTop: 8, background: "none", border: "1px solid #E2E8F0", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, color: "#64748B", cursor: "pointer", fontFamily: "inherit" } },
-        todos ? "mostrar só os 10 maiores" : `ver todos os ${destinos.length}`)));
+        todos ? "mostrar só os 10 maiores" : `ver todos os ${destinos.length}`)),
+    destinos.length > 0 && h(DashLegenda, { itens: [
+      ["Destino", "O hospital ou unidade que recebeu o paciente, com o nome da lista oficial."],
+      ["Linhas", "Quantas remoções (linhas da planilha) foram para esse destino no período."],
+      ["Saídas", "Quantas dessas já tiveram a ambulância saindo (têm data e horário de saída)."],
+      ["Espera", "O tempo do meio (mediana) entre o pedido da ambulância e a saída dela, nas remoções para esse destino. É quanto o paciente esperou pela ambulância."],
+      ["Fora", "O tempo do meio (mediana) que a ambulância ficou fora da Santa Casa, da saída até a volta. Só conta as que já voltaram."],
+      ["poucos casos", "Destino com menos de 5 remoções: o tempo muda muito com um único caso. Leia como indício, não como regra."]] }));
 }
 
 /* ─── Permaneceu no destino, cruzado com outros campos ───────────────────────── */
@@ -891,7 +976,7 @@ function DashPermanece({ tempos, C, Titulo, fmtMin }) {
   return h("div", { id: "bloco-permanece", style: DASH_CARTAO },
     h(Titulo, {
       extra: "campo “Permaneceu” da planilha",
-      tooltip: "Quantos pacientes ficaram no destino em vez de voltar à Santa Casa, por categoria. “Sem registro” é linha em que ninguém respondeu Sim ou Não: não conta como Sim nem como Não. O tempo fora é a mediana da saída ao retorno, separado entre quem permaneceu e quem não, só nas remoções com retorno."
+      tooltip: "Quantos pacientes ficaram no destino, por categoria (destino, especialidade, tipo de ambulância ou gravidade). Linha sem resposta Sim/Não aparece como “sem registro”. O tempo fora é o do meio (mediana), da saída até a volta, separado entre quem ficou e quem voltou."
     }, "Permaneceu no destino, por categoria"),
     h("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 } },
       DIMS.map(([id, rot]) => h("button", { key: id, type: "button", "aria-pressed": dim === id, onClick: () => setDim(id),
@@ -904,7 +989,14 @@ function DashPermanece({ tempos, C, Titulo, fmtMin }) {
         cel(g.n), cel(g.sim), cel(g.n ? Math.round(g.sim / g.n * 100) + "%" : "—", { fontWeight: 700 }),
         cel(fmtMin(dashMediana(g.foraSim)), { color: "#0F766E" }), cel(fmtMin(dashMediana(g.foraNao)), { color: "#0F766E" }))),
       lista.length > 15 && h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "8px 6px 0" } }, `Mostrando as 15 maiores de ${lista.length} categorias.`),
-      h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "8px 6px 0" } }, `Sem registro de permanência: ${lista.reduce((t, g) => t + g.sem, 0)} de ${tempos.length} linhas.`)));
+      h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "8px 6px 0" } }, `Sem registro de permanência: ${lista.reduce((t, g) => t + g.sem, 0)} de ${tempos.length} linhas.`)),
+    lista.length > 0 && h(DashLegenda, { itens: [
+      ["Destino, Especialidade, Tipo de ambulância, Gravidade", "Os botões de cima escolhem como agrupar as remoções. Cada linha da tabela é uma categoria do grupo escolhido."],
+      ["Linhas", "Quantas remoções há na categoria."],
+      ["Permaneceu", "Quantas delas o paciente ficou no hospital de destino e não voltou à Santa Casa."],
+      ["%", "A parte das remoções da categoria em que o paciente permaneceu. Linha sem resposta (Sim ou Não) não conta como Sim."],
+      ["Fora · sim", "O tempo do meio (mediana) que a ambulância ficou fora, da saída até a volta, nas remoções em que o paciente permaneceu no destino."],
+      ["Fora · não", "O mesmo tempo, nas remoções em que o paciente não permaneceu. Só entram remoções com a saída e o retorno anotados."]] }));
 }
 
 /* ─── Pacientes aguardando (Kanban, ao vivo) ─────────────────────────────────── */
@@ -922,7 +1014,7 @@ function DashAguardando({ cards, cfg, hojeIso, onAbrirCard, aoVivo, aberto, onTo
   return h("div", { id: "bloco-aguardando", style: DASH_CARTAO },
     h(Titulo, {
       extra: aoVivo ? "Kanban ao vivo · renova a cada 30 s" : "última publicação do Kanban",
-      tooltip: "Pacientes que ainda dependem de uma ação: aguardando aceite (conta desde a solicitação na CROSS) e aceitos aguardando ambulância (conta desde a finalização da CROSS). Vem só do Kanban, nunca da planilha, para não misturar duas fontes que se atualizam em momentos diferentes. Card sem data e hora de início aparece como “sem horário”. Os limites de alerta são os cadastrados em Configurações."
+      tooltip: "Pacientes que ainda dependem de alguma ação: esperando a CROSS aceitar (o tempo conta desde o pedido) ou já aceitos e esperando a ambulância (conta desde a finalização da CROSS). Vem só do Kanban, que se atualiza sozinho a cada 30 segundos. Card sem data e hora de início aparece como “sem horário”. Os limites de alerta são os que você cadastrou em Configurações."
     }, "Pacientes aguardando agora"),
     a.itens.length === 0 ? h("div", { style: { fontSize: 12, color: "#15803D", padding: "4px 0 2px" } }, "Nenhum paciente aguardando aceite ou ambulância.") : h(React.Fragment, null,
       h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 10, marginBottom: 12 } },
@@ -966,7 +1058,7 @@ function DashSLA({ sla, semGrav, Titulo, fmtMin }) {
   return h("div", { id: "bloco-sla", style: DASH_CARTAO },
     h(Titulo, {
       extra: "finalização da CROSS → saída da ambulância",
-      tooltip: "Compara, em cada remoção, o tempo entre a finalização da ficha na CROSS e a saída da ambulância com a meta da gravidade. É a parte do caminho que a Santa Casa controla. A meta de cada gravidade é a que você cadastrou em Configurações, com a data em que passou a valer: cada remoção é julgada pela meta vigente no dia da solicitação. Sem meta cadastrada o painel só mostra o tempo, sem dizer se foi bom ou ruim. Remoções sem gravidade ou sem os dois horários não entram."
+      tooltip: "Compara, em cada remoção, o tempo entre a CROSS finalizar a ficha e a ambulância sair com a meta daquela gravidade. É a parte que a Santa Casa controla. A meta é a que você cadastrou em Configurações, valendo na data do pedido. Sem meta cadastrada, o painel só mostra o tempo, sem dizer se foi bom ou ruim. Remoções sem gravidade ou sem os dois horários ficam de fora."
     }, "Cumprimento da meta de tempo"),
     !temAlgumaMeta && h("div", { style: { fontSize: 11.5, color: "#92400E", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 10, padding: "9px 12px", marginBottom: 10 } },
       "Nenhuma meta cadastrada. Defina o tempo máximo por gravidade em Configurações (no fim da página); até lá o painel mostra apenas os tempos."),
@@ -1003,7 +1095,7 @@ function DashReinsercao({ rein, Titulo }) {
   return h("div", { id: "bloco-reinsercao", style: DASH_CARTAO },
     h(Titulo, {
       extra: rein.base ? `${(total / rein.base * 100).toFixed(1).replace(".", ",")}% das linhas CROSS` : "",
-      tooltip: "Fichas que precisaram ser reinseridas no CROSS. Duas fontes: o status REINSERIDA (estruturado) e a observação em texto livre (palavras “reinserida/reinserido”). Hoje não existe um campo próprio nem o motivo da reinserção."
+      tooltip: "Fichas que precisaram ser colocadas de novo na CROSS. A contagem usa o status REINSERIDA e também observações escritas à mão que citam “reinserida”. Hoje não existe um campo próprio nem o motivo da reinserção."
     }, "Reinserções"),
     h("div", { style: { display: "flex", gap: 16, flexWrap: "wrap", alignItems: "baseline" } },
       h("div", { style: { fontSize: 30, fontWeight: 700, color: "#EA580C", fontVariantNumeric: "tabular-nums" } }, total),
@@ -1073,9 +1165,13 @@ function DashAlertas({ cards, cfg, hojeIso, sla, rein, qualidade, nCorrigir, emR
   ];
   return h("div", { id: "bloco-alertas", style: { marginBottom: 18 } },
     h("div", { role: "tablist", "aria-label": "Situação agora", style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 8 } },
-      faixa.map(f => h("button", { key: f.id, type: "button", role: "tab", "aria-selected": f.ativa, onClick: () => onTile(f.id), title: f.ativa ? "Clique para fechar" : "Clique para ver os casos aqui embaixo",
+      faixa.map(f => h("div", { key: f.id, role: "tab", tabIndex: 0, "aria-selected": f.ativa, onClick: () => onTile(f.id),
+        onKeyDown: e => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onTile(f.id); } },
+        title: f.ativa ? "Clique para fechar" : "Clique para ver os casos aqui embaixo",
         style: { textAlign: "left", background: f.ativa ? "#F8FAFC" : "#fff", border: "1px solid " + (f.ativa ? "#0F172A" : "#E8EDF3"), boxShadow: f.ativa ? "0 0 0 1px #0F172A" : "none", borderRadius: 14, padding: "14px 16px", cursor: "pointer", fontFamily: "inherit" } },
-        h("div", { style: { fontSize: 10.5, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 6, display: "flex", justifyContent: "space-between" } }, f.rot, h("span", { "aria-hidden": "true", style: { fontSize: 9 } }, f.ativa ? "▲" : "▼")),
+        h("div", { style: { fontSize: 10.5, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" } },
+          h("span", { style: { display: "inline-flex", alignItems: "center" } }, f.rot, h(DashDica, { texto: (DASH_GLOSSARIO.find(g => g[0] === f.rot) || [])[1] || f.rot, rotulo: f.rot })),
+          h("span", { "aria-hidden": "true", style: { fontSize: 9 } }, f.ativa ? "▲" : "▼")),
         h("div", { style: { fontSize: 28, fontWeight: 700, color: f.cor, lineHeight: 1, fontVariantNumeric: "tabular-nums" } }, f.n),
         h("div", { style: { fontSize: 10.5, color: "#94A3B8", marginTop: 6 } }, f.sub)))),
     qualidade.pct !== null && h("div", { style: { textAlign: "right", fontSize: 11.5, marginBottom: 10, color: qualidade.pct >= 95 ? "#15803D" : "#B45309" }, title: "Linhas do período sem nenhuma falha de dados a corrigir (as com falha ficam fora de parte das contas)" },
@@ -1150,7 +1246,9 @@ function DashConfig({ cfg, userNome, recarregar, showT, hojeIso }) {
           DASH_CFG_CHAVES.filter(c => c.grupo === g).map(c => {
             const atual = dashCfgEm(cfg, c.chave, hojeIso);
             return h("div", { key: c.chave },
-              h("label", { htmlFor: "cfg-" + c.chave, style: { display: "block", fontSize: 11.5, color: "#475569", marginBottom: 3 } }, c.rotulo + (c.unid ? " (" + c.unid + ")" : "")),
+              h("div", { style: { display: "flex", alignItems: "center", marginBottom: 3 } },
+                h("label", { htmlFor: "cfg-" + c.chave, style: { fontSize: 11.5, color: "#475569" } }, c.rotulo + (c.unid ? " (" + c.unid + ")" : "")),
+                h(DashDica, { texto: DASH_CFG_DICA[c.chave], rotulo: c.rotulo })),
               h("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
                 h("input", { id: "cfg-" + c.chave, type: "text", inputMode: "decimal", value: campos[c.chave] == null ? "" : campos[c.chave], placeholder: atual ? String(atual.valor) : "—",
                   onChange: e => setCampos(p => Object.assign({}, p, { [c.chave]: e.target.value })), style: inp }),
@@ -1192,13 +1290,113 @@ const DASH_SECAO_DO_BLOCO = {
   "bloco-excecoes": "sec-excecoes"
 };
 
+/* ═══════════════════════════════════════════════════════════════════════════════
+   EXPLICAÇÕES EM LINGUAGEM SIMPLES
+   Cada número e cada coluna do painel tem uma explicação para quem não conhece os termos. Três formas:
+   1) o "?" ao lado do nome (DashDica): passa o mouse, toca ou clica;  2) legendas escritas embaixo das tabelas (DashLegenda);
+   3) o Glossário (botão no topo), com todos os termos juntos.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+const DASH_GLOSSARIO = [
+  ["Mediana", "O tempo do meio. Se todas as remoções fossem colocadas em fila, da mais rápida para a mais demorada, a mediana é a que está no meio: metade levou menos que esse tempo e metade levou mais. É melhor que a média porque um caso muito demorado não estraga o resultado."],
+  ["P95", "Quase o pior caso. De cada 100 remoções, 95 levaram esse tempo ou menos, e só 5 levaram mais. Mostra quanto a espera chega a durar nos dias ruins, sem contar os casos fora do comum. Só aparece com 20 remoções ou mais, porque com poucas o número não é confiável."],
+  ["Maior", "A remoção mais demorada do período naquela etapa. Clique para ver qual foi, com o nome do paciente e o link para abrir a linha na planilha."],
+  ["Acima de 2h", "Quantas remoções levaram mais de 2 horas naquela etapa."],
+  ["Fora da unidade", "Quanto tempo a ambulância fica fora da Santa Casa em cada remoção: da hora em que sai até a hora em que volta. É também o tempo que o paciente passa no destino. Só conta remoções que têm a saída e o retorno anotados."],
+  ["Tempo CROSS", "Quanto a CROSS demora para responder: da hora em que a Santa Casa faz o pedido até a hora em que a CROSS finaliza a ficha."],
+  ["Tempo interno", "A parte que depende só da Santa Casa: da finalização da ficha na CROSS até a Santa Casa pedir a ambulância."],
+  ["Espera pela ambulância", "Do pedido da ambulância até ela sair da Santa Casa."],
+  ["Tempo total", "Da solicitação à CROSS até a ambulância voltar. É calculado remoção por remoção, só nas que têm todos os horários preenchidos; por isso não é a soma das etapas."],
+  ["Pedidos à CROSS", "Quantas remoções foram pedidas à CROSS no período, contadas pelo dia do pedido. Só entra linha que tem o número da ficha CROSS e a data da solicitação."],
+  ["Finalizações da CROSS", "Quantas fichas a CROSS finalizou no período, contadas pelo dia da finalização. Pedido e finalização acontecem em dias diferentes, por isso os dois números quase nunca são iguais."],
+  ["Saídas de ambulância", "Quantas vezes a ambulância saiu da Santa Casa no período (qualquer linha, CROSS ou outras, com data e horário de saída)."],
+  ["Remoção CROSS e outras remoções", "Remoção CROSS é a linha que tem o número da ficha da CROSS. As outras (exames, retornos, transferências sem ficha) são as “outras remoções”. As duas somam o total de linhas."],
+  ["Meta, Medidas, Dentro, Fora", "Meta: o tempo máximo aceito entre a finalização da CROSS e a saída da ambulância, por gravidade. Medidas: quantas remoções entram na conta. Dentro: as que saíram no tempo da meta ou antes. Fora: as que passaram da meta."],
+  ["Gravidade", "A prioridade da ficha CROSS: Vermelho (1) é emergência, Amarelo (2) urgência, Verde (3) menos grave, Cinza (4) agendamento."],
+  ["Ambulância básica e avançada", "Básica: técnico e motorista. Avançada: tem médico a bordo, usada em casos graves. A UTI móvel conta como avançada."],
+  ["Permaneceu no destino", "Paciente que ficou no hospital de destino e não voltou à Santa Casa."],
+  ["Protocolo de AVC", "Atendimento de AVC (derrame) com meta de a ambulância sair em até 1 hora depois da finalização da ficha na CROSS."],
+  ["Aguardando", "Pacientes do Kanban que ainda dependem de alguma ação: esperando a CROSS aceitar ou esperando a ambulância."],
+  ["Vermelhos aguardando", "Dos pacientes que aguardam, quantos são de gravidade vermelha (emergência)."],
+  ["Em remoção", "Pacientes cuja ambulância já está a caminho, na coluna “Remoção em andamento” do Kanban."],
+  ["Não atendidas", "Linhas cujo status diz que a remoção não aconteceu (cancelada, evasão, alta, reinserida, paciente instável…). O motivo é o próprio status."],
+  ["Alertas ativos", "Quantos avisos estão acesos agora: esperas acima do limite, atrasos da meta, cards parados. Os limites você define em Configurações."],
+  ["Reinserção", "Quando a ficha precisa ser colocada de novo no sistema da CROSS."],
+  ["Saneamento de falhas", "A lista do que está errado ou faltando nos registros. O painel não completa nem adivinha: o que tem problema fica fora da conta e aparece ali, com link para corrigir."],
+  ["Qualidade dos registros", "A porcentagem de linhas do período que não têm nenhuma falha a corrigir."],
+  ["Frota", "Quantas ambulâncias a Santa Casa tem, separadas em básicas e avançadas, com a data em que cada quantidade passou a valer. Você cadastra em Configurações."],
+  ["Período e escala", "Período: quais remoções entram (Tudo, hoje, 7 dias, um mês ou datas à sua escolha). Escala: se o gráfico mostra um ponto por dia, por semana ou por mês."],
+  ["Kanban e Livro de Saída", "Kanban: o quadro dos pedidos em andamento (pendente, aceito, em remoção…). Livro de Saída: o registro feito pela equipe quando a ambulância sai e volta, que pode ser ligado à planilha."]
+];
+
+/* O "?" ao lado de um nome: abre ao passar o mouse, ao focar com o teclado ou ao clicar/tocar (clicar fixa aberto). */
+function DashDica({ texto, rotulo }) {
+  const h = React.createElement;
+  const [hover, setHover] = useState(false), [fixa, setFixa] = useState(false), [dir, setDir] = useState(false);
+  const ref = React.useRef(null);
+  const visivel = hover || fixa;
+  useEffect(() => {
+    if (!visivel) return;
+    const el = ref.current;
+    if (el && el.getBoundingClientRect) { const r = el.getBoundingClientRect(); setDir(r.left + 300 > (window.innerWidth || 1200)); }
+  }, [visivel]);
+  useEffect(() => {
+    if (!fixa) return;
+    const fora = e => { if (ref.current && !ref.current.contains(e.target)) setFixa(false); };
+    const esc = e => { if (e.key === "Escape") setFixa(false); };
+    document.addEventListener("mousedown", fora); document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("keydown", esc); };
+  }, [fixa]);
+  return h("span", { ref, className: "dash-dica dash-no-print", style: { position: "relative", display: "inline-flex", marginLeft: 5, verticalAlign: "middle", textTransform: "none", letterSpacing: "normal" },
+    onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false) },
+    h("span", { role: "button", tabIndex: 0, "aria-label": "O que significa" + (rotulo ? ": " + rotulo : ""), "aria-expanded": visivel,
+      onClick: e => { e.stopPropagation(); e.preventDefault(); setFixa(v => !v); },
+      onKeyDown: e => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); e.preventDefault(); setFixa(v => !v); } },
+      onFocus: () => setHover(true), onBlur: () => setHover(false),
+      style: { width: 15, height: 15, borderRadius: 99, border: "1px solid " + (visivel ? "#475569" : "#CBD5E1"), color: visivel ? "#0F172A" : "#94A3B8", background: visivel ? "#F1F5F9" : "#fff",
+        fontSize: 9.5, fontWeight: 800, lineHeight: "13px", textAlign: "center", cursor: "help", userSelect: "none", flexShrink: 0 } }, "?"),
+    visivel && h("span", { role: "tooltip", style: { position: "absolute", top: "calc(100% + 6px)", [dir ? "right" : "left"]: 0, zIndex: 3000, width: 290, maxWidth: "80vw", background: "#0F172A", color: "#F1F5F9",
+      padding: "10px 12px", borderRadius: 10, fontSize: 11.5, lineHeight: 1.55, fontWeight: 400, textAlign: "left", whiteSpace: "normal", boxShadow: "0 10px 30px rgba(15,23,42,.35)", textTransform: "none", letterSpacing: "normal" } }, texto));
+}
+
+/* Legenda escrita (sempre visível) embaixo de uma tabela: o que cada coluna quer dizer, em linguagem simples. */
+function DashLegenda({ itens, titulo }) {
+  const h = React.createElement;
+  return h("div", { className: "dash-legenda", style: { margin: "12px 6px 0", padding: "12px 14px", background: "#F8FAFC", borderRadius: 12 } },
+    h("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 8 } }, titulo || "O que cada coluna quer dizer"),
+    h("dl", { style: { margin: 0, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))", gap: "10px 22px" } },
+      itens.map(([t, d]) => h("div", { key: t },
+        h("dt", { style: { fontSize: 11, fontWeight: 700, color: "#0F172A", textTransform: "uppercase", letterSpacing: ".04em" } }, t),
+        h("dd", { style: { margin: "2px 0 0", fontSize: 11.5, color: "#64748B", lineHeight: 1.5 } }, d)))));
+}
+
+/* Janela com o glossário completo. */
+function DashGlossario({ onClose }) {
+  const h = React.createElement;
+  const [q, setQ] = useState("");
+  useEffect(() => { const f = e => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", f); return () => window.removeEventListener("keydown", f); }, []);
+  const lista = DASH_GLOSSARIO.filter(([t, d]) => !q.trim() || (t + " " + d).toLowerCase().includes(q.trim().toLowerCase()));
+  return h("div", { onClick: e => { if (e.target === e.currentTarget) onClose(); }, className: "dash-no-print",
+    style: { position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2500, padding: 16 } },
+    h("div", { role: "dialog", "aria-modal": "true", "aria-label": "Glossário do painel", style: { background: "#fff", borderRadius: 16, width: "100%", maxWidth: 640, maxHeight: "88vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,.35)", overflow: "hidden" } },
+      h("div", { style: { padding: "16px 20px", borderBottom: "1px solid #F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 } },
+        h("div", null, h("div", { style: { fontWeight: 700, fontSize: 15, color: "#0F172A" } }, "Glossário do painel"), h("div", { style: { fontSize: 11.5, color: "#64748B", marginTop: 3 } }, "Os termos do painel, em palavras simples.")),
+        h("button", { type: "button", onClick: onClose, "aria-label": "Fechar", style: { background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 22, lineHeight: 1, padding: 4 } }, "×")),
+      h("div", { style: { padding: "10px 20px 0" } },
+        h("input", { type: "search", "aria-label": "Procurar no glossário", placeholder: "Procurar um termo…", value: q, onChange: e => setQ(e.target.value), style: { width: "100%", boxSizing: "border-box", padding: "8px 11px", border: "1px solid #E2E8F0", borderRadius: 9, fontSize: 13, fontFamily: "inherit" } })),
+      h("dl", { style: { overflowY: "auto", margin: 0, padding: "6px 20px 18px" } },
+        lista.length === 0 ? h("div", { style: { padding: "20px 0", color: "#94A3B8", fontSize: 13, textAlign: "center" } }, "Nenhum termo encontrado.")
+          : lista.map(([t, d]) => h("div", { key: t, style: { padding: "10px 0", borderBottom: "1px solid #F1F5F9" } },
+              h("dt", { style: { fontSize: 13, fontWeight: 700, color: "#0F172A" } }, t),
+              h("dd", { style: { margin: "3px 0 0", fontSize: 12.5, color: "#475569", lineHeight: 1.6 } }, d))))));
+}
+
 const DASH_CSS_IMPRESSAO = `
 .dash-print-only { display: none; }
 @media print {
   @page { size: A4; margin: 12mm; }
   html, body { background: #fff !important; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .dash-no-print { display: none !important; }
+  .dash-no-print, .dash-dica { display: none !important; }
   .dash-print-only { display: block !important; }
   .dash-secao + .dash-secao { break-before: page; }
   [id^="bloco-"] { break-inside: avoid; }
@@ -1274,7 +1472,7 @@ function DashExcecoes({ cards, cfg, hojeIso, plan, onAbrirCard, Titulo, fmtMin }
   return h("div", { id: "bloco-excecoes", style: DASH_CARTAO },
     h(Titulo, {
       extra: `${todas.length} caso${todas.length !== 1 ? "s" : ""}`,
-      tooltip: "Os casos individuais por trás dos alertas, juntos numa tabela. Entram: pacientes do Kanban esperando acima do limite que você cadastrou, remoções que saíram fora da meta de tempo da gravidade, atrasos do protocolo de AVC e remoções não realizadas (com o motivo do status). Ordem: urgente (vermelho ou AVC), alta, média; dentro de cada uma, a que espera há mais tempo. Sem limite ou meta cadastrados, esses casos não são apontados: cadastre em Configurações."
+      tooltip: "Os casos, um a um, por trás dos alertas, numa só tabela: pacientes esperando mais que o limite, remoções que saíram fora da meta, atrasos do protocolo de AVC e remoções não realizadas. A ordem vai do mais urgente (vermelho ou AVC) ao menos urgente; dentro de cada nível, a que espera há mais tempo. Sem limites ou metas cadastrados em Configurações, esses casos não são apontados."
     }, "Casos para atenção"),
     h("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 } },
       ORIGENS.map(([id, rot]) => h("button", { key: id, type: "button", "aria-pressed": filtro === id, onClick: () => { setFiltro(id); setTodos(false); },
@@ -1300,7 +1498,13 @@ function DashExcecoes({ cards, cfg, hojeIso, plan, onAbrirCard, Titulo, fmtMin }
             }))),
     lista.length > 15 && h("button", { type: "button", onClick: () => setTodos(v => !v),
       style: { marginTop: 8, background: "none", border: "1px solid #E2E8F0", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, color: "#64748B", cursor: "pointer", fontFamily: "inherit" } },
-      todos ? "mostrar só os 15 primeiros" : `ver todos os ${lista.length}`));
+      todos ? "mostrar só os 15 primeiros" : `ver todos os ${lista.length}`),
+    todas.length > 0 && h(DashLegenda, { itens: [
+      ["Prioridade", "Urgente: paciente vermelho ou protocolo de AVC. Alta: amarelo ou reinserção. Média: os demais. Dentro de cada nível, o mais demorado vem primeiro."],
+      ["Paciente", "O nome e o número da ficha da CROSS."],
+      ["Situação", "Em que ponto o caso está: aguardando aceite, aguardando ambulância, fora da meta, protocolo de AVC ou o status de não realizada."],
+      ["Tempo", "Há quanto tempo o paciente espera, ou quanto tempo a etapa levou."],
+      ["Motivo", "Por que o caso está nesta lista."]] }));
 }
 
 /* Status da planilha que dizem que NÃO houve remoção (o motivo é o próprio status). Nomes canônicos de canon.js. */
@@ -1338,6 +1542,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const [justTexto, setJustTexto] = useState("");
   const [justSaving, setJustSaving] = useState(false);
   const [secao, setSecao] = useState("sec-agora");   // aba (seção) aberta: Agora é a primeira
+  const [verGlossario, setVerGlossario] = useState(false);
   const [imprimindo, setImprimindo] = useState(false); // ao imprimir, todas as seções aparecem de uma vez
   const [aba, setAba] = useState(null);              // painel aberto logo abaixo dos números: remocao | nao | alertas | falhas
   const [agAberto, setAgAberto] = useState(false);     // lista dos pacientes aguardando: COMEÇA minimizada
@@ -1473,6 +1678,31 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   }, [remocoes, limInf, limSup]);
 
   const totaisGraf = { saidas: eventos.saidas.length, pedidos: eventos.pedidos.length, finalizacoes: eventos.finalizacoes.length };
+  // Pedido à CROSS = linha COM ficha e com data de solicitação dentro do período. Finalização = qualquer linha com data de finalização no
+  // período. Aqui se separa, linha por linha, o que faz um número diferir do outro.
+  const reconc = useMemo(() => {
+    const dentro = d => !!d && d >= limInf && d <= limSup;
+    const A = { semFicha: [], semDataSol: [], solImpossivel: [], solForaPeriodo: 0 };      // finalizações cujo pedido não está contado
+    const B = { semFinalizacao: 0, finImpossivel: [], finForaPeriodo: 0 };                 // pedidos cuja finalização não está contada
+    remocoes.forEach(r => {
+      const p = dashDiaIso(r.data_solicitacao), f = dashDiaIso(r.data_resposta_cross), ficha = dashTemFicha(r);
+      const contaPed = ficha && dentro(p), contaFin = dentro(f);
+      const item = (campo, texto) => ({ id: r.id, campo, nome: r.nome_paciente || "(sem nome)", ficha: r.ficha_cross || "", texto });
+      const imp = d => d < DASH_DATA_MIN || d > hojeIso;
+      if (contaFin && !contaPed) {
+        if (!ficha) A.semFicha.push(item("ficha_cross", `Finalizada em ${dashFmtBR(f)}, mas a linha não tem ficha CROSS: não conta como pedido à CROSS.`));
+        else if (!p) A.semDataSol.push(item("data_solicitacao", `Finalizada em ${dashFmtBR(f)}, mas sem data de solicitação: o pedido não tem dia.`));
+        else if (imp(p)) A.solImpossivel.push(item("data_solicitacao", `Finalizada em ${dashFmtBR(f)}, mas a data de solicitação (${dashFmtBR(p)}) é impossível.`));
+        else A.solForaPeriodo++;
+      }
+      if (contaPed && !contaFin) {
+        if (!f) B.semFinalizacao++;
+        else if (imp(f)) B.finImpossivel.push(item("data_resposta_cross", `Pedido em ${dashFmtBR(p)}, mas a data de finalização (${dashFmtBR(f)}) é impossível.`));
+        else B.finForaPeriodo++;
+      }
+    });
+    return { A, B };
+  }, [remocoes, limInf, limSup, hojeIso]);
 
   const serie = useMemo(() => {
     const chave = d => {
@@ -1787,20 +2017,20 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     // "Saneamento de falhas".
     const par = parMin;
     const DEFS = [
-      { id: "sol_fin", de: "Solicitação", ate: "Finalização", dono: "CROSS", cor: "#0369A1",
-        tip: "Tempo mediano entre a solicitação da Santa Casa à CROSS e a finalização da ficha na CROSS (o aceite é o mesmo momento da finalização).",
+      { id: "sol_fin", campo: "data_resposta_cross", de: "Solicitação", ate: "Finalização", dono: "CROSS", cor: "#0369A1",
+        tip: "O tempo do meio (mediana) que a CROSS levou para responder: do pedido da Santa Casa até a CROSS finalizar a ficha.",
         calc: x => par(x.data_solicitacao, x.horario_solicitacao, x.data_resposta_cross, x.horario_resposta_cross, false),
         pts: x => [dm(x.data_solicitacao, x.horario_solicitacao), dm(x.data_resposta_cross, x.horario_resposta_cross)] },
-      { id: "fin_ped", de: "Finalização", ate: "Solicitação da ambulância", dono: "Santa Casa", cor: "#B45309",
-        tip: "Tempo mediano entre a finalização da ficha na CROSS e a solicitação da ambulância pela Santa Casa. Vem da coluna min_finalizacao_pedido_amb da planilha de remoção.",
+      { id: "fin_ped", campo: "hora_solic_ambulancia", de: "Finalização", ate: "Solicitação da ambulância", dono: "Santa Casa", cor: "#B45309",
+        tip: "O tempo do meio (mediana) entre a CROSS finalizar a ficha e a Santa Casa pedir a ambulância. É o que depende só da Santa Casa antes de chamar a ambulância.",
         calc: x => { const m = minFinPed(x); return m === null ? { v: null, neg: false } : (m < 0 || m >= 43200) ? { v: null, neg: true } : { v: m, neg: false }; },
         pts: x => [dm(x.data_resposta_cross, x.horario_resposta_cross), dm(x.data_saida_ambulancia, x.hora_solic_ambulancia)] },
-      { id: "ped_sai", de: "Solicitação da ambulância", ate: "Saída", dono: "Santa Casa", cor: "#BE123C",
-        tip: "Tempo mediano entre a solicitação da ambulância e a saída dela, como está na coluna T. ESPERA da planilha. Se a célula estiver vazia, usa a mesma conta da planilha: data e horário dos dois momentos, sem supor dia. Se faltar algum, o caso fica de fora e aparece em “Saneamento de falhas”.",
+      { id: "ped_sai", campo: "horario_saida_ambulancia", de: "Solicitação da ambulância", ate: "Saída", dono: "Santa Casa", cor: "#BE123C",
+        tip: "O tempo do meio (mediana) entre o pedido da ambulância e ela sair da Santa Casa. É a espera pela ambulância.",
         calc: x => { const g = dashHMemMin(x.tempo_espera); return g !== null ? { v: g, neg: false } : par(x.data_saida_ambulancia, x.hora_solic_ambulancia, x.data_saida_real, x.horario_saida_ambulancia); },
         pts: x => [dm(x.data_saida_ambulancia, x.hora_solic_ambulancia), dm(x.data_saida_real, x.horario_saida_ambulancia)] },
-      { id: "sai_ret", de: "Saída", ate: "Retorno", dono: "Santa Casa", cor: "#0F766E",
-        tip: "Tempo mediano que a ambulância ficou fora: da saída ao retorno, como está na coluna DURAÇÃO da planilha. Se a célula estiver vazia, usa a mesma conta da planilha: data e horário dos dois momentos, sem supor dia. Se faltar algum, o caso fica de fora e aparece em “Saneamento de falhas”.",
+      { id: "sai_ret", campo: "horario_retorno", de: "Saída", ate: "Retorno", dono: "Santa Casa", cor: "#0F766E",
+        tip: "O tempo do meio (mediana) que a ambulância ficou fora da Santa Casa: da saída até a volta. É também o tempo que o paciente passa no destino. Só conta remoções que têm a saída e o retorno anotados.",
         calc: x => { const g = dashHMemMin(x.duracao_remocao); return g !== null ? { v: g, neg: false } : par(x.data_saida_real, x.horario_saida_ambulancia, x.data_retorno, x.horario_retorno); },
         pts: x => [dm(x.data_saida_real, x.horario_saida_ambulancia), dm(x.data_retorno, x.horario_retorno)] },
     ];
@@ -1815,7 +2045,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
         const r = def.calc(x);
         if (r.v === null) { if (r.neg) nNeg++; else nSem++; return; }
         const p = def.pts(x);
-        const caso = { nome: x.nome_paciente || "(sem nome)", ficha: x.ficha_cross || "", avc: x.protocolo_avc === true,
+        const caso = { id: x.id, campo: def.campo, nome: x.nome_paciente || "(sem nome)", ficha: x.ficha_cross || "", avc: x.protocolo_avc === true,
                        min: r.v, grav: g.chave, de: p[0], ate: p[1] };
         [g, todas].forEach(o => { o.nPos++; o.v.push(r.v); o.casos.push(caso); });
       });
@@ -1827,7 +2057,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
         o.acima2h = o.v.filter(m => m > 120).length;
         delete o.v;
       });
-      return { id: def.id, de: def.de, ate: def.ate, dono: def.dono, cor: def.cor, tip: def.tip,
+      return { id: def.id, campo: def.campo, de: def.de, ate: def.ate, dono: def.dono, cor: def.cor, tip: def.tip,
                rotulo: `${def.de} → ${def.ate}`, nNeg, nSem, todas, grupos: [...grupos.values()].filter(g => g.total > 0) };
     });
   }, [dados]);
@@ -1862,9 +2092,14 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
   const tempoTotal = useMemo(() => {   // solicitação → retorno, remoção por remoção (não é a soma das medianas)
     const tot = temposLinha.map(t => t.total).filter(x => x !== null);
-    return { mediana: dashMediana(tot), n: tot.length };
+    const top = temposLinha.filter(t => t.total !== null).sort((a, b) => b.total - a.total).slice(0, 10).map(t => ({ id: t.r.id, campo: "horario_retorno", nome: t.r.nome_paciente || "(sem nome)", ficha: t.r.ficha_cross || "",
+      texto: `Solicitação ${dm(t.r.data_solicitacao, t.r.horario_solicitacao)} → retorno ${dm(t.r.data_retorno, t.r.horario_retorno)} = ${dashFmtMin(t.total)}` }));
+    return { mediana: dashMediana(tot), n: tot.length, top };
   }, [temposLinha]);
 
+  const longasFora = useMemo(() => temposLinha.filter(t => t.fora !== null).sort((a, b) => b.fora - a.fora).slice(0, 10).map(t => ({
+    id: t.r.id, campo: "horario_retorno", nome: t.r.nome_paciente || "(sem nome)", ficha: t.r.ficha_cross || "",
+    texto: `Saída ${dm(t.r.data_saida_real, t.r.horario_saida_ambulancia)} → retorno ${dm(t.r.data_retorno, t.r.horario_retorno)} = ${dashFmtMin(t.fora)}` })), [temposLinha]);
   const foraStats = useMemo(() => {   // (ver também: DashMotivos)
     const v = temposLinha.map(t => t.fora).filter(x => x !== null);
     return { n: v.length, mediana: dashMediana(v), p95: v.length >= 20 ? dashPercentil(v, 95) : null, max: v.length ? Math.max(...v) : null };
@@ -2059,10 +2294,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     style: { fontSize: 11.5, color: "#CBD5E1", padding: "14px 0", textAlign: "center" }
   }, children);
 
-  function TipIcon(props) {
-    return React.createElement("span", {className:"tip", style:{marginLeft:4,color:"#CBD5E1",fontSize:10,fontWeight:700,verticalAlign:"middle",userSelect:"none"}},
-      "?", React.createElement("span", {className:"tipbox"}, props.texto));
-  }
+  function TipIcon(props) { return React.createElement(DashDica, { texto: props.texto }); }
   const Kpi = ({ label, valor, sub, cor, alerta, tooltip, onClick, ativo, topo }) => /*#__PURE__*/React.createElement(Card, {
     onClick,
     style: { ...(alerta ? { borderColor: "#FDE68A", background: "#FFFBEB" } : null), ...(ativo ? { borderColor: cor || "#0F172A", boxShadow: `0 0 0 1px ${cor || "#0F172A"}` } : null), ...(topo ? { borderTop: `3px solid ${topo}` } : null) }
@@ -2141,7 +2373,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     const on = escalaEfetiva === id, livre = escalaLiberada[id];
     return /*#__PURE__*/React.createElement("button", {
       key: id, onClick: () => livre && setEscala(id), disabled: !livre,
-      title: livre ? "" : motivoBloqueio[id],
+      title: livre ? DICA_ESCALA[id] : motivoBloqueio[id],
       style: { padding: "5px 13px", borderRadius: 7, border: "none", fontSize: 12,
                fontWeight: on ? 650 : 450, cursor: livre ? "pointer" : "not-allowed",
                background: on ? "#0F172A" : "transparent",
@@ -2149,8 +2381,10 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     }, txt);
   };
 
+  const DICA_PERIODO = { tudo: "Todas as remoções da planilha, de qualquer data.", hoje: "Só as remoções pedidas hoje.", "7d": "Os últimos 7 dias, contando hoje.", mes: "Um mês inteiro, que você escolhe ao lado.", custom: "Um período à sua escolha: de uma data a outra." };
+  const DICA_ESCALA = { dia: "O gráfico mostra um ponto por dia.", semana: "O gráfico mostra um ponto por semana (de segunda a domingo).", mes: "O gráfico mostra um ponto por mês." };
   const btnPeriodo = (id, txt) => /*#__PURE__*/React.createElement("button", {
-    key: id,
+    key: id, title: DICA_PERIODO[id],
     onClick: () => {
       setPeriodo(id);
       if (id === "custom" && (!ini || !fim)) { setIni(iso(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 29))); setFim(hojeIso); }
@@ -2202,6 +2436,8 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
         totaisGraf.saidas, " saídas de ambulância · ", dados.length, " linhas",
         deDia && ` · ${fmtDia(deDia)}${ateDia && ateDia !== deDia ? " a " + fmtDia(ateDia) : ""}`,
         atualizando && " · atualizando…"),
+      /*#__PURE__*/React.createElement("button", { type: "button", onClick: () => setVerGlossario(true), title: "Explica, em palavras simples, cada termo do painel (mediana, P95, fora da unidade…).",
+        style: { padding: "6px 12px", borderRadius: 9, border: "1px solid #CBD5E1", background: "#fff", color: "#334155", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" } }, "📖 Glossário"),
       /*#__PURE__*/React.createElement("button", { type: "button", onClick: imprimir, disabled: imprimindo, title: "Abre a impressão com todas as seções do painel, uma por página. Escolha “Salvar como PDF” para gerar o arquivo.",
         style: { padding: "6px 12px", borderRadius: 9, border: "1px solid #CBD5E1", background: "#fff", color: "#334155", fontSize: 12, fontWeight: 600, cursor: imprimindo ? "default" : "pointer", fontFamily: "inherit", opacity: imprimindo ? 0.6 : 1 } }, imprimindo ? "Preparando…" : "🖨 Imprimir / PDF")
     ),
@@ -2252,11 +2488,11 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     ),
     /*#__PURE__*/React.createElement(DashSecao, { id: "sec-capacidade", ativa: ativaSec("sec-capacidade") },
     /* ══ Frota e capacidade ══ */
-    /*#__PURE__*/React.createElement(DashFrota, { frota: frotaHoje, fora: foraStats, cobertura: coberturaFrota, Titulo, fmtMin }),
+    /*#__PURE__*/React.createElement(DashFrota, { frota: frotaHoje, fora: foraStats, longas: longasFora, cobertura: coberturaFrota, Titulo, fmtMin }),
     /* ══ Volume: saídas (barras) + pedidos à CROSS e finalizações da CROSS (linhas) ══ */
     /*#__PURE__*/React.createElement(DashVolume, {
       serie, escala: escalaEfetiva, rotulo: rotuloSerie, rotuloLongo: rotuloLongoSerie, entrou,
-      totais: totaisGraf, notas: notasGraf, Titulo, Vazio
+      totais: totaisGraf, notas: notasGraf, reconc, Titulo, Vazio
     }),
     ),
     /*#__PURE__*/React.createElement(DashSecao, { id: "sec-problemas", ativa: ativaSec("sec-problemas") },
@@ -2273,14 +2509,14 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     /*#__PURE__*/React.createElement("div", { style: { marginBottom: 22 } },
       /*#__PURE__*/React.createElement(Titulo, {
         extra: "CROSS + outras = total de linhas",
-        tooltip: "Cada linha da planilha é uma remoção. Remoção CROSS é a linha com o Nº da ficha CROSS preenchido; outras remoções são as linhas sem ficha CROSS (altas, hemodiálise, exames etc.). A soma dos dois é sempre o total de linhas do período escolhido. Para comparar com a planilha inteira, escolha Tudo."
+        tooltip: "Cada linha da planilha é uma remoção. Remoção CROSS é a que tem o número da ficha da CROSS; as outras (altas, hemodiálise, exames…) não têm ficha. As duas somam o total de linhas do período. Para comparar com a planilha inteira, escolha Tudo."
       }, "Remoções na planilha"),
       /*#__PURE__*/React.createElement("div", {
         style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 12 }
       },
         /*#__PURE__*/React.createElement(Kpi, {
           label: "Total de linhas", valor: tipos.total, sub: "remoções CROSS + outras remoções",
-          tooltip: "Todas as linhas da planilha no período escolhido. Sempre igual à soma dos dois cards ao lado." }),
+          tooltip: "Todas as linhas da planilha no período escolhido. É sempre a soma dos dois cartões ao lado." }),
         /*#__PURE__*/React.createElement(Kpi, {
           label: "Remoções CROSS", valor: tipos.cross, cor: "#0369A1", sub: `${pctCross}% do total · com ficha CROSS`,
           tooltip: "Linhas com o Nº da ficha CROSS preenchido." }),
@@ -2302,18 +2538,18 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Saídas de ambulância", valor: totaisGraf.saidas,
         sub: diasNoPeriodo ? `${(totaisGraf.saidas / diasNoPeriodo).toFixed(1)} por dia` : "no período",
-        tooltip: "Saídas de ambulância no período, de todas as linhas (CROSS e outras): conta o dia da saída (data e horário de saída preenchidos na planilha). Linha ainda sem saída não entra. A saída conta no dia da saída e as linhas, no dia do pedido; por isso, nos períodos curtos, os dois números podem não coincidir (em Tudo coincidem). Fonte: planilha de remoções." }),
+        tooltip: "Quantas vezes a ambulância saiu da Santa Casa no período, em qualquer linha (CROSS ou outras). Conta no dia da saída; linha sem saída registrada não entra. Como os pedidos contam no dia do pedido e as saídas no dia da saída, em períodos curtos os dois números podem não ser iguais (em Tudo, são)." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Ambulância avançada",
         valor: gAmb.informados ? `${((gAmb.itens.find(i => i.canonico === "AVANÇADA")?.n || 0) / gAmb.informados * 100).toFixed(0)}%` : "—",
         sub: (() => { const nAv = gAmb.itens.find(i => i.canonico === "AVANÇADA")?.n || 0; return `${nAv} avançada${nAv !== 1 ? "s" : ""} de ${gAmb.informados} com tipo informado · ${gAmb.total - gAmb.informados} sem tipo`; })(),
         alerta: gAmb.cobertura < 80,
-        tooltip: "A porcentagem é: ambulâncias avançadas ÷ linhas que têm o tipo de ambulância preenchido (não ÷ o total de linhas). As linhas sem tipo ficam fora da conta, e o número delas aparece abaixo. SAV = Suporte Avançado de Vida; inclui UTI móvel, que a gestão decidiu contar como Avançada (01/10/2026): na planilha o valor pode aparecer como UTI." }),
+        tooltip: "Das saídas em que o tipo de ambulância foi anotado, qual a porcentagem de ambulâncias avançadas (com médico a bordo, para casos graves). Conta só as linhas com o tipo preenchido; as sem tipo ficam de fora e aparecem no cartão. A UTI móvel conta como avançada." }),
       /*#__PURE__*/React.createElement(Kpi, {
         label: "Permaneceu no destino", valor: perm.n ? `${perm.pct.toFixed(0)}%` : "—",
         sub: `${perm.sim} de ${perm.n} linhas · ${perm.semInfo} sem registro`,
         alerta: perm.n > 0 && perm.semInfo / perm.n > 0.2,
-        tooltip: "% das linhas do período em que o paciente ficou no hospital de destino e não voltou à Santa Casa. O denominador é o total de linhas do período; os sem registro (campo vazio) contam como não-permaneceu, então o valor real pode ser maior." })
+        tooltip: "De todas as linhas do período, a porcentagem em que o paciente ficou no hospital de destino e não voltou à Santa Casa. Linha sem resposta (Sim/Não) conta como “não permaneceu”, então o valor real pode ser maior." })
     ),
     /*#__PURE__*/React.createElement(DashDestinos, { destinos, Titulo, fmtMin }),
     /*#__PURE__*/React.createElement(DashPermanece, { tempos: temposLinha, C, Titulo, fmtMin }),
@@ -2324,7 +2560,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
       /* Gravidade — proporção importa mais que valor absoluto */
       /*#__PURE__*/React.createElement(Card, null,
-        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gGrav }), tooltip: "Distribuição por nível de urgência do paciente conforme registrado na planilha. VERMELHO=emergência, AMARELO=urgência, VERDE=menor gravidade." }, "Gravidade"),
+        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gGrav }), tooltip: "Quantos pacientes há em cada nível de urgência, segundo a prioridade da ficha da CROSS: vermelho = emergência, amarelo = urgência, verde = menos grave, cinza = agendamento." }, "Gravidade"),
         gGrav.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
         /*#__PURE__*/React.createElement(React.Fragment, null,
           /*#__PURE__*/React.createElement("div", {
@@ -2345,7 +2581,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
       /* Especialidades — recursos apartados das clínicas */
       /*#__PURE__*/React.createElement(Card, null,
-        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gEspec }), tooltip: "Especialidades e exames solicitados à CROSS. Recursos (exames, procedimentos) ficam separados das especialidades clínicas pois não competem pelas mesmas vagas." }, "Recursos solicitados"),
+        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gEspec }), tooltip: "O que foi pedido à CROSS: especialidades médicas (clínica, ortopedia…) e recursos (exames, procedimentos). Os recursos ficam separados porque não disputam as mesmas vagas dos leitos." }, "Recursos solicitados"),
         gEspec.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
         /*#__PURE__*/React.createElement(React.Fragment, null,
           recursos.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -2363,7 +2599,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
       /* Hospitais */
       /*#__PURE__*/React.createElement(Card, null,
-        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gHosp }), tooltip: "Hospitais e unidades que receberam os pacientes. Mostra para onde a Santa Casa mais encaminha." }, "Instituições de destino"),
+        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gHosp }), tooltip: "Para onde a Santa Casa mais encaminha os pacientes: os hospitais e unidades de destino." }, "Instituições de destino"),
         gHosp.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
         gHosp.itens.map(i => /*#__PURE__*/React.createElement(Barra, {
           key: i.canonico,
@@ -2373,7 +2609,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
       /* Status */
       /*#__PURE__*/React.createElement("div", { id: "bloco-desfecho", style: { display: "contents" } }, /*#__PURE__*/React.createElement(Card, null,
-        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gStatus }), tooltip: "O que aconteceu com cada remocao: paciente transferido, evadiu, resolvido localmente etc. Campo status da planilha." }, "Desfecho"),
+        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gStatus }), tooltip: "O que aconteceu com cada pedido, segundo o status da planilha: finalizada pela CROSS, cancelada, paciente evadiu, resolvido no próprio hospital etc." }, "Desfecho"),
         gStatus.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
         gStatus.itens.map(i => /*#__PURE__*/React.createElement(Barra, {
           key: i.canonico,
@@ -2383,7 +2619,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
 
       /* Ambulância */
       /*#__PURE__*/React.createElement(Card, null,
-        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gAmb }), tooltip: "Básica (SBV) = apenas técnico e motorista. Avançada (SAV) = médico a bordo, usada em casos críticos. O percentual de avançada é um indicador de gravidade da demanda." }, "Tipo de ambulância"),
+        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gAmb }), tooltip: "Básica: técnico e motorista. Avançada: tem médico a bordo, usada em casos graves. Uma porcentagem alta de avançadas indica uma demanda de pacientes mais graves." }, "Tipo de ambulância"),
         gAmb.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
         gAmb.itens.map(i => /*#__PURE__*/React.createElement(Barra, {
           key: i.canonico, label: i.canonico === (C && C.NAO_CLASSIFICADO) ? "Outro / não classificado" : i.canonico, n: i.n, pct: i.pct, max: gAmb.itens[0].n,
@@ -2440,6 +2676,8 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     ),
     /* ══ Configurações do painel (frota, metas e limites): só administrador ══ */
     isAdmin && /*#__PURE__*/React.createElement(DashConfig, { cfg, userNome, recarregar: recarregarCfg, showT, hojeIso }),
+    verGlossario && /*#__PURE__*/React.createElement(DashGlossario, { onClose: () => setVerGlossario(false) }),
+
     /* Rodapé honesto sobre a base */
     /*#__PURE__*/React.createElement("div", {
       style: { fontSize: 10.5, color: "#CBD5E1", marginTop: 18, lineHeight: 1.6 }
