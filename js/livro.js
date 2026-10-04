@@ -17,7 +17,7 @@ function strSim(a, b) {
 // Cada etapa tem os seus campos obrigatórios; quem registra a etapa é carimbado pelo servidor.
 const LS_EMPTY={data_solic_ambulancia:"",hora_solic_ambulancia:"",nome_paciente:"",idade:"",especialidade:"",destino:"",ambulancia:"",observacao:"",
   data_saida:"",hora_saida:"",medico:"",enfermeiro:"",tecnico_auxiliar:"",protocolo_avc:false};
-const LS_SAIDA_EMPTY={data_saida:"",hora_saida:"",medico:"",enfermeiro:"",tecnico_auxiliar:"",observacao:""};
+const LS_SAIDA_EMPTY={data_saida:"",hora_saida:"",medico:"",enfermeiro:"",tecnico_auxiliar:"",observacao:"",prefixo_ambulancia:""};
 const LS_RET_EMPTY={data_retorno:"",hora_retorno:"",finalizado:null,permaneceu:null,observacao:""};
 // Obrigatórios do PEDIDO. Os da saída só valem quando a saída é registrada (LS_REQ_SAIDA); os do retorno, no retorno.
 const LS_REQ_PEDIDO=["data_solic_ambulancia","hora_solic_ambulancia","nome_paciente","idade","especialidade","destino","ambulancia"];
@@ -65,6 +65,7 @@ function lsDiff(dIni,hIni,dFim,hFim){
 function lsLivroParaPlanilha(l){
   const u={};
   if(l.ambulancia)u.tipo_ambulancia=l.ambulancia;
+  if(String(l.prefixo_ambulancia||"").trim())u.prefixo_ambulancia=String(l.prefixo_ambulancia).trim();   // qual ambulância fez a remoção
   if(l.data_solic_ambulancia)u.data_saida_ambulancia=l.data_solic_ambulancia; // coluna da planilha "Solicitação base ambulância — data"
   if(l.hora_solic_ambulancia)u.hora_solic_ambulancia=lsHora(l.hora_solic_ambulancia);
   if(l.data_saida){u.data_saida_real=l.data_saida;u.data_saida_real_inferida=false;}  // dia em que a ambulância realmente saiu
@@ -95,7 +96,7 @@ function lsDiferencasPlanilha(l,rem){
   cmpD("data_saida_real",l.data_saida);cmpH("horario_saida_ambulancia",l.hora_saida);
   cmpD("data_retorno",l.data_retorno);cmpH("horario_retorno",l.hora_retorno);
   // O Livro é o registro de quem realmente foi na ambulância: vale mais que a escala prevista.
-  ["medico","enfermeiro","tecnico_auxiliar"].forEach(k=>{const v=String(l[k]||"").trim();if(v&&String(rem[k]||"").trim()!==v)u[k]=v;});
+  ["medico","enfermeiro","tecnico_auxiliar","prefixo_ambulancia"].forEach(k=>{const v=String(l[k]||"").trim();if(v&&String(rem[k]||"").trim()!==v)u[k]=v;});
   ["finalizado","permaneceu"].forEach(k=>{if((l[k]===true||l[k]===false)&&rem[k]!==l[k])u[k]=l[k];});
   if(l.protocolo_avc===true&&rem.protocolo_avc!==true)u.protocolo_avc=true;
   // A observação de cada etapa é ACRESCENTADA no Livro. Na planilha só acompanha se ela estava vazia ou igual à anterior:
@@ -114,7 +115,7 @@ function lsDiferencasPlanilha(l,rem){
   return u;
 }
 // Campos da planilha que o Livro compara/atualiza depois do vínculo
-const LS_REM_SEL="id,nome_paciente,data_solicitacao,ficha_cross,data_saida_real,horario_saida_ambulancia,data_retorno,horario_retorno,medico,enfermeiro,tecnico_auxiliar,finalizado,permaneceu,observacao,data_saida_real_inferida,data_retorno_inferida,protocolo_avc";
+const LS_REM_SEL="id,nome_paciente,data_solicitacao,ficha_cross,data_saida_real,horario_saida_ambulancia,data_retorno,horario_retorno,medico,enfermeiro,tecnico_auxiliar,finalizado,permaneceu,observacao,data_saida_real_inferida,data_retorno_inferida,protocolo_avc,prefixo_ambulancia";
 // "14:30:00" -> "14:30" (o banco pode devolver com segundos; a planilha e o dashboard esperam HH:MM)
 function lsHora(v){const t=String(v||"").trim();const m=t.match(/^(\d{1,2}):(\d{2})/);return m?m[1].padStart(2,"0")+":"+m[2]:t;}
 // Usa H() do app: resolve o JWT da sessao a cada chamada. Header fixo com a
@@ -518,7 +519,15 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
         p_medico:saiForm.medico,p_enfermeiro:saiForm.enfermeiro,p_tecnico:saiForm.tecnico_auxiliar,
         p_observacao:(saiForm.observacao||"").trim()||null})});
       if(!r.ok)throw new Error(await r.text());
-      const salvo=await r.json();
+      let salvo=await r.json();
+      const pref=String(saiForm.prefixo_ambulancia||"").trim();
+      if(pref){   // a função livro_registrar_saida não recebe o prefixo: grava à parte. Se falhar, a saída já está registrada.
+        try{
+          const rp=await fetch(`${SB_URL}/rest/v1/livro_saida?id=eq.${p.id}`,{method:"PATCH",headers:{...LS_H(),Prefer:"return=representation"},body:JSON.stringify({prefixo_ambulancia:pref})});
+          if(rp.ok){const [at]=await rp.json();if(at)salvo=at;}
+          else console.warn("[LivroSaida] prefixo não gravado:",await rp.text());
+        }catch(e){console.warn("[LivroSaida] prefixo não gravado:",e);}
+      }
       fecharPasso();setSaiForm({...LS_SAIDA_EMPTY});
       await aposEtapa(salvo,"Saída");
     }catch(e){console.error("[LivroSaida] falha ao registrar saída:",e);setPassoMsg("⚠ "+msgErroPasso(e));}
@@ -837,6 +846,9 @@ function LivroSaida({currentUser,userId,onClose,onPendentesChange}){
                         ),
                         React.createElement("div",{style:{marginTop:12}},EQUIPE3(saiForm,(k,v)=>{setSaiForm(f=>({...f,[k]:v}));setPassoErros(er=>({...er,[k]:false}));},passoErros,p.protocolo_avc===true)),
                         NOTA_SEM,
+                        React.createElement("div",{style:{marginTop:10}},
+                          LBL("Prefixo / identificação da ambulância",false),
+                          React.createElement("input",{type:"text",value:saiForm.prefixo_ambulancia||"",onChange:e=>setSaiForm(f=>({...f,prefixo_ambulancia:e.target.value})),placeholder:"Opcional — ex.: USB 01, USA 02 ou a placa",style:{...iSR(false)}})),
                         React.createElement("div",{style:{marginTop:10}},
                           LBL("Observação da saída",false),
                           React.createElement("textarea",{rows:2,value:saiForm.observacao,onChange:e=>setSaiForm(f=>({...f,observacao:e.target.value})),placeholder:"Opcional — é acrescentada à observação do pedido",style:{...iSR(false),resize:"vertical"}})),
