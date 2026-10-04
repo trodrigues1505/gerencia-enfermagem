@@ -373,10 +373,22 @@ function checarOrdemAmbulancia(m) {
   if (sai !== null && ret !== null && ret < sai) return `O retorno (${fmt(m.data_retorno, m.horario_retorno)}) está antes da saída (${fmt(m.data_saida_real, m.horario_saida_ambulancia)}). Confira as datas e os horários.`;
   return null;
 }
+function hojeLocalIso() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+/* Solicitação na CROSS: o dia tem de existir no calendário real (a partir de 01/01/2020, e não pode ser futuro), e a solicitação não pode
+ * ser DEPOIS da finalização da CROSS. Devolve a mensagem do problema ou null. */
+function checarSolicitacao(m) {
+  const d = String(m.data_solicitacao || "").slice(0, 10);
+  if (d && (d < "2020-01-01" || d > hojeLocalIso())) return `Data da solicitação impossível (${fmtD(d)}): use um dia entre 01/01/2020 e hoje.`;
+  const sol = tsLocal(m.data_solicitacao, m.horario_solicitacao), fin = tsLocal(m.data_resposta_cross, m.horario_resposta_cross);
+  if (sol !== null && fin !== null && sol > fin)
+    return `A solicitação (${fmtD(m.data_solicitacao)} ${String(m.horario_solicitacao).trim().slice(0, 5)}) está depois da finalização da CROSS (${fmtD(m.data_resposta_cross)} ${String(m.horario_resposta_cross).trim().slice(0, 5)}). Confira as datas e os horários.`;
+  return null;
+}
 const CAMPOS_AMBULANCIA = ["data_saida_ambulancia", "hora_solic_ambulancia", "data_saida_real", "horario_saida_ambulancia", "data_retorno", "horario_retorno"];
 /* Validação do formulário da linha. Só cobra o que a pessoa MUDOU (linha antiga com problema não trava a edição de outro campo). */
 function validarFormularioAmbulancia(form, original) {
   const mudou = k => !original || String(form[k] || "") !== String(original[k] || "");
+  if (["data_solicitacao", "horario_solicitacao"].some(mudou)) { const a = checarSolicitacao(form); if (a) return a; }
   if (form.horario_saida_ambulancia && !form.data_saida_real && mudou("horario_saida_ambulancia")) {
     const s = sugerirDiaDoHorario(form.data_saida_ambulancia, form.hora_solic_ambulancia, form.horario_saida_ambulancia);
     return "Preencha a DATA SAÍDA AMB.: o horário de saída precisa do dia em que a ambulância saiu." + (s ? ` (Pelo pedido da ambulância, deve ser ${fmtD(s)}${s !== String(form.data_saida_ambulancia).slice(0, 10) ? ", pois o horário passou da meia-noite" : ""}; confirme e digite.)` : "");
@@ -470,6 +482,7 @@ const GRAV_MAP = {
 function gravInfo(v) { return GRAV_MAP[v] || {label:v||"—",bg:"#F1F5F9",fc:"#475569",bd:"#E2E8F0"}; }
 
 const S_OPTS=["FICHA FINALIZADA","FICHA FINALIZADA VIA CROSS","FICHA FINALIZADA PELA CROSS","FICHA FINALIZADA PELA ORIGEM","FICHA ENCERRADA PELO CROSS","ENCERRADA PELO CROSS","REMOÇÃO CONCLUÍDA","REMOÇÃO NÃO REALIZADA, POR INDISPONIBILIDADE DE AMBULÂNCIA","ALTA HOSPITALAR","RESOLVIDO COM RECURSOS LOCAIS","CASO SEM ATUALIZAÇÃO MÉDICA HÁ 48 HORAS","EVASÃO/ALTA A PEDIDO","CANCELADA PELO CROSS","CANCELADA PELO SOLICITANTE","PACIENTE EM REMOÇÃO","PACIENTE AGUARDANDO AMBULÂNCIA","CONCLUIDO","AGENDAMENTO SECRETARIA DA SAÚDE","HEMODIÁLISE","REINSERIDA","PACIENTE INSTÁVEL, REMOÇÃO NÃO LIBERADA","OUTRO"];
+const M_OPTS=(typeof Canon!=="undefined"&&Canon.MOTIVOS_TEMPO_INTERNO)||[];   // motivos do tempo interno (lista em canon.js)
 const G_OPTS=["VERMELHO","AMARELO","VERDE","CINZA"];   // prioridade CROSS 1,2,3,4 (canon.js, PRIORIDADE_CROSS)
 const ST_OPTS=["EMERGÊNCIA","CLÍNICA MÉDICA","OBSERVAÇÃO ADULTO","OBSERVAÇÃO INFANTIL","CLÍNICA PEDIÁTRICA","UTI","BLOCO MATERNO","EVASÃO","OUTRO"];
 const P_OPTS=["AVALIAÇÃO","EXAME","LEITO","BANCO","ALTA","OUTRO"];
@@ -509,6 +522,7 @@ const COLS = [
   ["data_saida_real",         "DATA DA SAÍDA DA AMBULÂNCIA",            "DATA SAÍDA AMB.",   "—",           "date","",       "Dia em que a ambulância realmente SAIU (pode ser diferente do dia em que foi solicitada). Fonte: Livro de Saída. \"≈\" = data deduzida pelo horário, não digitada",80],
   ["min_finalizacao_pedido_amb","TEMPO DA FINALIZAÇÃO CROSS ATÉ A SOLICITAÇÃO DA AMBULÂNCIA","T. FINALIZ. → SOLIC. AMB.","—","ro","","Auto (calculada pelo banco): tempo entre a finalização da ficha na CROSS e a solicitação da ambulância pela Santa Casa. Negativo = solicitação registrada ANTES da finalização. Vazio = falta data ou hora de um dos dois. Não é editável",90],
   ["prefixo_ambulancia",        "PREFIXO / IDENTIFICAÇÃO DA AMBULÂNCIA",  "PREFIXO AMB.",       "—",           "text","",       "Qual ambulância fez a remoção (prefixo ou placa). Campo novo: ainda sem dados; base para medir uso da frota. Fonte: Livro de Saída"],
+  ["motivo_demora_interna",      "MOTIVO DO TEMPO INTERNO",                "MOTIVO T. INTERNO",  "—",           "sel", "M_OPTS", "Por que passou tempo entre a finalização da CROSS e o pedido da ambulância. Manual. Alimenta o bloco Tempo interno por motivo, no painel",190],
 ];
 
 // "SEM MÉDICO" etc.: afirmação explícita de que não houve aquele profissional (definida em canon.js)
@@ -627,7 +641,7 @@ function Cell({rowId,field,value,tipo,optsKey,onSave,fmtDisplay,colorStyle,suges
   const [free,setFree]=useState(false);
   const ref=useRef();
   const wrapRef=useRef();
-  const OPTS_MAP={S_OPTS,G_OPTS,ST_OPTS,P_OPTS,A_OPTS};
+  const OPTS_MAP={S_OPTS,G_OPTS,ST_OPTS,P_OPTS,A_OPTS,M_OPTS};
   const opts=optsKey?OPTS_MAP[optsKey]:null;
   useEffect(()=>{setVal(value||"");},[value]);
   useEffect(()=>{if(ed&&ref.current)ref.current.focus();},[ed]);
@@ -850,6 +864,7 @@ function FormModal({row,onClose,onSave,saving}){
           <div className="fsc"><div className="fst">Ambulância</div>
             <div className="fg fg3">
               <div className="fd"><label>Tipo</label><SelOrFree value={form.tipo_ambulancia} onChange={v=>set("tipo_ambulancia",v)} opts={A_OPTS}/></div>
+              <div className="fd"><label>Motivo do tempo interno</label><SelOrFree value={form.motivo_demora_interna} onChange={v=>set("motivo_demora_interna",v)} opts={M_OPTS}/></div>
               <div className="fd"><label>Prefixo da ambulância</label><input type="text" placeholder="ex.: USB 01 ou a placa" value={form.prefixo_ambulancia||""} onChange={e=>set("prefixo_ambulancia",e.target.value)}/></div>
               <div className="fd"><label>Data Solic. Ambulância</label><input type="date" value={form.data_saida_ambulancia} onChange={e=>set("data_saida_ambulancia",e.target.value)}/></div>
               <div className="fd"><label>Hora Solic. Ambulância</label><input type="time" value={form.hora_solic_ambulancia} onChange={e=>set("hora_solic_ambulancia",e.target.value)}/></div>
@@ -1576,6 +1591,7 @@ function App(){
   const COL_NOVAS_ANTES_DE = [
     ["data_saida_real","horario_saida_ambulancia"],
     ["min_finalizacao_pedido_amb","data_saida_real"],   // vem DEPOIS da linha acima, para cair logo após a hora do pedido
+    ["motivo_demora_interna","data_saida_real"],       // logo depois do tempo da CROSS ao pedido da ambulância
     ["data_retorno","horario_retorno"],
     ["prefixo_ambulancia","data_saida_ambulancia"],   // logo depois do tipo de ambulância
   ];
@@ -1593,7 +1609,7 @@ function App(){
   const ORDEM_PADRAO = [
     "setor","procedimento","especialidade","diagnostico","gravidade",
     "instituicao_destino","data_resposta_cross","horario_resposta_cross","status",
-    "tipo_ambulancia","prefixo_ambulancia","data_saida_ambulancia","hora_solic_ambulancia","min_finalizacao_pedido_amb","data_saida_real","horario_saida_ambulancia","tempo_espera",
+    "tipo_ambulancia","prefixo_ambulancia","data_saida_ambulancia","hora_solic_ambulancia","min_finalizacao_pedido_amb","motivo_demora_interna","data_saida_real","horario_saida_ambulancia","tempo_espera",
     "medico","enfermeiro","tecnico_auxiliar","data_retorno","horario_retorno","duracao_remocao",
     "finalizado","permaneceu","observacao",
   ];
@@ -1750,6 +1766,10 @@ function App(){
           u[campoData]=dia; u[campoData+"_inferida"]=false; flags[campoData]=dia; flags[campoData+"_inferida"]=false;
         }
       }
+      if(row && (field==="data_solicitacao"||field==="horario_solicitacao") && safeVal){
+        const avisoSol=checarSolicitacao({...row,[field]:safeVal});
+        if(avisoSol){push(avisoSol,"err");return;}
+      }
       if(row && CAMPOS_AMBULANCIA.includes(field)){
         const aviso=checarOrdemAmbulancia({...row,[field]:safeVal,...flags});
         if(aviso){push(aviso,"err");return;}
@@ -1772,6 +1792,8 @@ function App(){
         if(CAMPOS_BASE_MIN_FIN_PED.includes(field)) nx.min_finalizacao_pedido_amb=minFinalPedidoDe(nx);
         return nx;
       }));
+      if(field==="data_solicitacao"&&safeVal&&((faixa.ini&&safeVal<faixa.ini)||(faixa.fim&&safeVal>faixa.fim)))
+        push(`Data salva (${fmtD(safeVal)}), mas fora do período exibido (${faixa.rotulo}). A linha some desta lista ao recarregar; mude o período para vê-la.`);
     }catch(e){push(e.message,"err");}
   };
 
@@ -2303,6 +2325,7 @@ function App(){
                   "data_retorno":<td><Cell rowId={r.id} field="data_retorno" value={r.data_retorno} tipo="date" onSave={handleCell} fmtDisplay={fmtD} inferida={r.data_retorno_inferida===true}/></td>,
                   "permaneceu":<td style={{textAlign:"center"}}><BoolCell rowId={r.id} field="permaneceu" value={r.permaneceu} onSave={handleCell}/></td>,
                   "prefixo_ambulancia":<td><Cell rowId={r.id} field="prefixo_ambulancia" value={r.prefixo_ambulancia} onSave={handleCell}/></td>,
+                  "motivo_demora_interna":<td><Cell rowId={r.id} field="motivo_demora_interna" value={r.motivo_demora_interna} tipo="sel" optsKey="M_OPTS" onSave={handleCell}/></td>,
                 };
 
                 return(
@@ -2338,7 +2361,7 @@ function App(){
                       </div>
                     </td>
                     {/* 4 Colunas sticky — sempre primeiro, na ordem fixa */}
-                    <td className="stk" style={{left:L1}}><div style={{padding:"2px 6px",fontSize:10,whiteSpace:"nowrap"}}>{fmtD(r.data_solicitacao)||"—"}</div></td>
+                    <td className="stk" style={{left:L1}}><Cell rowId={r.id} field="data_solicitacao" value={r.data_solicitacao} tipo="date" onSave={handleCell} fmtDisplay={fmtD}/></td>
                     <td className="stk" style={{left:L2}}><Cell rowId={r.id} field="horario_solicitacao" value={r.horario_solicitacao} tipo="time" onSave={handleCell}/></td>
                     <td className="stk" style={{left:L3}}><Cell rowId={r.id} field="ficha_cross" value={r.ficha_cross} onSave={handleCell}/></td>
                     <td className="stk stk-last" style={{left:L4}}><Cell rowId={r.id} field="nome_paciente" value={r.nome_paciente} onSave={handleCell}/></td>
