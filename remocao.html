@@ -333,6 +333,62 @@ async function dbGetTodas(path){
   return out;
 }
 
+// ─── Saída e retorno da ambulância: a DATA é sempre uma escolha confirmada por uma pessoa ───────────────────────────────
+// A planilha não grava mais um horário de saída (ou de retorno) sem o dia em que aconteceu, e não sugere nada por conta própria:
+// a sugestão só aparece numa pergunta, e o que vale é a resposta de quem digitou. Mesma ideia do Livro de Saída.
+function tsLocal(d, hh) {
+  const di = String(d || "").slice(0, 10), m = String(hh || "").trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(di) || !m) return null;
+  const t = new Date(`${di}T${m[1].padStart(2, "0")}:${m[2]}:00`);
+  return isNaN(t) ? null : t.getTime();
+}
+/* "31/02/2026" tem formato de data mas não existe no calendário: aqui só vale dia que existe (normalizeDateValue, que as importações usam,
+ * confere apenas o formato). Devolve AAAA-MM-DD ou null. */
+function dataRealIso(texto) {
+  const m = String(texto || "").trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+  if (!m) return null;
+  const y = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]), mo = Number(m[2]), d = Number(m[1]);
+  const t = new Date(y, mo - 1, d);
+  if (t.getFullYear() !== y || t.getMonth() !== mo - 1 || t.getDate() !== d) return null;
+  return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+function somaDiaIso(iso, n) {
+  const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+/* Dia SUGERIDO (só para perguntar) a um horário digitado sem data: o mesmo dia do momento anterior, ou o seguinte se o horário
+ * for menor que o do momento anterior (passou da meia-noite). Sem o dia do momento anterior, não há o que sugerir (null). */
+function sugerirDiaDoHorario(diaAnterior, horaAnterior, hora) {
+  const di = String(diaAnterior || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(di)) return null;
+  const a = String(horaAnterior || "").trim().match(/^(\d{1,2}):(\d{2})/), b = String(hora || "").trim().match(/^(\d{1,2}):(\d{2})/);
+  return (a && b && Number(b[1]) * 60 + Number(b[2]) < Number(a[1]) * 60 + Number(a[2])) ? somaDiaIso(di, 1) : di;
+}
+/* Ordem dos momentos da ambulância (as mesmas regras do Livro): a saída não pode ser antes do pedido da ambulância, nem o
+ * retorno antes da saída. Só olha pares completos (data + horário). Devolve a mensagem do 1º problema ou null. */
+function checarOrdemAmbulancia(m) {
+  const fmt = (d, hh) => `${fmtD(d)} ${String(hh).trim().slice(0, 5)}`;
+  const ped = tsLocal(m.data_saida_ambulancia, m.hora_solic_ambulancia), sai = tsLocal(m.data_saida_real, m.horario_saida_ambulancia), ret = tsLocal(m.data_retorno, m.horario_retorno);
+  if (ped !== null && sai !== null && sai < ped) return `A saída (${fmt(m.data_saida_real, m.horario_saida_ambulancia)}) está antes da solicitação da ambulância (${fmt(m.data_saida_ambulancia, m.hora_solic_ambulancia)}). Confira as datas e os horários.`;
+  if (sai !== null && ret !== null && ret < sai) return `O retorno (${fmt(m.data_retorno, m.horario_retorno)}) está antes da saída (${fmt(m.data_saida_real, m.horario_saida_ambulancia)}). Confira as datas e os horários.`;
+  return null;
+}
+const CAMPOS_AMBULANCIA = ["data_saida_ambulancia", "hora_solic_ambulancia", "data_saida_real", "horario_saida_ambulancia", "data_retorno", "horario_retorno"];
+/* Validação do formulário da linha. Só cobra o que a pessoa MUDOU (linha antiga com problema não trava a edição de outro campo). */
+function validarFormularioAmbulancia(form, original) {
+  const mudou = k => !original || String(form[k] || "") !== String(original[k] || "");
+  if (form.horario_saida_ambulancia && !form.data_saida_real && mudou("horario_saida_ambulancia")) {
+    const s = sugerirDiaDoHorario(form.data_saida_ambulancia, form.hora_solic_ambulancia, form.horario_saida_ambulancia);
+    return "Preencha a DATA SAÍDA AMB.: o horário de saída precisa do dia em que a ambulância saiu." + (s ? ` (Pelo pedido da ambulância, deve ser ${fmtD(s)}${s !== String(form.data_saida_ambulancia).slice(0, 10) ? ", pois o horário passou da meia-noite" : ""}; confirme e digite.)` : "");
+  }
+  if (form.horario_retorno && !form.data_retorno && mudou("horario_retorno")) {
+    const s = sugerirDiaDoHorario(form.data_saida_real, form.horario_saida_ambulancia, form.horario_retorno);
+    return "Preencha a DATA RETORNO: o horário de retorno precisa do dia em que a ambulância voltou." + (s ? ` (Pela saída, deve ser ${fmtD(s)}${s !== String(form.data_saida_real).slice(0, 10) ? ", pois o horário passou da meia-noite" : ""}; confirme e digite.)` : "");
+  }
+  if (CAMPOS_AMBULANCIA.some(mudou)) return checarOrdemAmbulancia(form);
+  return null;
+}
+
 // Diferença entre dois momentos (data + hora) em HH:MM. SEM suposição: precisa das DUAS datas e dos DOIS horários, e o fim não
 // pode ser antes do início. Faltou algo, ou ficou fora de ordem: devolve "" (a célula fica vazia em vez de um valor inventado).
 // A ambulância pode ser pedida num dia e sair no outro (pedido 10:00 dia 1, saída 12:00 dia 2 = 26:00, não 02:00).
@@ -740,6 +796,7 @@ function KanbanImportModal({onClose,onImport}){
 
 function FormModal({row,onClose,onSave,saving}){
   const [form,setForm]=useState(row?{...EMPTY,...row}:{...EMPTY,data_solicitacao:new Date().toISOString().split("T")[0]});
+  const [avisoAmb,setAvisoAmb]=useState("");   // por que o formulário não salvou (saída/retorno sem o dia, ou fora de ordem)
   const set=(k,v)=>setForm(f=>{
     const n={...f,[k]:v};
     if(["horario_saida_ambulancia","hora_solic_ambulancia","data_saida_ambulancia","data_saida_real"].includes(k)) n.tempo_espera=tempoEsperaDe(n);
@@ -849,9 +906,10 @@ function FormModal({row,onClose,onSave,saving}){
             </div>
           </div>
         </div>
+        {avisoAmb&&<div role="alert" style={{background:"#FEF2F2",border:"1px solid #FCA5A5",color:"#991B1B",borderRadius:8,padding:"8px 12px",fontSize:12,lineHeight:1.5,margin:"0 0 10px"}}>⚠ {avisoAmb}</div>}
         <div className="mft">
           <button className="btn btn-g" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-p" disabled={saving||!form.nome_paciente} onClick={()=>onSave(form)}>
+          <button className="btn btn-p" disabled={saving||!form.nome_paciente} onClick={()=>{const msg=validarFormularioAmbulancia(form,row&&row.id?row:null);if(msg){setAvisoAmb(msg);return;}setAvisoAmb("");onSave(form);}}>
             {saving?"Salvando…":(row?.id?"Salvar":"Criar Registro")}</button>
         </div>
       </div>
@@ -1673,8 +1731,31 @@ function App(){
       if(field==="data_saida_real"){u.data_saida_real_inferida=false;flags.data_saida_real_inferida=false;}
       if(field==="data_retorno"){u.data_retorno_inferida=false;flags.data_retorno_inferida=false;}
       const row=rows.find(r=>r.id===rowId);
+      // Saída/retorno: horário sem o dia em que aconteceu NÃO é gravado sozinho. Pergunta o dia (com sugestão) e grava os dois
+      // juntos, já como data CONFIRMADA (não "deduzida"). Sem dia anterior para sugerir, pede para preencher antes.
+      if(row && safeVal && (field==="horario_saida_ambulancia"||field==="horario_retorno")){
+        const ehSaida=field==="horario_saida_ambulancia";
+        const campoData=ehSaida?"data_saida_real":"data_retorno";
+        if(!row[campoData]){
+          const sug=ehSaida?sugerirDiaDoHorario(row.data_saida_ambulancia,row.hora_solic_ambulancia,safeVal):sugerirDiaDoHorario(row.data_saida_real,row.horario_saida_ambulancia,safeVal);
+          if(!sug){
+            push(ehSaida?"Antes do horário de saída, preencha a DATA SOLIC. AMB. (ou digite direto a DATA SAÍDA AMB.).":"Antes do retorno, preencha a data e o horário da saída da ambulância.","err");
+            return;
+          }
+          const ant=ehSaida?row.data_saida_ambulancia:row.data_saida_real;
+          const resp=window.prompt(`Em que dia ${ehSaida?"a ambulância saiu":"a ambulância voltou"}, às ${String(safeVal).slice(0,5)}?  (dd/mm/aaaa)\n\nSugestão: ${fmtD(sug)}${sug!==String(ant).slice(0,10)?" (o horário passou da meia-noite)":""}. Confirme ou corrija.`,fmtD(sug));
+          if(resp===null){push("Horário não salvo: sem o dia o painel não sabe quando foi.","err");return;}
+          const dia=dataRealIso(resp);
+          if(!dia){push("Data inválida (use um dia que exista, no formato dd/mm/aaaa). O horário não foi salvo.","err");return;}
+          u[campoData]=dia; u[campoData+"_inferida"]=false; flags[campoData]=dia; flags[campoData+"_inferida"]=false;
+        }
+      }
+      if(row && CAMPOS_AMBULANCIA.includes(field)){
+        const aviso=checarOrdemAmbulancia({...row,[field]:safeVal,...flags});
+        if(aviso){push(aviso,"err");return;}
+      }
       if(row){
-        const m={...row,[field]:safeVal};   // a linha como ficará depois desta edição
+        const m={...row,[field]:safeVal,...flags};   // a linha como ficará depois desta edição
         // se o campo calculado foi limpo (value vazio), recalcula; se foi digitado à mão, vale o digitado
         const teManual=field==="tempo_espera"?value:null;
         const durManual=field==="duracao_remocao"?value:null;
