@@ -793,6 +793,7 @@ function FormModal({row,onClose,onSave,saving}){
           <div className="fsc"><div className="fst">Ambulância</div>
             <div className="fg fg3">
               <div className="fd"><label>Tipo</label><SelOrFree value={form.tipo_ambulancia} onChange={v=>set("tipo_ambulancia",v)} opts={A_OPTS}/></div>
+              <div className="fd"><label>Prefixo da ambulância</label><input type="text" placeholder="ex.: USB 01 ou a placa" value={form.prefixo_ambulancia||""} onChange={e=>set("prefixo_ambulancia",e.target.value)}/></div>
               <div className="fd"><label>Data Solic. Ambulância</label><input type="date" value={form.data_saida_ambulancia} onChange={e=>set("data_saida_ambulancia",e.target.value)}/></div>
               <div className="fd"><label>Hora Solic. Ambulância</label><input type="time" value={form.hora_solic_ambulancia} onChange={e=>set("hora_solic_ambulancia",e.target.value)}/></div>
               <div className="fd"><label>Data da Saída{form.data_saida_real_inferida===true&&<span style={{color:"#B45309",fontWeight:400,textTransform:"none"}}> (≈ deduzida)</span>}</label><input type="date" value={form.data_saida_real||""} onChange={e=>set("data_saida_real",e.target.value)}/></div>
@@ -1518,6 +1519,7 @@ function App(){
     ["data_saida_real","horario_saida_ambulancia"],
     ["min_finalizacao_pedido_amb","data_saida_real"],   // vem DEPOIS da linha acima, para cair logo após a hora do pedido
     ["data_retorno","horario_retorno"],
+    ["prefixo_ambulancia","data_saida_ambulancia"],   // logo depois do tipo de ambulância
   ];
   const inserirNovas = (lista, quais) => {
     quais.forEach(([f,ancora])=>{
@@ -1533,7 +1535,7 @@ function App(){
   const ORDEM_PADRAO = [
     "setor","procedimento","especialidade","diagnostico","gravidade",
     "instituicao_destino","data_resposta_cross","horario_resposta_cross","status",
-    "tipo_ambulancia","data_saida_ambulancia","hora_solic_ambulancia","min_finalizacao_pedido_amb","data_saida_real","horario_saida_ambulancia","tempo_espera",
+    "tipo_ambulancia","prefixo_ambulancia","data_saida_ambulancia","hora_solic_ambulancia","min_finalizacao_pedido_amb","data_saida_real","horario_saida_ambulancia","tempo_espera",
     "medico","enfermeiro","tecnico_auxiliar","data_retorno","horario_retorno","duracao_remocao",
     "finalizado","permaneceu","observacao",
   ];
@@ -2219,6 +2221,7 @@ function App(){
                   "data_saida_real":<td><Cell rowId={r.id} field="data_saida_real" value={r.data_saida_real} tipo="date" onSave={handleCell} fmtDisplay={fmtD} inferida={r.data_saida_real_inferida===true}/></td>,
                   "data_retorno":<td><Cell rowId={r.id} field="data_retorno" value={r.data_retorno} tipo="date" onSave={handleCell} fmtDisplay={fmtD} inferida={r.data_retorno_inferida===true}/></td>,
                   "permaneceu":<td style={{textAlign:"center"}}><BoolCell rowId={r.id} field="permaneceu" value={r.permaneceu} onSave={handleCell}/></td>,
+                  "prefixo_ambulancia":<td><Cell rowId={r.id} field="prefixo_ambulancia" value={r.prefixo_ambulancia} onSave={handleCell}/></td>,
                 };
 
                 return(
@@ -2261,7 +2264,7 @@ function App(){
                     {/* Colunas móveis na ordem definida por movColOrder */}
                     {movColOrder.map(colIdx=>{
                       const [f]=COLS[colIdx];
-                      return React.cloneElement(movCellMap[f],{key:f});
+                      return movCellMap[f]?React.cloneElement(movCellMap[f],{key:f}):<td key={f}><Cell rowId={r.id} field={f} value={r[f]} onSave={handleCell}/></td>;   // coluna sem célula própria: texto simples (nunca derruba a tela)
                     })}
                     <td style={{textAlign:"center"}}>
                       <button className="delbtn" title="Excluir" onClick={()=>handleDelete(r.id)}><Ico n="trash" s={11}/></button>
