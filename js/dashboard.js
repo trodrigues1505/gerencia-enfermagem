@@ -533,7 +533,7 @@ const DASH_SANEAMENTO_SECOES = [
   { id: "aguarda", titulo: "Aguardando · pode ser normal" }
 ];
 const DASH_CAMPOS_LISTA = [
-  ["especialidade", "Especialidade"], ["instituicao_destino", "Instituição de destino"], ["setor", "Setor"],
+  ["especialidade", "Especialidade"], ["instituicao_destino", "Instituição de destino"],
   ["status", "Status"], ["gravidade", "Gravidade"], ["tipo_ambulancia", "Tipo de ambulância"]
 ];
 const DASH_PROBLEMAS_DEF = [
@@ -562,6 +562,10 @@ const DASH_PROBLEMAS_DEF = [
   { id: "ordem", secao: "datas", tipo: "corrigir", titulo: "Horários fora de ordem",
     ajuda: "Um momento aparece antes do anterior, ou com mais de 30 dias de diferença. Provável erro de digitação; esse intervalo fica fora dos tempos." },
 
+  { id: "interno_sem_motivo", secao: "fichas", tipo: "acompanhar", titulo: "Tempo interno longo, sem motivo informado",
+    ajuda: "O tempo entre a finalização da CROSS e o pedido da ambulância passou do limite que você definiu em Configurações e a linha não tem o MOTIVO DO TEMPO INTERNO. Preencha para o painel mostrar onde o tempo é perdido." },
+  { id: "tempo_suspeito", secao: "datas", tipo: "acompanhar", titulo: "Etapa com tempo suspeito (confira a digitação)",
+    ajuda: "Alguma etapa passou do limite de horas que você definiu em Configurações. Pode ser um caso real muito demorado ou um erro de data. O painel NÃO tira a linha da conta: confira e corrija se for erro." },
   { id: "status_conflito", secao: "fichas", tipo: "corrigir", titulo: "Status diz que não houve remoção, mas há saída registrada",
     ajuda: "O status da planilha (cancelada, evasão, alta, reinserida…) contradiz a saída da ambulância. No painel vale a saída; corrija o status ou a saída." },
   { id: "reinsercao_texto", secao: "fichas", tipo: "acompanhar", titulo: "Reinserção só citada na observação",
@@ -698,7 +702,9 @@ const DASH_CFG_CHAVES = [
   { chave: "sla_cinza_min",              grupo: "sla",    rotulo: "Cinza: sair em até",                    unid: "min" },
   { chave: "alerta_espera_min",          grupo: "alerta", rotulo: "Paciente aguardando há mais de",        unid: "min" },
   { chave: "alerta_espera_vermelho_min", grupo: "alerta", rotulo: "Vermelho aguardando há mais de",        unid: "min" },
-  { chave: "alerta_sem_atualizacao_h",   grupo: "alerta", rotulo: "Card sem atualização há mais de",       unid: "h" }
+  { chave: "alerta_sem_atualizacao_h",   grupo: "alerta", rotulo: "Card sem atualização há mais de",       unid: "h" },
+  { chave: "motivo_obrigatorio_acima_min", grupo: "dados", rotulo: "Tempo interno acima de (exige motivo)", unid: "min" },
+  { chave: "limite_suspeito_h",          grupo: "dados",  rotulo: "Etapa acima de (confira a digitação)",  unid: "h" }
 ];
 const DASH_CFG_ROTULO = DASH_CFG_CHAVES.reduce((a, c) => { a[c.chave] = c.rotulo + (c.unid ? " (" + c.unid + ")" : ""); return a; }, {});
 
@@ -780,36 +786,37 @@ function DashListaModal({ titulo, subtitulo, itens, onClose }) {
         itens.length > LIM && h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "8px 4px" } }, `Mostrando ${LIM} de ${itens.length}.`))));
 }
 
-/* ─── Situação das remoções ─────────────────────────────────────────────────── */
-function DashSituacao({ classes, total, Titulo }) {
+/* ─── Tempo interno por motivo ─────────────────────────────────────────────── */
+function DashMotivos({ linhas, limMotivo, Titulo, fmtMin }) {
   const h = React.createElement;
-  const [sel, setSel] = useState(null);
-  const BLOCOS = ["Realizadas", "Em andamento", "Não realizadas · motivo pelo status"];
-  const maxN = Math.max(1, ...classes.map(c => c.itens.length));
-  const aberta = sel ? classes.find(c => c.id === sel) : null;
-  return h("div", { id: "bloco-situacao", style: DASH_CARTAO },
+  const lista = (typeof Canon !== "undefined" && Canon.MOTIVOS_TEMPO_INTERNO) || [];
+  const com = linhas.filter(t => t.interno !== null);
+  const g = {};
+  com.forEach(t => {
+    const nome = !t.motivo ? "Sem motivo informado" : (lista.includes(t.motivo) ? t.motivo : t.motivo + " (fora da lista)");
+    const x = g[nome] || (g[nome] = { nome, v: [], sem: !t.motivo });
+    x.v.push(t.interno);
+  });
+  const total = com.reduce((t, x) => t + x.interno, 0);
+  const rows = Object.values(g).map(x => ({ nome: x.nome, sem: x.sem, n: x.v.length, soma: x.v.reduce((a, b) => a + b, 0), mediana: dashMediana(x.v), maior: Math.max(...x.v) })).sort((a, b) => b.soma - a.soma);
+  const informados = com.filter(t => t.motivo).length;
+  const GRID = "minmax(200px,3fr) repeat(4,minmax(66px,1fr))";
+  const cel = (t, extra) => h("span", { style: Object.assign({ textAlign: "right", fontSize: 12, color: "#475569", fontVariantNumeric: "tabular-nums" }, extra) }, t);
+  return h("div", { id: "bloco-motivos", style: DASH_CARTAO },
     h(Titulo, {
-      extra: `${total} linha${total !== 1 ? "s" : ""} · a soma fecha com o total`,
-      tooltip: "Cada linha da planilha cai em UMA situação, nesta ordem: (1) a ambulância saiu (data e horário de saída preenchidos) → Realizada; (2) senão, o status da planilha diz que não houve remoção (cancelada, evasão, alta, reinserida, paciente instável…) → o motivo é o status; (3) senão, a CROSS já finalizou → Aguardando ambulância; (4) senão, linha com ficha → Aguardando a CROSS; (5) linha sem ficha → Outra remoção ainda sem saída. “Não atendida” não é o mesmo que “não realizada por falha”: o motivo é o do status. Clique numa situação para ver os casos."
-    }, "Situação das remoções"),
-    BLOCOS.map(bloco => {
-      const cs = classes.filter(c => c.bloco === bloco && (c.itens.length > 0 || c.fixa));
-      if (!cs.length) return null;
-      const sub = cs.reduce((t, c) => t + c.itens.length, 0);
-      return h("div", { key: bloco, style: { marginTop: 10 } },
-        h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 } },
-          h("span", null, bloco), h("span", null, sub)),
-        cs.map(c => h("button", { key: c.id, type: "button", disabled: !c.itens.length, onClick: () => setSel(c.id), title: c.ajuda || "",
-          style: { width: "100%", display: "block", textAlign: "left", background: "none", border: "none", padding: "6px 2px", cursor: c.itens.length ? "pointer" : "default", fontFamily: "inherit", opacity: c.itens.length ? 1 : 0.55 } },
-          h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginBottom: 3 } },
-            h("span", { style: { fontSize: 12.5, color: "#334155", display: "flex", alignItems: "center", gap: 7 } },
-              h("span", { style: { width: 8, height: 8, borderRadius: 99, background: c.cor, flexShrink: 0 } }), c.rotulo),
-            h("span", { style: { fontSize: 12, color: "#64748B", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" } },
-              h("b", { style: { color: "#0F172A" } }, c.itens.length), "  ", total ? (c.itens.length / total * 100).toFixed(1).replace(".", ",") + "%" : "")),
-          h("div", { style: { height: 6, background: "#F1F5F9", borderRadius: 99, overflow: "hidden" } },
-            h("div", { style: { height: "100%", width: `${c.itens.length / maxN * 100}%`, background: c.cor, borderRadius: 99 } })))));
-    }),
-    aberta && h(DashListaModal, { titulo: aberta.rotulo, subtitulo: aberta.ajuda, itens: aberta.itens, onClose: () => setSel(null) }));
+      extra: com.length ? `${informados} de ${com.length} com motivo` : "",
+      tooltip: "Tempo interno é o tempo entre a finalização da ficha na CROSS e o pedido da ambulância: a parte que depende só da Santa Casa. Aqui ele é separado pelo MOTIVO que a equipe registrou na planilha. “% do tempo” é a parte de cada motivo no total de tempo interno do período; os motivos estão ordenados do que mais consome tempo para o que menos consome. Linhas sem motivo aparecem juntas para você enxergar o quanto ainda falta preencher."
+    }, "Tempo interno por motivo"),
+    com.length === 0 ? h("div", { style: { fontSize: 11.5, color: "#CBD5E1", padding: "14px 0", textAlign: "center" } }, "Sem remoções com o tempo interno medido no período") : h(React.Fragment, null,
+      h("div", { style: { display: "grid", gridTemplateColumns: GRID, gap: "0 10px", fontSize: 10, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", padding: "0 6px 6px" } },
+        h("span", null, "Motivo"), cel("Casos"), cel("Mediana"), cel("Maior"), cel("% do tempo")),
+      rows.map(r => h("div", { key: r.nome, style: { display: "grid", gridTemplateColumns: GRID, gap: "0 10px", alignItems: "baseline", padding: "8px 6px", borderTop: "1px solid #F1F5F9" } },
+        h("span", { style: { fontSize: 12.5, fontWeight: 600, color: r.sem ? "#B45309" : "#0F172A", minWidth: 0 } }, r.nome),
+        cel(r.n), cel(fmtMin(r.mediana), { fontWeight: 700, color: "#B45309" }), cel(fmtMin(r.maior)),
+        cel(total ? Math.round(r.soma / total * 100) + "%" : "—", { fontWeight: 700 }))),
+      h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "8px 6px 0", lineHeight: 1.5 } },
+        limMotivo === null ? "Para o painel cobrar o motivo quando o tempo interno ficar longo, defina o limite em Configurações (“Tempo interno acima de”)."
+          : `Linhas com tempo interno acima de ${fmtMin(limMotivo)} e sem motivo aparecem em Saneamento de falhas.`)));
 }
 
 /* ─── Frota e capacidade ─────────────────────────────────────────────────────── */
@@ -1013,10 +1020,10 @@ function DashReinsercao({ rein, Titulo }) {
 
 /* ─── Alertas do gestor + qualidade dos registros ─────────────────────────────── */
 /* Painel que se abre logo abaixo dos números (aba): lista curta dos casos por trás do número. */
-function DashPainelLista({ titulo, sub, linhas, vazio, rodape, onFechar }) {
+function DashPainelLista({ titulo, sub, linhas, vazio, rodape, onFechar, onIr }) {
   const h = React.createElement;
   const LIM = 10;
-  const ir = alvo => { const el = document.getElementById(alvo); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  const ir = onIr || (alvo => { const el = document.getElementById(alvo); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" }); });
   return h("div", { role: "region", "aria-label": titulo, style: Object.assign({}, DASH_CARTAO, { marginBottom: 14, borderColor: "#CBD5E1" }) },
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 6 } },
       h("div", null, h("div", { style: { fontSize: 13, fontWeight: 700, color: "#0F172A" } }, titulo), sub && h("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 2 } }, sub)),
@@ -1037,7 +1044,7 @@ function DashPainelLista({ titulo, sub, linhas, vazio, rodape, onFechar }) {
     rodape && h("button", { type: "button", onClick: () => ir(rodape.alvo), style: { marginTop: 8, background: "none", border: "1px solid #E2E8F0", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, color: "#64748B", cursor: "pointer", fontFamily: "inherit" } }, rodape.rot));
 }
 
-function DashAlertas({ cards, cfg, hojeIso, sla, rein, qualidade, nCorrigir, emRemocao, naoAtendidas, aba, agAberto, agFiltro, onTile, painel }) {
+function DashAlertas({ cards, cfg, hojeIso, sla, rein, qualidade, nCorrigir, emRemocao, naoAtendidas, aba, agAberto, agFiltro, onTile, onIr, painel }) {
   const h = React.createElement;
   const [agora, setAgora] = useState(() => Date.now());
   useEffect(() => { const iv = setInterval(() => setAgora(Date.now()), 30000); return () => clearInterval(iv); }, []);
@@ -1052,7 +1059,7 @@ function DashAlertas({ cards, cfg, hojeIso, sla, rein, qualidade, nCorrigir, emR
     { id: "parado", alvo: "bloco-aguardando", n: a.semAtualizacao === null ? null : a.semAtualizacao.length, rot: a.semAtualizacao === null ? "Card parado: limite não cadastrado" : `card sem atualização há mais de ${a.limAtual} h` },
     { id: "dados", alvo: "bloco-saneamento", n: nCorrigir, rot: nCorrigir === 1 ? "falha de dados a corrigir" : "falhas de dados a corrigir" }
   ];
-  const ir = alvo => { const el = document.getElementById(alvo); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  const ir = onIr || (alvo => { const el = document.getElementById(alvo); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" }); });
   const nVerm = a.itens.filter(i => i.vermelho).length;
   const nAlertas = chips.filter(c => c.n !== null && c.n > 0 && !c.neutro).length;
   const maiorVerm = a.itens.filter(i => i.vermelho && i.min !== null).reduce((m, i) => Math.max(m, i.min), 0);
@@ -1098,7 +1105,8 @@ function DashConfig({ cfg, userNome, recarregar, showT, hojeIso }) {
   const [salvando, setSalvando] = useState(false);
   const GRUPOS = [["frota", "Frota de ambulâncias", "Quantas ambulâncias existem a partir da data escolhida."],
                   ["sla", "Meta de tempo por gravidade", "Tempo máximo entre a finalização da CROSS e a saída da ambulância."],
-                  ["alerta", "Limites dos alertas", "Quando o painel deve acusar espera ou card parado."]];
+                  ["alerta", "Limites dos alertas", "Quando o painel deve acusar espera ou card parado."],
+                  ["dados", "Qualidade dos dados", "Quando o painel deve cobrar o motivo do tempo interno e apontar tempos que parecem erro de digitação. Sem valor, não cobra."]];
   async function salvar() {
     const linhas = DASH_CFG_CHAVES.filter(c => String(campos[c.chave] == null ? "" : campos[c.chave]).trim() !== "")
       .map(c => ({ chave: c.chave, valor: Number(String(campos[c.chave]).trim().replace(",", ".")), vigente_desde: vigencia, criado_por: userNome || null }));
@@ -1125,7 +1133,7 @@ function DashConfig({ cfg, userNome, recarregar, showT, hojeIso }) {
   }
   const historico = [...cfg].sort((a, b) => String(b.vigente_desde).localeCompare(String(a.vigente_desde)) || String(b.criado_em || "").localeCompare(String(a.criado_em || "")));
   const inp = { padding: "6px 9px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12.5, fontFamily: "inherit", width: 110, background: "#fff", color: "#0F172A" };
-  return h("div", { id: "bloco-config", style: DASH_CARTAO },
+  return h("div", { id: "bloco-config", className: "dash-no-print", style: DASH_CARTAO },
     h("button", { type: "button", "aria-expanded": aberto, onClick: () => setAberto(v => !v),
       style: { width: "100%", display: "flex", justifyContent: "space-between", alignItems: "baseline", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left" } },
       h("span", { style: { fontSize: 12, fontWeight: 700, color: "#0F172A" } }, "⚙ Configurações do painel"),
@@ -1174,10 +1182,46 @@ const DASH_SECOES = [
   { id: "sec-excecoes",   n: 6, rot: "Exceções",   titulo: "Tabela de exceções",       sub: "Os casos individuais que geraram os alertas, do mais urgente ao menos urgente." }
 ];
 
-function DashSecao({ id, children }) {
+/* Em qual aba mora cada bloco: um alerta ou botão "ver detalhes" troca de aba e só então rola até o bloco. */
+const DASH_SECAO_DO_BLOCO = {
+  "bloco-alertas": "sec-agora", "bloco-aguardando": "sec-agora", "bloco-fila": "sec-agora",
+  "bloco-tempos": "sec-atrasos", "bloco-sla": "sec-atrasos", "bloco-motivos": "sec-atrasos",
+  "bloco-frota": "sec-capacidade",
+  "bloco-reinsercao": "sec-problemas", "bloco-saneamento": "sec-problemas",
+  "bloco-destinos": "sec-analise", "bloco-permanece": "sec-analise", "bloco-desfecho": "sec-analise",
+  "bloco-excecoes": "sec-excecoes"
+};
+
+const DASH_CSS_IMPRESSAO = `
+.dash-print-only { display: none; }
+@media print {
+  @page { size: A4; margin: 12mm; }
+  html, body { background: #fff !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .dash-no-print { display: none !important; }
+  .dash-print-only { display: block !important; }
+  .dash-secao + .dash-secao { break-before: page; }
+  [id^="bloco-"] { break-inside: avoid; }
+  #dash-print-root { padding: 0 !important; opacity: 1 !important; }
+}`;
+/* Imprimir / salvar em PDF: esconde, só durante a impressão, tudo o que não é o painel (cabeçalho, menus, botões flutuantes). */
+function dashIsolarParaImpressao(raiz) {
+  const ocultos = [];
+  let no = raiz;
+  while (no && no.parentElement && no !== document.body) {
+    Array.prototype.forEach.call(no.parentElement.children, irm => {
+      if (irm !== no && irm.tagName !== "STYLE" && irm.tagName !== "SCRIPT" && irm.style.display !== "none") { ocultos.push([irm, irm.style.display]); irm.style.display = "none"; }
+    });
+    no = no.parentElement;
+  }
+  return () => ocultos.forEach(([el, d]) => { el.style.display = d; });
+}
+
+function DashSecao({ id, ativa, children }) {
+  if (!ativa) return null;   // aba: só o conteúdo da seção escolhida existe na tela
   const h = React.createElement;
   const s = DASH_SECOES.find(x => x.id === id);
-  return h("section", { id, "aria-labelledby": id + "-t", style: { scrollMarginTop: 12, marginBottom: 30 } },
+  return h("section", { id, className: "dash-secao", role: "tabpanel", "aria-labelledby": "tab-" + id, style: { scrollMarginTop: 12, marginBottom: 30 } },
     h("div", { style: { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", margin: "0 0 12px", paddingBottom: 8, borderBottom: "1px solid #E2E8F0" } },
       h("span", { "aria-hidden": "true", style: { width: 22, height: 22, borderRadius: 99, background: "#0F172A", color: "#fff", fontSize: 11, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, alignSelf: "center" } }, s.n),
       h("h2", { id: id + "-t", style: { margin: 0, fontSize: 16, fontWeight: 700, color: "#0F172A", letterSpacing: "-.01em" } }, s.titulo),
@@ -1185,13 +1229,26 @@ function DashSecao({ id, children }) {
     React.Children.toArray(children));   // toArray dá uma chave a cada filho (sem aviso do React)
 }
 
-function DashNavSecoes() {
+/* A linha numerada (1 Agora · 2 Atrasos · 3 Capacidade…) são ABAS: clicar mostra só aquela seção, sem rolar a página. */
+function DashNavSecoes({ ativa, onSelect }) {
   const h = React.createElement;
-  const ir = (e, id) => { e.preventDefault(); const el = document.getElementById(id); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
-  return h("nav", { "aria-label": "Seções do painel", style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 } },
-    DASH_SECOES.map(s => h("a", { key: s.id, href: "#" + s.id, onClick: e => ir(e, s.id),
-      style: { display: "inline-flex", alignItems: "center", gap: 7, padding: "6px 12px", borderRadius: 99, background: "#F1F5F9", color: "#475569", fontSize: 12, fontWeight: 600, textDecoration: "none" } },
-      h("span", { style: { width: 16, height: 16, borderRadius: 99, background: "#CBD5E1", color: "#fff", fontSize: 9.5, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, s.n), s.rot)));
+  const teclas = (e, i) => {
+    const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!d) return;
+    e.preventDefault();
+    const alvo = DASH_SECOES[(i + d + DASH_SECOES.length) % DASH_SECOES.length];
+    onSelect(alvo.id);
+    const el = document.getElementById("tab-" + alvo.id); if (el && el.focus) el.focus();
+  };
+  return h("div", { role: "tablist", "aria-label": "Seções do painel", className: "dash-no-print", style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 } },
+    DASH_SECOES.map((sc, i) => {
+      const on = sc.id === ativa;
+      return h("button", { key: sc.id, id: "tab-" + sc.id, type: "button", role: "tab", "aria-selected": on, "aria-controls": sc.id, tabIndex: on ? 0 : -1,
+        onClick: () => onSelect(sc.id), onKeyDown: e => teclas(e, i),
+        style: { display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 14px", borderRadius: 99, border: "none", cursor: "pointer", fontFamily: "inherit",
+          background: on ? "#0F172A" : "#F1F5F9", color: on ? "#fff" : "#475569", fontSize: 12.5, fontWeight: on ? 700 : 600 } },
+        h("span", { style: { width: 17, height: 17, borderRadius: 99, background: on ? "#fff" : "#CBD5E1", color: on ? "#0F172A" : "#fff", fontSize: 10, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, sc.n), sc.rot);
+    }));
 }
 
 /* ─── Tabela de exceções: um só lugar com os casos individuais, do mais urgente ao menos urgente ─── */
@@ -1280,7 +1337,9 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const [justModal, setJustModal] = useState(null);
   const [justTexto, setJustTexto] = useState("");
   const [justSaving, setJustSaving] = useState(false);
-  const [aba, setAba] = useState(null);              // aba aberta logo abaixo dos números: remocao | nao | alertas | falhas
+  const [secao, setSecao] = useState("sec-agora");   // aba (seção) aberta: Agora é a primeira
+  const [imprimindo, setImprimindo] = useState(false); // ao imprimir, todas as seções aparecem de uma vez
+  const [aba, setAba] = useState(null);              // painel aberto logo abaixo dos números: remocao | nao | alertas | falhas
   const [agAberto, setAgAberto] = useState(false);     // lista dos pacientes aguardando: COMEÇA minimizada
   const [agFiltro, setAgFiltro] = useState("todos");   // todos | vermelhos
   const [cfg, setCfg] = useState([]);   // frota, metas e limites (tabela painel_config), cada um com a data em que passa a valer
@@ -1289,6 +1348,20 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     catch (e) { /* tabela ainda não criada ou sem permissão: o painel segue, só não tem metas nem limites */ }
   }
   useEffect(() => { recarregarCfg(); }, []);
+  const desfazIsolamento = React.useRef(null);
+  const restauraImpressao = () => { if (desfazIsolamento.current) { desfazIsolamento.current(); desfazIsolamento.current = null; } setImprimindo(false); };
+  useEffect(() => {   // se o navegador avisar que a impressão acabou (ou a janela voltar a ter foco), tudo volta ao normal
+    window.addEventListener("afterprint", restauraImpressao);
+    return () => { window.removeEventListener("afterprint", restauraImpressao); if (desfazIsolamento.current) desfazIsolamento.current(); };
+  }, []);
+  const imprimir = () => {
+    setImprimindo(true);   // todas as seções aparecem de uma vez
+    setTimeout(() => {
+      const raiz = document.getElementById("dash-print-root");
+      if (raiz) desfazIsolamento.current = dashIsolarParaImpressao(raiz);
+      try { window.print(); } finally { setTimeout(restauraImpressao, 1200); }
+    }, 350);
+  };
   const podeJustificar = isAdmin || !!(currentUser && currentUser.can_justificativa);
 
   /* ── Recorte temporal ─────────────────────────────────────────────────── */
@@ -1337,7 +1410,9 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       .then(r => { if (vivo) setAnomalas(r); }).catch(() => {});
     sbGetTodas("acoes_enfermagem?status=in.(pendente,iniciada,pausada)&select=id,titulo,status,prioridade,responsavel_nome,prazo&order=prioridade.asc.nullslast,created_at.asc")
       .then(r => { if (vivo) setTarefas(r); }).catch(() => {});
-    sbGetTodas("livro_saida?status_vinculo=in.(pendente,independente)&select=id,nome_paciente,data_saida,hora_saida,destino,status_vinculo,created_at&order=created_at.desc")
+    // registros apagados do Livro não contam. Se o banco ainda não tem a coluna `apagado_em`, repete sem o filtro.
+    const qLivro = "livro_saida?status_vinculo=in.(pendente,independente)&select=id,nome_paciente,data_saida,hora_saida,destino,status_vinculo,created_at&order=created_at.desc";
+    sbGetTodas(qLivro + "&apagado_em=is.null").catch(() => sbGetTodas(qLivro))
       .then(r => { if (vivo) setLivroSemVinculo(r.filter(x => x.hora_saida || x.data_saida)); }).catch(() => {});
     return () => { vivo = false; };
   }, [hojeIso]);
@@ -1532,6 +1607,8 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
    * Cada grupo é uma lista com o link da linha. Definições e textos: DASH_PROBLEMAS_DEF.
    * Linhas olhadas: as do período (`dados`). Exceções: "sem data" e "data no futuro" olham tudo o que veio do servidor
    * (`remocoes`), porque essas linhas não entram em período nenhum; e a conferência de ficha repetida compara com tudo o que veio. */
+  const limMotivo = (() => { const c = dashCfgEm(cfg, "motivo_obrigatorio_acima_min", hojeIso); return c ? Number(c.valor) : null; })();
+  const limSusp = (() => { const c = dashCfgEm(cfg, "limite_suspeito_h", hojeIso); return c ? Number(c.valor) : null; })();
   const problemas = useMemo(() => {
     const G = {};
     const add = (id, r, campo, motivo) => (G[id] || (G[id] = [])).push({
@@ -1573,6 +1650,18 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       const retD = temData(r.data_retorno), retH = temHora(r.horario_retorno);
       const fin = finD && finH, sai = saiD && saiH;
 
+      // tempo interno sem motivo / etapas com tempo suspeito (só cobra se o limite foi cadastrado em Configurações)
+      if (limMotivo !== null) {
+        const fp = minFinPed(r);
+        if (fp !== null && fp !== undefined && fp > limMotivo && !String(r.motivo_demora_interna || "").trim()) add("interno_sem_motivo", r, "motivo_demora_interna", `Tempo interno de ${dashFmtMin(fp)} (limite ${dashFmtMin(limMotivo)}) sem motivo.`);
+      }
+      if (limSusp !== null) {
+        const ETAPAS = [["Solicitação → finalização da CROSS", parMin(r.data_solicitacao, r.horario_solicitacao, r.data_resposta_cross, r.horario_resposta_cross).v, "data_resposta_cross"],
+          ["Finalização → pedido da ambulância", minFinPed(r), "hora_solic_ambulancia"],
+          ["Pedido da ambulância → saída", (dashHMemMin(r.tempo_espera) !== null ? dashHMemMin(r.tempo_espera) : parMin(r.data_saida_ambulancia, r.hora_solic_ambulancia, r.data_saida_real, r.horario_saida_ambulancia).v), "horario_saida_ambulancia"],
+          ["Saída → retorno", (dashHMemMin(r.duracao_remocao) !== null ? dashHMemMin(r.duracao_remocao) : parMin(r.data_saida_real, r.horario_saida_ambulancia, r.data_retorno, r.horario_retorno).v), "horario_retorno"]];
+        ETAPAS.forEach(([nome, v, campo]) => { if (v !== null && v !== undefined && v > limSusp * 60) add("tempo_suspeito", r, campo, `${nome}: ${dashFmtMin(v)} (limite ${limSusp} h).`); });
+      }
       // status que contradiz a saída / reinserção só no texto
       const stCan = C ? C.classificar("status", r.status).canonico : "";
       if (sai && DASH_STATUS_NAO_REALIZADA[stCan]) add("status_conflito", r, "status", `Status “${stCan}”, mas a ambulância saiu em ${dm(r.data_saida_real, r.horario_saida_ambulancia)}.`);
@@ -1656,7 +1745,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       grupos: DASH_PROBLEMAS_DEF.map(def => Object.assign({}, def, { itens: G[def.id] || [] })),
       n: id => (G[id] || []).length
     };
-  }, [remocoes, dados, hojeIso, cards, cols, discrepancias, tarefas, livroSemVinculo, anomalas]);
+  }, [remocoes, dados, hojeIso, cards, cols, discrepancias, tarefas, livroSemVinculo, anomalas, limMotivo, limSusp]);
   const qualidade = useMemo(() => {
     const ids = new Set(), noPeriodo = new Set(dados.map(r => r.id));
     let nCorrigir = 0;
@@ -1669,7 +1758,6 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const gGrav   = useMemo(() => ag("gravidade"),           [dados]);
   const gEspec  = useMemo(() => ag("especialidade"),       [dados]);
   const gHosp   = useMemo(() => ag("instituicao_destino"), [dados]);
-  const gSetor  = useMemo(() => ag("setor"),               [dados]);
   const gAmb    = useMemo(() => ag("tipo_ambulancia"),     [dados]);
   const gStatus = useMemo(() => ag("status"),              [dados]);
 
@@ -1762,6 +1850,8 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     return {
       r,
       finSai: v(r.data_resposta_cross, r.horario_resposta_cross, r.data_saida_real, r.horario_saida_ambulancia),
+      interno: (() => { const m = minFinPed(r); return (m === null || m === undefined || m < 0) ? null : m; })(),
+      motivo: String(r.motivo_demora_interna || "").trim(),
       espera: gE !== null ? gE : v(r.data_saida_ambulancia, r.hora_solic_ambulancia, r.data_saida_real, r.horario_saida_ambulancia),
       fora: gD !== null ? gD : v(r.data_saida_real, r.horario_saida_ambulancia, r.data_retorno, r.horario_retorno),
       total: v(r.data_solicitacao, r.horario_solicitacao, r.data_retorno, r.horario_retorno),
@@ -1775,7 +1865,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     return { mediana: dashMediana(tot), n: tot.length };
   }, [temposLinha]);
 
-  const foraStats = useMemo(() => {
+  const foraStats = useMemo(() => {   // (ver também: DashMotivos)
     const v = temposLinha.map(t => t.fora).filter(x => x !== null);
     return { n: v.length, mediana: dashMediana(v), p95: v.length >= 20 ? dashPercentil(v, 95) : null, max: v.length ? Math.max(...v) : null };
   }, [temposLinha]);
@@ -2012,15 +2102,21 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   // Avisos sob o gráfico: pedidos do período que ainda não têm saída ou finalização (não aparecem nas barras/linhas)
   const GRAV_NOME = { emergencia: "Vermelho", urgencia: "Amarelo", menor_gravidade: "Verde", agendamento: "Cinza" };
   const fecharAba = () => setAba(null);
+  const ativaSec = id => imprimindo || secao === id;
+  const irParaBloco = id => {   // troca para a aba onde o bloco mora e só então rola até ele
+    const sec = DASH_SECAO_DO_BLOCO[id];
+    if (sec) setSecao(sec);
+    setTimeout(() => { const el = document.getElementById(id); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" }); }, 80);
+  };
   const painelAba = aba === "remocao" ? React.createElement(DashPainelLista, {
-      titulo: "Em remoção agora", sub: "cards na coluna “Remoção em andamento” do Kanban", onFechar: fecharAba, vazio: "Nenhuma remoção em andamento.",
+      titulo: "Em remoção agora", sub: "cards na coluna “Remoção em andamento” do Kanban", onFechar: fecharAba, onIr: irParaBloco, vazio: "Nenhuma remoção em andamento.",
       linhas: cards.filter(c => c.col_id === "andamento").map(c => ({ nome: c.nome || "(sem nome)", ficha: c.ficha_cross || "", texto: `${GRAV_NOME[c.grav] || "Sem prioridade"} · ${c.hosp ? "→ " + c.hosp : "sem hospital de destino"}`, fn: onAbrirCard ? () => onAbrirCard(c.id) : null, rotFn: "abrir card →" })) })
     : aba === "nao" ? React.createElement(DashPainelLista, {
-      titulo: "Não atendidas no período", sub: "linhas cujo status diz que a remoção não aconteceu, com o motivo", onFechar: fecharAba, vazio: "Nenhuma remoção não atendida no período.",
-      rodape: { rot: "ver a situação de todas as remoções ↓", alvo: "bloco-situacao" },
+      titulo: "Não atendidas no período", sub: "linhas cujo status diz que a remoção não aconteceu, com o motivo", onFechar: fecharAba, onIr: irParaBloco, vazio: "Nenhuma remoção não atendida no período.",
+      rodape: { rot: "ver o desfecho de todas as remoções ↓", alvo: "bloco-desfecho" },
       linhas: situacao.filter(c => c.id.startsWith("st:")).flatMap(c => c.itens.map(it => ({ nome: it.nome, ficha: it.ficha, texto: `${c.rotulo} — ${it.texto}`, href: `remocao.html?foco=${encodeURIComponent(it.id)}&campo=${encodeURIComponent(it.campo || "status")}` }))) })
     : aba === "falhas" ? React.createElement(DashPainelLista, {
-      titulo: "Falhas a corrigir", sub: "o que está errado ou faltando nos registros, por tipo", onFechar: fecharAba, vazio: "Nenhuma falha a corrigir.",
+      titulo: "Falhas a corrigir", sub: "o que está errado ou faltando nos registros, por tipo", onFechar: fecharAba, onIr: irParaBloco, vazio: "Nenhuma falha a corrigir.",
       rodape: { rot: "ver os casos, com link para corrigir ↓", alvo: "bloco-saneamento" },
       linhas: problemas.grupos.filter(g => g.tipo === "corrigir" && g.itens.length).sort((x, y) => y.itens.length - x.itens.length).map(g => ({ nome: g.titulo, ficha: "", texto: `${g.itens.length} caso${g.itens.length !== 1 ? "s" : ""}` })) })
     : null;
@@ -2069,12 +2165,19 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const estiloSel = { padding: "5px 9px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, background: "#fff", color: "#0F172A", fontFamily: "inherit" };
 
   return /*#__PURE__*/React.createElement("div", {
+    id: "dash-print-root",
     // ao trocar de período a tela fica visível, só mais clara, até chegar o dado novo
     style: { padding: "4px 0 40px", opacity: atualizando ? 0.6 : 1, transition: "opacity .15s" }
   },
+    /*#__PURE__*/React.createElement("style", null, DASH_CSS_IMPRESSAO),
+    /*#__PURE__*/React.createElement("div", { className: "dash-print-only", style: { marginBottom: 14, paddingBottom: 8, borderBottom: "2px solid #0F172A" } },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#0F172A" } }, "Gerência de Enfermagem · Santa Casa de Francisco Morato — Painel de regulação"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11.5, color: "#475569", marginTop: 3 } },
+        `${periodo === "tudo" ? "Todos os registros" : "Período"}${deDia ? ": " + fmtDia(deDia) + (ateDia && ateDia !== deDia ? " a " + fmtDia(ateDia) : "") : ""} · ${totaisGraf.saidas} saídas de ambulância · ${dados.length} linhas · gerado em ${new Date().toLocaleString("pt-BR")}`)),
 
     /* ══ Controles ══ */
     /*#__PURE__*/React.createElement("div", {
+      className: "dash-no-print",
       style: { display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", marginBottom: 18 }
     },
       /*#__PURE__*/React.createElement("div", {
@@ -2098,7 +2201,9 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginLeft: "auto" } },
         totaisGraf.saidas, " saídas de ambulância · ", dados.length, " linhas",
         deDia && ` · ${fmtDia(deDia)}${ateDia && ateDia !== deDia ? " a " + fmtDia(ateDia) : ""}`,
-        atualizando && " · atualizando…")
+        atualizando && " · atualizando…"),
+      /*#__PURE__*/React.createElement("button", { type: "button", onClick: imprimir, disabled: imprimindo, title: "Abre a impressão com todas as seções do painel, uma por página. Escolha “Salvar como PDF” para gerar o arquivo.",
+        style: { padding: "6px 12px", borderRadius: 9, border: "1px solid #CBD5E1", background: "#fff", color: "#334155", fontSize: 12, fontWeight: 600, cursor: imprimindo ? "default" : "pointer", fontFamily: "inherit", opacity: imprimindo ? 0.6 : 1 } }, imprimindo ? "Preparando…" : "🖨 Imprimir / PDF")
     ),
 
     !faixa && /*#__PURE__*/React.createElement("div", {
@@ -2110,11 +2215,11 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
                borderRadius: 9, padding: "9px 13px", marginBottom: 16 }
     }, "Escala ", escala === "mes" ? "mensal" : "semanal", " ainda não disponível — ", motivoBloqueio[escala],
        ". Mostrando a diária."),
-    /*#__PURE__*/React.createElement(DashNavSecoes, null),
-    /*#__PURE__*/React.createElement(DashSecao, { id: "sec-agora" },
+    /*#__PURE__*/React.createElement(DashNavSecoes, { ativa: secao, onSelect: setSecao }),
+    /*#__PURE__*/React.createElement(DashSecao, { id: "sec-agora", ativa: ativaSec("sec-agora") },
     /* ══ Alertas do gestor + qualidade dos registros: cada chip leva ao bloco ══ */
     /*#__PURE__*/React.createElement(DashAlertas, {
-      aba, agAberto, agFiltro, painel: painelAba,
+      aba, agAberto, agFiltro, painel: painelAba, onIr: irParaBloco,
       onTile: id => {
         if (id === "aguardando" || id === "verm") {   // estes dois abrem a lista de aguardando, que fica logo abaixo
           const f = id === "verm" ? "vermelhos" : "todos";
@@ -2132,9 +2237,12 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       titulo: isAdmin ? "Agora · fila do Kanban" : "Última publicação · fila do Kanban"
     })),
     ),
-    /*#__PURE__*/React.createElement(DashSecao, { id: "sec-atrasos" },
+    /*#__PURE__*/React.createElement(DashSecao, { id: "sec-atrasos", ativa: ativaSec("sec-atrasos") },
     /* ══ Onde o tempo é gasto: as etapas do caminho e o tempo total ══ */
     
+    /* ══ Tempo interno por motivo ══ */
+    /*#__PURE__*/React.createElement(DashMotivos, { linhas: temposLinha, limMotivo, Titulo, fmtMin }),
+
     /* ══ Cumprimento da meta de tempo por gravidade (metas em Configurações) ══ */
     /*#__PURE__*/React.createElement(DashSLA, { sla, semGrav: slaSemGrav, Titulo, fmtMin }),
     /* ══ Tempos do caminho da remoção: 5 intervalos, clique para ver por gravidade ══ */
@@ -2142,7 +2250,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     /* ══ Protocolo de AVC (Livro de Remoção): meta de saída em até 1h da finalização da CROSS ══ */
     /*#__PURE__*/React.createElement(DashProtocoloAVC, { protocolos, totalRemocoes: dados.length, Card, Kpi, Titulo, Vazio, fmtMin }),
     ),
-    /*#__PURE__*/React.createElement(DashSecao, { id: "sec-capacidade" },
+    /*#__PURE__*/React.createElement(DashSecao, { id: "sec-capacidade", ativa: ativaSec("sec-capacidade") },
     /* ══ Frota e capacidade ══ */
     /*#__PURE__*/React.createElement(DashFrota, { frota: frotaHoje, fora: foraStats, cobertura: coberturaFrota, Titulo, fmtMin }),
     /* ══ Volume: saídas (barras) + pedidos à CROSS e finalizações da CROSS (linhas) ══ */
@@ -2151,9 +2259,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       totais: totaisGraf, notas: notasGraf, Titulo, Vazio
     }),
     ),
-    /*#__PURE__*/React.createElement(DashSecao, { id: "sec-problemas" },
-    /* ══ Situação das remoções: realizada, aguardando, ou não realizada (com o motivo do status) ══ */
-    /*#__PURE__*/React.createElement(DashSituacao, { classes: situacao, total: dados.length, Titulo }),
+    /*#__PURE__*/React.createElement(DashSecao, { id: "sec-problemas", ativa: ativaSec("sec-problemas") },
     /*#__PURE__*/React.createElement(DashReinsercao, { rein: reinsercao, Titulo }),
     /* ══ Saneamento de falhas: substitui o balão. Tudo o que ficou fora da conta ou pede atenção, com link ou botão para abrir ══ */
     /*#__PURE__*/React.createElement(DashSaneamento, {
@@ -2162,7 +2268,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       onJustificar: d => { setJustModal(d); setJustTexto(""); }
     }),
     ),
-    /*#__PURE__*/React.createElement(DashSecao, { id: "sec-analise" },
+    /*#__PURE__*/React.createElement(DashSecao, { id: "sec-analise", ativa: ativaSec("sec-analise") },
     /* ══ Remoções na planilha: CROSS + outras = total de linhas ══ */
     /*#__PURE__*/React.createElement("div", { style: { marginBottom: 22 } },
       /*#__PURE__*/React.createElement(Titulo, {
@@ -2265,28 +2371,15 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
           n: i.n, pct: i.pct, max: gHosp.itens[0].n,
           cor: i.canonico === (C && C.NAO_CLASSIFICADO) ? "#CBD5E1" : "#0EA5E9" }))),
 
-      /* Setor — rótulo honesto: é o que a CROSS informa, não a unidade real */
-      /*#__PURE__*/React.createElement(Card, null,
-        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gSetor }), tooltip: "Setor/especialidade solicitante informado na ficha CROSS. Atencao: Clinica Medica indica quem fez o pedido, nao onde o paciente esta internado." }, "Setor informado na CROSS"),
-        /*#__PURE__*/React.createElement("div", {
-          style: { fontSize: 10.5, color: "#94A3B8", marginTop: -8, marginBottom: 12, lineHeight: 1.5 }
-        }, '"Clínica Médica" na ficha indica a especialidade solicitante, não onde o paciente está.'),
-        gSetor.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
-        gSetor.itens.map(i => /*#__PURE__*/React.createElement(Barra, {
-          key: i.canonico,
-          label: i.canonico === (C && C.NAO_CLASSIFICADO) ? "Não classificado" : i.canonico,
-          n: i.n, pct: i.pct, max: gSetor.itens[0].n,
-          cor: i.canonico === (C && C.NAO_CLASSIFICADO) ? "#CBD5E1" : "#14B8A6" }))),
-
       /* Status */
-      /*#__PURE__*/React.createElement(Card, null,
+      /*#__PURE__*/React.createElement("div", { id: "bloco-desfecho", style: { display: "contents" } }, /*#__PURE__*/React.createElement(Card, null,
         /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gStatus }), tooltip: "O que aconteceu com cada remocao: paciente transferido, evadiu, resolvido localmente etc. Campo status da planilha." }, "Desfecho"),
         gStatus.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
         gStatus.itens.map(i => /*#__PURE__*/React.createElement(Barra, {
           key: i.canonico,
           label: i.canonico === (C && C.NAO_CLASSIFICADO) ? "Não classificado" : i.canonico,
           n: i.n, pct: i.pct, max: gStatus.itens[0].n,
-          cor: i.canonico === (C && C.NAO_CLASSIFICADO) ? "#CBD5E1" : "#64748B" }))),
+          cor: i.canonico === (C && C.NAO_CLASSIFICADO) ? "#CBD5E1" : "#64748B" })))),
 
       /* Ambulância */
       /*#__PURE__*/React.createElement(Card, null,
@@ -2297,7 +2390,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
           cor: i.canonico === "AVANÇADA" ? "#F59E0B" : "#64748B" })))
     ),
     ),
-    /*#__PURE__*/React.createElement(DashSecao, { id: "sec-excecoes" },
+    /*#__PURE__*/React.createElement(DashSecao, { id: "sec-excecoes", ativa: ativaSec("sec-excecoes") },
     /*#__PURE__*/React.createElement(DashExcecoes, { cards, cfg, hojeIso, plan: excecoesPlan, onAbrirCard, Titulo, fmtMin }),
     ),
     /* ── Modal de justificativa ── */
