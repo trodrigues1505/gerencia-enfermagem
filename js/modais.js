@@ -4,37 +4,22 @@ function AceiteModal({
   onConfirm,
   onCancel
 }) {
-  // O aceite da CROSS é o mesmo momento da finalização (vem da ficha). Aqui só se confirma o HOSPITAL DE DESTINO, que fica em
-  // `hosp` do card. receptor/data_aceite/hora_aceite continuam sendo enviados ao servidor (cards-move ainda os espera), mas não
-  // aparecem mais para ninguém: o receptor leva o mesmo hospital e data/hora são as de agora, como sempre foram.
-  const [form, setForm] = useState({
-    receptor: card.hosp || "",
-    data_aceite: new Date().toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric"
-    }),
-    hora_aceite: nowStr()
-  });
+  // O aceite da CROSS é o mesmo momento da finalização (vem da ficha). Aqui só se confirma o HOSPITAL DE DESTINO (`hosp` do card).
+  // O servidor novo (cards-move v3) só usa `hosp`. receptor/data_aceite/hora_aceite seguem no envio apenas para o servidor ANTIGO,
+  // que ainda os exige: depois que as colunas forem apagadas, nada disso é gravado.
+  const [form, setForm] = useState({ hosp: card.hosp || "" });
   const [err, setErr] = useState("");
   const upd = (k, v) => setForm(p => ({
     ...p,
     [k]: v
   }));
   function confirm() {
-    if (!form.receptor.trim()) {
+    const hosp = form.hosp.trim();
+    if (!hosp) {
       setErr("O hospital de destino é obrigatório.");
       return;
     }
-    if (!form.data_aceite.trim()) {
-      setErr("Data é obrigatória.");
-      return;
-    }
-    if (!form.hora_aceite.trim()) {
-      setErr("Hora é obrigatória.");
-      return;
-    }
-    onConfirm(form);
+    onConfirm({ hosp, receptor: hosp, data_aceite: todayStr(), hora_aceite: nowStr() });
   }
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -95,8 +80,8 @@ function AceiteModal({
     }
   }, "Confirme o hospital de destino (Unidade Receptora da ficha CROSS) antes de mover o paciente para esta coluna."), /*#__PURE__*/React.createElement(Field, {
     label: "Hospital de destino (Unidade Receptora) *",
-    fieldKey: "receptor",
-    value: form.receptor,
+    fieldKey: "hosp",
+    value: form.hosp,
     onChange: upd,
     placeholder: "Ex.: HOSP DR ALBANO FRANCA ROCHA SOBRINHO"
   }), err && /*#__PURE__*/React.createElement("div", {
