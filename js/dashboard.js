@@ -184,7 +184,7 @@ a.dsh-pill-link:hover{background:var(--bg)}
 @keyframes dshPop{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
 
 /* dica "?" e legenda */
-.dsh-tip{position:absolute;top:calc(100% + 6px);z-index:3000;width:290px;max-width:80vw;background:var(--ink);color:#F1F5F9;padding:var(--s3);border-radius:var(--ri);font-size:12px;line-height:1.55;font-weight:400;text-align:left;white-space:normal;box-shadow:0 12px 32px rgba(15,23,42,.35);text-transform:none;letter-spacing:normal}
+.dsh-tip{position:fixed;left:0;top:0;z-index:3000;width:290px;max-width:calc(100vw - 16px);box-sizing:border-box;pointer-events:none;background:var(--ink);color:#F1F5F9;padding:var(--s3);border-radius:var(--ri);font-size:12px;line-height:1.55;font-weight:400;text-align:left;white-space:normal;box-shadow:0 12px 32px rgba(15,23,42,.35);text-transform:none;letter-spacing:normal}
 .dsh-legenda{margin-top:var(--s4);border-radius:var(--ri);background:var(--bg)}
 .dsh-legenda>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:10px var(--s3);font-size:12px;font-weight:600;color:var(--muted);border-radius:var(--ri)}
 .dsh-legenda>summary::-webkit-details-marker{display:none}
@@ -298,6 +298,24 @@ a.dsh-san__item:hover{background:#FEF3C7}
   .dsh-exc>.dsh-exc__act{grid-column:2}
   .dsh-sec__t{font-size:18px}
 }
+.dsh-title__r{display:flex;align-items:center;gap:var(--s2);margin-left:auto}
+.dsh-title__r .dsh-x{width:30px;height:30px}
+.dsh-sec__top{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--s3)}
+.dsh-menu{position:relative}
+.dsh-menu__p{position:absolute;right:0;top:calc(100% + 6px);z-index:60;min-width:270px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:6px;box-shadow:0 12px 32px rgba(15,23,42,.16)}
+.dsh-menu__i{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;border:0;background:transparent;padding:10px 12px;border-radius:10px;cursor:pointer;color:var(--ink);font-size:13px}
+.dsh-menu__i:hover{background:var(--bg)}
+.dsh-menu__i span{font-size:12px;color:var(--muted)}
+.dsh-menu__d{font-size:11.5px;color:var(--muted);padding:8px 12px 6px;border-top:1px solid var(--line2);margin-top:4px;line-height:1.5}
+.dsh-cb{width:18px;height:18px;accent-color:#0F172A;cursor:pointer;flex-shrink:0;margin:2px 0 0}
+.dsh-cb:disabled{cursor:not-allowed;opacity:.5}
+.dsh-nao__row{display:flex;align-items:flex-start;gap:var(--s3);padding:10px 8px;border-radius:12px;cursor:pointer}
+.dsh-nao__row:hover{background:var(--bg)}
+.dsh-nao__bar{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);flex-wrap:wrap;padding:10px 12px;margin:12px 0 4px;background:var(--bg);border-radius:12px}
+.dsh-nao__all{display:inline-flex;align-items:center;gap:10px;font-size:13px;font-weight:600;cursor:pointer}
+.dsh-metabar__corte{position:absolute;top:2px;height:20px;border-left:2px dashed #B45309;transform:translateX(-1px)}
+.dsh-aud__i{display:grid;grid-template-columns:130px 190px minmax(0,1fr);gap:var(--s3);padding:10px 0;border-top:1px solid var(--line2);font-size:12.5px;align-items:baseline}
+@media (max-width:760px){.dsh-aud__i{grid-template-columns:1fr;gap:2px}.dsh-menu__p{right:auto;left:0}}
 @media (prefers-reduced-motion:reduce){.dsh *{animation:none!important;transition:none!important}}
 `;
 (function () {
@@ -359,14 +377,18 @@ function useDashEntrou() {
   return e;
 }
 function useDashContagem(alvo, dur = 900) {
-  const [v, setV] = useState(() => (dashMenosMovimento() ? alvo : 0));
+  const ini = dashMenosMovimento() ? alvo : 0;
+  const [v, setV] = useState(ini);
+  const atual = React.useRef(ini);   // valor que está na tela agora: quando o número muda, anima dele até o novo (e não recomeça do zero)
   useEffect(() => {
-    if (dashMenosMovimento() || typeof alvo !== "number" || !isFinite(alvo)) { setV(alvo); return; }
+    if (dashMenosMovimento() || typeof alvo !== "number" || !isFinite(alvo)) { atual.current = alvo; setV(alvo); return; }
+    const de = typeof atual.current === "number" ? atual.current : 0;
     let raf, t0 = null;
     const passo = t => {
       if (t0 === null) t0 = t;
       const p = Math.min((t - t0) / dur, 1);
-      setV(alvo * (1 - Math.pow(1 - p, 3)));
+      const val = de + (alvo - de) * (1 - Math.pow(1 - p, 3));
+      atual.current = val; setV(val);
       if (p < 1) raf = requestAnimationFrame(passo);
     };
     raf = requestAnimationFrame(passo);
@@ -378,6 +400,25 @@ function DashNum({ valor, sufixo = "", casas = 0 }) {
   const v = useDashContagem(typeof valor === "number" ? valor : null);
   if (typeof valor !== "number") return valor == null ? null : valor;
   return (typeof v === "number" ? v : valor).toFixed(casas) + sufixo;
+}
+
+/* Contexto de impressão: cada bloco e cada aba pede ao Dashboard "imprima só isto". */
+const DashImpCtx = React.createContext(null);
+
+/* ─── Auditoria ───────────────────────────────────────────────────────────────
+ * Toda alteração feita pelo painel (configurações, justificativas) grava uma linha em `painel_auditoria`: quem, quando,
+ * o quê, valor antes e valor depois. A tabela não tem política de alterar nem de apagar, então o registro é permanente.
+ * Se a gravação falhar, o painel AVISA na tela (a alteração já foi feita, mas fica sem registro).                         */
+async function dashAuditar(entradas, quem) {
+  const linhas = (Array.isArray(entradas) ? entradas : [entradas]).map(e => ({
+    usuario_nome: quem || null, acao: e.acao, entidade: e.entidade || null, entidade_id: e.entidade_id == null ? null : String(e.entidade_id),
+    resumo: e.resumo || null, antes: e.antes == null ? null : e.antes, depois: e.depois == null ? null : e.depois }));
+  if (!linhas.length) return { ok: true };
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/painel_auditoria`, { method: "POST", headers: Object.assign({}, H(), { Prefer: "return=minimal" }), body: JSON.stringify(linhas) });
+    if (!r.ok) throw new Error(await r.text());
+    return { ok: true };
+  } catch (e) { return { ok: false, erro: e.message }; }
 }
 
 /* ─── Peças visuais reutilizáveis (ficam FORA do Dashboard para manter a identidade entre renderizações) ─── */
@@ -392,12 +433,15 @@ function DashCard({ children, style, onClick, className, id }) {
 
 function DashTitulo({ children, extra, tooltip, icone }) {
   const h = React.createElement;
+  const imp = React.useContext(DashImpCtx);
+  const botao = imp && h("button", { type: "button", className: "dsh-x dash-no-print", title: "Imprimir só este bloco", "aria-label": "Imprimir só este bloco",
+    onClick: e => { e.stopPropagation(); imp.bloco(e.currentTarget); } }, h(DashIcone, { n: "printer", tam: 16 }));
   return h("div", { className: "dsh-title" },
     h("div", { className: "dsh-title__t" },
       icone && h("span", { className: "dsh-title__icon" }, h(DashIcone, { n: icone, tam: 16 })),
       h("span", null, children),
       tooltip && h(DashDica, { texto: tooltip, rotulo: typeof children === "string" ? children : undefined })),
-    extra && h("div", { className: "dsh-title__x" }, extra));
+    (extra || botao) && h("div", { className: "dsh-title__r" }, extra && h("div", { className: "dsh-title__x" }, extra), botao));
 }
 
 function DashKpi({ label, valor, sub, cor, alerta, tooltip, onClick, ativo, topo }) {
@@ -486,20 +530,23 @@ function DashRosca({ segs, centro, sub, tam = 132 }) {
     h("div", { className: "dsh-rosca__c" }, h("b", { className: "dsh-num" }, centro), sub && h("span", null, sub)));
 }
 
-/* Barra "duas partes contra uma meta" (ex.: Santa Casa + ambulância contra 1h) */
-function DashMetaBar({ a, b, meta, rotA, rotB, corA, corB, metaTxt }) {
+/* Barra "duas partes contra uma meta" (ex.: Santa Casa + ambulância contra o tempo do AVC).
+ * `corte` (opcional) é o prazo que só a Santa Casa tem para pedir a ambulância: aparece como um tracejado.            */
+function DashMetaBar({ a, b, meta, corte, rotA, rotB, corA, corB, metaTxt }) {
   const h = React.createElement, entrou = useDashEntrou();
-  corA = corA || "#D97706"; corB = corB || "#E11D48"; metaTxt = metaTxt || "meta 1h";
+  corA = corA || "#D97706"; corB = corB || "#E11D48"; metaTxt = metaTxt || ("meta " + dashFmtMin(meta));
   const total = a + b, escala = Math.max(meta, total);
+  const temCorte = typeof corte === "number" && corte > 0 && corte < meta;
   return h("div", { className: "dsh-metabar" },
     h("div", { className: "dsh-metabar__box" },
       h("div", { className: "dsh-metabar__fill" },
         h("div", { title: `${rotA}: ${dashFmtMin(a)}`, style: { width: entrou ? a / escala * 100 + "%" : "0%", background: corA } }),
         h("div", { title: `${rotB}: ${dashFmtMin(b)}`, style: { width: entrou ? b / escala * 100 + "%" : "0%", background: corB } })),
+      temCorte && h("span", { className: "dsh-metabar__corte", title: "Prazo da Santa Casa para pedir a ambulância: " + dashFmtMin(corte), style: { left: corte / escala * 100 + "%" } }),
       h("span", { className: "dsh-metabar__meta", title: metaTxt, style: { left: meta / escala * 100 + "%" } })),
     h("div", { className: "dsh-metabar__t" },
       h("b", { style: { color: corA } }, rotA + " " + dashFmtMin(a)), " · ", h("b", { style: { color: corB } }, rotB + " " + dashFmtMin(b)),
-      ` · total ${dashFmtMin(total)} (${metaTxt})`));
+      ` · total ${dashFmtMin(total)} (${metaTxt}${temCorte ? " · tracejado: prazo da Santa Casa " + dashFmtMin(corte) : ""})`));
 }
 
 function DashCobertura({ g }) {
@@ -634,24 +681,41 @@ function dashDiaDaSaida(x) {
    ══════════════════════════════════════════════════════════════════════════ */
 
 
-/* O "?" ao lado de um nome: abre ao passar o mouse, ao focar com o teclado ou ao clicar/tocar (clicar fixa aberto). */
+/* O "?" ao lado de um nome: abre ao passar o mouse, ao focar com o teclado ou ao clicar/tocar (clicar fixa aberto).
+ * O balão é desenhado FORA do cartão (direto no <body>) e posicionado pela tela: assim nenhum cartão o corta
+ * (os cartões têm overflow escondido) nem o cartão vizinho passa por cima. Perto da borda, ele se desloca para caber;
+ * sem espaço embaixo, abre em cima.                                                                                       */
+const useDashLayoutEffect = (typeof window !== "undefined" && React.useLayoutEffect) ? React.useLayoutEffect : useEffect;
 function DashDica({ texto, rotulo }) {
   const h = React.createElement;
-  const [hover, setHover] = useState(false), [fixa, setFixa] = useState(false), [dir, setDir] = useState(false);
-  const ref = React.useRef(null);
+  const [hover, setHover] = useState(false), [fixa, setFixa] = useState(false), [pos, setPos] = useState(null);
+  const ref = React.useRef(null), tipRef = React.useRef(null);
   const visivel = hover || fixa;
+  const posiciona = () => {
+    const el = ref.current, tip = tipRef.current;
+    if (!el || !tip) return;
+    const r = el.getBoundingClientRect(), vw = window.innerWidth || 1200, vh = window.innerHeight || 800;
+    const w = Math.min(290, vw - 16), alt = tip.offsetHeight || 0;
+    const left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, vw - w - 8));
+    let top = r.bottom + 8;
+    if (top + alt > vh - 8 && r.top - 8 - alt >= 8) top = r.top - 8 - alt;
+    setPos({ left, top, w });
+  };
+  useDashLayoutEffect(() => { if (visivel) posiciona(); else setPos(null); }, [visivel, texto]);
   useEffect(() => {
     if (!visivel) return;
-    const el = ref.current;
-    if (el && el.getBoundingClientRect) { const r = el.getBoundingClientRect(); setDir(r.left + 300 > (window.innerWidth || 1200)); }
+    window.addEventListener("scroll", posiciona, true); window.addEventListener("resize", posiciona);
+    return () => { window.removeEventListener("scroll", posiciona, true); window.removeEventListener("resize", posiciona); };
   }, [visivel]);
   useEffect(() => {
     if (!fixa) return;
-    const fora = e => { if (ref.current && !ref.current.contains(e.target)) setFixa(false); };
+    const fora = e => { if (ref.current && !ref.current.contains(e.target) && !(tipRef.current && tipRef.current.contains(e.target))) setFixa(false); };
     const esc = e => { if (e.key === "Escape") setFixa(false); };
     document.addEventListener("mousedown", fora); document.addEventListener("keydown", esc);
     return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("keydown", esc); };
   }, [fixa]);
+  const tip = visivel && h("span", { ref: tipRef, role: "tooltip", className: "dsh dsh-tip dash-no-print",
+    style: { left: pos ? pos.left : 0, top: pos ? pos.top : 0, width: pos ? pos.w : 290, visibility: pos ? "visible" : "hidden" } }, texto);
   return h("span", { ref, className: "dash-dica dash-no-print", style: { position: "relative", display: "inline-flex", marginLeft: 6, verticalAlign: "middle", textTransform: "none", letterSpacing: "normal" },
     onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false) },
     h("span", { role: "button", tabIndex: 0, "aria-label": "O que significa" + (rotulo ? ": " + rotulo : ""), "aria-expanded": visivel,
@@ -660,7 +724,7 @@ function DashDica({ texto, rotulo }) {
       onFocus: () => setHover(true), onBlur: () => setHover(false),
       style: { width: 16, height: 16, borderRadius: 99, border: "1px solid " + (visivel ? "#475569" : "#CBD5E1"), color: visivel ? "#0F172A" : "#64748B", background: visivel ? "#F1F5F9" : "#fff",
         fontSize: 10, fontWeight: 800, lineHeight: "14px", textAlign: "center", cursor: "help", userSelect: "none", flexShrink: 0, transition: "all .15s" } }, "?"),
-    visivel && h("span", { role: "tooltip", className: "dsh-tip", style: { [dir ? "right" : "left"]: 0 } }, texto));
+    tip && (typeof ReactDOM !== "undefined" && ReactDOM.createPortal ? ReactDOM.createPortal(tip, document.body) : tip));
 }
 
 /* Explicação escrita ("como ler"), recolhida por padrão para não poluir; abre com um clique. */
@@ -745,6 +809,7 @@ function DashFilaKanban({ cols, cards, titulo }) {
 }
 
 /* ─── Protocolo de AVC ───────────────────────────────────────────────────────
+ * Meta e prazo vêm de Configurações (avc_meta_min e avc_prazo_pedido_min, cada um com a data em que passa a valer).
  * Estado de "qual card está aberto" fica aqui, no próprio componente, para o resto da tela não ser refeito a cada clique. */
 function DashProtocoloAVC({ protocolos, totalRemocoes }) {
   const h = React.createElement, fmtMin = dashFmtMin;
@@ -756,10 +821,14 @@ function DashProtocoloAVC({ protocolos, totalRemocoes }) {
     return () => window.removeEventListener("keydown", f);
   }, [avcSel]);
   const P = protocolos;
+  const metaTxt = fmtMin(P.metaMin), prazoTxt = fmtMin(P.prazoPedido);
+  const dividido = P.prazoDefinido && P.prazoPedido < P.metaMin;
   const titulo = h(DashTitulo, {
     icone: "zap",
-    extra: "meta: sair com médico e enfermeiro em até 1h da finalização da CROSS",
-    tooltip: "O protocolo de AVC (derrame) tem uma meta: a ambulância precisa sair em até 1 hora depois que a CROSS finaliza a ficha. Aqui entram só os pacientes marcados como Protocolo de AVC no Livro de Saída (desde outubro/2026) e que já foram ligados à planilha. Cada paciente cai em um só grupo: saiu no horário; atraso porque a Santa Casa demorou a pedir a ambulância; ou atraso porque a ambulância demorou a sair depois de pedida. Clique em um cartão para ver os pacientes."
+    extra: `meta: sair com médico e enfermeiro em até ${metaTxt} da finalização da CROSS`,
+    tooltip: `O protocolo de AVC (derrame) tem uma meta: a ambulância precisa sair em até ${metaTxt} depois que a CROSS finaliza a ficha. ` +
+      (dividido ? `Dentro dela, a Santa Casa tem até ${prazoTxt} para pedir a ambulância; se pedir depois disso, o atraso é da Santa Casa, mesmo que a ambulância tenha pouco tempo para sair. ` : `Hoje a Santa Casa e o setor de ambulância dividem esse tempo; em Configurações você pode definir um prazo só da Santa Casa para pedir a ambulância. `) +
+      "Aqui entram só os pacientes marcados como Protocolo de AVC no Livro de Saída (desde outubro/2026) e que já foram ligados à planilha. Cada paciente cai em um só grupo: saiu no horário; atraso da Santa Casa; ou atraso da ambulância. Clique em um cartão para ver os pacientes."
   }, "Protocolo de AVC");
 
   if (P.total === 0) return h(DashCard, { id: "bloco-avc" }, titulo,
@@ -769,7 +838,9 @@ function DashProtocoloAVC({ protocolos, totalRemocoes }) {
   const SEL = { noHorario: ["No horário", "#15803D", "#DCFCE7"], atrasoSantaCasa: ["Atraso · Santa Casa", "#92400E", "#FEF3C7"],
     atrasoAmbulancia: ["Atraso · ambulância", "#9F1239", "#FFE4E6"], atrasoSemCausa: ["Atraso · causa não apurada", "#475569", "#F1F5F9"],
     semHorarios: ["Sem horário para medir", "#92400E", "#FFFBEB"] };
-  const TIT = { total: "Todos os protocolos de AVC", noHorario: "Saíram no horário", atrasoSantaCasa: "Atraso · Santa Casa demorou a pedir a ambulância", atrasoAmbulancia: "Atraso · ambulância saiu depois de 1h" };
+  const TIT = { total: "Todos os protocolos de AVC", noHorario: "Saíram no horário",
+    atrasoSantaCasa: dividido ? `Atraso · Santa Casa pediu a ambulância depois de ${prazoTxt}` : "Atraso · Santa Casa demorou a pedir a ambulância",
+    atrasoAmbulancia: dividido ? `Atraso · pedido no prazo, mas a ambulância saiu depois de ${metaTxt}` : `Atraso · ambulância saiu depois de ${metaTxt}` };
 
   const casos = avcSel && (() => {
     const itens = avcSel === "total" ? P.lista : P.lista.filter(c => c.cat === avcSel);
@@ -790,12 +861,19 @@ function DashProtocoloAVC({ protocolos, totalRemocoes }) {
           linha("Solicitação da ambulância", c.pedTxt, false, rel(c.minPedido)),
           linha("Saída da ambulância", c.saiTxt, c.faltaSaida, rel(c.minSaida)),
           (c.minPedido !== null && c.minPedido >= 0 && c.minAmb !== null && c.minAmb >= 0) &&
-            h("div", { style: { marginTop: 8 } }, h(DashMetaBar, { a: c.minPedido, b: c.minAmb, meta: 60, rotA: "Santa Casa", rotB: "Ambulância" })),
+            h("div", { style: { marginTop: 8 } }, h(DashMetaBar, { a: c.minPedido, b: c.minAmb, meta: c.meta, corte: c.prazo, rotA: "Santa Casa", rotB: "Ambulância", metaTxt: "meta " + fmtMin(c.meta) })),
           (c.medico || c.enfermeiro) && h("div", { className: "dsh-list__m" }, "Médico: " + (c.medico || "—") + " · Enfermeiro(a): " + (c.enfermeiro || "—"))))));
   })();
 
   return h(DashCard, { id: "bloco-avc" },
     titulo,
+    h("div", { className: "dsh-chips", style: { marginBottom: 12 } },
+      h("span", { className: "dsh-chip" }, "Meta total " + metaTxt),
+      dividido
+        ? h(React.Fragment, null,
+            h("span", { className: "dsh-chip dsh-chip--warn" }, "Santa Casa pede em até " + prazoTxt),
+            h("span", { className: "dsh-chip", style: { background: "#FFE4E6", color: "#9F1239" } }, "Ambulância: o resto até " + metaTxt))
+        : h("span", { className: "dsh-chip" }, "Prazo próprio da Santa Casa não definido: as duas partes dividem a meta")),
     h(DashEmpilhada, { alto: "lg", segs: [
       { id: "noHorario", rot: "No horário", valor: P.noHorario, cor: "#16A34A" },
       { id: "atrasoSantaCasa", rot: "Atraso · Santa Casa", valor: P.atrasoSantaCasa, cor: "#D97706" },
@@ -808,35 +886,36 @@ function DashProtocoloAVC({ protocolos, totalRemocoes }) {
         ativo: avcSel === "total", onClick: alterna("total"),
         tooltip: "Quantos pacientes de AVC (derrame) houve no período. Clique para ver todos." }),
       h(DashKpi, { label: "Saíram no horário", valor: P.noHorario, cor: "#15803D",
-        sub: `${(P.noHorario / P.total * 100).toFixed(0)}% dos protocolos · até 1h`,
+        sub: `${(P.noHorario / P.total * 100).toFixed(0)}% dos protocolos · até ${metaTxt}`,
         ativo: avcSel === "noHorario", onClick: P.noHorario ? alterna("noHorario") : undefined,
-        tooltip: "A ambulância saiu em até 1 hora depois que a CROSS finalizou a ficha. Cumpriu a meta." }),
-      h(DashKpi, { label: "Atraso · Santa Casa", valor: P.atrasoSantaCasa, cor: "#B45309", sub: "demorou a pedir a ambulância",
+        tooltip: `A ambulância saiu em até ${metaTxt} depois que a CROSS finalizou a ficha. Cumpriu a meta.` }),
+      h(DashKpi, { label: "Atraso · Santa Casa", valor: P.atrasoSantaCasa, cor: "#B45309", sub: dividido ? `pediu a ambulância depois de ${prazoTxt}` : "demorou a pedir a ambulância",
         alerta: P.atrasoSantaCasa > 0, ativo: avcSel === "atrasoSantaCasa", onClick: P.atrasoSantaCasa ? alterna("atrasoSantaCasa") : undefined,
-        tooltip: "Passou de 1 hora porque a Santa Casa demorou mais de 1 hora, depois da finalização da CROSS, para pedir a ambulância." }),
-      h(DashKpi, { label: "Atraso · ambulância", valor: P.atrasoAmbulancia, cor: "#BE123C", sub: "chegou depois de 1h",
+        tooltip: `Passou da meta de ${metaTxt} e a Santa Casa levou mais de ${prazoTxt}, depois da finalização da CROSS, para pedir a ambulância.` }),
+      h(DashKpi, { label: "Atraso · ambulância", valor: P.atrasoAmbulancia, cor: "#BE123C", sub: dividido ? "pedido no prazo, saída fora da meta" : `saiu depois de ${metaTxt}`,
         alerta: P.atrasoAmbulancia > 0, ativo: avcSel === "atrasoAmbulancia", onClick: P.atrasoAmbulancia ? alterna("atrasoAmbulancia") : undefined,
-        tooltip: "Passou de 1 hora mesmo com a ambulância pedida em até 1 hora: quem demorou foi a saída da ambulância." })),
+        tooltip: `Passou da meta de ${metaTxt} mesmo com a ambulância pedida em até ${prazoTxt}: quem demorou foi a saída da ambulância.` })),
 
     casos,
 
     h("div", { className: "dsh-sep" }),
-    h("div", { className: "dsh-eyebrow", style: { marginBottom: 8 } }, "A hora dividida · quanto levou cada lado"),
+    h("div", { className: "dsh-eyebrow", style: { marginBottom: 8 } }, "O tempo da meta dividido · quanto levou cada lado"),
     (P.santaCasa.mediana !== null && P.ambulancia.mediana !== null) &&
-      h("div", { style: { marginBottom: 16 } }, h(DashMetaBar, { a: P.santaCasa.mediana, b: P.ambulancia.mediana, meta: 60, rotA: "Santa Casa", rotB: "Ambulância" })),
+      h("div", { style: { marginBottom: 16 } }, h(DashMetaBar, { a: P.santaCasa.mediana, b: P.ambulancia.mediana, meta: P.metaMin, corte: P.prazoPedido, rotA: "Santa Casa", rotB: "Ambulância", metaTxt: "meta " + metaTxt })),
     h("div", { className: "dsh-grid dsh-g2 dsh-grid--tight", style: { marginBottom: 0 } },
       h(DashKpi, { label: "Santa Casa · finalização → solicitação", valor: fmtMin(P.santaCasa.mediana), cor: "#B45309",
         sub: P.santaCasa.n ? `mediana · ${P.santaCasa.n} com horário · maior: ${fmtMin(P.santaCasa.max)}` : "sem protocolos com os dois horários",
-        tooltip: "O tempo do meio (mediana) entre a CROSS finalizar a ficha e a Santa Casa pedir a ambulância. É a parte da hora que depende da Santa Casa. Entram só os pacientes que têm os dois horários." }),
+        tooltip: "O tempo do meio (mediana) entre a CROSS finalizar a ficha e a Santa Casa pedir a ambulância. É a parte do tempo que depende da Santa Casa. Entram só os pacientes que têm os dois horários." }),
       h(DashKpi, { label: "Ambulância · solicitação → saída", valor: fmtMin(P.ambulancia.mediana), cor: "#BE123C",
         sub: P.ambulancia.n ? `mediana · ${P.ambulancia.n} com horário · maior: ${fmtMin(P.ambulancia.max)}` : "sem protocolos com os dois horários",
-        tooltip: "O tempo do meio (mediana) entre o pedido da ambulância e a saída dela. É a parte da hora que depende do setor de ambulância. A meta de 1 hora é a soma das duas partes: se a Santa Casa levou 45 minutos para pedir, sobram 15 para a ambulância sair." })),
+        tooltip: `O tempo do meio (mediana) entre o pedido da ambulância e a saída dela. É a parte que depende do setor de ambulância. A meta de ${metaTxt} é a soma das duas partes.` })),
 
-    (P.semHorarios > 0 || P.atrasoSemCausa > 0) && h("div", { className: "dsh-nota", style: { marginTop: 16 } },
+    (P.semHorarios > 0 || P.atrasoSemCausa > 0 || !P.prazoDefinido) && h("div", { className: "dsh-nota", style: { marginTop: 16 } },
       P.semHorarios > 0 && h("div", null,
         `${P.semHorarios} protocolo${P.semHorarios !== 1 ? "s" : ""} sem horário para medir (contam no total, mas não entram nas três categorias): ${P.semFinalizacao} sem finalização da CROSS · ${P.semSaida} sem data ou horário de saída da ambulância. Clique em “Protocolos de AVC” para ver quais.`),
       P.atrasoSemCausa > 0 && h("div", null,
-        `${P.atrasoSemCausa} saíram depois de 1h, mas sem o horário da solicitação da ambulância — a causa do atraso não pôde ser apurada.`)));
+        `${P.atrasoSemCausa} saíram depois de ${metaTxt}, mas sem o horário da solicitação da ambulância — a causa do atraso não pôde ser apurada.`),
+      !P.prazoDefinido && h("div", null, "Dica: em Configurações, defina o prazo da Santa Casa para pedir a ambulância. Assim um pedido feito tarde não é contado como atraso do setor de ambulância.")));
 }
 
 /* ─── Onde o tempo é gasto: as etapas do caminho ──────────────────────────────
@@ -1178,7 +1257,7 @@ const DASH_PROBLEMAS_DEF = [
   { id: "vazio_destino", secao: "vazios", tipo: "corrigir", titulo: "Finalizada pela CROSS, sem instituição de destino",
     ajuda: "Linha CROSS com finalização, que não foi cancelada nem resolvida no local, e sem INSTITUIÇÃO DESTINO. A linha fica fora do gráfico de destinos." },
 
-  { id: "avc_sem_medida", secao: "avc", tipo: "corrigir", titulo: "Protocolo de AVC sem dados para medir a meta de 1h",
+  { id: "avc_sem_medida", secao: "avc", tipo: "corrigir", titulo: "Protocolo de AVC sem dados para medir a meta do AVC",
     ajuda: "Para medir a meta é preciso a finalização da CROSS e a saída da ambulância, cada uma com data e horário." },
   { id: "avc_sem_equipe", secao: "avc", tipo: "corrigir", titulo: "Protocolo de AVC que saiu sem médico ou enfermeiro(a)",
     ajuda: "O protocolo exige médico e enfermeiro(a) na ambulância. “Sem médico” e “Sem enfermeiro(a)” contam como falta. Hoje essa conferência só existe na tela do Livro de Saída; o servidor ainda não recusa." },
@@ -1212,7 +1291,9 @@ const DASH_CFG_CHAVES = [
   { chave: "alerta_espera_vermelho_min", grupo: "alerta", rotulo: "Vermelho aguardando há mais de",        unid: "min" },
   { chave: "alerta_sem_atualizacao_h",   grupo: "alerta", rotulo: "Card sem atualização há mais de",       unid: "h" },
   { chave: "motivo_obrigatorio_acima_min", grupo: "dados", rotulo: "Tempo interno acima de (exige motivo)", unid: "min" },
-  { chave: "limite_suspeito_h",          grupo: "dados",  rotulo: "Etapa acima de (confira a digitação)",  unid: "h" }
+  { chave: "limite_suspeito_h",          grupo: "dados",  rotulo: "Etapa acima de (confira a digitação)",  unid: "h" },
+  { chave: "avc_meta_min",               grupo: "avc",    rotulo: "AVC: tempo total até a ambulância sair", unid: "min" },
+  { chave: "avc_prazo_pedido_min",       grupo: "avc",    rotulo: "AVC: prazo da Santa Casa para pedir a ambulância", unid: "min" }
 ];
 const DASH_CFG_DICA = {
   frota_basica: "Quantas ambulâncias básicas (técnico e motorista) a Santa Casa tem a partir da data escolhida lá em cima. Quando a quantidade mudar, registre a nova com a nova data: o histórico fica guardado.",
@@ -1225,7 +1306,9 @@ const DASH_CFG_DICA = {
   alerta_espera_vermelho_min: "O mesmo alerta, só para pacientes vermelhos, que costumam ter um limite menor.",
   alerta_sem_atualizacao_h: "Se o card de um paciente que aguarda ficar parado, sem ninguém mexer, por mais horas do que isso, o painel avisa.",
   motivo_obrigatorio_acima_min: "Se a espera entre a CROSS finalizar a ficha e a Santa Casa pedir a ambulância passar disto (em minutos), o painel cobra que o motivo seja preenchido na planilha. Sem valor, não cobra.",
-  limite_suspeito_h: "Se alguma etapa de uma remoção passar de tantas horas, o painel avisa para conferir se não é erro de digitação. A remoção continua entrando na conta. Sem valor, não avisa."
+  limite_suspeito_h: "Se alguma etapa de uma remoção passar de tantas horas, o painel avisa para conferir se não é erro de digitação. A remoção continua entrando na conta. Sem valor, não avisa.",
+  avc_meta_min: "Tempo máximo, em minutos, entre a CROSS finalizar a ficha de um AVC e a ambulância sair da Santa Casa. Sem valor, vale 60 (1 hora).",
+  avc_prazo_pedido_min: "Parte desse tempo que é só da Santa Casa: o prazo, em minutos, para pedir a ambulância depois da finalização da CROSS. Se a Santa Casa pedir depois desse prazo e a ambulância sair fora da meta, o atraso conta para a Santa Casa. Se pedir dentro do prazo, conta para o setor de ambulância. Precisa ser menor ou igual ao tempo total. Sem valor, as duas partes dividem o tempo total, como antes."
 };
 const DASH_CFG_ROTULO = DASH_CFG_CHAVES.reduce((a, c) => { a[c.chave] = c.rotulo + (c.unid ? " (" + c.unid + ")" : ""); return a; }, {});
 
@@ -1695,6 +1778,91 @@ function DashReinsercao({ rein }) {
     sel && h(DashListaModal, { titulo: "Reinserções", subtitulo: "status REINSERIDA e observação com “reinserida/reinserido”", itens, onClose: () => setSel(false) }));
 }
 
+/* ─── Não atendidas: lista para marcar como JUSTIFICADA ───────────────────────
+ * Marcar uma remoção como justificada (ex.: alta) tira ela da contagem de "não atendidas e não justificadas".
+ * Quem marcou, quando e o motivo ficam gravados (tabela remocao_justificativas) e no registro de auditoria.        */
+function DashNaoAtendidas({ lista, just, justOk, podeJustificar, onJustificar, onDesfazer, onFechar, onIr }) {
+  const h = React.createElement;
+  const [filtro, setFiltro] = useState("todas");
+  const [sel, setSel] = useState({});
+  const [modal, setModal] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [verJust, setVerJust] = useState(false);
+  const LIM = 100;
+  const pend = lista.filter(x => !just[String(x.id)]);
+  const feitas = lista.filter(x => just[String(x.id)]);
+  const status = Array.from(new Set(pend.map(x => x.status)));
+  const filtroEf = (filtro === "todas" || status.indexOf(filtro) >= 0) ? filtro : "todas";
+  const visiveis = pend.filter(x => filtroEf === "todas" || x.status === filtroEf);
+  const marcadas = visiveis.filter(x => sel[String(x.id)]);
+  const todasMarcadas = visiveis.length > 0 && marcadas.length === visiveis.length;
+  const alterna = x => setSel(s => Object.assign({}, s, { [String(x.id)]: !s[String(x.id)] }));
+  const marcaTodas = () => setSel(s => { const n = Object.assign({}, s); visiveis.forEach(x => { n[String(x.id)] = !todasMarcadas; }); return n; });
+  const pode = podeJustificar && justOk !== false;
+  async function confirmar() {
+    setSalvando(true);
+    const ok = await onJustificar(marcadas, motivo.trim());
+    setSalvando(false);
+    if (ok) { setModal(false); setMotivo(""); setSel({}); }
+  }
+  const quando = d => { try { return new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } };
+  const card = h(DashCard, { style: { marginBottom: 16, borderColor: "#CBD5E1" } },
+    h("div", { role: "region", "aria-label": "Não atendidas e não justificadas" },
+      h("div", { className: "dsh-title", style: { marginBottom: 8 } },
+        h("div", null,
+          h("div", { className: "dsh-title__t" }, "Não atendidas e não justificadas"),
+          h("div", { className: "dsh-sub" }, `${pend.length} sem justificativa · ${feitas.length} justificada${feitas.length !== 1 ? "s" : ""} (já fora desta contagem)`)),
+        h("button", { type: "button", className: "dsh-x", onClick: onFechar, "aria-label": "Fechar" }, h(DashIcone, { n: "x", tam: 18 }))),
+      justOk === false && h("div", { className: "dsh-banner", style: { marginBottom: 12 } }, h(DashIcone, { n: "alert", tam: 16 }),
+        h("div", null, h("b", null, "Justificativas ainda não disponíveis: "), "a tabela remocao_justificativas não foi encontrada. Rode o arquivo painel-auditoria-e-justificativas.sql no Supabase e recarregue a página.")),
+      !podeJustificar && h("div", { className: "dsh-nota", style: { marginBottom: 8 } }, "Só quem tem permissão de justificativa pode marcar. Você pode ver a lista."),
+      pend.length === 0 ? h(DashVazio, { ok: true }, "Nenhuma remoção não atendida sem justificativa.") : h(React.Fragment, null,
+        status.length > 1 && h("div", { className: "dsh-seg dsh-seg--sm", role: "group", "aria-label": "Filtrar por status", style: { marginTop: 4 } },
+          [["todas", `Todas (${pend.length})`]].concat(status.map(st => [st, `${st} (${pend.filter(x => x.status === st).length})`])).map(([id, rot]) =>
+            h("button", { key: id, type: "button", "aria-pressed": filtroEf === id, onClick: () => setFiltro(id) }, rot))),
+        h("div", { className: "dsh-nao__bar" },
+          h("label", { className: "dsh-nao__all" }, h("input", { type: "checkbox", className: "dsh-cb", checked: todasMarcadas, onChange: marcaTodas, disabled: !pode }), `Selecionar todas (${visiveis.length})`),
+          h("button", { type: "button", className: "dsh-btn dsh-btn--primary dsh-btn--sm", disabled: !pode || marcadas.length === 0, onClick: () => setModal(true) },
+            h(DashIcone, { n: "check", tam: 14 }), marcadas.length ? `Justificar ${marcadas.length} selecionada${marcadas.length !== 1 ? "s" : ""}` : "Justificar selecionadas")),
+        h("ul", { className: "dsh-list" },
+          visiveis.slice(0, LIM).map(x => h("li", { key: x.id, className: "dsh-list__i", style: { padding: "2px 0" } },
+            h("label", { className: "dsh-nao__row" },
+              h("input", { type: "checkbox", className: "dsh-cb", checked: !!sel[String(x.id)], onChange: () => alterna(x), disabled: !pode, "aria-label": "Marcar " + x.nome }),
+              h("div", { style: { minWidth: 0, flex: 1 } },
+                h("div", { className: "dsh-list__top", style: { justifyContent: "flex-start", gap: 8 } },
+                  h("span", { className: "dsh-list__n" }, x.nome), x.ficha && h("span", { className: "dsh-sub" }, x.ficha), h("span", { className: "dsh-chip" }, x.status)),
+                h("div", { className: "dsh-list__m" }, x.texto)),
+              h("a", { href: `remocao.html?foco=${encodeURIComponent(x.id)}&campo=${encodeURIComponent(x.campo || "status")}`, className: "dsh-link", onClick: e => e.stopPropagation() }, "abrir linha", h(DashIcone, { n: "external", tam: 13 })))))),
+        visiveis.length > LIM && h("div", { className: "dsh-nota", style: { padding: "6px 8px" } }, `Mostrando ${LIM} de ${visiveis.length}. Justifique estas e a lista avança.`)),
+      feitas.length > 0 && h("div", { style: { marginTop: 16 } },
+        h("button", { type: "button", className: "dsh-btn dsh-btn--sm", "aria-expanded": verJust, onClick: () => setVerJust(v => !v) },
+          h("span", { style: { display: "inline-flex", transform: verJust ? "rotate(180deg)" : "none", transition: "transform .15s" } }, h(DashIcone, { n: "chevron", tam: 14 })), `Justificadas (${feitas.length})`),
+        verJust && h("ul", { className: "dsh-list", style: { marginTop: 8 } },
+          feitas.slice(0, LIM).map(x => {
+            const j = just[String(x.id)];
+            return h("li", { key: x.id, className: "dsh-list__i" },
+              h("div", { className: "dsh-list__top" },
+                h("div", { style: { minWidth: 0 } },
+                  h("span", { className: "dsh-list__n" }, x.nome), x.ficha && h("span", { className: "dsh-sub", style: { marginLeft: 8 } }, x.ficha), h("span", { className: "dsh-chip dsh-chip--ok", style: { marginLeft: 8 } }, x.status)),
+                podeJustificar && h("button", { type: "button", className: "dsh-btn dsh-btn--sm dsh-btn--ghost dsh-btn--danger", onClick: () => onDesfazer(j, x) }, "desfazer")),
+              h("div", { className: "dsh-list__m" }, (j.motivo ? "Motivo: " + j.motivo + " · " : "Sem motivo informado · ") + "por " + (j.justificado_por_nome || "—") + " em " + quando(j.created_at)));
+          }))),
+      h("button", { type: "button", className: "dsh-btn dsh-btn--sm", style: { marginTop: 12 }, onClick: () => onIr("bloco-desfecho") }, "ver o desfecho de todas as remoções ↓")));
+  return h(React.Fragment, null, card,
+    modal && h(DashModal, { titulo: "Justificar remoção não realizada", sub: `${marcadas.length} remoç${marcadas.length !== 1 ? "ões" : "ão"} · ficam fora de “não atendidas e não justificadas”`, onClose: () => { if (!salvando) setModal(false); }, largura: 520 },
+      h("div", { style: { background: "var(--bg)", borderRadius: 12, padding: "10px 14px", marginBottom: 14, maxHeight: 140, overflowY: "auto", fontSize: 13 } },
+        marcadas.slice(0, 30).map(x => h("div", { key: x.id, style: { padding: "2px 0" } }, h("b", null, x.nome), h("span", { className: "dsh-sub", style: { marginLeft: 6 } }, x.status))),
+        marcadas.length > 30 && h("div", { className: "dsh-sub" }, `e mais ${marcadas.length - 30}`)),
+      h("label", { htmlFor: "dash-nao-motivo", style: { fontSize: 13, fontWeight: 650, display: "block", marginBottom: 6 } }, "Motivo (opcional)"),
+      h("textarea", { id: "dash-nao-motivo", rows: 3, value: motivo, onChange: e => setMotivo(e.target.value), placeholder: "Ex.: alta hospitalar confirmada pelo médico",
+        className: "dsh-in", style: { width: "100%", height: "auto", padding: "10px 12px", resize: "vertical", lineHeight: 1.5 } }),
+      h("div", { className: "dsh-sub", style: { marginTop: 8 } }, "Fica registrado quem justificou e quando. Dá para desfazer depois, na lista de justificadas."),
+      h("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 } },
+        h("button", { type: "button", className: "dsh-btn", disabled: salvando, onClick: () => setModal(false) }, "Cancelar"),
+        h("button", { type: "button", className: "dsh-btn dsh-btn--primary", disabled: salvando || marcadas.length === 0, onClick: confirmar }, salvando ? "Salvando…" : "Marcar como justificada"))));
+}
+
 /* ─── Alertas do gestor + qualidade dos registros ─────────────────────────────── */
 /* Painel que se abre logo abaixo dos números (aba): lista curta dos casos por trás do número. */
 function DashPainelLista({ titulo, sub, linhas, vazio, rodape, onFechar, onIr }) {
@@ -1723,7 +1891,7 @@ function DashPainelLista({ titulo, sub, linhas, vazio, rodape, onFechar, onIr })
       rodape && h("button", { type: "button", className: "dsh-btn dsh-btn--sm", style: { marginTop: 8 }, onClick: () => ir(rodape.alvo) }, rodape.rot)));
 }
 
-function DashAlertas({ cards, cfg, hojeIso, sla, rein, qualidade, nCorrigir, emRemocao, naoAtendidas, aba, agAberto, agFiltro, onTile, onIr, painel }) {
+function DashAlertas({ cards, cfg, hojeIso, sla, rein, qualidade, nCorrigir, emRemocao, naoAtendidas, nJustificadas, aba, agAberto, agFiltro, onTile, onIr, painel }) {
   const h = React.createElement, entrou = useDashEntrou();
   const [agora, setAgora] = useState(() => Date.now());
   useEffect(() => { const iv = setInterval(() => setAgora(Date.now()), 30000); return () => clearInterval(iv); }, []);
@@ -1745,7 +1913,7 @@ function DashAlertas({ cards, cfg, hojeIso, sla, rein, qualidade, nCorrigir, emR
     { id: "aguardando", rot: "Aguardando", ic: "hourglass", n: a.itens.length, sub: `${a.itens.filter(i => i.c.col_id === "pendente").length} aceite · ${a.itens.filter(i => i.c.col_id === "aceite").length} ambulância`, cor: "#0F172A", tom: "#F1F5F9", ativa: agAberto && agFiltro === "todos" },
     { id: "verm", rot: "Vermelhos aguardando", ic: "zap", n: nVerm, sub: nVerm && maiorVerm ? "maior espera " + dashFmtMin(maiorVerm) : "ninguém esperando", cor: nVerm ? "#B91C1C" : "#0F172A", tom: nVerm ? "#FEE2E2" : "#F1F5F9", ativa: agAberto && agFiltro === "vermelhos" },
     { id: "remocao", rot: "Em remoção", ic: "truck", n: emRemocao, sub: "ambulância na rua (Kanban)", cor: "#0F172A", tom: "#DBEAFE", ativa: aba === "remocao" },
-    { id: "nao", rot: "Não atendidas", ic: "x", n: naoAtendidas, sub: "no período, pelo status", cor: naoAtendidas ? "#C2410C" : "#0F172A", tom: naoAtendidas ? "#FFEDD5" : "#F1F5F9", ativa: aba === "nao" },
+    { id: "nao", rot: "Não atendidas e não justificadas", ic: "x", n: naoAtendidas, sub: nJustificadas ? `+ ${nJustificadas} justificada${nJustificadas !== 1 ? "s" : ""}` : "no período, pelo status", cor: naoAtendidas ? "#C2410C" : "#0F172A", tom: naoAtendidas ? "#FFEDD5" : "#F1F5F9", ativa: aba === "nao" },
     { id: "alertas", rot: "Alertas ativos", ic: "alert", n: nAlertas, sub: nAlertas ? "clique para ver quais" : "tudo dentro dos limites", cor: nAlertas ? "#B91C1C" : "#15803D", tom: nAlertas ? "#FEE2E2" : "#DCFCE7", ativa: aba === "alertas" },
     { id: "falhas", rot: "Falhas a corrigir", ic: "wrench", n: nCorrigir, sub: "nos registros", cor: nCorrigir ? "#B45309" : "#15803D", tom: nCorrigir ? "#FEF3C7" : "#DCFCE7", ativa: aba === "falhas" }
   ];
@@ -1753,7 +1921,7 @@ function DashAlertas({ cards, cfg, hojeIso, sla, rein, qualidade, nCorrigir, emR
     h("div", { role: "tablist", "aria-label": "Situação agora", className: "dsh-grid dsh-grid--tight", style: { gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,150px),1fr))", marginBottom: 12 } },
       faixa.map(f => h("div", { key: f.id, role: "tab", tabIndex: 0, "aria-selected": f.ativa, className: "dsh-tile", onClick: () => onTile(f.id),
         onKeyDown: e => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onTile(f.id); } },
-        title: f.ativa ? "Clique para fechar" : "Clique para ver os casos aqui embaixo" },
+        },
         h("div", { className: "dsh-tile__h" },
           h("span", { className: "dsh-tile__ic", style: { background: f.tom, color: f.cor } }, h(DashIcone, { n: f.ic, tam: 16 })),
           h("span", { className: "dsh-tile__lbl" }, f.rot, h(DashDica, { texto: (DASH_GLOSSARIO.find(g => g[0] === f.rot) || [])[1] || f.rot, rotulo: f.rot }))),
@@ -1781,6 +1949,45 @@ function DashAlertas({ cards, cfg, hojeIso, sla, rein, qualidade, nCorrigir, emR
     painel);
 }
 
+/* ─── Registro de auditoria (dentro de Configurações): quem mudou o quê, quando, valor antes e depois ─── */
+const DASH_AUD_ROT = { config_registrar: "Configuração", config_excluir: "Configuração excluída", justificar_discrepancia: "Discrepância justificada",
+  remocao_justificar: "Remoção justificada", remocao_desjustificar: "Justificativa desfeita" };
+function DashAuditoria() {
+  const h = React.createElement;
+  const [aberto, setAberto] = useState(false);
+  const [linhas, setLinhas] = useState(null);
+  const [erro, setErro] = useState("");
+  const [carregando, setCarregando] = useState(false);
+  async function carregar() {
+    setCarregando(true);
+    try {
+      const r = await fetch(`${SB_URL}/rest/v1/painel_auditoria?select=*&order=criado_em.desc&limit=200`, { headers: H() });
+      if (!r.ok) throw new Error(await r.text());
+      setLinhas(await r.json()); setErro("");
+    } catch (e) { setErro(e.message); }
+    setCarregando(false);
+  }
+  useEffect(() => { if (aberto && linhas === null) carregar(); }, [aberto]);
+  const quando = d => { try { return new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } };
+  return h("div", null,
+    h("div", { className: "dsh-sep" }),
+    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" } },
+      h("div", null, h("div", { style: { fontSize: 14, fontWeight: 650 } }, "Registro de auditoria"),
+        h("div", { className: "dsh-sub" }, "Quem mudou o quê e quando: configurações, justificativas de fila e remoções justificadas. Mostra as 200 mais recentes; não dá para editar nem apagar por aqui.")),
+      h("div", { style: { display: "flex", gap: 8 } },
+        aberto && h("button", { type: "button", className: "dsh-btn dsh-btn--sm", disabled: carregando, onClick: carregar }, carregando ? "Atualizando…" : "Atualizar"),
+        h("button", { type: "button", className: "dsh-btn dsh-btn--sm", "aria-expanded": aberto, onClick: () => setAberto(v => !v) }, aberto ? "Recolher" : "Ver registro"))),
+    aberto && (erro
+      ? h("div", { className: "dsh-banner", style: { marginTop: 12 } }, h(DashIcone, { n: "alert", tam: 16 }), h("div", null, h("b", null, "Não consegui ler o registro: "), erro, " (se a tabela painel_auditoria ainda não existe, rode o arquivo painel-auditoria-e-justificativas.sql no Supabase)."))
+      : linhas === null ? h("div", { className: "dsh-sub", style: { padding: "12px 0" } }, "Carregando…")
+      : linhas.length === 0 ? h(DashVazio, null, "Nenhuma alteração registrada ainda.")
+      : h("div", { style: { maxHeight: 380, overflowY: "auto", marginTop: 8 }, "data-auditoria": "lista" },
+          linhas.map(l => h("div", { key: l.id, className: "dsh-aud__i" },
+            h("span", { className: "dsh-sub dsh-num" }, quando(l.criado_em)),
+            h("span", null, h("b", null, l.usuario_nome || "—"), " ", h("span", { className: "dsh-chip", style: { marginLeft: 4 } }, DASH_AUD_ROT[l.acao] || l.acao)),
+            h("span", { style: { color: "var(--ink2)" } }, l.resumo || ""))))));
+}
+
 /* ─── Configurações do painel: frota, metas e limites, cada valor com a data em que passa a valer ─── */
 function DashConfig({ cfg, userNome, recarregar, showT, hojeIso }) {
   const h = React.createElement;
@@ -1791,7 +1998,8 @@ function DashConfig({ cfg, userNome, recarregar, showT, hojeIso }) {
   const GRUPOS = [["frota", "Frota de ambulâncias", "Quantas ambulâncias existem a partir da data escolhida."],
                   ["sla", "Meta de tempo por gravidade", "Tempo máximo entre a finalização da CROSS e a saída da ambulância."],
                   ["alerta", "Limites dos alertas", "Quando o painel deve acusar espera ou card parado."],
-                  ["dados", "Qualidade dos dados", "Quando o painel deve cobrar o motivo do tempo interno e apontar tempos que parecem erro de digitação. Sem valor, não cobra."]];
+                  ["dados", "Qualidade dos dados", "Quando o painel deve cobrar o motivo do tempo interno e apontar tempos que parecem erro de digitação. Sem valor, não cobra."],
+                  ["avc", "Protocolo de AVC", "O tempo total para a ambulância sair e, dentro dele, o prazo que a Santa Casa tem para pedi-la. Sem o prazo da Santa Casa, as duas partes dividem o tempo total."]];
   async function salvar() {
     const linhas = DASH_CFG_CHAVES.filter(c => String(campos[c.chave] == null ? "" : campos[c.chave]).trim() !== "")
       .map(c => ({ chave: c.chave, valor: Number(String(campos[c.chave]).trim().replace(",", ".")), vigente_desde: vigencia, criado_por: userNome || null }));
@@ -1799,12 +2007,20 @@ function DashConfig({ cfg, userNome, recarregar, showT, hojeIso }) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(vigencia)) { showT("Escolha a data em que os valores passam a valer.", "err"); return; }
     const ruim = linhas.find(l => !isFinite(l.valor) || l.valor < 0 || (DASH_CFG_CHAVES.find(c => c.chave === l.chave).inteiro && !Number.isInteger(l.valor)));
     if (ruim) { showT(`Valor inválido em “${DASH_CFG_ROTULO[ruim.chave]}”. Use número maior ou igual a zero${DASH_CFG_CHAVES.find(c => c.chave === ruim.chave).inteiro ? ", inteiro" : ""}.`, "err"); return; }
+    const efetivo = ch => { const l = linhas.find(x => x.chave === ch); if (l) return l.valor; const c = dashCfgEm(cfg, ch, vigencia); return c ? Number(c.valor) : null; };
+    const aM = efetivo("avc_meta_min"), aP = efetivo("avc_prazo_pedido_min");
+    if (linhas.some(l => (l.chave === "avc_meta_min" || l.chave === "avc_prazo_pedido_min") && l.valor <= 0)) { showT("Os tempos do AVC precisam ser maiores que zero.", "err"); return; }
+    if (aP !== null && aP > (aM !== null ? aM : 60)) { showT(`O prazo da Santa Casa (${aP} min) não pode ser maior que o tempo total do AVC (${aM !== null ? aM : 60} min).`, "err"); return; }
     setSalvando(true);
     try {
       const r = await fetch(`${SB_URL}/rest/v1/painel_config?on_conflict=chave,vigente_desde`, {
         method: "POST", headers: Object.assign({}, H(), { Prefer: "resolution=merge-duplicates,return=minimal" }), body: JSON.stringify(linhas) });
       if (!r.ok) throw new Error(await r.text());
-      setCampos({}); await recarregar(); showT(`${linhas.length} valor${linhas.length !== 1 ? "es" : ""} registrado${linhas.length !== 1 ? "s" : ""}, valendo desde ${dashFmtBR(vigencia)}.`);
+      const aud = await dashAuditar(linhas.map(l => { const ant = dashCfgEm(cfg, l.chave, vigencia); return { acao: "config_registrar", entidade: "painel_config", entidade_id: l.chave,
+        resumo: `${DASH_CFG_ROTULO[l.chave]}: ${ant ? ant.valor + " → " : ""}${l.valor}, valendo desde ${dashFmtBR(vigencia)}`,
+        antes: ant ? { valor: Number(ant.valor), vigente_desde: String(ant.vigente_desde).slice(0, 10) } : null, depois: { valor: l.valor, vigente_desde: vigencia } }; }), userNome || "");
+      setCampos({}); await recarregar();
+      showT((aud.ok ? "" : "ATENÇÃO — não foi registrado na auditoria: " + aud.erro + ". ") + `${linhas.length} valor${linhas.length !== 1 ? "es" : ""} registrado${linhas.length !== 1 ? "s" : ""}, valendo desde ${dashFmtBR(vigencia)}.`, aud.ok ? undefined : "err");
     } catch (e) { showT("Não consegui salvar: " + e.message, "err"); }
     setSalvando(false);
   }
@@ -1813,7 +2029,10 @@ function DashConfig({ cfg, userNome, recarregar, showT, hojeIso }) {
     try {
       const r = await fetch(`${SB_URL}/rest/v1/painel_config?id=eq.${c.id}`, { method: "DELETE", headers: H() });
       if (!r.ok) throw new Error(await r.text());
-      await recarregar(); showT("Registro excluído.");
+      const aud = await dashAuditar({ acao: "config_excluir", entidade: "painel_config", entidade_id: c.chave,
+        resumo: `Excluiu ${DASH_CFG_ROTULO[c.chave]}: ${c.valor}, que valia desde ${dashFmtBR(String(c.vigente_desde).slice(0, 10))}`,
+        antes: { valor: Number(c.valor), vigente_desde: String(c.vigente_desde).slice(0, 10), criado_por: c.criado_por || null } }, userNome || "");
+      await recarregar(); showT("Registro excluído." + (aud.ok ? "" : " ATENÇÃO: não foi registrado na auditoria (" + aud.erro + ")."), aud.ok ? undefined : "err");
     } catch (e) { showT("Não consegui excluir: " + e.message, "err"); }
   }
   const historico = [...cfg].sort((a, b) => String(b.vigente_desde).localeCompare(String(a.vigente_desde)) || String(b.criado_em || "").localeCompare(String(a.criado_em || "")));
@@ -1854,7 +2073,8 @@ function DashConfig({ cfg, userNome, recarregar, showT, hojeIso }) {
               h("span", { style: { fontWeight: 600, color: "var(--ink)", minWidth: 220 } }, DASH_CFG_ROTULO[c.chave] || c.chave),
               h("b", null, String(c.valor)),
               h("span", { className: "dsh-sub" }, "desde " + dashFmtBR(String(c.vigente_desde).slice(0, 10)) + (c.criado_por ? " · por " + c.criado_por : "")),
-              h("button", { type: "button", className: "dsh-btn dsh-btn--sm dsh-btn--ghost dsh-btn--danger", style: { marginLeft: "auto" }, onClick: () => excluir(c) }, "excluir"))))));
+              h("button", { type: "button", className: "dsh-btn dsh-btn--sm dsh-btn--ghost dsh-btn--danger", style: { marginLeft: "auto" }, onClick: () => excluir(c) }, "excluir")))),
+      h(DashAuditoria, null)));
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
@@ -1904,11 +2124,12 @@ const DASH_GLOSSARIO = [
   ["Gravidade", "A prioridade da ficha CROSS: Vermelho (1) é emergência, Amarelo (2) urgência, Verde (3) menos grave, Cinza (4) agendamento."],
   ["Ambulância básica e avançada", "Básica: técnico e motorista. Avançada: tem médico a bordo, usada em casos graves. A UTI móvel conta como avançada."],
   ["Permaneceu no destino", "Paciente que ficou no hospital de destino e não voltou à Santa Casa."],
-  ["Protocolo de AVC", "Atendimento de AVC (derrame) com meta de a ambulância sair em até 1 hora depois da finalização da ficha na CROSS."],
+  ["Protocolo de AVC", "Atendimento de AVC (derrame) com meta de a ambulância sair em até 1 hora (ou o tempo que você definir em Configurações) depois da finalização da ficha na CROSS. Dentro da meta, a Santa Casa pode ter um prazo só dela para pedir a ambulância; passado esse prazo, o atraso é da Santa Casa."],
   ["Aguardando", "Pacientes do Kanban que ainda dependem de alguma ação: esperando a CROSS aceitar ou esperando a ambulância."],
   ["Vermelhos aguardando", "Dos pacientes que aguardam, quantos são de gravidade vermelha (emergência)."],
   ["Em remoção", "Pacientes cuja ambulância já está a caminho, na coluna “Remoção em andamento” do Kanban."],
-  ["Não atendidas", "Linhas cujo status diz que a remoção não aconteceu (cancelada, evasão, alta, reinserida, paciente instável…). O motivo é o próprio status."],
+  ["Não atendidas e não justificadas", "Linhas cujo status diz que a remoção não aconteceu (cancelada, evasão, alta, reinserida, paciente instável…) e que ainda NÃO foram marcadas como justificadas. Quando você justifica uma remoção, ela sai desta contagem e passa para “justificadas” (o número menor abaixo)."],
+  ["Justificada", "Remoção não realizada que a equipe já explicou (por exemplo, uma alta). Quem tem permissão marca na lista de não atendidas; fica registrado quem marcou e quando, e dá para desfazer."],
   ["Alertas ativos", "Quantos avisos estão acesos agora: esperas acima do limite, atrasos da meta, cards parados. Os limites você define em Configurações."],
   ["Reinserção", "Quando a ficha precisa ser colocada de novo no sistema da CROSS."],
   ["Saneamento de falhas", "A lista do que está errado ou faltando nos registros. O painel não completa nem adivinha: o que tem problema fica fora da conta e aparece ali, com link para corrigir."],
@@ -1930,32 +2151,67 @@ const DASH_CSS_IMPRESSAO = `
   .dash-secao + .dash-secao { break-before: page; }
   [id^="bloco-"] { break-inside: avoid; }
   #dash-print-root { padding: 0 !important; opacity: 1 !important; }
+  .dash-print-chain.dsh-grid { display: block !important; }
+  .dash-print-chain.dsh-grid > * { margin-bottom: 16px !important; }
   .dsh-card { box-shadow: none !important; }
   .dsh-click:hover, .dsh-tile:hover { transform: none !important; box-shadow: none !important; }
 }`;
 /* Imprimir / salvar em PDF: esconde, só durante a impressão, tudo o que não é o painel (cabeçalho, menus, botões flutuantes).
- * As explicações "Como ler esta parte" também abrem durante a impressão e voltam a fechar depois.                          */
-function dashIsolarParaImpressao(raiz) {
-  const ocultos = [], abertas = [];
-  let no = raiz;
+ * Com `alvo`, esconde também tudo o que não é aquele bloco (o cabeçalho do relatório continua). As explicações
+ * "Como ler esta parte" abrem durante a impressão e voltam a fechar depois.                                              */
+function dashIsolarParaImpressao(raiz, alvo) {
+  const ocultos = [], abertas = [], marcados = [];
+  let no = alvo || raiz;
   while (no && no.parentElement && no !== document.body) {
+    if (alvo) { no.classList.add("dash-print-chain"); marcados.push(no); }
     Array.prototype.forEach.call(no.parentElement.children, irm => {
-      if (irm !== no && irm.tagName !== "STYLE" && irm.tagName !== "SCRIPT" && irm.style.display !== "none") { ocultos.push([irm, irm.style.display]); irm.style.display = "none"; }
+      if (irm === no || irm.tagName === "STYLE" || irm.tagName === "SCRIPT" || irm.style.display === "none") return;
+      if (alvo && irm.classList.contains("dash-print-only")) return;
+      ocultos.push([irm, irm.style.display]); irm.style.display = "none";
     });
     no = no.parentElement;
   }
-  raiz.querySelectorAll("details.dsh-legenda").forEach(d => { if (!d.open) { d.open = true; abertas.push(d); } });
-  return () => { ocultos.forEach(([el, d]) => { el.style.display = d; }); abertas.forEach(d => { d.open = false; }); };
+  (alvo || raiz).querySelectorAll("details.dsh-legenda").forEach(d => { if (!d.open) { d.open = true; abertas.push(d); } });
+  return () => {
+    ocultos.forEach(([el, d]) => { el.style.display = d; });
+    abertas.forEach(d => { d.open = false; });
+    marcados.forEach(el => el.classList.remove("dash-print-chain"));
+  };
+}
+
+/* Botão "Imprimir / PDF" com escolha: só a aba aberta ou o painel inteiro. Para um bloco só, use o ícone no título dele. */
+function DashMenuImprimir({ imprimindo, secaoRot, onTudo, onAba }) {
+  const h = React.createElement;
+  const [aberto, setAberto] = useState(false);
+  const ref = React.useRef(null);
+  useEffect(() => {
+    if (!aberto) return;
+    const fora = e => { if (ref.current && !ref.current.contains(e.target)) setAberto(false); };
+    const esc = e => { if (e.key === "Escape") setAberto(false); };
+    document.addEventListener("mousedown", fora); document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("keydown", esc); };
+  }, [aberto]);
+  const item = (rot, sub, fn) => h("button", { type: "button", role: "menuitem", className: "dsh-menu__i", onClick: () => { setAberto(false); fn(); } }, h("b", null, rot), h("span", null, sub));
+  return h("div", { ref, className: "dsh-menu" },
+    h("button", { type: "button", className: "dsh-btn", "aria-haspopup": "menu", "aria-expanded": aberto, disabled: imprimindo, onClick: () => setAberto(v => !v),
+      title: "Imprimir ou salvar em PDF. Escolha “Salvar como PDF” na janela de impressão para gerar o arquivo." },
+      h(DashIcone, { n: "printer", tam: 15 }), imprimindo ? "Preparando…" : "Imprimir / PDF", h(DashIcone, { n: "chevron", tam: 14 })),
+    aberto && h("div", { role: "menu", className: "dsh-menu__p" },
+      item("Só a aba aberta", secaoRot || "", onAba),
+      item("Painel inteiro", "todas as abas, uma por página", onTudo),
+      h("div", { className: "dsh-menu__d" }, "Para imprimir só um bloco, use o ícone de impressora no título dele.")));
 }
 
 function DashSecao({ id, ativa, children }) {
+  const imp = React.useContext(DashImpCtx);
   if (!ativa) return null;   // aba: só o conteúdo da seção escolhida existe na tela
   const h = React.createElement;
   const s = DASH_SECOES.find(x => x.id === id);
   return h("section", { id, className: "dash-secao", role: "tabpanel", "aria-labelledby": "tab-" + id, style: { scrollMarginTop: 12, marginBottom: 32 } },
-    h("div", { className: "dsh-sec__h" },
-      h("h2", { id: id + "-t", className: "dsh-sec__t" }, s.titulo),
-      h("div", { className: "dsh-sec__s" }, s.sub)),
+    h("div", { className: "dsh-sec__h dsh-sec__top" },
+      h("div", null, h("h2", { id: id + "-t", className: "dsh-sec__t" }, s.titulo), h("div", { className: "dsh-sec__s" }, s.sub)),
+      imp && h("button", { type: "button", className: "dsh-btn dsh-btn--sm dash-no-print", title: "Imprimir só esta aba", onClick: () => imp.secao(id, s.titulo) },
+        h(DashIcone, { n: "printer", tam: 14 }), "Imprimir aba")),
     React.Children.toArray(children));   // toArray dá uma chave a cada filho (sem aviso do React)
 }
 
@@ -1995,7 +2251,7 @@ function DashExcecoes({ cards, cfg, hojeIso, plan, onAbrirCard }) {
     .map(i => ({ origem: "aguardando", pri: i.vermelho ? 1 : 2, nome: i.c.nome || "(sem nome)", ficha: i.c.ficha_cross || "", grav: GR[i.c.grav] || "Sem prioridade",
       situacao: DASH_COLUNAS_AGUARDANDO[i.c.col_id], min: i.min, motivo: `aguardando há mais que o limite (${i.vermelho && a.limVerm !== null && i.min > a.limVerm ? a.limVerm : a.limEspera} min)`, card: i.c.id }));
   const todas = kanban.concat(plan).sort((x, y) => x.pri - y.pri || (y.min === null ? -1 : y.min) - (x.min === null ? -1 : x.min));
-  const ORIGENS = [["todas", "Todas"], ["aguardando", "Aguardando"], ["meta", "Fora da meta"], ["avc", "AVC"], ["nao", "Não realizadas"]];
+  const ORIGENS = [["todas", "Todas"], ["aguardando", "Aguardando"], ["meta", "Fora da meta"], ["avc", "AVC"], ["nao", "Não justificadas"]];
   const conta = o => o === "todas" ? todas.length : todas.filter(x => x.origem === o).length;
   const lista = (filtro === "todas" ? todas : todas.filter(x => x.origem === filtro));
   const vista = todos ? lista : lista.slice(0, 15);
@@ -2076,6 +2332,8 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const [secao, setSecao] = useState("sec-agora");   // aba (seção) aberta: Agora é a primeira
   const [verGlossario, setVerGlossario] = useState(false);
   const [imprimindo, setImprimindo] = useState(false); // ao imprimir, todas as seções aparecem de uma vez
+  const [impEscopo, setImpEscopo] = useState("tudo");   // o que está sendo impresso: "tudo" · id de uma aba · "bloco"
+  const [impRotulo, setImpRotulo] = useState("");       // nome da aba ou do bloco impresso (vai no cabeçalho do papel)
   const [aba, setAba] = useState(null);              // painel aberto logo abaixo dos números: remocao | nao | alertas | falhas
   const [agAberto, setAgAberto] = useState(false);     // lista dos pacientes aguardando: COMEÇA minimizada
   const [agFiltro, setAgFiltro] = useState("todos");   // todos | vermelhos
@@ -2085,17 +2343,56 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     catch (e) { /* tabela ainda não criada ou sem permissão: o painel segue, só não tem metas nem limites */ }
   }
   useEffect(() => { recarregarCfg(); }, []);
+  const [justRem, setJustRem] = useState([]);   // remoções não atendidas já JUSTIFICADAS (tabela remocao_justificativas)
+  const [justOk, setJustOk] = useState(null);   // null = carregando · true = tabela existe · false = tabela ainda não criada
+  async function recarregarJustRem() {
+    try { setJustRem(await sbGetTodas("remocao_justificativas?select=*&order=created_at.desc")); setJustOk(true); }
+    catch (e) { setJustOk(false); }
+  }
+  useEffect(() => { recarregarJustRem(); }, []);
+  /* A lista de pacientes aguardando COMEÇA minimizada e volta a minimizar quando a pessoa sai da aba Agora. */
+  useEffect(() => { if (secao !== "sec-agora") { setAgAberto(false); setAgFiltro("todos"); setAba(null); } }, [secao]);
+
+  async function justificarRemocoes(itens, motivo) {
+    const quem = (currentUser && currentUser.nome) || userNome || "";
+    const linhas = itens.map(x => ({ remocao_id: String(x.id), nome_paciente: x.nome || null, ficha_cross: x.ficha || null, status_na_data: x.status || null, motivo: motivo || null, justificado_por_nome: quem || null }));
+    try {
+      const r = await fetch(`${SB_URL}/rest/v1/remocao_justificativas?on_conflict=remocao_id`, { method: "POST", headers: Object.assign({}, H(), { Prefer: "resolution=merge-duplicates,return=minimal" }), body: JSON.stringify(linhas) });
+      if (!r.ok) throw new Error(await r.text());
+    } catch (e) { showT("Não consegui salvar a justificativa: " + e.message, "err"); return false; }
+    const aud = await dashAuditar(itens.map(x => ({ acao: "remocao_justificar", entidade: "remocao", entidade_id: x.id,
+      resumo: `Justificou a remoção não atendida de ${x.nome || "(sem nome)"} (${x.status})${motivo ? " — " + motivo : ""}`, depois: { status: x.status, motivo: motivo || null, ficha_cross: x.ficha || null } })), quem);
+    await recarregarJustRem();
+    showT(`${itens.length} remoç${itens.length !== 1 ? "ões justificadas" : "ão justificada"}.` + (aud.ok ? "" : " ATENÇÃO: não foi registrado na auditoria (" + aud.erro + ")."), aud.ok ? undefined : "err");
+    return true;
+  }
+  async function desjustificarRemocao(j, x) {
+    const quem = (currentUser && currentUser.nome) || userNome || "";
+    try {
+      const r = await fetch(`${SB_URL}/rest/v1/remocao_justificativas?remocao_id=eq.${encodeURIComponent(j.remocao_id)}`, { method: "DELETE", headers: H() });
+      if (!r.ok) throw new Error(await r.text());
+    } catch (e) { showT("Não consegui desfazer: " + e.message, "err"); return false; }
+    const nome = (x && x.nome) || j.nome_paciente || "(sem nome)";
+    const aud = await dashAuditar({ acao: "remocao_desjustificar", entidade: "remocao", entidade_id: j.remocao_id, resumo: `Desfez a justificativa da remoção não atendida de ${nome}`,
+      antes: { status: j.status_na_data || null, motivo: j.motivo || null, justificado_por: j.justificado_por_nome || null, justificado_em: j.created_at || null } }, quem);
+    await recarregarJustRem();
+    showT("Justificativa desfeita: a remoção voltou para “não justificadas”." + (aud.ok ? "" : " ATENÇÃO: não foi registrado na auditoria (" + aud.erro + ")."), aud.ok ? undefined : "err");
+    return true;
+  }
   const desfazIsolamento = React.useRef(null);
-  const restauraImpressao = () => { if (desfazIsolamento.current) { desfazIsolamento.current(); desfazIsolamento.current = null; } setImprimindo(false); };
+  const restauraImpressao = () => { if (desfazIsolamento.current) { desfazIsolamento.current(); desfazIsolamento.current = null; } setImprimindo(false); setImpEscopo("tudo"); setImpRotulo(""); };
   useEffect(() => {   // se o navegador avisar que a impressão acabou (ou a janela voltar a ter foco), tudo volta ao normal
     window.addEventListener("afterprint", restauraImpressao);
     return () => { window.removeEventListener("afterprint", restauraImpressao); if (desfazIsolamento.current) desfazIsolamento.current(); };
   }, []);
-  const imprimir = () => {
-    setImprimindo(true);   // todas as seções aparecem de uma vez
+  /* escopo: "tudo" (todas as abas) · id de uma aba (ex.: "sec-atrasos") · "bloco" (só o bloco `alvoId`) */
+  const imprimir = (escopo, rotulo, alvoId) => {
+    if (imprimindo) return;
+    setImpEscopo(escopo || "tudo"); setImpRotulo(rotulo || ""); setImprimindo(true);
     setTimeout(() => {
       const raiz = document.getElementById("dash-print-root");
-      if (raiz) desfazIsolamento.current = dashIsolarParaImpressao(raiz);
+      const alvo = alvoId ? document.getElementById(alvoId) : null;
+      if (raiz) desfazIsolamento.current = dashIsolarParaImpressao(raiz, alvo);
       try { window.print(); } finally { setTimeout(restauraImpressao, 1200); }
     }, 350);
   };
@@ -2296,11 +2593,19 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   };
   const minFinPed = x => (x.min_finalizacao_pedido_amb === undefined ? null : x.min_finalizacao_pedido_amb);
   const protocolos = useMemo(() => {
-    const HORA = 60 * 60000;
+    // Meta total e prazo da Santa Casa valem pela data do caso (Configurações guarda cada valor com a data em que passa a valer).
+    // Sem prazo cadastrado, o prazo é a própria meta: as duas partes dividem o tempo, como antes.
+    const parAvc = dia => {
+      const m = dashCfgEm(cfg, "avc_meta_min", dia), p = dashCfgEm(cfg, "avc_prazo_pedido_min", dia);
+      const meta = m ? Number(m.valor) : 60;
+      return { meta, prazo: p ? Math.min(Number(p.valor), meta) : meta };
+    };
     const r = { total: 0, noHorario: 0, atrasoSantaCasa: 0, atrasoAmbulancia: 0, atrasoSemCausa: 0, semHorarios: 0, semFinalizacao: 0, semSaida: 0, lista: [] };
     dados.forEach(x => {
       if (x.protocolo_avc !== true) return;
       r.total++;
+      const { meta: META, prazo: PRAZO } = parAvc(dashDiaIso(x.data_resposta_cross) || dashDiaIso(x.data_solicitacao) || hojeIso);
+      const HORA = META * 60000;
       const fin = quando(x.data_resposta_cross, x.horario_resposta_cross);
       // Dia da saída: só a data de saída preenchida na planilha (data_saida_real), e só com o horário de saída. Sem uma das duas,
       // o caso fica em "sem horário para medir" em vez de o painel adivinhar o dia (antes caía na data do pedido e, se a saída foi
@@ -2309,7 +2614,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       const sai = quando(dSaida, x.horario_saida_ambulancia);
       const ped = quando(x.data_saida_ambulancia, x.hora_solic_ambulancia);   // pedido da ambulância pela Santa Casa
       const caso = {
-        cat: null, id: x.id, grav: dashRotuloCanon(C, "gravidade", x.gravidade, "Sem gravidade"), nome: x.nome_paciente || "(sem nome)", ficha: x.ficha_cross || "", destino: x.instituicao_destino || "",
+        cat: null, meta: META, prazo: PRAZO, id: x.id, grav: dashRotuloCanon(C, "gravidade", x.gravidade, "Sem gravidade"), nome: x.nome_paciente || "(sem nome)", ficha: x.ficha_cross || "", destino: x.instituicao_destino || "",
         medico: x.medico || "", enfermeiro: x.enfermeiro || "",
         finTxt: dm(x.data_resposta_cross, x.horario_resposta_cross),
         pedTxt: dm(x.data_saida_ambulancia, x.hora_solic_ambulancia),
@@ -2328,7 +2633,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       }
       if (sai - fin <= HORA) { r.noHorario++; caso.cat = "noHorario"; return; }
       if (caso.minPedido === null) { r.atrasoSemCausa++; caso.cat = "atrasoSemCausa"; return; }
-      if (caso.minPedido > 60) { r.atrasoSantaCasa++; caso.cat = "atrasoSantaCasa"; }
+      if (caso.minPedido > PRAZO) { r.atrasoSantaCasa++; caso.cat = "atrasoSantaCasa"; }
       else { r.atrasoAmbulancia++; caso.cat = "atrasoAmbulancia"; }
     });
     // As duas partes da hora: Santa Casa (finalização → pedido) e setor de ambulância (pedido → saída).
@@ -2337,8 +2642,10 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     const resumo = a => ({ mediana: med(a), n: a.length, max: a.length ? Math.max(...a) : null });
     r.santaCasa = resumo(r.lista.map(c => c.minPedido).filter(v => v !== null && v >= 0));
     r.ambulancia = resumo(r.lista.map(c => c.minAmb).filter(v => v !== null && v >= 0));
+    const atual = parAvc(hojeIso);
+    r.metaMin = atual.meta; r.prazoPedido = atual.prazo; r.prazoDefinido = !!dashCfgEm(cfg, "avc_prazo_pedido_min", hojeIso);
     return r;
-  }, [dados]);
+  }, [dados, cfg, hojeIso]);
   /* ── Saneamento de falhas ────────────────────────────────────────────────
    * Só LÊ os campos da planilha e aponta o que está incompleto, fora de ordem ou suspeito. Não corrige, não completa, não adivinha.
    * Cada grupo é uma lista com o link da linha. Definições e textos: DASH_PROBLEMAS_DEF.
@@ -2419,8 +2726,8 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       }
       // protocolo de AVC
       if (r.protocolo_avc === true) {
-        if (!fin) add("avc_sem_medida", r, finD ? "horario_resposta_cross" : "data_resposta_cross", "Sem finalização da CROSS completa (data e horário): a meta de 1h não pode ser medida.");
-        else if (!sai) add("avc_sem_medida", r, saiD ? "horario_saida_ambulancia" : "data_saida_real", "Sem data e horário de saída da ambulância: não entra na meta de 1h.");
+        if (!fin) add("avc_sem_medida", r, finD ? "horario_resposta_cross" : "data_resposta_cross", "Sem finalização da CROSS completa (data e horário): a meta do AVC não pode ser medida.");
+        else if (!sai) add("avc_sem_medida", r, saiD ? "horario_saida_ambulancia" : "data_saida_real", "Sem data e horário de saída da ambulância: não entra na meta do AVC.");
         if (sai && semEquipe(r.medico)) add("avc_sem_equipe", r, "medico", "Saiu sem médico registrado.");
         if (sai && semEquipe(r.enfermeiro)) add("avc_sem_equipe", r, "enfermeiro", "Saiu sem enfermeiro(a) registrado(a).");
       }
@@ -2688,16 +2995,19 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     return Object.values(cl);
   }, [dados]);
 
+  const justMap = useMemo(() => { const m = {}; justRem.forEach(j => { m[String(j.remocao_id)] = j; }); return m; }, [justRem]);
+  const naoLista = useMemo(() => situacao.filter(c => c.id.startsWith("st:")).flatMap(c => c.itens.map(it => Object.assign({}, it, { status: c.rotulo }))), [situacao]);
+  const nNaoJust = naoLista.filter(x => !justMap[String(x.id)]).length, nJust = naoLista.length - nNaoJust;
   const excecoesPlan = useMemo(() => {
     const out = [];
     sla.forEach(s => s.fora.forEach(f => out.push({ origem: "meta", pri: f.grav === "Vermelho" ? 1 : f.grav === "Amarelo" ? 2 : 3, nome: f.nome, ficha: f.ficha, grav: f.grav,
       situacao: "Saiu fora da meta", min: f.min, motivo: `meta de ${dashFmtMin(s.alvo)} para ${f.grav}: levou ${dashFmtMin(f.min)}`, id: f.id, campo: f.campo })));
     protocolos.lista.filter(c => ["atrasoSantaCasa", "atrasoAmbulancia", "atrasoSemCausa"].includes(c.cat)).forEach(c => out.push({ origem: "avc", pri: 1, nome: c.nome, ficha: c.ficha, grav: c.grav || "Vermelho",
-      situacao: "Protocolo de AVC", min: c.minSaida, motivo: ({ atrasoSantaCasa: "passou de 1h: Santa Casa demorou a pedir a ambulância", atrasoAmbulancia: "passou de 1h: ambulância demorou a sair", atrasoSemCausa: "passou de 1h: sem horário do pedido da ambulância" })[c.cat], id: c.id, campo: "horario_saida_ambulancia" }));
-    situacao.filter(c => c.id.startsWith("st:")).forEach(c => c.itens.forEach(it => out.push({ origem: "nao", pri: c.id === "st:Reinserida" || c.id === "st:Não realizada (ambulância indisponível)" || c.id === "st:Paciente instável / remoção não liberada" ? 2 : 3,
+      situacao: "Protocolo de AVC", min: c.minSaida, motivo: ({ atrasoSantaCasa: `passou de ${dashFmtMin(c.meta)}: Santa Casa demorou a pedir a ambulância`, atrasoAmbulancia: `passou de ${dashFmtMin(c.meta)}: ambulância demorou a sair`, atrasoSemCausa: `passou de ${dashFmtMin(c.meta)}: sem horário do pedido da ambulância` })[c.cat], id: c.id, campo: "horario_saida_ambulancia" }));
+    situacao.filter(c => c.id.startsWith("st:")).forEach(c => c.itens.filter(it => !justMap[String(it.id)]).forEach(it => out.push({ origem: "nao", pri: c.id === "st:Reinserida" || c.id === "st:Não realizada (ambulância indisponível)" || c.id === "st:Paciente instável / remoção não liberada" ? 2 : 3,
       nome: it.nome, ficha: it.ficha, grav: String(it.grav || "").replace(/^./, m => m.toUpperCase()), situacao: c.rotulo, min: null, motivo: c.ajuda.replace(/^Status da planilha: /, "status: ").replace(/\.$/, ""), id: it.id, campo: it.campo })));
     return out;
-  }, [sla, protocolos, situacao]);
+  }, [sla, protocolos, situacao, justMap]);
 
   /* ═══ Montagem da tela ═══════════════════════════════════════════════════
    * Tudo acima (estados, filtros e contas) é o mesmo de antes; daqui para baixo é só a apresentação. Nenhum hook novo
@@ -2727,7 +3037,11 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   // Avisos sob o gráfico: pedidos do período que ainda não têm saída ou finalização (não aparecem nas barras/linhas)
   const GRAV_NOME = { emergencia: "Vermelho", urgencia: "Amarelo", menor_gravidade: "Verde", agendamento: "Cinza" };
   const fecharAba = () => setAba(null);
-  const ativaSec = id => imprimindo || secao === id;
+  const ativaSec = id => {
+    if (imprimindo && impEscopo === "tudo") return true;                                    // painel inteiro: todas as abas
+    if (imprimindo && String(impEscopo).indexOf("sec-") === 0) return id === impEscopo;      // só uma aba
+    return secao === id;                                                                    // tela normal e impressão de um bloco: a aba aberta
+  };
   const irParaBloco = id => {   // troca para a aba onde o bloco mora e só então rola até ele
     const sec = DASH_SECAO_DO_BLOCO[id];
     if (sec) setSecao(sec);
@@ -2736,10 +3050,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const painelAba = aba === "remocao" ? React.createElement(DashPainelLista, {
       titulo: "Em remoção agora", sub: "cards na coluna “Remoção em andamento” do Kanban", onFechar: fecharAba, onIr: irParaBloco, vazio: "Nenhuma remoção em andamento.",
       linhas: cards.filter(c => c.col_id === "andamento").map(c => ({ nome: c.nome || "(sem nome)", ficha: c.ficha_cross || "", texto: `${GRAV_NOME[c.grav] || "Sem prioridade"} · ${c.hosp ? "→ " + c.hosp : "sem hospital de destino"}`, fn: onAbrirCard ? () => onAbrirCard(c.id) : null, rotFn: "abrir card →" })) })
-    : aba === "nao" ? React.createElement(DashPainelLista, {
-      titulo: "Não atendidas no período", sub: "linhas cujo status diz que a remoção não aconteceu, com o motivo", onFechar: fecharAba, onIr: irParaBloco, vazio: "Nenhuma remoção não atendida no período.",
-      rodape: { rot: "ver o desfecho de todas as remoções ↓", alvo: "bloco-desfecho" },
-      linhas: situacao.filter(c => c.id.startsWith("st:")).flatMap(c => c.itens.map(it => ({ nome: it.nome, ficha: it.ficha, texto: `${c.rotulo} — ${it.texto}`, href: `remocao.html?foco=${encodeURIComponent(it.id)}&campo=${encodeURIComponent(it.campo || "status")}` }))) })
+    : aba === "nao" ? React.createElement(DashNaoAtendidas, { lista: naoLista, just: justMap, justOk, podeJustificar, onJustificar: justificarRemocoes, onDesfazer: desjustificarRemocao, onFechar: fecharAba, onIr: irParaBloco })
     : aba === "falhas" ? React.createElement(DashPainelLista, {
       titulo: "Falhas a corrigir", sub: "o que está errado ou faltando nos registros, por tipo", onFechar: fecharAba, onIr: irParaBloco, vazio: "Nenhuma falha a corrigir.",
       rodape: { rot: "ver os casos, com link para corrigir ↓", alvo: "bloco-saneamento" },
@@ -2787,12 +3098,22 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   };
   const periodoTxt = deDia ? `${fmtDia(deDia)}${ateDia && ateDia !== deDia ? " a " + fmtDia(ateDia) : ""}` : "";
 
-  return h("div", { id: "dash-print-root", className: "dsh",
+  const impCtx = {
+    secao: (id, rot) => imprimir(id, rot, null),
+    bloco: el => {
+      const blk = el && el.closest ? el.closest('[id^="bloco-"]') : null;
+      if (!blk) return;
+      const t = blk.querySelector(".dsh-title__t > span:not(.dsh-title__icon)");
+      imprimir("bloco", t ? t.textContent : "", blk.id);
+    }
+  };
+  return h(DashImpCtx.Provider, { value: impCtx }, h("div", { id: "dash-print-root", className: "dsh",
     // ao trocar de período a tela fica visível, só mais clara, até chegar o dado novo
     style: { padding: "4px 0 40px", opacity: atualizando ? 0.6 : 1, transition: "opacity .15s" } },
     h("style", null, DASH_CSS_IMPRESSAO),
     h("div", { className: "dash-print-only", style: { marginBottom: 14, paddingBottom: 8, borderBottom: "2px solid #0F172A" } },
       h("div", { style: { fontSize: 16, fontWeight: 700, color: "#0F172A" } }, "Gerência de Enfermagem · Santa Casa de Francisco Morato — Painel de regulação"),
+      impRotulo && h("div", { style: { fontSize: 13, fontWeight: 700, color: "#0F172A", marginTop: 4 } }, (impEscopo === "bloco" ? "Bloco: " : "Aba: ") + impRotulo),
       h("div", { style: { fontSize: 11.5, color: "#475569", marginTop: 3 } },
         `${periodo === "tudo" ? "Todos os registros" : "Período"}${deDia ? ": " + fmtDia(deDia) + (ateDia && ateDia !== deDia ? " a " + fmtDia(ateDia) : "") : ""} · ${totaisGraf.saidas} saídas de ambulância${diasNoPeriodo ? " (" + porDia + " por dia)" : ""} · ${dados.length} linhas · gerado em ${new Date().toLocaleString("pt-BR")}`)),
 
@@ -2808,8 +3129,8 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       h("div", { className: "dsh-seg", role: "group", "aria-label": "Escala do gráfico" }, [["dia", "Diária"], ["semana", "Semanal"], ["mes", "Mensal"]].map(([i, t]) => btnEscala(i, t))),
       h("span", { className: "dsh-bar-tools__sp" }),
       h("button", { type: "button", className: "dsh-btn", onClick: () => setVerGlossario(true), title: "Explica, em palavras simples, cada termo do painel (mediana, P95, fora da unidade…)." }, h(DashIcone, { n: "book", tam: 15 }), "Glossário"),
-      h("button", { type: "button", className: "dsh-btn", onClick: imprimir, disabled: imprimindo, title: "Abre a impressão com todas as seções do painel, uma por página. Escolha “Salvar como PDF” para gerar o arquivo." },
-        h(DashIcone, { n: "printer", tam: 15 }), imprimindo ? "Preparando…" : "Imprimir / PDF")),
+      h(DashMenuImprimir, { imprimindo, secaoRot: (DASH_SECOES.find(x => x.id === secao) || {}).titulo,
+        onTudo: () => imprimir("tudo", "", null), onAba: () => imprimir(secao, (DASH_SECOES.find(x => x.id === secao) || {}).titulo, null) })),
 
     !faixa && h("div", { className: "dsh-aviso" }, "Escolha a data inicial e a final do período (a inicial não pode ser depois da final)."),
     /* Escala indisponível: diz o porquê em vez de esconder o botão */
@@ -2844,7 +3165,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
           } else setAba(x => x === id ? null : id);
         },
         cards, cfg, hojeIso, sla, rein: reinsercao, qualidade, nCorrigir: qualidade.nCorrigir, emRemocao: cards.filter(c => c.col_id === "andamento").length,
-        naoAtendidas: situacao.filter(c => c.id.startsWith("st:")).reduce((t, c) => t + c.itens.length, 0)
+        naoAtendidas: nNaoJust, nJustificadas: nJust
       }),
       h(DashAguardando, { cards, cfg, hojeIso, onAbrirCard, aoVivo: isAdmin, aberto: agAberto, onToggle: () => setAgAberto(v => !v), filtro: agFiltro, onFiltro: setAgFiltro }),
       h(DashFilaKanban, { cols, cards, titulo: isAdmin ? "Agora · fila do Kanban" : "Última publicação · fila do Kanban" })),
@@ -2895,7 +3216,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
       /* Distribuições */
       h("div", { className: "dsh-grid dsh-g2" },
         /* Gravidade — proporção importa mais que valor absoluto */
-        h(DashCard, null,
+        h(DashCard, { id: "bloco-gravidade" },
           h(DashTitulo, { icone: "alert", extra: h(DashCobertura, { g: gGrav }), tooltip: "Quantos pacientes há em cada nível de urgência, segundo a prioridade da ficha da CROSS: vermelho = emergência, amarelo = urgência, verde = menos grave, cinza = agendamento." }, "Gravidade"),
           gGrav.itens.length === 0 ? h(DashVazio, null, "Sem dados") : (() => {
             const ordem = (C ? C.GRAVIDADE_ORDEM : []).map(g => ({ g, it: gGrav.itens.find(i => i.canonico === g) })).filter(x => x.it);
@@ -2910,7 +3231,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
           })()),
 
         /* Especialidades — recursos apartados das clínicas */
-        h(DashCard, null,
+        h(DashCard, { id: "bloco-recursos" },
           h(DashTitulo, { icone: "bars", extra: h(DashCobertura, { g: gEspec }), tooltip: "O que foi pedido à CROSS: especialidades médicas (clínica, ortopedia…) e recursos (exames, procedimentos). Os recursos ficam separados porque não disputam as mesmas vagas dos leitos." }, "Recursos solicitados"),
           gEspec.itens.length === 0 ? h(DashVazio, null, "Sem dados") :
           h(React.Fragment, null,
@@ -2928,7 +3249,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
             n: i.n, pct: i.pct, max: gStatus.itens[0].n, cor: i.canonico === (C && C.NAO_CLASSIFICADO) ? "#CBD5E1" : "#64748B" }))),
 
         /* Ambulância */
-        h(DashCard, null,
+        h(DashCard, { id: "bloco-ambulancia" },
           h(DashTitulo, { icone: "truck", extra: h(DashCobertura, { g: gAmb }), tooltip: "Básica: técnico e motorista. Avançada: tem médico a bordo, usada em casos graves; a UTI móvel conta como avançada. A porcentagem é sobre as linhas que têm o tipo preenchido (o número aparece no canto do cartão); as linhas sem tipo ficam de fora." }, "Tipo de ambulância"),
           gAmb.itens.length === 0 ? h(DashVazio, null, "Sem dados") :
           h(DashEmpilhada, { alto: "lg", segs: gAmb.itens.map(i => ({
@@ -2961,7 +3282,10 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
               const rj = await fetch(SB_URL + "/rest/v1/discrepancia_justificativas", { method: "POST", headers: Object.assign({}, H(), { Prefer: "return=minimal" }),
                 body: JSON.stringify({ card_id: d.aceitado.id, card_nome: d.aceitado.nome, card_grav: d.aceitado.grav, conflito_card_id: d.pendente.id, conflito_card_nome: d.pendente.nome, conflito_card_grav: d.pendente.grav, justificativa: justTexto.trim(), justificado_por_nome: (currentUser && currentUser.nome) || "" }) });
               if (!rj.ok) throw new Error(await rj.text());
-              setJustModal(null); showT("Justificativa registrada.");
+              const aud = await dashAuditar({ acao: "justificar_discrepancia", entidade: "card", entidade_id: d.aceitado.id,
+                resumo: `Justificou a prioridade de ${d.aceitado.nome} sobre ${d.pendente.nome}: ${justTexto.trim()}`, depois: { card_id: d.aceitado.id, conflito_card_id: d.pendente.id, justificativa: justTexto.trim() } },
+                (currentUser && currentUser.nome) || userNome || "");
+              setJustModal(null); showT("Justificativa registrada." + (aud.ok ? "" : " ATENÇÃO: não foi registrado na auditoria (" + aud.erro + ")."), aud.ok ? undefined : "err");
             } catch (ex) { showT("Erro ao salvar: " + ex.message, "err"); }
             setJustSaving(false);
           } }, justSaving ? "Salvando..." : "Registrar"))),
@@ -2974,7 +3298,7 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     h("div", { className: "dsh-nota", style: { marginTop: 24, color: "var(--faint)" } },
       "Indicadores calculados sobre a planilha de remoções. ",
       "Percentuais usam como denominador os registros que informaram cada campo — o número aparece ao lado de cada bloco.")
-  );
+  ));
 }
 
 function PublicationsHistory({
