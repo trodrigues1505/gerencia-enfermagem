@@ -9,6 +9,545 @@
   document.head.appendChild(st);
 })();
 
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SISTEMA VISUAL DO PAINEL (redesenho out/2026)
+   Só a aparência mudou: as contas, as regras de dados e os nomes dos campos continuam os de antes.
+   Cores, espaços e raios ficam em variáveis (.dsh); componentes usam classes `dsh-*`.
+   Espaçamento: 4 · 8 · 12 · 16 · 24 · 32 · 48.   Raios: cartão 16 · campo 12 · pequeno 8.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+const DASH_CSS_BASE = `
+.dsh{--ink:#0F172A;--ink2:#334155;--muted:#64748B;--faint:#94A3B8;--line:#E8EDF3;--line2:#F1F5F9;--bg:#F8FAFC;--accent:#2563EB;
+  --ok:#15803D;--okbg:#DCFCE7;--warn:#B45309;--warnbg:#FEF3C7;--warnline:#FDE68A;--bad:#B91C1C;--badbg:#FEE2E2;
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;--rc:16px;--ri:12px;--rs:8px;
+  font-family:Inter,Geist,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.dsh *,.dsh *::before,.dsh *::after{box-sizing:border-box}
+.dsh button,.dsh input,.dsh select,.dsh textarea{font-family:inherit}
+.dsh :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dsh-num{font-variant-numeric:tabular-nums}
+.dsh h2,.dsh h3{margin:0}
+
+/* cartões */
+.dsh-card{background:#fff;border:1px solid var(--line);border-radius:var(--rc);padding:var(--s5);margin-bottom:var(--s4);box-shadow:0 1px 2px rgba(15,23,42,.03)}
+.dsh-card .dsh-card{background:var(--bg);border-color:transparent;box-shadow:none;padding:var(--s4);margin-bottom:0;border-radius:var(--ri)}
+.dsh-click{cursor:pointer;transition:box-shadow .18s,transform .18s,border-color .18s,background .18s}
+.dsh-click:hover{box-shadow:0 6px 18px rgba(15,23,42,.08);transform:translateY(-1px)}
+.dsh-card .dsh-click:hover{background:#fff;border-color:var(--line)}
+.dsh-card--warn{background:#FFFDF5;border-color:var(--warnline)}
+.dsh-grid{display:grid;gap:var(--s4);margin-bottom:var(--s4)}
+.dsh-grid>.dsh-card{margin-bottom:0}
+.dsh-grid--tight{gap:var(--s3)}
+.dsh-g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr))}
+.dsh-g3{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+.dsh-g4{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))}
+.dsh-g-fila{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));margin-bottom:0}
+.dsh-sep{height:1px;background:var(--line2);margin:var(--s4) 0}
+.dsh-stack>*+*{margin-top:var(--s4)}
+
+/* títulos */
+.dsh-title{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);margin-bottom:var(--s4);flex-wrap:wrap}
+.dsh-title__t{display:flex;align-items:center;gap:var(--s2);font-size:15px;font-weight:650;letter-spacing:-.01em;color:var(--ink)}
+.dsh-title__icon{width:28px;height:28px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;background:var(--line2);color:var(--ink2);flex-shrink:0}
+.dsh-title__x{font-size:12px;color:var(--muted)}
+.dsh-sub{font-size:12px;color:var(--muted);line-height:1.5}
+.dsh-eyebrow{font-size:11px;font-weight:650;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+
+/* números de destaque */
+.dsh-kpi{position:relative;overflow:hidden}
+.dsh-kpi__bar{position:absolute;left:0;right:0;top:0;height:3px}
+.dsh-kpi__l{display:flex;align-items:center;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:var(--s2)}
+.dsh-kpi__v{font-size:30px;font-weight:700;line-height:1.05;letter-spacing:-.02em}
+.dsh-kpi__s{font-size:12px;color:var(--muted);margin-top:var(--s2);line-height:1.45}
+.dsh-card.dsh-kpi--alert{background:#FFFBEB;border-color:var(--warnline)}
+.dsh-card.dsh-kpi--on{box-shadow:0 0 0 2px var(--kc,var(--ink));border-color:transparent}
+.dsh-big{font-size:40px;font-weight:700;letter-spacing:-.03em;line-height:1}
+
+/* chips e etiquetas */
+.dsh-chip{text-transform:none;letter-spacing:normal;display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:600;background:var(--line2);color:var(--ink2);white-space:nowrap;line-height:1.6}
+.dsh-chip--ok{background:var(--okbg);color:var(--ok)}
+.dsh-chip--warn{background:var(--warnbg);color:var(--warn)}
+.dsh-chip--bad{background:var(--badbg);color:var(--bad)}
+.dsh-tag{display:inline-block;margin-left:6px;padding:0 6px;border-radius:6px;font-size:10.5px;font-weight:700;background:#F5F3FF;color:#6D28D9;vertical-align:middle;line-height:1.6}
+.dsh-tag--warn{background:var(--warnbg);color:var(--warn)}
+.dsh-dot{width:9px;height:9px;border-radius:99px;display:inline-block;flex-shrink:0}
+.dsh-live{width:8px;height:8px;border-radius:99px;background:#22C55E;display:inline-block;animation:dshPulse 2s infinite}
+@keyframes dshPulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}70%{box-shadow:0 0 0 7px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+.dsh-gchip{display:inline-block;padding:1px 9px;border-radius:99px;font-size:11px;font-weight:700;border:1px solid transparent;white-space:nowrap}
+
+/* botões */
+.dsh-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink2);font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s,color .15s,transform .1s;white-space:nowrap;text-decoration:none}
+.dsh-btn:hover{background:var(--bg);border-color:#CBD5E1}
+.dsh-btn:active{transform:translateY(1px)}
+.dsh-btn:disabled{opacity:.55;cursor:default}
+.dsh-btn--primary{background:var(--ink);border-color:var(--ink);color:#fff}
+.dsh-btn--primary:hover{background:#1E293B;border-color:#1E293B}
+.dsh-btn--ghost{border-color:transparent;background:transparent}
+.dsh-btn--ghost:hover{background:var(--line2);border-color:transparent}
+.dsh-btn--sm{height:30px;padding:0 10px;font-size:12px;border-radius:8px}
+.dsh-btn--danger{color:var(--bad)}
+.dsh-btn--danger:hover{background:var(--badbg);border-color:transparent}
+.dsh-x{width:32px;height:32px;border-radius:10px;border:0;background:transparent;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.dsh-x:hover{background:var(--line2);color:var(--ink)}
+.dsh-link{font-size:12px;font-weight:650;color:var(--warn);text-decoration:none;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.dsh-link:hover{text-decoration:underline}
+
+/* controles segmentados */
+.dsh-seg{display:inline-flex;gap:2px;background:var(--line2);padding:3px;border-radius:12px;flex-wrap:wrap}
+.dsh-seg button{border:0;background:transparent;height:30px;padding:0 12px;border-radius:9px;font-size:13px;font-weight:550;color:var(--muted);cursor:pointer;transition:background .15s,color .15s,box-shadow .15s;white-space:nowrap}
+.dsh-seg button:hover:not(:disabled){color:var(--ink)}
+.dsh-seg button[aria-pressed="true"]{background:#fff;color:var(--ink);font-weight:650;box-shadow:0 1px 3px rgba(15,23,42,.12)}
+.dsh-seg button:disabled{color:#CBD5E1;cursor:not-allowed}
+.dsh-seg--sm button{height:26px;padding:0 10px;font-size:12px}
+.dsh-in{height:34px;padding:0 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font-size:13px}
+.dsh-in:hover{border-color:#CBD5E1}
+
+/* barra de ferramentas */
+.dsh-bar-tools{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;margin-bottom:var(--s4)}
+.dsh-bar-tools__sp{flex:1 1 auto}
+.dsh-resumo{font-size:12px;color:var(--muted)}
+.dsh-aviso{font-size:13px;color:#92400E;background:#FFFBEB;border:1px solid var(--warnline);border-radius:var(--ri);padding:var(--s3) var(--s4);margin-bottom:var(--s4);line-height:1.55}
+.dsh-nota{font-size:12px;color:var(--muted);line-height:1.6}
+.dsh-nota--warn{color:var(--warn)}
+.dsh-banner{display:flex;gap:var(--s3);align-items:flex-start;padding:var(--s3) var(--s4);background:#FFFBEB;border:1px solid var(--warnline);border-radius:var(--ri);font-size:12.5px;color:#78350F;line-height:1.6}
+.dsh-banner svg{margin-top:3px;color:var(--warn)}
+.dsh-estado{padding:var(--s7);text-align:center;color:var(--muted);font-size:14px}
+.dsh-vazio{display:flex;flex-direction:column;align-items:center;gap:var(--s2);padding:var(--s5) var(--s4);color:var(--faint);font-size:13px;text-align:center}
+.dsh-vazio--ok{color:var(--ok)}
+
+/* abas das seções */
+.dsh-tabs{display:flex;gap:var(--s1);overflow-x:auto;padding:4px;background:#fff;border:1px solid var(--line);border-radius:16px;margin-bottom:var(--s5);scrollbar-width:none}
+.dsh-tabs::-webkit-scrollbar{display:none}
+.dsh-tab{flex:1 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);height:40px;padding:0 var(--s4);border:0;border-radius:12px;background:transparent;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s}
+.dsh-tab:hover{background:var(--bg);color:var(--ink)}
+.dsh-tab[aria-selected="true"]{background:var(--ink);color:#fff}
+.dsh-tab__n{min-width:20px;height:20px;padding:0 6px;border-radius:99px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;background:var(--line2);color:var(--ink2)}
+.dsh-tab[aria-selected="true"] .dsh-tab__n{background:rgba(255,255,255,.22);color:#fff}
+.dsh-tab__n--warn{background:var(--warnbg);color:var(--warn)}
+.dsh-sec__h{margin:0 0 var(--s4)}
+.dsh-sec__t{font-size:20px;font-weight:700;letter-spacing:-.02em}
+.dsh-sec__s{font-size:13px;color:var(--muted);margin-top:2px}
+
+/* barras */
+.dsh-track{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.dsh-track>i{display:block;height:100%;border-radius:99px;transition:width .75s cubic-bezier(.22,.9,.3,1)}
+.dsh-track--sm{height:5px}
+.dsh-track--lg{height:12px}
+.dsh-bar{display:flex;gap:2px;height:12px;border-radius:99px;overflow:hidden;background:var(--line)}
+.dsh-bar--lg{height:22px}
+.dsh-bar--sm{height:6px}
+.dsh-bar__seg{height:100%;min-width:0;display:flex;align-items:center;justify-content:center;transition:width .8s cubic-bezier(.22,.9,.3,1);overflow:hidden}
+.dsh-bar__in{font-size:11px;font-weight:700;color:#fff;white-space:nowrap;padding:0 4px}
+.dsh-leg{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s4);margin-top:var(--s3)}
+.dsh-leg__i{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink2)}
+.dsh-leg__l{color:var(--muted)}
+.dsh-leg__p{color:var(--faint);font-size:12px}
+.dsh-barra{margin-bottom:var(--s3)}
+.dsh-barra:last-child{margin-bottom:0}
+.dsh-barra__top{display:flex;justify-content:space-between;align-items:baseline;gap:var(--s2);margin-bottom:6px}
+.dsh-barra__l{font-size:13px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dsh-barra__v{font-size:13px;font-weight:650;color:var(--ink);white-space:nowrap}
+.dsh-barra__p{color:var(--faint);font-weight:500}
+.dsh-rosca{position:relative;flex-shrink:0}
+.dsh-rosca__c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}
+.dsh-rosca__c b{font-size:24px;letter-spacing:-.02em}
+.dsh-rosca__c span{font-size:11px;color:var(--muted);margin-top:2px}
+.dsh-rosca-box{display:flex;align-items:center;gap:var(--s5);flex-wrap:wrap}
+.dsh-rosca-box>.dsh-lista-leg{flex:1 1 180px;min-width:0}
+.dsh-lista-leg>div{display:flex;align-items:center;gap:var(--s2);padding:6px 0;font-size:13px}
+.dsh-lista-leg>div+div{border-top:1px solid var(--line2)}
+.dsh-lista-leg .dsh-lista-leg__n{flex:1;color:var(--ink2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dsh-metabar__box{position:relative;padding-top:6px}
+.dsh-metabar__fill{display:flex;height:10px;border-radius:99px;overflow:hidden;background:var(--line)}
+.dsh-metabar__fill>div{transition:width .8s cubic-bezier(.22,.9,.3,1)}
+.dsh-metabar__meta{position:absolute;top:0;width:2px;height:22px;background:var(--ink);border-radius:2px;transform:translateX(-1px)}
+.dsh-metabar__t{font-size:12px;color:var(--muted);margin-top:6px}
+
+/* linhas de lista */
+.dsh-list{list-style:none;margin:0;padding:0}
+.dsh-list__i{padding:var(--s3) 0;border-top:1px solid var(--line2)}
+.dsh-list__i:first-child{border-top:0}
+.dsh-list__top{display:flex;justify-content:space-between;align-items:center;gap:var(--s2);flex-wrap:wrap}
+.dsh-list__n{font-size:14px;font-weight:650;color:var(--ink)}
+.dsh-list__m{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.55}
+.dsh-list__m b{font-weight:600;color:var(--ink2)}
+.dsh-list__m--warn{color:var(--warn)}
+.dsh-pill-link{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;padding:var(--s2) var(--s3);margin:0 calc(var(--s3) * -1);border-radius:10px;text-decoration:none;color:var(--ink2);font-size:13px;transition:background .15s}
+a.dsh-pill-link:hover{background:var(--bg)}
+
+/* modais */
+.dsh-modal{position:fixed;inset:0;z-index:2000;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;padding:var(--s4);animation:dshFade .18s ease}
+.dsh-modal__box{background:#fff;border-radius:20px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(15,23,42,.3);overflow:hidden;animation:dshPop .22s cubic-bezier(.22,.9,.3,1);outline:none}
+.dsh-modal__h{padding:var(--s5) var(--s5) var(--s3);display:flex;justify-content:space-between;gap:var(--s3);align-items:flex-start}
+.dsh-modal__t{font-size:17px;font-weight:700;letter-spacing:-.01em}
+.dsh-modal__s{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.5}
+.dsh-modal__b{overflow-y:auto;padding:0 var(--s5) var(--s5)}
+@keyframes dshFade{from{opacity:0}to{opacity:1}}
+@keyframes dshPop{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+
+/* dica "?" e legenda */
+.dsh-tip{position:absolute;top:calc(100% + 6px);z-index:3000;width:290px;max-width:80vw;background:var(--ink);color:#F1F5F9;padding:var(--s3);border-radius:var(--ri);font-size:12px;line-height:1.55;font-weight:400;text-align:left;white-space:normal;box-shadow:0 12px 32px rgba(15,23,42,.35);text-transform:none;letter-spacing:normal}
+.dsh-legenda{margin-top:var(--s4);border-radius:var(--ri);background:var(--bg)}
+.dsh-legenda>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:10px var(--s3);font-size:12px;font-weight:600;color:var(--muted);border-radius:var(--ri)}
+.dsh-legenda>summary::-webkit-details-marker{display:none}
+.dsh-legenda>summary:hover{color:var(--ink)}
+.dsh-legenda[open]>summary{color:var(--ink)}
+.dsh-legenda__dl{margin:0;padding:0 var(--s4) var(--s4);display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:var(--s3) var(--s5)}
+.dsh-legenda dt{font-size:12px;font-weight:700;color:var(--ink)}
+.dsh-legenda dd{margin:2px 0 0;font-size:12px;color:var(--muted);line-height:1.5}
+
+/* alertas do topo */
+.dsh-tile{text-align:left;background:#fff;border:1px solid var(--line);border-radius:var(--rc);padding:var(--s4);cursor:pointer;transition:box-shadow .18s,border-color .18s,transform .18s;display:flex;flex-direction:column;gap:var(--s2);position:relative;box-shadow:0 1px 2px rgba(15,23,42,.03)}
+.dsh-tile:hover{box-shadow:0 6px 18px rgba(15,23,42,.08);transform:translateY(-1px)}
+.dsh-tile[aria-selected="true"]{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.dsh-tile__h{display:flex;align-items:center;gap:10px;font-size:12.5px;font-weight:600;color:var(--muted);line-height:1.3}
+.dsh-tile__lbl{display:inline-flex;align-items:center;flex-wrap:wrap}
+.dsh-tile__ic{width:30px;height:30px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center}
+.dsh-tile__v{font-size:30px;font-weight:700;line-height:1;letter-spacing:-.02em}
+.dsh-tile__s{font-size:12px;color:var(--muted)}
+.dsh-qual{display:flex;align-items:center;gap:var(--s3);font-size:12.5px;color:var(--muted);margin:var(--s3) 0 var(--s4)}
+.dsh-qual .dsh-track{flex:1;max-width:240px}
+.dsh-chips{display:flex;flex-wrap:wrap;gap:var(--s2)}
+.dsh-chipbtn{display:inline-flex;align-items:baseline;gap:var(--s2);padding:8px 12px;border:0;border-radius:10px;cursor:pointer;font-size:12.5px;font-weight:600}
+
+/* aguardando agora */
+.dsh-ag__top{display:grid;grid-template-columns:auto 1fr;gap:var(--s5);align-items:center;margin-bottom:var(--s4)}
+.dsh-ag__stats{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
+.dsh-stat__l{font-size:11.5px;color:var(--muted);font-weight:600}
+.dsh-stat__v{font-size:18px;font-weight:700;letter-spacing:-.01em}
+.dsh-ag__row{display:grid;grid-template-columns:10px minmax(0,1fr) minmax(120px,220px) 200px;gap:var(--s3);align-items:center;padding:var(--s3) 0;border-top:1px solid var(--line2)}
+.dsh-ag__row:first-child{border-top:0}
+.dsh-ag__n{font-size:13.5px;font-weight:650}
+.dsh-ag__t{font-size:14px;font-weight:700;text-align:right;white-space:nowrap}
+
+/* linhas com barra (destinos, motivos, permaneceu, SLA) */
+.dsh-linha{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,2fr) auto;gap:var(--s2) var(--s4);align-items:center;padding:var(--s3) 0}
+.dsh-rows>*+*{border-top:1px solid var(--line2)}
+.dsh-linha--motivos{grid-template-columns:minmax(0,2fr) minmax(0,1.1fr) auto}
+.dsh-linha--dest{grid-template-columns:minmax(0,1.4fr) minmax(0,1.5fr) auto}
+.dsh-linha__n{font-size:13.5px;font-weight:600;color:var(--ink);min-width:0}
+.dsh-linha__n small{display:block;font-size:12px;font-weight:400;color:var(--muted)}
+.dsh-linha__m{display:flex;gap:var(--s2);flex-wrap:wrap;justify-content:flex-end}
+.dsh-mini{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.dsh-mini+.dsh-mini{margin-top:4px}
+.dsh-mini__t{flex:1;min-width:60px}
+.dsh-mini__v{min-width:64px;text-align:right;font-weight:650;color:var(--ink2)}
+.dsh-mini__l{min-width:44px}
+.dsh-pct{font-size:18px;font-weight:700;letter-spacing:-.01em;text-align:right;min-width:52px}
+.dsh-pair{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3);margin-top:var(--s2)}
+.dsh-pair__l{font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:3px}
+.dsh-pair__l b{color:var(--ink2);font-weight:650}
+
+/* hero das análises */
+.dsh-hero{display:flex;align-items:center;gap:var(--s5);flex-wrap:wrap;margin-bottom:var(--s4)}
+.dsh-hero>.dsh-hero__bar{flex:1 1 280px;min-width:0}
+.dsh-hero__num{flex-shrink:0}
+
+/* frota */
+.dsh-fleet{display:flex;gap:var(--s3);flex-wrap:wrap}
+.dsh-fleet__i{flex:1 1 90px;background:#fff;border-radius:var(--ri);padding:var(--s3) var(--s4)}
+.dsh-fleet__v{font-size:30px;font-weight:700;line-height:1;letter-spacing:-.02em}
+.dsh-fleet__l{font-size:12px;color:var(--muted);margin-top:4px}
+
+/* saneamento */
+.dsh-san__sec{display:flex;justify-content:space-between;align-items:center;gap:var(--s3);text-align:left;width:100%;background:var(--bg);border:0;border-radius:var(--ri);padding:var(--s3) var(--s4);cursor:pointer;transition:background .15s}
+.dsh-san__sec:hover{background:var(--line2)}
+.dsh-san__sec b{font-size:13.5px;font-weight:600;color:var(--ink)}
+.dsh-san__h{font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--warn);display:flex;justify-content:space-between;margin:var(--s5) 0 var(--s2)}
+.dsh-san__g{border-top:1px solid var(--line2)}
+.dsh-san__gb{width:100%;display:flex;align-items:center;gap:var(--s3);padding:var(--s3) 2px;background:none;border:0;cursor:pointer;text-align:left}
+.dsh-san__gb span:first-child{flex:1;font-size:13px;font-weight:600;color:var(--ink)}
+.dsh-san__item{display:flex;align-items:baseline;gap:var(--s3);flex-wrap:wrap;font-size:12.5px;padding:8px var(--s2);border-radius:var(--rs);color:var(--ink2);text-decoration:none}
+a.dsh-san__item:hover{background:#FEF3C7}
+.dsh-count{display:inline-block;min-width:24px;text-align:center;padding:0 8px;border-radius:99px;font-size:12px;font-weight:700;line-height:1.6}
+
+/* exceções */
+.dsh-exc{display:grid;grid-template-columns:4px minmax(0,1fr) auto;gap:var(--s3);align-items:center;padding:var(--s3) 0;border-top:1px solid var(--line2)}
+.dsh-exc:first-child{border-top:0}
+.dsh-exc__bar{align-self:stretch;border-radius:4px}
+.dsh-exc__n{font-size:14px;font-weight:650}
+.dsh-exc__m{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s3);align-items:center;margin-top:4px;font-size:12px;color:var(--muted)}
+.dsh-exc__t{font-size:15px;font-weight:700;margin-right:var(--s2)}
+
+/* configurações */
+.dsh-cfg__g{background:var(--bg);border-radius:var(--ri);padding:var(--s4)}
+.dsh-cfg__f{display:flex;flex-direction:column;gap:6px}
+.dsh-cfg__f label{font-size:12.5px;color:var(--ink2);font-weight:550}
+.dsh-cfg__hist{display:flex;align-items:baseline;gap:var(--s3);flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line2);font-size:12.5px;color:var(--ink2)}
+
+/* controle de impressão e responsivo */
+@media (max-width:760px){
+  .dsh-card{padding:var(--s4)}
+  .dsh-kpi__v,.dsh-tile__v{font-size:26px}
+  .dsh-ag__top{grid-template-columns:1fr}
+  .dsh-ag__row{grid-template-columns:10px 1fr auto}
+  .dsh-ag__row>.dsh-track{grid-column:2 / 4;grid-row:2}
+  .dsh-linha,.dsh-linha--motivos{grid-template-columns:1fr auto}
+  .dsh-linha>.dsh-linha__bar{grid-column:1 / 3;grid-row:2}
+  .dsh-linha--dest{grid-template-columns:1fr}
+  .dsh-linha--dest>.dsh-linha__bar{grid-column:auto;grid-row:auto}
+  .dsh-linha--dest .dsh-linha__m{justify-content:flex-start}
+  .dsh-resumo-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:var(--s2)!important}
+  .dsh-resumo-grid .dsh-card{padding:var(--s3)}
+  .dsh-resumo-grid .dsh-kpi__v{font-size:22px}
+  .dsh-hide-sm{display:none}
+  .dsh-pair{grid-template-columns:1fr}
+  .dsh-seg{flex-wrap:nowrap;overflow-x:auto;max-width:100%}
+  .dsh-modal{padding:0;align-items:flex-end}
+  .dsh-modal__box{border-radius:20px 20px 0 0;max-height:92vh}
+  .dsh-modal__h,.dsh-modal__b{padding-left:var(--s4);padding-right:var(--s4)}
+  .dsh-exc{grid-template-columns:4px minmax(0,1fr)}
+  .dsh-exc>.dsh-exc__act{grid-column:2}
+  .dsh-sec__t{font-size:18px}
+}
+@media (prefers-reduced-motion:reduce){.dsh *{animation:none!important;transition:none!important}}
+`;
+(function () {
+  if (typeof document === "undefined" || document.getElementById("ge-dash-css-v2")) return;
+  const st = document.createElement("style");
+  st.id = "ge-dash-css-v2";
+  st.textContent = DASH_CSS_BASE;
+  document.head.appendChild(st);
+})();
+
+/* ─── Ícones (traço fino, no estilo Lucide; desenhados aqui para não depender de biblioteca externa) ─── */
+const DASH_ICONES = {
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  truck: '<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>',
+  activity: '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>',
+  bars: '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  ok: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  chevron: '<path d="m6 9 6 6 6-6"/>',
+  arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  external: '<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
+  printer: '<path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/>',
+  book: '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
+  sliders: '<path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  hourglass: '<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>',
+  route: '<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
+  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  pin: '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
+  repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+  wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  list: '<path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/>',
+  zap: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  calendar: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>'
+};
+function DashIcone({ n, tam = 16, cor }) {
+  const d = DASH_ICONES[n];
+  if (!d) return null;
+  return React.createElement("svg", { width: tam, height: tam, viewBox: "0 0 24 24", fill: "none", stroke: cor || "currentColor", strokeWidth: 2,
+    strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", focusable: "false", style: { flexShrink: 0 }, dangerouslySetInnerHTML: { __html: d } });
+}
+
+/* ─── Animação de entrada: números sobem até o valor e barras preenchem ao montar ───
+ * Cada componente tem o seu próprio gatilho, então trocar de aba refaz a animação e atualizar a tela não.
+ * Respeita prefers-reduced-motion: quem pediu menos movimento recebe o valor final direto.                   */
+function dashMenosMovimento() {
+  return typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+function useDashEntrou() {
+  const [e, setE] = useState(dashMenosMovimento);
+  useEffect(() => {
+    if (e) return;
+    const t = setTimeout(() => setE(true), 40);
+    return () => clearTimeout(t);
+  }, []);
+  return e;
+}
+function useDashContagem(alvo, dur = 900) {
+  const [v, setV] = useState(() => (dashMenosMovimento() ? alvo : 0));
+  useEffect(() => {
+    if (dashMenosMovimento() || typeof alvo !== "number" || !isFinite(alvo)) { setV(alvo); return; }
+    let raf, t0 = null;
+    const passo = t => {
+      if (t0 === null) t0 = t;
+      const p = Math.min((t - t0) / dur, 1);
+      setV(alvo * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) raf = requestAnimationFrame(passo);
+    };
+    raf = requestAnimationFrame(passo);
+    return () => cancelAnimationFrame(raf);
+  }, [alvo, dur]);
+  return v;
+}
+function DashNum({ valor, sufixo = "", casas = 0 }) {
+  const v = useDashContagem(typeof valor === "number" ? valor : null);
+  if (typeof valor !== "number") return valor == null ? null : valor;
+  return (typeof v === "number" ? v : valor).toFixed(casas) + sufixo;
+}
+
+/* ─── Peças visuais reutilizáveis (ficam FORA do Dashboard para manter a identidade entre renderizações) ─── */
+function DashCard({ children, style, onClick, className, id }) {
+  return React.createElement("div", {
+    id, onClick, className: "dsh-card" + (onClick ? " dsh-click" : "") + (className ? " " + className : ""),
+    role: onClick ? "button" : undefined, tabIndex: onClick ? 0 : undefined,
+    onKeyDown: onClick ? (e => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onClick(); } }) : undefined,
+    style
+  }, children);
+}
+
+function DashTitulo({ children, extra, tooltip, icone }) {
+  const h = React.createElement;
+  return h("div", { className: "dsh-title" },
+    h("div", { className: "dsh-title__t" },
+      icone && h("span", { className: "dsh-title__icon" }, h(DashIcone, { n: icone, tam: 16 })),
+      h("span", null, children),
+      tooltip && h(DashDica, { texto: tooltip, rotulo: typeof children === "string" ? children : undefined })),
+    extra && h("div", { className: "dsh-title__x" }, extra));
+}
+
+function DashKpi({ label, valor, sub, cor, alerta, tooltip, onClick, ativo, topo }) {
+  const h = React.createElement;
+  return h(DashCard, { onClick, className: "dsh-kpi" + (alerta ? " dsh-kpi--alert" : "") + (ativo ? " dsh-kpi--on" : ""), style: { "--kc": cor || "#0F172A" } },
+    topo && h("span", { className: "dsh-kpi__bar", style: { background: topo } }),
+    h("div", { className: "dsh-kpi__l" }, label, tooltip && h(DashDica, { texto: tooltip, rotulo: label })),
+    h("div", { className: "dsh-kpi__v dsh-num", style: { color: cor || "var(--ink)" } }, typeof valor === "number" ? h(DashNum, { valor }) : valor),
+    sub && h("div", { className: "dsh-kpi__s" }, sub));
+}
+
+function DashVazio({ children, ok, icone }) {
+  const h = React.createElement;
+  return h("div", { className: "dsh-vazio" + (ok ? " dsh-vazio--ok" : "") },
+    h(DashIcone, { n: icone || (ok ? "ok" : "search"), tam: 22 }), h("span", null, children));
+}
+
+/* Barra horizontal simples: um valor contra o maior da lista */
+function DashBarra({ label, n, pct, max, cor, tag }) {
+  const h = React.createElement, entrou = useDashEntrou();
+  return h("div", { className: "dsh-barra" },
+    h("div", { className: "dsh-barra__top" },
+      h("span", { className: "dsh-barra__l", title: typeof label === "string" ? label : undefined }, label, tag && h("span", { className: "dsh-tag" }, tag)),
+      h("span", { className: "dsh-barra__v dsh-num" }, h(DashNum, { valor: n }), h("span", { className: "dsh-barra__p" }, "  ", h(DashNum, { valor: pct, sufixo: "%" })))),
+    h("div", { className: "dsh-track" }, h("i", { style: { width: entrou ? (max ? n / max * 100 : 0) + "%" : "0%", background: cor } })));
+}
+
+/* Barra empilhada de uma cor por fatia, na proporção de cada uma. segs: [{ id, rot, valor, cor, txt? }] */
+/* Texto legível sobre qualquer cor de fatia: escuro sobre cor clara, branco sobre cor escura */
+function dashTextoSobre(cor) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(cor || ""));
+  if (!m) return "#fff";
+  const l = (0.299 * parseInt(m[1], 16) + 0.587 * parseInt(m[2], 16) + 0.114 * parseInt(m[3], 16)) / 255;
+  return l > 0.62 ? "#0F172A" : "#fff";
+}
+function DashEmpilhada({ segs, alto, legenda = true }) {
+  const h = React.createElement, entrou = useDashEntrou();
+  const ref = React.useRef(null);
+  const [larg, setLarg] = useState(0);
+  useEffect(() => {   // mede a barra para só escrever dentro da fatia quando o texto cabe
+    const el = ref.current;
+    if (!el) return;
+    const medir = () => setLarg(el.getBoundingClientRect().width);
+    medir();
+    if (typeof ResizeObserver === "undefined") { window.addEventListener("resize", medir); return () => window.removeEventListener("resize", medir); }
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const total = segs.reduce((t, s) => t + (s.valor || 0), 0);
+  const vis = segs.filter(s => s.valor > 0);
+  return h("div", null,
+    h("div", { ref, className: "dsh-bar" + (alto === "lg" ? " dsh-bar--lg" : alto === "sm" ? " dsh-bar--sm" : ""), role: "img",
+      "aria-label": vis.length ? vis.map(s => `${s.rot}: ${s.txt || s.valor}`).join(", ") : "sem dados" },
+      vis.map(s => {
+        const p = total ? s.valor / total * 100 : 0;
+        return h("div", { key: s.id, className: "dsh-bar__seg", title: `${s.rot}: ${s.txt || s.valor} (${p.toFixed(0)}%)`, style: { width: entrou ? p + "%" : "0%", background: s.cor } },
+          alto === "lg" && (() => { const rot = s.txt || Math.round(p) + "%"; return larg * p / 100 >= rot.length * 7 + 16 ? h("span", { className: "dsh-bar__in", style: { color: dashTextoSobre(s.cor) } }, rot) : null; })());
+      })),
+    legenda && h("div", { className: "dsh-leg" },
+      segs.map(s => h("div", { key: s.id, className: "dsh-leg__i", style: { opacity: s.valor > 0 ? 1 : 0.5 } },
+        h("span", { className: "dsh-dot", style: { background: s.cor } }),
+        h("span", { className: "dsh-leg__l" }, s.rot),
+        h("b", { className: "dsh-num" }, s.txt || s.valor),
+        total > 0 && h("span", { className: "dsh-leg__p" }, Math.round(s.valor / total * 100) + "%")))));
+}
+
+/* Rosca (donut) com o total no centro */
+function DashRosca({ segs, centro, sub, tam = 132 }) {
+  const h = React.createElement, entrou = useDashEntrou();
+  const total = segs.reduce((t, s) => t + (s.valor || 0), 0);
+  const vis = segs.filter(s => s.valor > 0);
+  const R = 52, CIRC = 2 * Math.PI * R;
+  let acum = 0;
+  return h("div", { className: "dsh-rosca", style: { width: tam, height: tam } },
+    h("svg", { viewBox: "0 0 140 140", width: tam, height: tam, role: "img", "aria-label": vis.map(s => `${s.rot}: ${s.valor}`).join(", ") || "sem dados" },
+      h("circle", { cx: 70, cy: 70, r: R, fill: "none", stroke: "#F1F5F9", strokeWidth: 16 }),
+      total > 0 && vis.map(s => {
+        const len = s.valor / total * CIRC, vao = vis.length > 1 ? Math.min(3, len * 0.25) : 0;
+        const el = h("circle", { key: s.id, cx: 70, cy: 70, r: R, fill: "none", stroke: s.cor, strokeWidth: 16, transform: "rotate(-90 70 70)",
+          strokeDasharray: entrou ? `${Math.max(0, len - vao)} ${CIRC}` : `0 ${CIRC}`, strokeDashoffset: -acum,
+          style: { transition: "stroke-dasharray .8s cubic-bezier(.22,.9,.3,1)" } }, h("title", null, `${s.rot}: ${s.valor}`));
+        acum += len;
+        return el;
+      })),
+    h("div", { className: "dsh-rosca__c" }, h("b", { className: "dsh-num" }, centro), sub && h("span", null, sub)));
+}
+
+/* Barra "duas partes contra uma meta" (ex.: Santa Casa + ambulância contra 1h) */
+function DashMetaBar({ a, b, meta, rotA, rotB, corA, corB, metaTxt }) {
+  const h = React.createElement, entrou = useDashEntrou();
+  corA = corA || "#D97706"; corB = corB || "#E11D48"; metaTxt = metaTxt || "meta 1h";
+  const total = a + b, escala = Math.max(meta, total);
+  return h("div", { className: "dsh-metabar" },
+    h("div", { className: "dsh-metabar__box" },
+      h("div", { className: "dsh-metabar__fill" },
+        h("div", { title: `${rotA}: ${dashFmtMin(a)}`, style: { width: entrou ? a / escala * 100 + "%" : "0%", background: corA } }),
+        h("div", { title: `${rotB}: ${dashFmtMin(b)}`, style: { width: entrou ? b / escala * 100 + "%" : "0%", background: corB } })),
+      h("span", { className: "dsh-metabar__meta", title: metaTxt, style: { left: meta / escala * 100 + "%" } })),
+    h("div", { className: "dsh-metabar__t" },
+      h("b", { style: { color: corA } }, rotA + " " + dashFmtMin(a)), " · ", h("b", { style: { color: corB } }, rotB + " " + dashFmtMin(b)),
+      ` · total ${dashFmtMin(total)} (${metaTxt})`));
+}
+
+function DashCobertura({ g }) {
+  const baixa = g.cobertura < 80;
+  return React.createElement("span", { title: `${g.informados} de ${g.total} registros informaram este campo`, className: baixa ? "dsh-chip dsh-chip--warn" : "dsh-title__x" },
+    `${g.informados}/${g.total} informados`);
+}
+
+/* ─── Janela (modal) comum a todos os blocos ─── */
+function DashModal({ titulo, sub, onClose, largura, children, z }) {
+  const h = React.createElement, ref = React.useRef(null);
+  useEffect(() => {
+    const anterior = document.activeElement;
+    if (ref.current && ref.current.focus) ref.current.focus();
+    const f = e => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", f);
+    return () => { window.removeEventListener("keydown", f); if (anterior && anterior.focus) { try { anterior.focus(); } catch (x) { /* elemento saiu da tela */ } } };
+  }, []);
+  return h("div", { className: "dsh dsh-modal dash-no-print", style: z ? { zIndex: z } : undefined, onClick: e => { if (e.target === e.currentTarget) onClose(); } },
+    h("div", { ref, tabIndex: -1, role: "dialog", "aria-modal": "true", "aria-label": typeof titulo === "string" ? titulo : undefined, className: "dsh-modal__box", style: { maxWidth: largura || 640 } },
+      h("div", { className: "dsh-modal__h" },
+        h("div", { style: { minWidth: 0 } }, h("div", { className: "dsh-modal__t" }, titulo), sub && h("div", { className: "dsh-modal__s" }, sub)),
+        h("button", { type: "button", className: "dsh-x", onClick: onClose, "aria-label": "Fechar" }, h(DashIcone, { n: "x", tam: 18 }))),
+      h("div", { className: "dsh-modal__b" }, children)));
+}
+
+/* ─── Janela com a lista de casos (usada por vários blocos) ─── */
+function DashListaModal({ titulo, subtitulo, itens, onClose }) {
+  const h = React.createElement;
+  const LIM = 200;
+  return h(DashModal, { titulo, sub: `${itens.length} caso${itens.length !== 1 ? "s" : ""}${subtitulo ? " · " + subtitulo : ""}`, onClose, largura: 680 },
+    itens.length === 0 ? h(DashVazio, null, "Nenhum caso.")
+      : h("ul", { className: "dsh-list" },
+          itens.slice(0, LIM).map((it, i) => {
+            const corpo = [
+              h("span", { key: "n", className: "dsh-list__n", style: { fontSize: 13 } }, it.nome),
+              it.ficha && h("span", { key: "f", className: "dsh-sub" }, it.ficha),
+              h("span", { key: "t", className: "dsh-sub", style: { flex: "1 1 240px" } }, it.texto),
+              it.campo && h("span", { key: "l", className: "dsh-link", style: { marginLeft: "auto" } }, "abrir", h(DashIcone, { n: "external", tam: 13 }))
+            ];
+            return h("li", { key: i, className: "dsh-list__i", style: { padding: "4px 0" } },
+              it.campo
+                ? h("a", { href: `remocao.html?foco=${encodeURIComponent(it.id)}&campo=${encodeURIComponent(it.campo)}`, className: "dsh-pill-link" }, corpo)
+                : h("div", { className: "dsh-pill-link" }, corpo));
+          }),
+        itens.length > LIM && h("li", { className: "dsh-nota", style: { padding: "8px 0" } }, `Mostrando ${LIM} de ${itens.length}.`)));
+}
+
 /* ─── Leitura em páginas ──────────────────────────────────────────────────────
  * O Supabase devolve no máximo 1.000 linhas por consulta (Settings → API → Max rows) e corta o resto SEM avisar.
  * Antes, o dashboard pedia limit=5000 e recebia só 1.000. Esta função repete a consulta com limit/offset até acabar.
@@ -94,17 +633,68 @@ function dashDiaDaSaida(x) {
       com as clínicas; ficam visualmente apartados.
    ══════════════════════════════════════════════════════════════════════════ */
 
+
+/* O "?" ao lado de um nome: abre ao passar o mouse, ao focar com o teclado ou ao clicar/tocar (clicar fixa aberto). */
+function DashDica({ texto, rotulo }) {
+  const h = React.createElement;
+  const [hover, setHover] = useState(false), [fixa, setFixa] = useState(false), [dir, setDir] = useState(false);
+  const ref = React.useRef(null);
+  const visivel = hover || fixa;
+  useEffect(() => {
+    if (!visivel) return;
+    const el = ref.current;
+    if (el && el.getBoundingClientRect) { const r = el.getBoundingClientRect(); setDir(r.left + 300 > (window.innerWidth || 1200)); }
+  }, [visivel]);
+  useEffect(() => {
+    if (!fixa) return;
+    const fora = e => { if (ref.current && !ref.current.contains(e.target)) setFixa(false); };
+    const esc = e => { if (e.key === "Escape") setFixa(false); };
+    document.addEventListener("mousedown", fora); document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("keydown", esc); };
+  }, [fixa]);
+  return h("span", { ref, className: "dash-dica dash-no-print", style: { position: "relative", display: "inline-flex", marginLeft: 6, verticalAlign: "middle", textTransform: "none", letterSpacing: "normal" },
+    onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false) },
+    h("span", { role: "button", tabIndex: 0, "aria-label": "O que significa" + (rotulo ? ": " + rotulo : ""), "aria-expanded": visivel,
+      onClick: e => { e.stopPropagation(); e.preventDefault(); setFixa(v => !v); },
+      onKeyDown: e => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); e.preventDefault(); setFixa(v => !v); } },
+      onFocus: () => setHover(true), onBlur: () => setHover(false),
+      style: { width: 16, height: 16, borderRadius: 99, border: "1px solid " + (visivel ? "#475569" : "#CBD5E1"), color: visivel ? "#0F172A" : "#64748B", background: visivel ? "#F1F5F9" : "#fff",
+        fontSize: 10, fontWeight: 800, lineHeight: "14px", textAlign: "center", cursor: "help", userSelect: "none", flexShrink: 0, transition: "all .15s" } }, "?"),
+    visivel && h("span", { role: "tooltip", className: "dsh-tip", style: { [dir ? "right" : "left"]: 0 } }, texto));
+}
+
+/* Explicação escrita ("como ler"), recolhida por padrão para não poluir; abre com um clique. */
+function DashLegenda({ itens, titulo }) {
+  const h = React.createElement;
+  return h("details", { className: "dash-legenda dsh-legenda" },
+    h("summary", null, h(DashIcone, { n: "info", tam: 14 }), titulo || "Como ler esta parte"),
+    h("dl", { className: "dsh-legenda__dl" },
+      itens.map(([t, d]) => h("div", { key: t }, h("dt", null, t), h("dd", null, d)))));
+}
+
+/* Janela com o glossário completo. */
+function DashGlossario({ onClose }) {
+  const h = React.createElement;
+  const [q, setQ] = useState("");
+  const lista = DASH_GLOSSARIO.filter(([t, d]) => !q.trim() || (t + " " + d).toLowerCase().includes(q.trim().toLowerCase()));
+  return h(DashModal, { titulo: "Glossário do painel", sub: "Os termos do painel, em palavras simples.", onClose, largura: 640, z: 2500 },
+    h("input", { type: "search", className: "dsh-in", "aria-label": "Procurar no glossário", placeholder: "Procurar um termo…", value: q, onChange: e => setQ(e.target.value), style: { width: "100%", height: 40, marginBottom: 8 } }),
+    h("dl", { style: { margin: 0 } },
+      lista.length === 0 ? h(DashVazio, null, "Nenhum termo encontrado.")
+        : lista.map(([t, d]) => h("div", { key: t, style: { padding: "12px 0", borderTop: "1px solid var(--line2)" } },
+            h("dt", { style: { fontSize: 14, fontWeight: 650, color: "var(--ink)" } }, t),
+            h("dd", { style: { margin: "3px 0 0", fontSize: 13, color: "var(--ink2)", lineHeight: 1.6 } }, d)))));
+}
+
 /* ─── Fila do Kanban: cartões clicáveis que abrem a lista dos pacientes ───────
- * Componente próprio (fora do Dashboard) de propósito: abrir/fechar a janela
- * não re-renderiza o Dashboard inteiro, então os números não reanimam do zero.
- * "Aceitos sem hospital" conta só pacientes nas colunas abaixo. Pediatria e
- * Psiquiatria não são colunas — são marcas dentro delas, então já entram.
- * Para incluir outra coluna, acrescente o id dela aqui.                      */
+ * "Aceitos sem hospital" conta só pacientes nas colunas abaixo. Pediatria e Psiquiatria não são colunas — são marcas
+ * dentro delas, então já entram. Para incluir outra coluna, acrescente o id dela aqui.                              */
 const DASH_COLUNAS_ACEITAS = ["aceite", "andamento"];
 
-function DashFilaKanban({ cols, cards, Card, Num, titulo }) {
+function DashFilaKanban({ cols, cards, titulo }) {
   const h = React.createElement;
   const [sel, setSel] = useState(null); // { titulo, chave }
+  const entrou = useDashEntrou();
   const porCol = useMemo(() => {
     const m = {};
     cols.forEach(c => { m[c.id] = cards.filter(k => k.col_id === c.id); });
@@ -116,64 +706,48 @@ function DashFilaKanban({ cols, cards, Card, Num, titulo }) {
   const rotuloCol = id => (cols.find(c => c.id === id) || {}).label || id;
   const lista = !sel ? [] : sel.chave === "__semhosp" ? semHosp : (porCol[sel.chave] || []);
   const abrir = (tit, chave, n) => n ? () => setSel({ titulo: tit, chave }) : undefined;
-
-  useEffect(() => {
-    if (!sel) return;
-    const f = e => { if (e.key === "Escape") setSel(null); };
-    window.addEventListener("keydown", f);
-    return () => window.removeEventListener("keydown", f);
-  }, [sel]);
-
+  const qtd = c => (porCol[c.id] || []).length;
+  const max = Math.max(1, ...cols.map(qtd));
+  const total = cols.reduce((t, c) => t + qtd(c), 0);
   const catRotulo = c => (c.categoria && c.categoria !== "normal")
     ? (c.categoria.charAt(0).toUpperCase() + c.categoria.slice(1)) : (c.is_rn ? "RN" : null);
 
   return h(React.Fragment, null,
-    h("div", { style: { marginBottom: 22 } },
-      h("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 } }, titulo),
-      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 11 } },
-        cols.map(c => h(Card, { key: c.id, style: { padding: "13px 15px" }, onClick: abrir(c.label, c.id, (porCol[c.id] || []).length) },
-          h("div", { style: { fontSize: 10, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, c.label),
-          h("div", { style: { fontSize: 23, fontWeight: 700, color: c.accent || "#64748B", lineHeight: 1 } },
-            h(Num, { valor: (porCol[c.id] || []).length })))),
-        semHosp.length > 0 && h(Card, {
-          key: "sh", style: { padding: "13px 15px", borderColor: "#FDE68A", background: "#FFFBEB" },
-          onClick: abrir("Aceitos sem hospital de destino", "__semhosp", semHosp.length)
-        },
-          h("div", { style: { fontSize: 10, fontWeight: 600, color: "#B45309", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 } }, "Aceitos sem hospital"),
-          h("div", { style: { fontSize: 23, fontWeight: 700, color: "#B45309", lineHeight: 1 } }, h(Num, { valor: semHosp.length }))))),
+    h(DashCard, { id: "bloco-fila" },
+      h(DashTitulo, { icone: "list", extra: `${total} paciente${total !== 1 ? "s" : ""} no quadro` }, titulo),
+      h("div", { className: "dsh-grid dsh-g-fila dsh-grid--tight" },
+        cols.map(c => {
+          const n = qtd(c), cor = c.accent || "#64748B";
+          return h(DashCard, { key: c.id, onClick: abrir(c.label, c.id, n) },
+            h("div", { className: "dsh-sub", style: { fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: c.label }, c.label),
+            h("div", { className: "dsh-kpi__v dsh-num", style: { color: n ? cor : "var(--faint)", margin: "6px 0 10px" } }, h(DashNum, { valor: n })),
+            h("div", { className: "dsh-track dsh-track--sm" }, h("i", { style: { width: entrou ? n / max * 100 + "%" : "0%", background: cor } })));
+        }),
+        semHosp.length > 0 && h(DashCard, { key: "sh", className: "dsh-kpi--alert", onClick: abrir("Aceitos sem hospital de destino", "__semhosp", semHosp.length) },
+          h("div", { className: "dsh-sub", style: { fontWeight: 600, color: "var(--warn)" } }, "Aceitos sem hospital"),
+          h("div", { className: "dsh-kpi__v dsh-num", style: { color: "var(--warn)", margin: "6px 0 10px" } }, h(DashNum, { valor: semHosp.length })),
+          h("div", { className: "dsh-track dsh-track--sm" }, h("i", { style: { width: entrou ? semHosp.length / max * 100 + "%" : "0%", background: "#D97706" } }))))),
 
-    sel && h("div", {
-      onClick: e => { if (e.target === e.currentTarget) setSel(null); },
-      style: { position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 16 }
-    },
-      h("div", { role: "dialog", "aria-modal": "true", style: { background: "#fff", borderRadius: 16, width: "100%", maxWidth: 520, maxHeight: "85vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,.25)", overflow: "hidden" } },
-        h("div", { style: { padding: "14px 20px", borderBottom: "1px solid #F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "center" } },
-          h("div", null,
-            h("div", { style: { fontWeight: 700, fontSize: 15, color: "#0F172A" } }, sel.titulo),
-            h("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 2 } }, lista.length + " paciente" + (lista.length !== 1 ? "s" : ""))),
-          h("button", { onClick: () => setSel(null), "aria-label": "Fechar", style: { background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 20, padding: 4 } }, "✕")),
-        h("div", { style: { overflowY: "auto", padding: "8px 20px 16px" } },
-          lista.length === 0
-            ? h("div", { style: { padding: "24px 0", textAlign: "center", color: "#94A3B8", fontSize: 13 } }, "Nenhum paciente aqui agora.")
-            : lista.map((c, i) => {
-                const g = GC[c.grav] || (typeof GC_SEM !== "undefined" ? GC_SEM : GC.urgencia);
-                const cat = catRotulo(c);
-                const meta = [c.setor, c.rec, sel.chave === "__semhosp" ? rotuloCol(c.col_id) : (c.hosp ? "→ " + c.hosp : null)].filter(Boolean).join(" · ");
-                return h("div", { key: c.id, style: { padding: "11px 0", borderTop: i ? "1px solid #F1F5F9" : "none" } },
-                  h("div", { style: { display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" } },
-                    h("span", { style: { fontWeight: 600, fontSize: 13, color: "#0F172A" } }, c.nome,
-                      cat && h("span", { style: { marginLeft: 6, fontSize: 9.5, fontWeight: 700, color: "#6D28D9", background: "#F5F3FF", borderRadius: 4, padding: "1px 5px", verticalAlign: "middle" } }, cat)),
-                    h("span", { style: { fontSize: 10, fontWeight: 700, color: g.text, background: g.bg, border: "1px solid " + g.border, borderRadius: 99, padding: "1px 8px", whiteSpace: "nowrap" } }, g.label)),
-                  c.hd && h("div", { style: { fontSize: 11.5, color: "#475569", marginTop: 3 } }, "HD: " + c.hd),
-                  meta && h("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 3 } }, meta));
-              })))));
+    sel && h(DashModal, { titulo: sel.titulo, sub: `${lista.length} paciente${lista.length !== 1 ? "s" : ""}`, onClose: () => setSel(null), largura: 560 },
+      lista.length === 0 ? h(DashVazio, { ok: true }, "Nenhum paciente aqui agora.")
+        : h("ul", { className: "dsh-list" },
+            lista.map(c => {
+              const g = GC[c.grav] || (typeof GC_SEM !== "undefined" ? GC_SEM : GC.urgencia);
+              const cat = catRotulo(c);
+              const meta = [c.setor, c.rec, sel.chave === "__semhosp" ? rotuloCol(c.col_id) : (c.hosp ? "→ " + c.hosp : null)].filter(Boolean).join(" · ");
+              return h("li", { key: c.id, className: "dsh-list__i" },
+                h("div", { className: "dsh-list__top" },
+                  h("span", { className: "dsh-list__n" }, c.nome, cat && h("span", { className: "dsh-tag" }, cat)),
+                  h("span", { className: "dsh-gchip", style: { color: g.text, background: g.bg, borderColor: g.border } }, g.label)),
+                c.hd && h("div", { className: "dsh-list__m" }, h("b", null, "HD: "), c.hd),
+                meta && h("div", { className: "dsh-list__m" }, meta));
+            }))));
 }
 
-/* ─── Protocolo de AVC e Tempos do caminho: componentes PRÓPRIOS, fora do Dashboard ───────────────────────
- * Mesmo motivo do DashFilaKanban: Card/Kpi/Titulo são criados dentro do Dashboard, então qualquer estado
- * guardado lá refaz todos os cartões a cada clique e os números reanimam do zero. Aqui o estado de
- * "qual card/linha está aberto" fica no próprio componente e o resto da tela não é tocado.            */
-function DashProtocoloAVC({ protocolos, totalRemocoes, Card, Kpi, Titulo, Vazio, fmtMin }) {
+/* ─── Protocolo de AVC ───────────────────────────────────────────────────────
+ * Estado de "qual card está aberto" fica aqui, no próprio componente, para o resto da tela não ser refeito a cada clique. */
+function DashProtocoloAVC({ protocolos, totalRemocoes }) {
+  const h = React.createElement, fmtMin = dashFmtMin;
   const [avcSel, setAvcSel] = useState(null);   // card aberto: "total" | "noHorario" | "atrasoSantaCasa" | "atrasoAmbulancia"
   useEffect(() => {
     if (!avcSel) return;
@@ -181,217 +755,195 @@ function DashProtocoloAVC({ protocolos, totalRemocoes, Card, Kpi, Titulo, Vazio,
     window.addEventListener("keydown", f);
     return () => window.removeEventListener("keydown", f);
   }, [avcSel]);
-  return /*#__PURE__*/React.createElement("div", { style: { marginBottom: 22 } },
-      /*#__PURE__*/React.createElement(Titulo, {
-        extra: "meta: sair com médico e enfermeiro em até 1h da finalização da CROSS",
-        tooltip: "O protocolo de AVC (derrame) tem uma meta: a ambulância precisa sair em até 1 hora depois que a CROSS finaliza a ficha. Aqui entram só os pacientes marcados como Protocolo de AVC no Livro de Saída (desde outubro/2026) e que já foram ligados à planilha. Cada paciente cai em um só grupo: saiu no horário; atraso porque a Santa Casa demorou a pedir a ambulância; ou atraso porque a ambulância demorou a sair depois de pedida. Clique em um cartão para ver os pacientes."
-      }, "Protocolo de AVC"),
-      protocolos.total === 0
-        ? /*#__PURE__*/React.createElement(Card, null,
-            /*#__PURE__*/React.createElement(Vazio, null, "Nenhum protocolo de AVC no período. Marque “Protocolo de AVC” ao lançar o pedido no Livro de Remoção."))
-        : /*#__PURE__*/React.createElement(React.Fragment, null,
-            /*#__PURE__*/React.createElement("div", {
-              style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 12 }
-            },
-              /*#__PURE__*/React.createElement(Kpi, {
-                label: "Protocolos de AVC", valor: protocolos.total, cor: "#BE123C",
-                sub: totalRemocoes ? `${(protocolos.total / totalRemocoes * 100).toFixed(1).replace(".", ",")}% das linhas do período · clique para ver` : "clique para ver",
-                ativo: avcSel === "total", onClick: () => setAvcSel(avcSel === "total" ? null : "total"),
-                tooltip: "Quantos pacientes de AVC (derrame) houve no período. Clique para ver todos." }),
-              /*#__PURE__*/React.createElement(Kpi, {
-                label: "Saíram no horário", valor: protocolos.noHorario, cor: "#15803D",
-                sub: `${(protocolos.noHorario / protocolos.total * 100).toFixed(0)}% dos protocolos · até 1h`,
-                ativo: avcSel === "noHorario", onClick: protocolos.noHorario ? () => setAvcSel(avcSel === "noHorario" ? null : "noHorario") : undefined,
-                tooltip: "A ambulância saiu em até 1 hora depois que a CROSS finalizou a ficha. Cumpriu a meta." }),
-              /*#__PURE__*/React.createElement(Kpi, {
-                label: "Atraso · Santa Casa", valor: protocolos.atrasoSantaCasa, cor: "#B45309",
-                sub: "demorou a pedir a ambulância",
-                alerta: protocolos.atrasoSantaCasa > 0,
-                ativo: avcSel === "atrasoSantaCasa", onClick: protocolos.atrasoSantaCasa ? () => setAvcSel(avcSel === "atrasoSantaCasa" ? null : "atrasoSantaCasa") : undefined,
-                tooltip: "Passou de 1 hora porque a Santa Casa demorou mais de 1 hora, depois da finalização da CROSS, para pedir a ambulância." }),
-              /*#__PURE__*/React.createElement(Kpi, {
-                label: "Atraso · ambulância", valor: protocolos.atrasoAmbulancia, cor: "#BE123C",
-                sub: "chegou depois de 1h",
-                alerta: protocolos.atrasoAmbulancia > 0,
-                ativo: avcSel === "atrasoAmbulancia", onClick: protocolos.atrasoAmbulancia ? () => setAvcSel(avcSel === "atrasoAmbulancia" ? null : "atrasoAmbulancia") : undefined,
-                tooltip: "Passou de 1 hora mesmo com a ambulância pedida em até 1 hora: quem demorou foi a saída da ambulância." })),
+  const P = protocolos;
+  const titulo = h(DashTitulo, {
+    icone: "zap",
+    extra: "meta: sair com médico e enfermeiro em até 1h da finalização da CROSS",
+    tooltip: "O protocolo de AVC (derrame) tem uma meta: a ambulância precisa sair em até 1 hora depois que a CROSS finaliza a ficha. Aqui entram só os pacientes marcados como Protocolo de AVC no Livro de Saída (desde outubro/2026) e que já foram ligados à planilha. Cada paciente cai em um só grupo: saiu no horário; atraso porque a Santa Casa demorou a pedir a ambulância; ou atraso porque a ambulância demorou a sair depois de pedida. Clique em um cartão para ver os pacientes."
+  }, "Protocolo de AVC");
 
-            /* ── A hora dividida: quanto levou cada lado ── */
-            /*#__PURE__*/React.createElement("div", {
-              style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 12, marginTop: 12 }
-            },
-              /*#__PURE__*/React.createElement(Kpi, {
-                label: "Santa Casa · finalização → solicitação", valor: fmtMin(protocolos.santaCasa.mediana), cor: "#B45309",
-                sub: protocolos.santaCasa.n ? `mediana · ${protocolos.santaCasa.n} com horário · maior: ${fmtMin(protocolos.santaCasa.max)}` : "sem protocolos com os dois horários",
-                tooltip: "O tempo do meio (mediana) entre a CROSS finalizar a ficha e a Santa Casa pedir a ambulância. É a parte da hora que depende da Santa Casa. Entram só os pacientes que têm os dois horários." }),
-              /*#__PURE__*/React.createElement(Kpi, {
-                label: "Ambulância · solicitação → saída", valor: fmtMin(protocolos.ambulancia.mediana), cor: "#BE123C",
-                sub: protocolos.ambulancia.n ? `mediana · ${protocolos.ambulancia.n} com horário · maior: ${fmtMin(protocolos.ambulancia.max)}` : "sem protocolos com os dois horários",
-                tooltip: "O tempo do meio (mediana) entre o pedido da ambulância e a saída dela. É a parte da hora que depende do setor de ambulância. A meta de 1 hora é a soma das duas partes: se a Santa Casa levou 45 minutos para pedir, sobram 15 para a ambulância sair." })),
+  if (P.total === 0) return h(DashCard, { id: "bloco-avc" }, titulo,
+    h(DashVazio, null, "Nenhum protocolo de AVC no período. Marque “Protocolo de AVC” ao lançar o pedido no Livro de Remoção."));
 
-            /* ── Casos do card selecionado ── */
-            avcSel && (() => {
-              const TIT = { total: "Todos os protocolos de AVC", noHorario: "Saíram no horário", atrasoSantaCasa: "Atraso · Santa Casa demorou a pedir a ambulância", atrasoAmbulancia: "Atraso · ambulância saiu depois de 1h" };
-              const SEL = { noHorario: ["No horário", "#15803D", "#DCFCE7"], atrasoSantaCasa: ["Atraso · Santa Casa", "#92400E", "#FEF3C7"],
-                atrasoAmbulancia: ["Atraso · ambulância", "#9F1239", "#FFE4E6"], atrasoSemCausa: ["Atraso · causa não apurada", "#475569", "#F1F5F9"],
-                semHorarios: ["Sem horário para medir", "#92400E", "#FFFBEB"] };
-              const itens = avcSel === "total" ? protocolos.lista : protocolos.lista.filter(c => c.cat === avcSel);
-              const rel = m => m === null ? "" : m >= 0 ? ` (${fmtMin(m)} após a finalização)` : ` (${fmtMin(-m)} antes da finalização)`;
-              const linha = (rot, valor, falta, extra) => /*#__PURE__*/React.createElement("div", { style: { fontSize: 11.5, color: falta ? "#B45309" : "#475569", lineHeight: 1.55 } },
-                rot + ": ", /*#__PURE__*/React.createElement("b", { style: { fontWeight: 600 } }, valor), falta ? " — falta" : "", extra || "");
-              return /*#__PURE__*/React.createElement(Card, { style: { marginTop: 12 } },
-                /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 10 } },
-                  /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#0F172A" } }, TIT[avcSel],
-                    /*#__PURE__*/React.createElement("span", { style: { fontWeight: 500, color: "#94A3B8", marginLeft: 8 } }, `${itens.length} caso${itens.length !== 1 ? "s" : ""}`)),
-                  /*#__PURE__*/React.createElement("button", { onClick: () => setAvcSel(null), style: { background: "none", border: "1px solid #E2E8F0", color: "#64748B", borderRadius: 8, padding: "4px 12px", fontSize: 11.5, cursor: "pointer" } }, "Fechar")),
-                itens.map((c, k) => /*#__PURE__*/React.createElement("div", { key: k, style: { padding: "10px 0", borderTop: k ? "1px solid #F1F5F9" : "none" } },
-                  /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 3 } },
-                    /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: "#0F172A" } }, c.nome),
-                    c.ficha && /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: "#94A3B8" } }, "ficha " + c.ficha),
-                    avcSel === "total" && c.cat && /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, fontWeight: 700, borderRadius: 99, padding: "2px 9px", color: SEL[c.cat][1], background: SEL[c.cat][2] } }, SEL[c.cat][0])),
-                  c.destino && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginBottom: 2 } }, "Destino: " + c.destino),
-                  linha("Finalização da CROSS", c.finTxt, c.faltaFin),
-                  linha("Solicitação da ambulância", c.pedTxt, false, rel(c.minPedido)),
-                  linha("Saída da ambulância", c.saiTxt, c.faltaSaida, rel(c.minSaida)),
-                  (c.minPedido !== null && c.minPedido >= 0 && c.minAmb !== null && c.minAmb >= 0) && (() => {
-                    const total = c.minPedido + c.minAmb, escala = Math.max(60, total);
-                    return /*#__PURE__*/React.createElement("div", { style: { marginTop: 7 } },
-                      /*#__PURE__*/React.createElement("div", { style: { position: "relative", display: "flex", height: 8, borderRadius: 99, overflow: "hidden", background: "#F1F5F9" } },
-                        /*#__PURE__*/React.createElement("div", { title: `Santa Casa: ${fmtMin(c.minPedido)}`, style: { width: `${c.minPedido / escala * 100}%`, background: "#F59E0B" } }),
-                        /*#__PURE__*/React.createElement("div", { title: `Ambulância: ${fmtMin(c.minAmb)}`, style: { width: `${c.minAmb / escala * 100}%`, background: "#E11D48" } })),
-                      /*#__PURE__*/React.createElement("div", { style: { position: "relative", height: 0 } },
-                        /*#__PURE__*/React.createElement("div", { title: "Meta: 1h", style: { position: "absolute", left: `${60 / escala * 100}%`, top: -10, width: 2, height: 12, background: "#0F172A", borderRadius: 1 } })),
-                      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#64748B", marginTop: 4 } },
-                        /*#__PURE__*/React.createElement("span", { style: { color: "#B45309", fontWeight: 600 } }, "Santa Casa " + fmtMin(c.minPedido)), " · ",
-                        /*#__PURE__*/React.createElement("span", { style: { color: "#BE123C", fontWeight: 600 } }, "Ambulância " + fmtMin(c.minAmb)),
-                        ` · total ${fmtMin(total)} (meta 1h)`));
-                  })(),
-                  (c.medico || c.enfermeiro) && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 2 } },
-                    "Médico: " + (c.medico || "—") + " · Enfermeiro(a): " + (c.enfermeiro || "—")))));
-            })(),
+  const alterna = k => () => setAvcSel(avcSel === k ? null : k);
+  const SEL = { noHorario: ["No horário", "#15803D", "#DCFCE7"], atrasoSantaCasa: ["Atraso · Santa Casa", "#92400E", "#FEF3C7"],
+    atrasoAmbulancia: ["Atraso · ambulância", "#9F1239", "#FFE4E6"], atrasoSemCausa: ["Atraso · causa não apurada", "#475569", "#F1F5F9"],
+    semHorarios: ["Sem horário para medir", "#92400E", "#FFFBEB"] };
+  const TIT = { total: "Todos os protocolos de AVC", noHorario: "Saíram no horário", atrasoSantaCasa: "Atraso · Santa Casa demorou a pedir a ambulância", atrasoAmbulancia: "Atraso · ambulância saiu depois de 1h" };
 
-            (protocolos.semHorarios > 0 || protocolos.atrasoSemCausa > 0) && /*#__PURE__*/React.createElement("div", {
-              style: { fontSize: 11.5, color: "#64748B", lineHeight: 1.6, marginTop: 10 } },
-              protocolos.semHorarios > 0 && /*#__PURE__*/React.createElement("div", null,
-                `${protocolos.semHorarios} protocolo${protocolos.semHorarios !== 1 ? "s" : ""} sem horário para medir (contam no total, mas não entram nas três categorias): ${protocolos.semFinalizacao} sem finalização da CROSS · ${protocolos.semSaida} sem data ou horário de saída da ambulância. Clique em “Protocolos de AVC” para ver quais.`),
-              protocolos.atrasoSemCausa > 0 && /*#__PURE__*/React.createElement("div", null,
-                `${protocolos.atrasoSemCausa} saíram depois de 1h, mas sem o horário da solicitação da ambulância — a causa do atraso não pôde ser apurada.`))
-          ));
+  const casos = avcSel && (() => {
+    const itens = avcSel === "total" ? P.lista : P.lista.filter(c => c.cat === avcSel);
+    const rel = m => m === null ? "" : m >= 0 ? ` (${fmtMin(m)} após a finalização)` : ` (${fmtMin(-m)} antes da finalização)`;
+    const linha = (rot, valor, falta, extra) => h("div", { className: "dsh-list__m" + (falta ? " dsh-list__m--warn" : "") }, rot + ": ", h("b", null, valor), falta ? " — falta" : "", extra || "");
+    return h(DashCard, { style: { marginTop: 16 } },
+      h("div", { className: "dsh-title", style: { marginBottom: 8 } },
+        h("div", { className: "dsh-title__t", style: { fontSize: 14 } }, TIT[avcSel], h("span", { className: "dsh-chip" }, `${itens.length} caso${itens.length !== 1 ? "s" : ""}`)),
+        h("button", { type: "button", className: "dsh-btn dsh-btn--sm", onClick: () => setAvcSel(null) }, "Fechar")),
+      h("ul", { className: "dsh-list" },
+        itens.map((c, k) => h("li", { key: k, className: "dsh-list__i" },
+          h("div", { className: "dsh-list__top", style: { justifyContent: "flex-start", marginBottom: 2 } },
+            h("span", { className: "dsh-list__n" }, c.nome),
+            c.ficha && h("span", { className: "dsh-sub" }, "ficha " + c.ficha),
+            avcSel === "total" && c.cat && h("span", { className: "dsh-gchip", style: { color: SEL[c.cat][1], background: SEL[c.cat][2] } }, SEL[c.cat][0])),
+          c.destino && h("div", { className: "dsh-list__m" }, "Destino: " + c.destino),
+          linha("Finalização da CROSS", c.finTxt, c.faltaFin),
+          linha("Solicitação da ambulância", c.pedTxt, false, rel(c.minPedido)),
+          linha("Saída da ambulância", c.saiTxt, c.faltaSaida, rel(c.minSaida)),
+          (c.minPedido !== null && c.minPedido >= 0 && c.minAmb !== null && c.minAmb >= 0) &&
+            h("div", { style: { marginTop: 8 } }, h(DashMetaBar, { a: c.minPedido, b: c.minAmb, meta: 60, rotA: "Santa Casa", rotB: "Ambulância" })),
+          (c.medico || c.enfermeiro) && h("div", { className: "dsh-list__m" }, "Médico: " + (c.medico || "—") + " · Enfermeiro(a): " + (c.enfermeiro || "—"))))));
+  })();
+
+  return h(DashCard, { id: "bloco-avc" },
+    titulo,
+    h(DashEmpilhada, { alto: "lg", segs: [
+      { id: "noHorario", rot: "No horário", valor: P.noHorario, cor: "#16A34A" },
+      { id: "atrasoSantaCasa", rot: "Atraso · Santa Casa", valor: P.atrasoSantaCasa, cor: "#D97706" },
+      { id: "atrasoAmbulancia", rot: "Atraso · ambulância", valor: P.atrasoAmbulancia, cor: "#E11D48" },
+      { id: "atrasoSemCausa", rot: "Atraso · causa não apurada", valor: P.atrasoSemCausa, cor: "#94A3B8" },
+      { id: "semHorarios", rot: "Sem horário para medir", valor: P.semHorarios, cor: "#FCD34D" }] }),
+    h("div", { className: "dsh-grid dsh-g4 dsh-grid--tight", style: { marginTop: 20 } },
+      h(DashKpi, { label: "Protocolos de AVC", valor: P.total, cor: "#BE123C",
+        sub: totalRemocoes ? `${(P.total / totalRemocoes * 100).toFixed(1).replace(".", ",")}% das linhas do período` : "",
+        ativo: avcSel === "total", onClick: alterna("total"),
+        tooltip: "Quantos pacientes de AVC (derrame) houve no período. Clique para ver todos." }),
+      h(DashKpi, { label: "Saíram no horário", valor: P.noHorario, cor: "#15803D",
+        sub: `${(P.noHorario / P.total * 100).toFixed(0)}% dos protocolos · até 1h`,
+        ativo: avcSel === "noHorario", onClick: P.noHorario ? alterna("noHorario") : undefined,
+        tooltip: "A ambulância saiu em até 1 hora depois que a CROSS finalizou a ficha. Cumpriu a meta." }),
+      h(DashKpi, { label: "Atraso · Santa Casa", valor: P.atrasoSantaCasa, cor: "#B45309", sub: "demorou a pedir a ambulância",
+        alerta: P.atrasoSantaCasa > 0, ativo: avcSel === "atrasoSantaCasa", onClick: P.atrasoSantaCasa ? alterna("atrasoSantaCasa") : undefined,
+        tooltip: "Passou de 1 hora porque a Santa Casa demorou mais de 1 hora, depois da finalização da CROSS, para pedir a ambulância." }),
+      h(DashKpi, { label: "Atraso · ambulância", valor: P.atrasoAmbulancia, cor: "#BE123C", sub: "chegou depois de 1h",
+        alerta: P.atrasoAmbulancia > 0, ativo: avcSel === "atrasoAmbulancia", onClick: P.atrasoAmbulancia ? alterna("atrasoAmbulancia") : undefined,
+        tooltip: "Passou de 1 hora mesmo com a ambulância pedida em até 1 hora: quem demorou foi a saída da ambulância." })),
+
+    casos,
+
+    h("div", { className: "dsh-sep" }),
+    h("div", { className: "dsh-eyebrow", style: { marginBottom: 8 } }, "A hora dividida · quanto levou cada lado"),
+    (P.santaCasa.mediana !== null && P.ambulancia.mediana !== null) &&
+      h("div", { style: { marginBottom: 16 } }, h(DashMetaBar, { a: P.santaCasa.mediana, b: P.ambulancia.mediana, meta: 60, rotA: "Santa Casa", rotB: "Ambulância" })),
+    h("div", { className: "dsh-grid dsh-g2 dsh-grid--tight", style: { marginBottom: 0 } },
+      h(DashKpi, { label: "Santa Casa · finalização → solicitação", valor: fmtMin(P.santaCasa.mediana), cor: "#B45309",
+        sub: P.santaCasa.n ? `mediana · ${P.santaCasa.n} com horário · maior: ${fmtMin(P.santaCasa.max)}` : "sem protocolos com os dois horários",
+        tooltip: "O tempo do meio (mediana) entre a CROSS finalizar a ficha e a Santa Casa pedir a ambulância. É a parte da hora que depende da Santa Casa. Entram só os pacientes que têm os dois horários." }),
+      h(DashKpi, { label: "Ambulância · solicitação → saída", valor: fmtMin(P.ambulancia.mediana), cor: "#BE123C",
+        sub: P.ambulancia.n ? `mediana · ${P.ambulancia.n} com horário · maior: ${fmtMin(P.ambulancia.max)}` : "sem protocolos com os dois horários",
+        tooltip: "O tempo do meio (mediana) entre o pedido da ambulância e a saída dela. É a parte da hora que depende do setor de ambulância. A meta de 1 hora é a soma das duas partes: se a Santa Casa levou 45 minutos para pedir, sobram 15 para a ambulância sair." })),
+
+    (P.semHorarios > 0 || P.atrasoSemCausa > 0) && h("div", { className: "dsh-nota", style: { marginTop: 16 } },
+      P.semHorarios > 0 && h("div", null,
+        `${P.semHorarios} protocolo${P.semHorarios !== 1 ? "s" : ""} sem horário para medir (contam no total, mas não entram nas três categorias): ${P.semFinalizacao} sem finalização da CROSS · ${P.semSaida} sem data ou horário de saída da ambulância. Clique em “Protocolos de AVC” para ver quais.`),
+      P.atrasoSemCausa > 0 && h("div", null,
+        `${P.atrasoSemCausa} saíram depois de 1h, mas sem o horário da solicitação da ambulância — a causa do atraso não pôde ser apurada.`)));
 }
 
-function DashTempos({ intervalos, total, Card, Kpi, Titulo, fmtMin }) {
+/* ─── Onde o tempo é gasto: as etapas do caminho ──────────────────────────────
+ * Estados (qual etapa/gravidade está aberta) ficam aqui dentro, pelo mesmo motivo do AVC. */
+function DashTempos({ intervalos, total }) {
+  const h = React.createElement, fmtMin = dashFmtMin;
   const [verTotal, setVerTotal] = useState(false);
-  const h = React.createElement;
   const [sel, setSel] = useState(null);     // id do intervalo aberto no modal
   const [gSel, setGSel] = useState(null);   // linha de gravidade aberta dentro do modal ("todas" ou o nome da gravidade)
+  const entrou = useDashEntrou();
   const fechar = () => { setSel(null); setGSel(null); };
-  useEffect(() => {
-    if (!sel) return;
-    const f = e => { if (e.key === "Escape") fechar(); };
-    window.addEventListener("keydown", f);
-    return () => window.removeEventListener("keydown", f);
-  }, [sel]);
   const it = sel ? intervalos.find(i => i.id === sel) : null;
-  const COLS_GRID = "minmax(140px,2fr) repeat(5,minmax(54px,1fr))";
-  const cel = (txt, extra) => h("span", { style: { textAlign: "right", fontSize: 12, color: "#64748B", fontVariantNumeric: "tabular-nums", ...extra } }, txt);
+
+  const medidos = intervalos.filter(i => i.todas.mediana !== null && i.todas.mediana > 0);
+  const segs = medidos.map(i => ({ id: i.id, rot: `${i.de} → ${i.ate}`, valor: i.todas.mediana, cor: i.cor, txt: fmtMin(i.todas.mediana) }));
+
+  const linkLinha = (c, campo, curto) => c.id && h("a", { href: `remocao.html?foco=${encodeURIComponent(c.id)}&campo=${encodeURIComponent(campo || "nome_paciente")}`, className: "dsh-link" }, curto ? "abrir linha" : "abrir a linha na planilha", h(DashIcone, { n: "external", tam: 13 }));
+
+  const modal = it && (() => {
+    const grupos = [it.todas, ...it.grupos];
+    const maxMed = Math.max(1, ...grupos.map(g => g.mediana || 0));
+    const c0 = it.todas.casos[0];
+    return h(DashModal, { titulo: it.rotulo, onClose: fechar, largura: 680,
+      sub: h(React.Fragment, null, `Quanto tempo levou, por gravidade · ${it.dono} · mediana geral `, h("b", null, fmtMin(it.todas.mediana)), ` · ${it.todas.nPos} remoç${it.todas.nPos !== 1 ? "ões" : "ão"} medida${it.todas.nPos !== 1 ? "s" : ""}`) },
+      c0 && h("div", { className: "dsh-banner", style: { background: "#FFF7ED", borderColor: "#FED7AA", color: "#7C2D12", marginBottom: 20, justifyContent: "space-between", flexWrap: "wrap" } },
+        h("div", { style: { minWidth: 0 } },
+          h("div", { className: "dsh-eyebrow", style: { color: "#9A3412" } }, "A remoção mais longa desta etapa"),
+          h("div", { style: { marginTop: 4 } }, h("b", { style: { fontSize: 14 } }, c0.nome), c0.ficha && h("span", { className: "dsh-sub", style: { marginLeft: 6 } }, "ficha " + c0.ficha)),
+          h("div", { className: "dsh-sub", style: { color: "#9A3412" } }, `${it.de} ${c0.de} → ${it.ate} ${c0.ate} · ${c0.grav}`),
+          c0.min >= 2880 && h("div", { style: { fontSize: 12, marginTop: 6 } }, "Mais de 2 dias nesta etapa: vale conferir se não é erro de digitação em alguma data.")),
+        h("div", { style: { textAlign: "right" } },
+          h("div", { className: "dsh-num", style: { fontSize: 24, fontWeight: 700, color: "#9A3412" } }, fmtMin(c0.min)),
+          linkLinha(c0, it.campo))),
+      h("div", { className: "dsh-eyebrow", style: { marginBottom: 8 } }, "Por gravidade · clique para ver os casos"),
+      h("div", { className: "dsh-rows" }, grupos.map(g => {
+        const aberta = gSel === g.chave, clicavel = g.nPos > 0;
+        const alterna = () => setGSel(aberta ? null : g.chave);
+        return h("div", { key: g.chave },
+          h("div", { role: clicavel ? "button" : undefined, tabIndex: clicavel ? 0 : undefined, "aria-expanded": clicavel ? aberta : undefined,
+            onClick: clicavel ? alterna : undefined,
+            onKeyDown: clicavel ? (e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); alterna(); } }) : undefined,
+            className: "dsh-linha", style: { cursor: clicavel ? "pointer" : "default", background: aberta ? "var(--bg)" : "transparent", borderRadius: 10, padding: "12px 10px", margin: "0 -10px" } },
+            h("div", { className: "dsh-linha__n", style: { display: "flex", alignItems: "center", gap: 8, fontWeight: g.chave === "todas" ? 700 : 600 } },
+              g.chave !== "todas" && h("span", { className: "dsh-dot", style: { background: g.cor } }),
+              g.chave === "todas" ? "Todas" : g.chave,
+              h("small", { style: { marginLeft: 4 } }, `${g.nPos} de ${g.total}`)),
+            h("div", { className: "dsh-linha__bar" },
+              h("div", { className: "dsh-track dsh-track--lg" }, h("i", { style: { width: entrou ? (g.mediana || 0) / maxMed * 100 + "%" : "0%", background: g.chave === "todas" ? "#0F172A" : g.cor } })),
+              h("div", { className: "dsh-sub", style: { marginTop: 4 } }, g.nPos ? `maior ${fmtMin(g.max)}` : "sem medida", g.nPos && g.acima2h ? h("span", { style: { color: "var(--bad)", fontWeight: 600 } }, ` · ${g.acima2h} acima de 2h`) : null)),
+            h("div", { className: "dsh-pct dsh-num", style: { color: g.nPos ? "var(--ink)" : "#CBD5E1" } }, fmtMin(g.mediana))),
+          aberta && h("div", { style: { padding: "4px 0 12px" } },
+            h("ul", { className: "dsh-list" },
+              g.casos.slice(0, 60).map((c, k) => h("li", { key: k, className: "dsh-list__i", style: { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline", padding: "8px 0" } },
+                h("div", { style: { minWidth: 0 } },
+                  h("span", { style: { fontSize: 13, fontWeight: 600 } }, c.nome),
+                  c.ficha && h("span", { className: "dsh-sub", style: { marginLeft: 6 } }, "ficha " + c.ficha),
+                  c.avc && h("span", { className: "dsh-gchip", style: { marginLeft: 7, background: "#FFE4E6", color: "#9F1239" } }, "AVC"),
+                  g.chave === "todas" && h("span", { className: "dsh-sub", style: { marginLeft: 7 } }, c.grav),
+                  h("div", { className: "dsh-list__m" }, `${it.de} ${c.de} → ${it.ate} ${c.ate}`)),
+                h("div", { style: { textAlign: "right" } }, h("div", { className: "dsh-num", style: { fontWeight: 700, whiteSpace: "nowrap" } }, fmtMin(c.min)), linkLinha(c, it.campo, true))))),
+            g.casos.length > 60 && h("div", { className: "dsh-nota" }, `e mais ${g.casos.length - 60} casos`)));
+      })),
+      h("div", { className: "dsh-nota", style: { marginTop: 12 } }, "“Medidas” são as remoções com os dois horários deste intervalo, na ordem certa. Só elas entram na mediana e no maior tempo. A barra mostra a mediana de cada gravidade."),
+      (it.nNeg > 0 || it.nSem > 0) && h("div", { className: "dsh-nota", style: { marginTop: 8 } },
+        it.nNeg > 0 && h("div", { className: "dsh-nota--warn" }, `${it.nNeg} remoç${it.nNeg !== 1 ? "ões" : "ão"} inconsistente${it.nNeg !== 1 ? "s" : ""} (um momento antes do anterior, ou 30 dias ou mais de diferença): conferir a digitação em “Saneamento de falhas”. Não entra${it.nNeg !== 1 ? "m" : ""} na conta.`),
+        it.nSem > 0 && h("div", null, `${it.nSem} remoç${it.nSem !== 1 ? "ões" : "ão"} sem a data e o horário dos dois momentos: não entra${it.nSem !== 1 ? "m" : ""} na conta.`)));
+  })();
 
   return h(React.Fragment, null,
-    h("div", { id: "bloco-tempos", style: { marginBottom: 22 } },
-      h(Titulo, {
-        extra: "medianas · clique em um card para ver por gravidade",
+    h(DashCard, { id: "bloco-tempos" },
+      h(DashTitulo, {
+        icone: "route",
+        extra: "medianas · clique em uma etapa para ver por gravidade",
         tooltip: "Mostra em que parte do caminho o tempo é gasto. O caminho de uma remoção tem cinco momentos: pedido à CROSS → CROSS finaliza a ficha → Santa Casa pede a ambulância → ambulância sai → ambulância volta. Cada cartão é o tempo entre dois momentos seguidos, pelo tempo do meio (mediana). A faixa escura é o tempo do pedido até a volta, calculado remoção por remoção. As etapas não somam exatamente o total, porque cada uma usa só as remoções que têm os horários dela. Só entram remoções com data e horário dos dois momentos; se faltar algum, ou estiverem fora de ordem, o caso não entra e fica listado em Saneamento de falhas. O painel nunca completa nem adivinha um horário."
       }, "Onde o tempo é gasto"),
-      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 12 } },
-        intervalos.map(i => h(Kpi, {
-          key: i.id, label: i.rotulo, valor: fmtMin(i.todas.mediana), cor: i.cor,
-          sub: (i.todas.nPos ? `${i.dono} · mediana · ${i.todas.nPos} com horário · maior ${fmtMin(i.todas.max)} (clique para ver) · ${i.todas.acima2h} acima de 2h` : `${i.dono} · sem remoções com os dois horários`) + (i.nNeg ? ` · ${i.nNeg} inconsistente${i.nNeg !== 1 ? "s" : ""}` : ""),
-          alerta: i.nNeg > 0,
-          onClick: () => setSel(i.id), topo: i.cor,
-          tooltip: i.tip + " Clique no cartão para ver a remoção mais longa e os tempos por gravidade." }))),
-      h("div", { style: { marginTop: 12, padding: "10px 14px", background: "#0F172A", borderRadius: 12, color: "#F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" } },
-        h("div", null, h("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em" } }, "Tempo total · solicitação → retorno da ambulância"),
-          h("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 2 } }, total.n ? `mediana de ${total.n} remoç${total.n !== 1 ? "ões" : "ão"} com todos os momentos preenchidos` : "nenhuma remoção com todos os momentos preenchidos")),
-        h("div", { style: { display: "flex", alignItems: "center", gap: 14 } },
+      segs.length > 0
+        ? h(React.Fragment, null,
+            h(DashEmpilhada, { alto: "lg", segs, legenda: false }),
+            h("div", { className: "dsh-nota", style: { marginTop: 8 } }, "O tamanho de cada trecho é a mediana da etapa. As etapas não somam exatamente o tempo total: cada uma usa só as remoções que têm os seus horários."))
+        : h(DashVazio, null, "Nenhuma etapa com os dois horários preenchidos no período."),
+      h("div", { className: "dsh-grid dsh-g4 dsh-grid--tight", style: { marginTop: 20, marginBottom: 0 } },
+        intervalos.map(i => h(DashCard, { key: i.id, onClick: () => setSel(i.id), className: i.nNeg > 0 ? "dsh-kpi dsh-kpi--alert" : "dsh-kpi" },
+          h("span", { className: "dsh-kpi__bar", style: { background: i.cor } }),
+          h("div", { className: "dsh-kpi__l", style: { marginTop: 4, marginBottom: 4 } }, i.rotulo, h(DashDica, { texto: i.tip + " Clique no cartão para ver a remoção mais longa e os tempos por gravidade.", rotulo: i.rotulo })),
+          h("div", { className: "dsh-kpi__v dsh-num", style: { color: i.cor } }, fmtMin(i.todas.mediana)),
+          h("div", { className: "dsh-kpi__s" },
+            h("span", { className: "dsh-chip", style: { marginRight: 6 } }, i.dono),
+            i.todas.nPos ? `${i.todas.nPos} com horário · maior ${fmtMin(i.todas.max)}` : "sem remoções com os dois horários"),
+          (i.todas.acima2h > 0 || i.nNeg > 0) && h("div", { className: "dsh-chips", style: { marginTop: 8 } },
+            i.todas.acima2h > 0 && h("span", { className: "dsh-chip dsh-chip--bad" }, `${i.todas.acima2h} acima de 2h`),
+            i.nNeg > 0 && h("span", { className: "dsh-chip dsh-chip--warn" }, `${i.nNeg} inconsistente${i.nNeg !== 1 ? "s" : ""}`))))),
+      h("div", { style: { marginTop: 16, padding: "16px 20px", background: "#0F172A", borderRadius: 14, color: "#F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" } },
+        h("div", { style: { minWidth: 0 } },
+          h("div", { style: { fontSize: 11, fontWeight: 650, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em" } }, "Tempo total · solicitação → retorno da ambulância"),
+          h("div", { style: { fontSize: 12, color: "#94A3B8", marginTop: 2 } }, total.n ? `mediana de ${total.n} remoç${total.n !== 1 ? "ões" : "ão"} com todos os momentos preenchidos` : "nenhuma remoção com todos os momentos preenchidos")),
+        h("div", { style: { display: "flex", alignItems: "center", gap: 16 } },
           total.top && total.top.length > 0 && h("button", { type: "button", onClick: () => setVerTotal(true), title: "Mostra as remoções mais longas, da solicitação até a volta da ambulância",
-            style: { padding: "5px 11px", borderRadius: 8, border: "1px solid #475569", background: "transparent", color: "#E2E8F0", fontSize: 11.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" } }, "Ver as mais longas"),
-          h("div", { style: { fontSize: 26, fontWeight: 700, fontVariantNumeric: "tabular-nums" } }, fmtMin(total.mediana)))),
-      h(DashLegenda, { titulo: "Como ler esta parte", itens: [
+            className: "dsh-btn dsh-btn--sm", style: { background: "transparent", color: "#E2E8F0", borderColor: "#475569" } }, "Ver as mais longas"),
+          h("div", { className: "dsh-num", style: { fontSize: 30, fontWeight: 700, letterSpacing: "-.02em" } }, fmtMin(total.mediana)))),
+      h(DashLegenda, { itens: [
         ["Mediana (o número grande)", "O tempo do meio: metade das remoções levou menos que isso e metade levou mais. Um caso muito demorado não distorce."],
         ["Com horário", "Quantas remoções têm data e horário dos dois momentos da etapa. Só elas entram na conta."],
         ["Maior", "A remoção mais demorada daquela etapa. Clique no cartão para ver qual foi."],
         ["Acima de 2h", "Quantas remoções passaram de 2 horas naquela etapa."],
         ["Tempo total", "Da solicitação à CROSS até a ambulância voltar, remoção por remoção. Não é a soma das etapas."]] })),
     verTotal && h(DashListaModal, { titulo: "Remoções mais longas (solicitação → retorno)", subtitulo: "as 10 maiores do período, da mais longa para a menor", itens: total.top, onClose: () => setVerTotal(false) }),
-
-    it && h("div", {
-      onClick: e => { if (e.target === e.currentTarget) fechar(); },
-      style: { position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 16 }
-    },
-      h("div", { role: "dialog", "aria-modal": "true", "aria-label": it.rotulo,
-        style: { background: "#fff", borderRadius: 16, width: "100%", maxWidth: 640, maxHeight: "88vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,.35)", overflow: "hidden" } },
-        h("div", { style: { padding: "16px 20px", borderBottom: "1px solid #F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 } },
-          h("div", null,
-            h("div", { style: { fontWeight: 700, fontSize: 15, color: "#0F172A" } }, it.rotulo),
-            h("div", { style: { fontSize: 11.5, color: "#64748B", marginTop: 3, lineHeight: 1.5 } },
-              `Quanto tempo levou, por gravidade · ${it.dono} · mediana geral `, h("b", null, fmtMin(it.todas.mediana)), ` · ${it.todas.nPos} remoç${it.todas.nPos !== 1 ? "ões" : "ão"} medida${it.todas.nPos !== 1 ? "s" : ""}`)),
-          h("button", { onClick: fechar, "aria-label": "Fechar", style: { background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 22, lineHeight: 1, padding: 4 } }, "×")),
-        h("div", { style: { overflowY: "auto", padding: "14px 20px 18px" } },
-          it.todas.casos[0] && h("div", { style: { background: "#FFF7ED", border: "1px solid #FED7AA", borderRadius: 12, padding: "11px 14px", marginBottom: 14 } },
-            h("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#9A3412", textTransform: "uppercase", letterSpacing: ".05em" } }, "A remoção mais longa desta etapa"),
-            h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginTop: 4 } },
-              h("div", { style: { minWidth: 0 } },
-                h("span", { style: { fontSize: 13.5, fontWeight: 700, color: "#0F172A" } }, it.todas.casos[0].nome),
-                it.todas.casos[0].ficha && h("span", { style: { fontSize: 11, color: "#94A3B8", marginLeft: 6 } }, "ficha " + it.todas.casos[0].ficha),
-                h("div", { style: { fontSize: 11.5, color: "#64748B", marginTop: 2 } }, `${it.de} ${it.todas.casos[0].de} → ${it.ate} ${it.todas.casos[0].ate} · ${it.todas.casos[0].grav}`)),
-              h("div", { style: { textAlign: "right" } },
-                h("div", { style: { fontSize: 20, fontWeight: 700, color: "#9A3412", fontVariantNumeric: "tabular-nums" } }, fmtMin(it.todas.casos[0].min)),
-                it.todas.casos[0].id && h("a", { href: `remocao.html?foco=${encodeURIComponent(it.todas.casos[0].id)}&campo=${encodeURIComponent(it.campo || "nome_paciente")}`, style: { fontSize: 11.5, fontWeight: 700, color: "#B45309", textDecoration: "none" } }, "abrir a linha na planilha →"))),
-            it.todas.casos[0].min >= 2880 && h("div", { style: { fontSize: 11, color: "#9A3412", marginTop: 6 } }, "Mais de 2 dias nesta etapa: vale conferir se não é erro de digitação em alguma data.")),
-          h("div", { style: { display: "grid", gridTemplateColumns: COLS_GRID, gap: "0 10px", alignItems: "center", fontSize: 10, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", padding: "0 8px 6px" } },
-            h("span", null, "Gravidade"), cel("Remoções"), cel("Medidas"), cel("Mediana"), cel("Maior"), cel("> 2h")),
-          [it.todas, ...it.grupos].map(g => {
-            const aberta = gSel === g.chave, clicavel = g.nPos > 0;
-            const alterna = () => setGSel(aberta ? null : g.chave);
-            return h("div", { key: g.chave,
-              role: clicavel ? "button" : undefined, tabIndex: clicavel ? 0 : undefined,
-              onClick: clicavel ? alterna : undefined,
-              onKeyDown: clicavel ? (e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); alterna(); } }) : undefined,
-              style: { display: "grid", gridTemplateColumns: COLS_GRID, gap: "0 10px", alignItems: "center", padding: "9px 8px", borderRadius: 10,
-                       cursor: clicavel ? "pointer" : "default", background: aberta ? "#F8FAFC" : "transparent",
-                       border: `1px solid ${aberta ? "#CBD5E1" : "transparent"}`, transition: "background .15s,border-color .15s" } },
-              h("span", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: g.chave === "todas" ? 700 : 600, color: "#0F172A", minWidth: 0 } },
-                g.chave !== "todas" && h("span", { style: { width: 8, height: 8, borderRadius: 99, background: g.cor, flexShrink: 0 } }),
-                g.chave === "todas" ? "Todas" : g.chave),
-              cel(g.total), cel(g.nPos),
-              cel(fmtMin(g.mediana), { fontSize: 13, fontWeight: 700, color: g.nPos ? "#0F172A" : "#CBD5E1" }),
-              cel(fmtMin(g.max), { color: g.nPos ? "#64748B" : "#CBD5E1" }),
-              cel(g.nPos ? g.acima2h : "—", { color: g.acima2h ? "#B91C1C" : (g.nPos ? "#64748B" : "#CBD5E1") }));
-          }),
-          h("div", { style: { fontSize: 11, color: "#94A3B8", lineHeight: 1.55, margin: "8px 8px 0" } },
-            "“Medidas” são as remoções com os dois horários deste intervalo, na ordem certa. Só elas entram na mediana e no maior tempo. Clique numa linha para ver os casos, do maior para o menor."),
-          (it.nNeg > 0 || it.nSem > 0) && h("div", { style: { fontSize: 11.5, color: "#64748B", lineHeight: 1.6, margin: "8px 8px 0" } },
-            it.nNeg > 0 && h("div", { style: { color: "#B45309" } }, `${it.nNeg} remoç${it.nNeg !== 1 ? "ões" : "ão"} inconsistente${it.nNeg !== 1 ? "s" : ""} (um momento antes do anterior, ou 30 dias ou mais de diferença): conferir a digitação em “Saneamento de falhas”. Não entra${it.nNeg !== 1 ? "m" : ""} na conta.`),
-            it.nSem > 0 && h("div", null, `${it.nSem} remoç${it.nSem !== 1 ? "ões" : "ão"} sem a data e o horário dos dois momentos: não entra${it.nSem !== 1 ? "m" : ""} na conta.`)),
-
-          gSel && (() => {
-            const g = gSel === "todas" ? it.todas : it.grupos.find(x => x.chave === gSel);
-            if (!g) return null;
-            return h("div", { style: { marginTop: 14, paddingTop: 12, borderTop: "1px solid #F1F5F9" } },
-              h("div", { style: { fontSize: 12, fontWeight: 700, color: "#0F172A", marginBottom: 8 } },
-                `Casos · ${g.chave === "todas" ? "todas as gravidades" : g.chave}`,
-                h("span", { style: { fontWeight: 500, color: "#94A3B8", marginLeft: 8 } }, `${g.casos.length} caso${g.casos.length !== 1 ? "s" : ""}`)),
-              g.casos.slice(0, 60).map((c, k) => h("div", { key: k, style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, padding: "7px 0", borderBottom: "1px solid #F1F5F9" } },
-                h("div", { style: { minWidth: 0 } },
-                  h("span", { style: { fontSize: 12.5, fontWeight: 600, color: "#0F172A" } }, c.nome),
-                  c.ficha && h("span", { style: { fontSize: 11, color: "#94A3B8", marginLeft: 6 } }, "ficha " + c.ficha),
-                  c.avc && h("span", { style: { fontSize: 9.5, fontWeight: 800, marginLeft: 7, padding: "1px 7px", borderRadius: 99, background: "#FFE4E6", color: "#9F1239" } }, "AVC"),
-                  gSel === "todas" && h("span", { style: { fontSize: 10, marginLeft: 7, color: "#64748B" } }, c.grav),
-                  h("div", { style: { fontSize: 11, color: "#64748B", marginTop: 1 } }, `${it.de} ${c.de} → ${it.ate} ${c.ate}`)),
-                h("span", { style: { textAlign: "right" } },
-                  h("span", { style: { fontSize: 13, fontWeight: 700, color: "#0F172A", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" } }, fmtMin(c.min)),
-                  c.id && h("a", { href: `remocao.html?foco=${encodeURIComponent(c.id)}&campo=${encodeURIComponent(it.campo || "nome_paciente")}`, style: { display: "block", fontSize: 10.5, fontWeight: 700, color: "#B45309", textDecoration: "none" } }, "abrir linha →")))),
-              g.casos.length > 60 && h("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 6 } }, `e mais ${g.casos.length - 60} casos`));
-          })()))));
+    modal);
 }
 
 /* ─── Volume de remoções: gráfico misto (barras + duas linhas) ────────────────
@@ -407,8 +959,9 @@ const DASH_VOL_SERIES = [
   { id: "finalizacoes", nome: "Finalizações da CROSS", cor: "#0F766E", tracejada: true }
 ];
 
-function DashVolume({ serie, escala, rotulo, rotuloLongo, entrou, totais, notas, Titulo, Vazio }) {
+function DashVolume({ serie, escala, rotulo, rotuloLongo, totais, notas }) {
   const h = React.createElement;
+  const entrou = useDashEntrou();
   const [ocultas, setOcultas] = useState({});
   const [hover, setHover] = useState(null);
   const [larg, setLarg] = useState(720);
@@ -431,14 +984,14 @@ function DashVolume({ serie, escala, rotulo, rotuloLongo, entrou, totais, notas,
 
   useEffect(() => { setHover(null); }, [serie]);
 
-  const cartao = { background: "#fff", border: "1px solid #E8EDF3", borderRadius: 14, padding: "16px 18px", marginBottom: 14 };
   const unidade = escala === "dia" ? "dia" : escala === "semana" ? "semana" : "mês";
-  const titulo = h(Titulo, {
+  const titulo = h(DashTitulo, {
+    icone: "bars",
     extra: escala === "dia" ? "por dia" : escala === "semana" ? "por semana" : "por mês",
     tooltip: "Três contagens, cada uma pelo seu próprio dia. Barras: quantas vezes a ambulância saiu da Santa Casa (pelo dia da saída). Linha laranja: quantos pedidos foram feitos à CROSS (pelo dia do pedido; só linhas com ficha CROSS). Linha verde tracejada: quantas fichas a CROSS finalizou (pelo dia da finalização), ou seja, quanto a CROSS libera por dia. Como cada série usa o seu dia, o mesmo paciente aparece em dias diferentes. Clique na legenda para esconder uma série; passe o mouse num dia para ver os números dele."
   }, "Volume de remoções");
 
-  if (!temDados) return h("div", { style: cartao }, titulo, h(Vazio, null, "Sem movimentação no período"));
+  if (!temDados) return h(DashCard, { id: "bloco-volume" }, titulo, h(DashVazio, null, "Sem movimentação no período"));
 
   /* ── Geometria ── */
   const ALT = 230, MT = 14, MB = 30, ML = 30, MR = 8;
@@ -520,7 +1073,7 @@ function DashVolume({ serie, escala, rotulo, rotuloLongo, entrou, totais, notas,
     onMouseEnter: () => setHover(i), onClick: () => setHover(hover === i ? null : i) },
     h("title", null, `${rotuloLongo(pt.k)}: ${pt.saidas} saída${pt.saidas !== 1 ? "s" : ""} · ${pt.pedidos} pedido${pt.pedidos !== 1 ? "s" : ""} · ${pt.finalizacoes} finalizaç${pt.finalizacoes !== 1 ? "ões" : "ão"}`)));
 
-  return h("div", { style: cartao },
+  return h(DashCard, { id: "bloco-volume" },
     titulo,
     legenda,
     h("div", { ref, onMouseLeave: () => setHover(null), style: { width: "100%" } },
@@ -639,79 +1192,6 @@ const DASH_PROBLEMAS_DEF = [
     ajuda: "Pedidos CROSS com finalização e ainda sem saída de ambulância. Normal enquanto a ambulância não sai; se já saiu, preencha a saída." }
 ]);
 
-function DashSaneamento({ grupos, total, Titulo, onAbrirCard, onAbrirAcoes, onAbrirLivro, onJustificar, podeJustificar }) {
-  const h = React.createElement;
-  const [expandido, setExpandido] = useState(false);   // começa recolhido: só o resumo por seção
-  const [aberto, setAberto] = useState(null);          // id do grupo com a lista aberta
-  const LIMITE = 150;
-  const comItens = grupos.filter(g => g.itens.length);
-  const soma = tipo => comItens.filter(g => g.tipo === tipo).reduce((t, g) => t + g.itens.length, 0);
-  const nCorr = soma("corrigir"), nAtenc = soma("atencao"), nAcomp = soma("acompanhar");
-  const alerta = nCorr + nAtenc > 0;
-  const linhaAlerta = alerta ? "#FDE68A" : "#F1F5F9";
-  const COR = { corrigir: ["#92400E", "#FEF3C7"], atencao: ["#B91C1C", "#FEE2E2"], acompanhar: ["#475569", "#F1F5F9"] };
-  const resumo = [nCorr && `${nCorr} para corrigir`, nAtenc && `${nAtenc} para atender`, nAcomp && `${nAcomp} para acompanhar`].filter(Boolean).join(" · ");
-
-  const grupo = g => {
-    const ab = aberto === g.id, [corTxt, corBg] = COR[g.tipo];
-    return h("div", { key: g.id, style: { borderTop: "1px solid " + linhaAlerta } },
-      h("button", {
-        type: "button", "aria-expanded": ab, onClick: () => setAberto(ab ? null : g.id),
-        style: { width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 2px", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }
-      },
-        h("span", { style: { flex: 1, fontSize: 12.5, fontWeight: 600, color: "#0F172A" } }, g.titulo),
-        h("span", { style: { fontSize: 11, fontWeight: 700, borderRadius: 99, padding: "1px 9px", color: corTxt, background: corBg } }, g.itens.length),
-        h("span", { style: { fontSize: 11, color: "#94A3B8", width: 12 } }, ab ? "▾" : "▸")),
-      ab && h("div", { style: { padding: "0 2px 12px" } },
-        h("div", { style: { fontSize: 11, color: "#78716C", lineHeight: 1.55, marginBottom: 8 } }, g.ajuda),
-        g.itens.slice(0, LIMITE).map((p, i) => {
-          const botoes = [];
-          if (p.justificar && podeJustificar && onJustificar) botoes.push(["Justificar", () => onJustificar(p.justificar), true]);
-          if (p.card && onAbrirCard) botoes.push(["abrir card →", () => onAbrirCard(p.card)]);
-          if (p.tarefas && onAbrirAcoes) botoes.push(["abrir tarefas →", () => onAbrirAcoes()]);
-          if (p.livro && onAbrirLivro) botoes.push(["abrir o Livro →", () => onAbrirLivro()]);
-          const comLink = !!p.campo;
-          const corpo = [
-            h("span", { key: "n", style: { fontWeight: 600, color: "#0F172A" } }, p.nome),
-            p.ficha && h("span", { key: "f", style: { color: "#94A3B8" } }, p.ficha),
-            h("span", { key: "m", style: { flex: "1 1 220px" } }, p.motivo),
-            comLink && h("span", { key: "l", style: { marginLeft: "auto", fontWeight: 700, color: corTxt, whiteSpace: "nowrap" } }, g.tipo === "corrigir" ? "corrigir →" : "abrir →"),
-            botoes.map(([rot, fn, forte], k) => h("button", { key: "b" + k, type: "button", onClick: fn,
-              style: { marginLeft: k === 0 && !comLink ? "auto" : 0, padding: "3px 10px", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-                       border: forte ? "none" : "1px solid #CBD5E1", background: forte ? "#0F172A" : "transparent", color: forte ? "#fff" : "#475569" } }, rot))
-          ];
-          const estilo = { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", fontSize: 11.5, padding: "7px 8px", textDecoration: "none", borderRadius: 8, color: "#475569", transition: "background .15s" };
-          return comLink
-            ? h("a", { key: i, href: `remocao.html?foco=${encodeURIComponent(p.id)}&campo=${encodeURIComponent(p.campo)}`, style: estilo,
-                onMouseEnter: e => { e.currentTarget.style.background = alerta ? "#FEF3C7" : "#F8FAFC"; },
-                onMouseLeave: e => { e.currentTarget.style.background = "transparent"; } }, corpo)
-            : h("div", { key: i, style: estilo }, corpo);
-        }),
-        g.itens.length > LIMITE && h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "6px 8px" } }, `Mostrando ${LIMITE} de ${g.itens.length}. Corrija estas e a lista avança.`)));
-  };
-
-  return h("div", { id: "bloco-saneamento", style: { background: alerta ? "#FFFBEB" : "#fff", border: "1px solid " + (alerta ? "#FDE68A" : "#E8EDF3"), borderRadius: 14, padding: "16px 18px", marginBottom: 18 } },
-    h("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, cursor: comItens.length ? "pointer" : "default" },
-        onClick: () => comItens.length && setExpandido(v => !v) },
-      h("div", { style: { flex: 1 } }, h(Titulo, {
-        extra: comItens.length ? "" : "nada a corrigir",
-        tooltip: "Tudo o que, na planilha, no Kanban, no Livro de Saída e nas tarefas, está faltando, incompleto, fora de ordem, fora da lista ou pedindo atenção, e poderia distorcer os números ou atrasar o paciente. O painel não completa nem adivinha: o que está com problema fica fora da conta e aparece aqui, com link ou botão para abrir o caso. “Para atender” é fila e emergência; “aguardando” é o que pode ser normal, mas vale conferir. Uma mesma linha pode aparecer em mais de uma lista."
-      }, "Saneamento de falhas")),
-      comItens.length > 0 && h("div", { style: { fontSize: 11, color: alerta ? "#B45309" : "#64748B", whiteSpace: "nowrap" } }, resumo + (expandido ? "  ▴" : "  ▾"))),
-    comItens.length === 0
-      ? h("div", { style: { fontSize: 12, color: "#15803D", padding: "4px 0 2px" } }, `Nenhuma falha encontrada nas ${total} linhas do período.`)
-      : DASH_SANEAMENTO_SECOES.map(sec => {
-          const gs = comItens.filter(g => g.secao === sec.id);
-          if (!gs.length) return null;
-          const n = gs.reduce((t, g) => t + g.itens.length, 0);
-          if (!expandido) return h("div", { key: sec.id, style: { display: "flex", justifyContent: "space-between", fontSize: 12, color: "#475569", padding: "4px 0" } },
-            h("span", null, sec.titulo), h("span", { style: { fontWeight: 700, color: "#0F172A" } }, n));
-          return h("div", { key: sec.id, style: { marginTop: 12 } },
-            h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 10.5, fontWeight: 700, color: sec.id === "aguarda" ? "#64748B" : "#92400E", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 2 } },
-              h("span", null, sec.titulo), h("span", { style: { fontWeight: 600, opacity: 0.8 } }, n)),
-            gs.map(grupo));
-        }));
-}
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    BLOCOS DE GESTÃO (out/2026)
@@ -790,46 +1270,94 @@ function dashRotuloCanon(C, campo, v, vazio) {
   return r.canonico;
 }
 
-/* ─── Janela com a lista de casos (usada por vários blocos) ─── */
-function DashListaModal({ titulo, subtitulo, itens, onClose }) {
+
+/* ─── Saneamento de falhas ────────────────────────────────────────────────────
+ * O painel não completa nem adivinha dado. Tudo o que está incompleto, fora de ordem, fora da lista ou suspeito fica FORA da
+ * conta e aparece aqui, com o link que abre a linha na planilha (remocao.html?foco=<id>&campo=<campo>).
+ *   "corrigir"   = dado errado ou faltando, que distorce algum número
+ *   "atencao"    = fila e emergência
+ *   "acompanhar" = pode ser normal (ainda aguardando), mas vale conferir                                              */
+function DashSaneamento({ grupos, total, onAbrirCard, onAbrirAcoes, onAbrirLivro, onJustificar, podeJustificar }) {
   const h = React.createElement;
-  useEffect(() => {
-    const f = e => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", f);
-    return () => window.removeEventListener("keydown", f);
-  }, []);
-  const LIM = 200;
-  return h("div", {
-    onClick: e => { if (e.target === e.currentTarget) onClose(); },
-    style: { position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 16 }
-  },
-    h("div", { role: "dialog", "aria-modal": "true", "aria-label": titulo,
-      style: { background: "#fff", borderRadius: 16, width: "100%", maxWidth: 660, maxHeight: "85vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,.35)", overflow: "hidden" } },
-      h("div", { style: { padding: "16px 20px", borderBottom: "1px solid #F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 } },
-        h("div", null,
-          h("div", { style: { fontWeight: 700, fontSize: 15, color: "#0F172A" } }, titulo),
-          h("div", { style: { fontSize: 11.5, color: "#64748B", marginTop: 3, lineHeight: 1.5 } }, `${itens.length} caso${itens.length !== 1 ? "s" : ""}${subtitulo ? " · " + subtitulo : ""}`)),
-        h("button", { onClick: onClose, "aria-label": "Fechar", style: { background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 22, lineHeight: 1, padding: 4 } }, "×")),
-      h("div", { style: { overflowY: "auto", padding: "8px 20px 16px" } },
-        itens.length === 0 ? h("div", { style: { padding: "24px 0", textAlign: "center", color: "#94A3B8", fontSize: 13 } }, "Nenhum caso.")
-          : itens.slice(0, LIM).map((it, i) => {
-              const estilo = { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", fontSize: 11.5, padding: "8px 4px", borderTop: i ? "1px solid #F1F5F9" : "none", color: "#475569", textDecoration: "none" };
-              const corpo = [
-                h("span", { key: "n", style: { fontWeight: 600, color: "#0F172A" } }, it.nome),
-                it.ficha && h("span", { key: "f", style: { color: "#94A3B8" } }, it.ficha),
-                h("span", { key: "t", style: { flex: "1 1 240px" } }, it.texto),
-                it.campo && h("span", { key: "l", style: { marginLeft: "auto", fontWeight: 700, color: "#B45309", whiteSpace: "nowrap" } }, "abrir →")
-              ];
-              return it.campo
-                ? h("a", { key: i, href: `remocao.html?foco=${encodeURIComponent(it.id)}&campo=${encodeURIComponent(it.campo)}`, style: estilo }, corpo)
-                : h("div", { key: i, style: estilo }, corpo);
-            }),
-        itens.length > LIM && h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "8px 4px" } }, `Mostrando ${LIM} de ${itens.length}.`))));
+  const [expandido, setExpandido] = useState(false);   // começa recolhido: só o resumo por seção
+  const [aberto, setAberto] = useState(null);          // id do grupo com a lista aberta
+  const entrou = useDashEntrou();
+  const LIMITE = 150;
+  const comItens = grupos.filter(g => g.itens.length);
+  const soma = tipo => comItens.filter(g => g.tipo === tipo).reduce((t, g) => t + g.itens.length, 0);
+  const nCorr = soma("corrigir"), nAtenc = soma("atencao"), nAcomp = soma("acompanhar");
+  const alerta = nCorr + nAtenc > 0;
+  const COR = { corrigir: ["#92400E", "#FEF3C7"], atencao: ["#B91C1C", "#FEE2E2"], acompanhar: ["#475569", "#F1F5F9"] };
+  const secs = DASH_SANEAMENTO_SECOES.map(sec => {
+    const gs = comItens.filter(g => g.secao === sec.id);
+    return { sec, gs, n: gs.reduce((t, g) => t + g.itens.length, 0) };
+  }).filter(x => x.gs.length);
+  const maxN = Math.max(1, ...secs.map(x => x.n));
+
+  const grupo = g => {
+    const ab = aberto === g.id, [corTxt, corBg] = COR[g.tipo];
+    return h("div", { key: g.id, className: "dsh-san__g" },
+      h("button", { type: "button", className: "dsh-san__gb", "aria-expanded": ab, onClick: () => setAberto(ab ? null : g.id) },
+        h("span", null, g.titulo),
+        h("span", { className: "dsh-count", style: { color: corTxt, background: corBg } }, g.itens.length),
+        h("span", { style: { color: "var(--faint)", display: "inline-flex", transform: ab ? "rotate(180deg)" : "none", transition: "transform .15s" } }, h(DashIcone, { n: "chevron", tam: 16 }))),
+      ab && h("div", { style: { padding: "0 2px 16px" } },
+        h("div", { className: "dsh-sub", style: { marginBottom: 8 } }, g.ajuda),
+        g.itens.slice(0, LIMITE).map((p, i) => {
+          const botoes = [];
+          if (p.justificar && podeJustificar && onJustificar) botoes.push(["Justificar", () => onJustificar(p.justificar), true]);
+          if (p.card && onAbrirCard) botoes.push(["abrir card", () => onAbrirCard(p.card)]);
+          if (p.tarefas && onAbrirAcoes) botoes.push(["abrir tarefas", () => onAbrirAcoes()]);
+          if (p.livro && onAbrirLivro) botoes.push(["abrir o Livro", () => onAbrirLivro()]);
+          const comLink = !!p.campo;
+          const corpo = [
+            h("span", { key: "n", style: { fontWeight: 600, color: "var(--ink)" } }, p.nome),
+            p.ficha && h("span", { key: "f", className: "dsh-sub" }, p.ficha),
+            h("span", { key: "m", style: { flex: "1 1 220px", color: "var(--muted)" } }, p.motivo),
+            comLink && h("span", { key: "l", className: "dsh-link", style: { marginLeft: "auto", color: corTxt } }, g.tipo === "corrigir" ? "corrigir" : "abrir", h(DashIcone, { n: "external", tam: 13 })),
+            botoes.map(([rot, fn, forte], k) => h("button", { key: "b" + k, type: "button", onClick: fn,
+              className: "dsh-btn dsh-btn--sm" + (forte ? " dsh-btn--primary" : ""), style: { marginLeft: k === 0 && !comLink ? "auto" : 0 } }, rot))
+          ];
+          return comLink
+            ? h("a", { key: i, className: "dsh-san__item", href: `remocao.html?foco=${encodeURIComponent(p.id)}&campo=${encodeURIComponent(p.campo)}` }, corpo)
+            : h("div", { key: i, className: "dsh-san__item" }, corpo);
+        }),
+        g.itens.length > LIMITE && h("div", { className: "dsh-nota", style: { padding: "6px 8px" } }, `Mostrando ${LIMITE} de ${g.itens.length}. Corrija estas e a lista avança.`)));
+  };
+
+  return h(DashCard, { id: "bloco-saneamento", className: alerta ? "dsh-card--warn" : "" },
+    h(DashTitulo, {
+      icone: "wrench",
+      extra: comItens.length
+        ? h("button", { type: "button", className: "dsh-btn dsh-btn--sm", "aria-expanded": expandido, onClick: () => setExpandido(v => !v) }, expandido ? "Recolher" : "Ver detalhes",
+            h("span", { style: { display: "inline-flex", transform: expandido ? "rotate(180deg)" : "none", transition: "transform .15s" } }, h(DashIcone, { n: "chevron", tam: 14 })))
+        : "nada a corrigir",
+      tooltip: "Tudo o que, na planilha, no Kanban, no Livro de Saída e nas tarefas, está faltando, incompleto, fora de ordem, fora da lista ou pedindo atenção, e poderia distorcer os números ou atrasar o paciente. O painel não completa nem adivinha: o que está com problema fica fora da conta e aparece aqui, com link ou botão para abrir o caso. “Para atender” é fila e emergência; “aguardando” é o que pode ser normal, mas vale conferir. Uma mesma linha pode aparecer em mais de uma lista."
+    }, "Saneamento de falhas"),
+    comItens.length === 0
+      ? h(DashVazio, { ok: true }, `Nenhuma falha encontrada nas ${total} linhas do período.`)
+      : h(React.Fragment, null,
+          h(DashEmpilhada, { alto: "lg", segs: [
+            { id: "corrigir", rot: "para corrigir", valor: nCorr, cor: "#D97706" },
+            { id: "atencao", rot: "para atender", valor: nAtenc, cor: "#DC2626" },
+            { id: "acompanhar", rot: "para acompanhar", valor: nAcomp, cor: "#94A3B8" }] }),
+          !expandido
+            ? h("div", { className: "dsh-grid dsh-g3 dsh-grid--tight", style: { marginTop: 20, marginBottom: 0 } },
+                secs.map(({ sec, gs, n }) => h("button", { key: sec.id, type: "button", className: "dsh-san__sec", title: "Abrir os casos desta seção",
+                  onClick: () => { setExpandido(true); setAberto(gs[0].id); } },
+                  h("span", { style: { flex: 1, minWidth: 0 } },
+                    h("b", null, sec.titulo),
+                    h("span", { className: "dsh-track dsh-track--sm", style: { display: "block", marginTop: 8 } },
+                      h("i", { style: { width: entrou ? n / maxN * 100 + "%" : "0%", background: sec.id === "aguarda" ? "#94A3B8" : "#D97706" } }))),
+                  h("span", { className: "dsh-num", style: { fontSize: 20, fontWeight: 700 } }, n))))
+            : secs.map(({ sec, gs, n }) => h("div", { key: sec.id },
+                h("div", { className: "dsh-san__h", style: sec.id === "aguarda" ? { color: "var(--muted)" } : null }, h("span", null, sec.titulo), h("span", null, n)),
+                gs.map(grupo)))));
 }
 
 /* ─── Tempo interno por motivo ─────────────────────────────────────────────── */
-function DashMotivos({ linhas, limMotivo, Titulo, fmtMin }) {
-  const h = React.createElement;
+function DashMotivos({ linhas, limMotivo }) {
+  const h = React.createElement, fmtMin = dashFmtMin, entrou = useDashEntrou();
   const lista = (typeof Canon !== "undefined" && Canon.MOTIVOS_TEMPO_INTERNO) || [];
   const com = linhas.filter(t => t.interno !== null);
   const g = {};
@@ -839,106 +1367,134 @@ function DashMotivos({ linhas, limMotivo, Titulo, fmtMin }) {
     x.v.push(t.interno);
   });
   const total = com.reduce((t, x) => t + x.interno, 0);
-  const rows = Object.values(g).map(x => ({ nome: x.nome, sem: x.sem, n: x.v.length, soma: x.v.reduce((a, b) => a + b, 0), mediana: dashMediana(x.v), maior: Math.max(...x.v) })).sort((a, b) => b.soma - a.soma);
+  const PAL = ["#B45309", "#0369A1", "#7C3AED", "#0F766E", "#BE123C", "#4D7C0F", "#C2410C", "#1D4ED8"];
+  const rows = Object.values(g).map(x => ({ nome: x.nome, sem: x.sem, n: x.v.length, soma: x.v.reduce((a, b) => a + b, 0), mediana: dashMediana(x.v), maior: Math.max(...x.v) }))
+    .sort((a, b) => b.soma - a.soma);
+  rows.forEach((r, i) => { r.cor = r.sem ? "#CBD5E1" : PAL[i % PAL.length]; });
   const informados = com.filter(t => t.motivo).length;
-  const GRID = "minmax(200px,3fr) repeat(4,minmax(66px,1fr))";
-  const cel = (t, extra) => h("span", { style: Object.assign({ textAlign: "right", fontSize: 12, color: "#475569", fontVariantNumeric: "tabular-nums" }, extra) }, t);
-  return h("div", { id: "bloco-motivos", style: DASH_CARTAO },
-    h(Titulo, {
+  return h(DashCard, { id: "bloco-motivos" },
+    h(DashTitulo, {
+      icone: "hourglass",
       extra: com.length ? `${informados} de ${com.length} com motivo` : "",
       tooltip: "Tempo interno é o que passa entre a CROSS finalizar a ficha e a Santa Casa pedir a ambulância: depende só da Santa Casa. Aqui ele é separado pelo motivo anotado na planilha. “% do tempo” é a parte de cada motivo no total de tempo interno do período. Linhas sem motivo aparecem juntas, para você ver quanto falta preencher."
     }, "Tempo interno por motivo"),
-    com.length === 0 ? h("div", { style: { fontSize: 11.5, color: "#CBD5E1", padding: "14px 0", textAlign: "center" } }, "Sem remoções com o tempo interno medido no período") : h(React.Fragment, null,
-      h("div", { style: { display: "grid", gridTemplateColumns: GRID, gap: "0 10px", fontSize: 10, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", padding: "0 6px 6px" } },
-        h("span", null, "Motivo"), cel("Casos"), cel("Mediana"), cel("Maior"), cel("% do tempo")),
-      rows.map(r => h("div", { key: r.nome, style: { display: "grid", gridTemplateColumns: GRID, gap: "0 10px", alignItems: "baseline", padding: "8px 6px", borderTop: "1px solid #F1F5F9" } },
-        h("span", { style: { fontSize: 12.5, fontWeight: 600, color: r.sem ? "#B45309" : "#0F172A", minWidth: 0 } }, r.nome),
-        cel(r.n), cel(fmtMin(r.mediana), { fontWeight: 700, color: "#B45309" }), cel(fmtMin(r.maior)),
-        cel(total ? Math.round(r.soma / total * 100) + "%" : "—", { fontWeight: 700 }))),
-      h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "8px 6px 0", lineHeight: 1.5 } },
+    com.length === 0 ? h(DashVazio, null, "Sem remoções com o tempo interno medido no período") : h(React.Fragment, null,
+      h(DashEmpilhada, { alto: "lg", legenda: false, segs: rows.map(r => ({ id: r.nome, rot: r.nome, valor: r.soma, cor: r.cor, txt: Math.round(r.soma / total * 100) + "%" })) }),
+      h("div", { className: "dsh-rows", style: { marginTop: 16 } },
+        rows.map(r => h("div", { key: r.nome, className: "dsh-linha dsh-linha--motivos" },
+          h("div", { className: "dsh-linha__n", style: { display: "flex", gap: 8, alignItems: "flex-start" } },
+            h("span", { className: "dsh-dot", style: { background: r.cor, marginTop: 6 } }),
+            h("span", { style: { color: r.sem ? "var(--warn)" : "var(--ink)" } }, r.nome,
+              h("small", null, `${r.n} caso${r.n !== 1 ? "s" : ""} · mediana ${fmtMin(r.mediana)} · maior ${fmtMin(r.maior)}`))),
+          h("div", { className: "dsh-linha__bar" }, h("div", { className: "dsh-track" }, h("i", { style: { width: entrou ? (total ? r.soma / total * 100 : 0) + "%" : "0%", background: r.cor } }))),
+          h("div", { className: "dsh-pct dsh-num" }, total ? Math.round(r.soma / total * 100) + "%" : "—")))),
+      h("div", { className: "dsh-nota", style: { marginTop: 12 } },
         limMotivo === null ? "Para o painel cobrar o motivo quando o tempo interno ficar longo, defina o limite em Configurações (“Tempo interno acima de”)."
           : `Linhas com tempo interno acima de ${fmtMin(limMotivo)} e sem motivo aparecem em Saneamento de falhas.`)),
     com.length > 0 && h(DashLegenda, { itens: [
       ["Motivo", "A razão anotada na planilha para a espera entre a CROSS finalizar a ficha e a Santa Casa pedir a ambulância. “Sem motivo informado” são as linhas ainda não preenchidas."],
-      ["Casos", "Quantas remoções têm esse motivo."],
       ["Mediana", "O tempo do meio dessa espera, nas remoções com esse motivo. Metade esperou menos, metade esperou mais."],
       ["Maior", "A espera mais longa entre as remoções com esse motivo."],
       ["% do tempo", "A parte do tempo interno total do período que esse motivo consumiu. Os motivos estão ordenados do que mais consome ao que menos consome."]] }));
 }
 
 /* ─── Frota e capacidade ─────────────────────────────────────────────────────── */
-function DashFrota({ frota, fora, longas, cobertura, Titulo, fmtMin }) {
-  const h = React.createElement;
+function DashFrota({ frota, fora, longas, cobertura }) {
+  const h = React.createElement, fmtMin = dashFmtMin, entrou = useDashEntrou();
   const [ver, setVer] = useState(false);
-  const pct = (a, b) => b ? Math.round(a / b * 100) + "%" : "—";
+  const pct = (a, b) => b ? Math.round(a / b * 100) : null;
   const G = Object.fromEntries(DASH_GLOSSARIO);
-  const Item = (rot, dica, val, sub, cor, aoClicar) => h(aoClicar ? "button" : "div", Object.assign({ key: rot, style: { background: "#F8FAFC", borderRadius: 12, padding: "12px 14px", textAlign: "left", border: aoClicar ? "1px solid #CBD5E1" : "none", cursor: aoClicar ? "pointer" : "default", fontFamily: "inherit" } },
-    aoClicar ? { type: "button", onClick: aoClicar, title: "Clique para ver qual foi" } : {}),
-    h("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", display: "flex", alignItems: "center" } }, rot, h(DashDica, { texto: dica, rotulo: rot })),
-    h("div", { style: { fontSize: 22, fontWeight: 700, color: cor || "#0F172A", margin: "4px 0 2px", fontVariantNumeric: "tabular-nums" } }, val),
-    h("div", { style: { fontSize: 10.5, color: "#94A3B8" } }, sub));
-  return h("div", { id: "bloco-frota", style: DASH_CARTAO },
-    h(Titulo, {
+  const maxFora = fora.max || 0;
+  const barra = (rot, dica, valor, cor, nota) => h("div", { key: rot, style: { marginBottom: 12 } },
+    h("div", { className: "dsh-barra__top" },
+      h("span", { className: "dsh-barra__l", style: { display: "inline-flex", alignItems: "center" } }, rot, h(DashDica, { texto: dica, rotulo: rot })),
+      h("span", { className: "dsh-barra__v dsh-num" }, valor === null ? "—" : fmtMin(valor))),
+    h("div", { className: "dsh-track dsh-track--lg" }, h("i", { style: { width: entrou && valor !== null && maxFora ? valor / maxFora * 100 + "%" : "0%", background: cor } })),
+    nota && h("div", { className: "dsh-sub", style: { marginTop: 3 } }, nota));
+  const cob = (rot, a, b, cor) => { const p = pct(a, b); return h("div", { key: rot, style: { flex: "1 1 220px" } },
+    h("div", { className: "dsh-barra__top" }, h("span", { className: "dsh-barra__l" }, rot), h("span", { className: "dsh-barra__v dsh-num" }, p === null ? "—" : p + "%", h("span", { className: "dsh-barra__p" }, `  ${a} de ${b}`))),
+    h("div", { className: "dsh-track" }, h("i", { style: { width: entrou && p !== null ? p + "%" : "0%", background: p !== null && p < 80 ? "#F59E0B" : cor } }))); };
+  return h(DashCard, { id: "bloco-frota" },
+    h(DashTitulo, {
+      icone: "truck",
       extra: "frota cadastrada em Configurações",
       tooltip: "A frota é o que você cadastrou em Configurações, com a data em que cada quantidade passou a valer. “Fora da unidade” é quanto tempo a ambulância fica fora da Santa Casa em cada remoção, da saída até a volta. Os três números abaixo resumem esse tempo: o do meio (mediana), o “quase pior caso” (P95) e o maior."
     }, "Frota e capacidade"),
-    h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(175px,1fr))", gap: 12 } },
-      Item("Frota hoje", G["Frota"], frota ? `${frota.basica ?? "?"} básica${frota.basica === 1 ? "" : "s"} · ${frota.avancada ?? "?"} avançada${frota.avancada === 1 ? "" : "s"}` : "não cadastrada",
-        frota ? (frota.desde ? "vale desde " + dashFmtBR(frota.desde) : "") : "cadastre em Configurações (no fim da página)", frota ? "#0F172A" : "#B45309"),
-      Item("Fora da unidade · mediana", G["Fora da unidade"] + " " + G["Mediana"], fmtMin(fora.mediana), fora.n ? `${fora.n} remoç${fora.n !== 1 ? "ões" : "ão"} com retorno` : "nenhuma remoção com retorno", "#0F766E"),
-      Item("Fora da unidade · P95", G["P95"], fora.p95 === null ? "—" : fmtMin(fora.p95), fora.n >= 20 ? "95% voltam em até esse tempo" : `precisa de 20 remoções (tem ${fora.n})`, "#0F766E"),
-      Item("Fora da unidade · maior", G["Maior"], fmtMin(fora.max), longas && longas.length ? "a remoção mais longa · clique para ver" : "a remoção mais longa do período", "#0F766E", longas && longas.length ? () => setVer(true) : null)),
+    h("div", { className: "dsh-grid dsh-g2", style: { marginBottom: 0 } },
+      h(DashCard, null,
+        h("div", { className: "dsh-eyebrow", style: { marginBottom: 12, display: "flex", alignItems: "center" } }, "Frota hoje", h(DashDica, { texto: G["Frota"], rotulo: "Frota" })),
+        frota
+          ? h(React.Fragment, null,
+              h("div", { className: "dsh-fleet" },
+                h("div", { className: "dsh-fleet__i" }, h("div", { className: "dsh-fleet__v dsh-num" }, frota.basica ?? "?"), h("div", { className: "dsh-fleet__l" }, "básica" + (frota.basica === 1 ? "" : "s"))),
+                h("div", { className: "dsh-fleet__i" }, h("div", { className: "dsh-fleet__v dsh-num", style: { color: "#D97706" } }, frota.avancada ?? "?"), h("div", { className: "dsh-fleet__l" }, "avançada" + (frota.avancada === 1 ? "" : "s")))),
+              frota.desde && h("div", { className: "dsh-sub", style: { marginTop: 10 } }, "vale desde " + dashFmtBR(frota.desde)))
+          : h("div", { style: { color: "var(--warn)", fontSize: 13 } }, "Frota não cadastrada. Cadastre em Configurações (no fim da página).")),
+      h(DashCard, null,
+        h("div", { className: "dsh-eyebrow", style: { marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 } },
+          h("span", null, "Tempo fora da unidade"),
+          h("span", { className: "dsh-chip" }, fora.n ? `${fora.n} remoç${fora.n !== 1 ? "ões" : "ão"} com retorno` : "nenhuma com retorno")),
+        barra("Mediana", G["Fora da unidade"] + " " + G["Mediana"], fora.mediana, "#0F766E"),
+        barra("P95", G["P95"], fora.p95, "#14B8A6", fora.n >= 20 ? "95% voltam em até esse tempo" : `precisa de 20 remoções (tem ${fora.n})`),
+        barra("Maior", G["Maior"], fora.max, "#5EEAD4"),
+        longas && longas.length > 0 && h("button", { type: "button", className: "dsh-btn dsh-btn--sm", onClick: () => setVer(true) }, "Ver as mais longas"))),
+    h("div", { className: "dsh-sep" }),
+    h("div", { className: "dsh-eyebrow", style: { marginBottom: 12 } }, "Quanto da frota já dá para analisar"),
+    h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap" } },
+      cob("Tipo de ambulância preenchido", cobertura.comTipo, cobertura.saidas, "#0F766E"),
+      cob("Prefixo da ambulância preenchido", cobertura.comPrefixo, cobertura.saidas, "#0F766E")),
+    h("div", { className: "dsh-banner", style: { marginTop: 16 } },
+      h(DashIcone, { n: "info", tam: 16 }),
+      h("div", null, h("b", null, "Ainda não calculados: "), "ambulância ocupada na hora do pedido, uso da frota e demanda × capacidade por hora. Faltam dados: a planilha não dizia qual ambulância fez cada remoção (o campo “Prefixo da ambulância” é novo e começa vazio) e o tipo ainda não está preenchido em todas as saídas. Com tipo e prefixo preenchidos, esses indicadores passam a ser calculados.")),
     h(DashLegenda, { itens: [
       ["Frota hoje", "Quantas ambulâncias existem hoje, separadas em básicas e avançadas. Você cadastra em Configurações, com a data em que a quantidade passou a valer."],
-      ["Fora da unidade · mediana", "O tempo do meio que a ambulância fica fora da Santa Casa em uma remoção (da saída até a volta). Metade das remoções levou menos, metade levou mais."],
-      ["Fora da unidade · P95", "Quase o pior caso: 95 de cada 100 remoções voltam em até esse tempo; só 5 demoram mais. Só aparece com 20 remoções ou mais."],
-      ["Fora da unidade · maior", "A remoção em que a ambulância ficou mais tempo fora no período. Clique para ver qual foi."]] }),
-    h("div", { style: { marginTop: 12, padding: "10px 14px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12, fontSize: 11.5, color: "#78350F", lineHeight: 1.6 } },
-      h("b", null, "Ainda não calculados: "), "ambulância ocupada na hora do pedido, uso da frota e demanda × capacidade por hora. ",
-      "Faltam dados: a planilha não dizia qual ambulância fez cada remoção (o campo “Prefixo da ambulância” é novo e começa vazio), ",
-      `e o tipo de ambulância está preenchido em ${pct(cobertura.comTipo, cobertura.saidas)} das saídas do período (${cobertura.comTipo} de ${cobertura.saidas}); o prefixo, em ${pct(cobertura.comPrefixo, cobertura.saidas)}. `,
-      "Com tipo e prefixo preenchidos, esses indicadores passam a ser calculados."),
+      ["Mediana", "O tempo do meio que a ambulância fica fora da Santa Casa em uma remoção (da saída até a volta). Metade das remoções levou menos, metade levou mais."],
+      ["P95", "Quase o pior caso: 95 de cada 100 remoções voltam em até esse tempo; só 5 demoram mais. Só aparece com 20 remoções ou mais."],
+      ["Maior", "A remoção em que a ambulância ficou mais tempo fora no período."]] }),
     ver && h(DashListaModal, { titulo: "Remoções em que a ambulância ficou mais tempo fora", subtitulo: "as 10 maiores do período (saída → retorno), da maior para a menor", itens: longas, onClose: () => setVer(false) }));
 }
 
 /* ─── Destinos ───────────────────────────────────────────────────────────────── */
-function DashDestinos({ destinos, Titulo, fmtMin }) {
-  const h = React.createElement;
+function DashDestinos({ destinos }) {
+  const h = React.createElement, fmtMin = dashFmtMin, entrou = useDashEntrou();
   const [todos, setTodos] = useState(false);
   const lista = todos ? destinos : destinos.slice(0, 10);
-  const cel = (t, extra) => h("span", { style: Object.assign({ textAlign: "right", fontSize: 12, color: "#475569", fontVariantNumeric: "tabular-nums" }, extra) }, t);
-  const GRID = "minmax(160px,3fr) repeat(4,minmax(64px,1fr))";
-  return h("div", { id: "bloco-destinos", style: DASH_CARTAO },
-    h(Titulo, {
+  const max = Math.max(1, ...destinos.map(d => d.n));
+  return h(DashCard, { id: "bloco-destinos" },
+    h(DashTitulo, {
+      icone: "pin",
       extra: `${destinos.length} destino${destinos.length !== 1 ? "s" : ""}`,
       tooltip: "Para onde vão os pacientes e quanto tempo cada destino consome. Espera: do pedido da ambulância até ela sair. Fora: da saída até a volta. Cada tempo é o do meio (mediana). Destinos com menos de 5 remoções têm número instável: leia como indício, não como regra."
     }, "Destinos e tempo da remoção"),
-    destinos.length === 0 ? h("div", { style: { fontSize: 11.5, color: "#CBD5E1", padding: "14px 0", textAlign: "center" } }, "Sem dados no período") : h(React.Fragment, null,
-      h("div", { style: { display: "grid", gridTemplateColumns: GRID, gap: "0 10px", fontSize: 10, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", padding: "0 6px 6px" } },
-        h("span", null, "Destino"), cel("Linhas"), cel("Saídas"), cel("Espera"), cel("Fora")),
-      lista.map(d => h("div", { key: d.nome, style: { display: "grid", gridTemplateColumns: GRID, gap: "0 10px", alignItems: "baseline", padding: "8px 6px", borderTop: "1px solid #F1F5F9" } },
-        h("span", { style: { fontSize: 12.5, fontWeight: 600, color: "#0F172A", minWidth: 0 } }, d.nome,
-          d.n < 5 && h("span", { title: "Menos de 5 remoções: número instável", style: { marginLeft: 6, fontSize: 9.5, fontWeight: 700, color: "#B45309", background: "#FFFBEB", borderRadius: 4, padding: "1px 5px" } }, "poucos casos")),
-        cel(d.n), cel(d.saidas), cel(fmtMin(d.espera), { fontWeight: 700, color: "#B45309" }), cel(fmtMin(d.fora), { fontWeight: 700, color: "#0F766E" }))),
-      destinos.length > 10 && h("button", { type: "button", onClick: () => setTodos(v => !v),
-        style: { marginTop: 8, background: "none", border: "1px solid #E2E8F0", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, color: "#64748B", cursor: "pointer", fontFamily: "inherit" } },
+    destinos.length === 0 ? h(DashVazio, null, "Sem dados no período") : h(React.Fragment, null,
+      h("div", { className: "dsh-rows" },
+        lista.map(d => h("div", { key: d.nome, className: "dsh-linha dsh-linha--dest" },
+          h("div", { className: "dsh-linha__n" }, d.nome,
+            d.n < 5 && h("span", { className: "dsh-tag dsh-tag--warn", title: "Menos de 5 remoções: número instável" }, "poucos casos"),
+            h("small", null, `${d.saidas} saída${d.saidas !== 1 ? "s" : ""}`)),
+          h("div", { className: "dsh-linha__bar", style: { display: "flex", alignItems: "center", gap: 10 } },
+            h("div", { className: "dsh-track dsh-track--lg", style: { flex: 1 } }, h("i", { style: { width: entrou ? d.n / max * 100 + "%" : "0%", background: "#6366F1" } })),
+            h("b", { className: "dsh-num", style: { minWidth: 28, textAlign: "right" } }, d.n)),
+          h("div", { className: "dsh-linha__m" },
+            h("span", { className: "dsh-chip dsh-chip--warn", title: "Espera: do pedido da ambulância até a saída" }, h(DashIcone, { n: "hourglass", tam: 12 }), fmtMin(d.espera)),
+            h("span", { className: "dsh-chip", style: { background: "#CCFBF1", color: "#0F766E" }, title: "Fora: da saída até a volta" }, h(DashIcone, { n: "truck", tam: 12 }), fmtMin(d.fora)))))),
+      destinos.length > 10 && h("button", { type: "button", className: "dsh-btn dsh-btn--sm", style: { marginTop: 12 }, onClick: () => setTodos(v => !v) },
         todos ? "mostrar só os 10 maiores" : `ver todos os ${destinos.length}`)),
     destinos.length > 0 && h(DashLegenda, { itens: [
-      ["Destino", "O hospital ou unidade que recebeu o paciente, com o nome da lista oficial."],
-      ["Linhas", "Quantas remoções (linhas da planilha) foram para esse destino no período."],
+      ["Destino", "O hospital ou unidade que recebeu o paciente, com o nome da lista oficial. A barra mostra quantas remoções (linhas da planilha) foram para ele."],
       ["Saídas", "Quantas dessas já tiveram a ambulância saindo (têm data e horário de saída)."],
-      ["Espera", "O tempo do meio (mediana) entre o pedido da ambulância e a saída dela, nas remoções para esse destino. É quanto o paciente esperou pela ambulância."],
-      ["Fora", "O tempo do meio (mediana) que a ambulância ficou fora da Santa Casa, da saída até a volta. Só conta as que já voltaram."],
+      ["Espera (ampulheta)", "O tempo do meio (mediana) entre o pedido da ambulância e a saída dela. É quanto o paciente esperou pela ambulância."],
+      ["Fora (caminhão)", "O tempo do meio (mediana) que a ambulância ficou fora da Santa Casa, da saída até a volta. Só conta as que já voltaram."],
       ["poucos casos", "Destino com menos de 5 remoções: o tempo muda muito com um único caso. Leia como indício, não como regra."]] }));
 }
 
 /* ─── Permaneceu no destino, cruzado com outros campos ───────────────────────── */
-function DashPermanece({ tempos, C, geral, Titulo, fmtMin }) {
-  const h = React.createElement;
+function DashPermanece({ tempos, C, geral }) {
+  const h = React.createElement, fmtMin = dashFmtMin, entrou = useDashEntrou();
   const [dim, setDim] = useState("destino");
   const DIMS = [["destino", "Destino", "instituicao_destino", "Sem destino informado"], ["especialidade", "Especialidade", "especialidade", "Sem especialidade"],
                 ["tipo", "Tipo de ambulância", "tipo_ambulancia", "Sem tipo informado"], ["grav", "Gravidade", "gravidade", "Sem gravidade"]];
-  const [, , campo, vazio] = DIMS.find(d => d[0] === dim);
+  const [, rotDim, campo, vazio] = DIMS.find(d => d[0] === dim);
   const grupos = {};
   tempos.forEach(t => {
     const nome = dashRotuloCanon(C, campo, t.r[campo], vazio);
@@ -948,40 +1504,58 @@ function DashPermanece({ tempos, C, geral, Titulo, fmtMin }) {
     else if (t.r.permaneceu === false) { g.nao++; if (t.fora !== null) g.foraNao.push(t.fora); }
     else g.sem++;
   });
-  const lista = Object.values(grupos).sort((a, b) => b.n - a.n);
-  const cel = (t, extra) => h("span", { style: Object.assign({ textAlign: "right", fontSize: 12, color: "#475569", fontVariantNumeric: "tabular-nums" }, extra) }, t);
-  const GRID = "minmax(150px,3fr) repeat(5,minmax(62px,1fr))";
-  return h("div", { id: "bloco-permanece", style: DASH_CARTAO },
-    h(Titulo, {
+  const lista = Object.values(grupos).sort((a, b) => b.n - a.n).slice(0, 15);
+  const nTotalCat = Object.keys(grupos).length;
+  lista.forEach(g => { g.mSim = dashMediana(g.foraSim); g.mNao = dashMediana(g.foraNao); });
+  const maxFora = Math.max(1, ...lista.map(g => Math.max(g.mSim || 0, g.mNao || 0)));
+  const COR_SIM = "#0F766E", COR_NAO = "#64748B", COR_SEM = "#E2E8F0";
+  const nao = geral ? geral.n - geral.sim - geral.semInfo : 0;
+  const mini = (rot, valor, cor) => h("div", null,
+    h("div", { className: "dsh-pair__l" }, h("span", null, rot), h("b", { className: "dsh-num" }, fmtMin(valor))),
+    h("div", { className: "dsh-track dsh-track--sm" }, h("i", { style: { width: entrou && valor ? valor / maxFora * 100 + "%" : "0%", background: cor } })));
+  return h(DashCard, { id: "bloco-permanece" },
+    h(DashTitulo, {
+      icone: "target",
       extra: "campo “Permaneceu” da planilha",
       tooltip: "Quantos pacientes ficaram no destino, por categoria (destino, especialidade, tipo de ambulância ou gravidade). Linha sem resposta Sim/Não aparece como “sem registro”. O tempo fora é o do meio (mediana), da saída até a volta, separado entre quem ficou e quem voltou."
-    }, "Permaneceu no destino, por categoria"),
-    geral && geral.n > 0 && h("div", { style: { fontSize: 12, color: "#475569", marginBottom: 10, lineHeight: 1.6 } },
-      "No total do período: ", h("b", { style: { color: "#0F172A" } }, `${geral.pct.toFixed(0)}%`), ` permaneceram no destino (${geral.sim} de ${geral.n} linhas)`,
-      geral.semInfo > 0 && h("span", { style: { color: geral.semInfo / geral.n > 0.2 ? "#B45309" : "#94A3B8" } }, ` · ${geral.semInfo} sem registro, que não contam como Sim nem como Não`), "."),
-    h("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 } },
-      DIMS.map(([id, rot]) => h("button", { key: id, type: "button", "aria-pressed": dim === id, onClick: () => setDim(id),
-        style: { padding: "5px 12px", borderRadius: 8, border: "none", fontSize: 12, fontFamily: "inherit", cursor: "pointer", fontWeight: dim === id ? 650 : 450, background: dim === id ? "#0F172A" : "#F1F5F9", color: dim === id ? "#fff" : "#64748B" } }, rot))),
-    lista.length === 0 ? h("div", { style: { fontSize: 11.5, color: "#CBD5E1", padding: "14px 0", textAlign: "center" } }, "Sem dados no período") : h(React.Fragment, null,
-      h("div", { style: { display: "grid", gridTemplateColumns: GRID, gap: "0 10px", fontSize: 10, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", padding: "0 6px 6px" } },
-        h("span", null, DIMS.find(d => d[0] === dim)[1]), cel("Linhas"), cel("Permaneceu"), cel("%"), cel("Fora · sim"), cel("Fora · não")),
-      lista.slice(0, 15).map(g => h("div", { key: g.nome, style: { display: "grid", gridTemplateColumns: GRID, gap: "0 10px", alignItems: "baseline", padding: "8px 6px", borderTop: "1px solid #F1F5F9" } },
-        h("span", { style: { fontSize: 12.5, fontWeight: 600, color: "#0F172A", minWidth: 0 } }, g.nome),
-        cel(g.n), cel(g.sim), cel(g.n ? Math.round(g.sim / g.n * 100) + "%" : "—", { fontWeight: 700 }),
-        cel(fmtMin(dashMediana(g.foraSim)), { color: "#0F766E" }), cel(fmtMin(dashMediana(g.foraNao)), { color: "#0F766E" }))),
-      lista.length > 15 && h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "8px 6px 0" } }, `Mostrando as 15 maiores de ${lista.length} categorias.`)),
+    }, "Permaneceu no destino"),
+    geral && geral.n > 0 && h("div", { className: "dsh-hero" },
+      h("div", { className: "dsh-hero__num" },
+        h("div", { className: "dsh-big dsh-num", style: { color: COR_SIM } }, h(DashNum, { valor: Math.round(geral.pct), sufixo: "%" })),
+        h("div", { className: "dsh-sub" }, `permaneceram (${geral.sim} de ${geral.n} linhas)`)),
+      h("div", { className: "dsh-hero__bar" },
+        h(DashEmpilhada, { alto: "lg", segs: [
+          { id: "sim", rot: "Permaneceu", valor: geral.sim, cor: COR_SIM },
+          { id: "nao", rot: "Voltou (não permaneceu)", valor: nao, cor: COR_NAO },
+          { id: "sem", rot: "Sem registro", valor: geral.semInfo, cor: COR_SEM }] }))),
+    geral && geral.semInfo > 0 && h("div", { className: "dsh-nota" + (geral.semInfo / geral.n > 0.2 ? " dsh-nota--warn" : ""), style: { marginBottom: 16 } },
+      `${geral.semInfo} linha${geral.semInfo !== 1 ? "s" : ""} sem registro: não contam como Sim nem como Não.`),
+    h("div", { className: "dsh-seg dsh-seg--sm", role: "group", "aria-label": "Agrupar por", style: { marginBottom: 8 } },
+      DIMS.map(([id, rot]) => h("button", { key: id, type: "button", "aria-pressed": dim === id, onClick: () => setDim(id) }, rot))),
+    lista.length === 0 ? h(DashVazio, null, "Sem dados no período") : h(React.Fragment, null,
+      h("div", { className: "dsh-rows" },
+        lista.map(g => h("div", { key: g.nome, className: "dsh-linha", style: { gridTemplateColumns: "minmax(0,1fr) auto" } },
+          h("div", { style: { minWidth: 0 } },
+            h("div", { className: "dsh-linha__n" }, g.nome, h("small", null, `${g.n} linha${g.n !== 1 ? "s" : ""}`)),
+            h("div", { style: { marginTop: 8 } },
+              h(DashEmpilhada, { alto: "sm", legenda: false, segs: [
+                { id: "sim", rot: "Permaneceu", valor: g.sim, cor: COR_SIM }, { id: "nao", rot: "Voltou", valor: g.nao, cor: COR_NAO }, { id: "sem", rot: "Sem registro", valor: g.sem, cor: COR_SEM }] })),
+            h("div", { className: "dsh-pair" },
+              mini("Fora · permaneceu", g.mSim, "#2DD4BF"), mini("Fora · voltou", g.mNao, "#94A3B8"))),
+          h("div", { style: { textAlign: "right", alignSelf: "start" } },
+            h("div", { className: "dsh-pct dsh-num", style: { color: COR_SIM } }, g.n ? Math.round(g.sim / g.n * 100) + "%" : "—"),
+            h("div", { className: "dsh-sub" }, `${g.sim} de ${g.n}`))))),
+      nTotalCat > 15 && h("div", { className: "dsh-nota", style: { marginTop: 8 } }, `Mostrando as 15 maiores de ${nTotalCat} categorias.`)),
     lista.length > 0 && h(DashLegenda, { itens: [
-      ["Destino, Especialidade, Tipo de ambulância, Gravidade", "Os botões de cima escolhem como agrupar as remoções. Cada linha da tabela é uma categoria do grupo escolhido."],
-      ["Linhas", "Quantas remoções há na categoria."],
-      ["Permaneceu", "Quantas delas o paciente ficou no hospital de destino e não voltou à Santa Casa."],
-      ["%", "A parte das remoções da categoria em que o paciente permaneceu. Linha sem resposta (Sim ou Não) não conta como Sim."],
-      ["Fora · sim", "O tempo do meio (mediana) que a ambulância ficou fora, da saída até a volta, nas remoções em que o paciente permaneceu no destino."],
-      ["Fora · não", "O mesmo tempo, nas remoções em que o paciente não permaneceu. Só entram remoções com a saída e o retorno anotados."]] }));
+      [rotDim, "Os botões de cima escolhem como agrupar as remoções. Cada linha é uma categoria do grupo escolhido."],
+      ["Barra de cima (verde, cinza e claro)", "A proporção das remoções da categoria em que o paciente permaneceu (verde), voltou (cinza) ou ficou sem registro (claro). Linha sem resposta não conta como Sim."],
+      ["% à direita", "A parte das remoções da categoria em que o paciente permaneceu no destino."],
+      ["Fora · permaneceu / Fora · voltou", "O tempo do meio (mediana) que a ambulância ficou fora, da saída até a volta, em cada um dos dois casos. As duas barras usam a mesma escala para poder comparar. Só entram remoções com a saída e o retorno anotados."]] }));
 }
 
 /* ─── Pacientes aguardando (Kanban, ao vivo) ─────────────────────────────────── */
-function DashAguardando({ cards, cfg, hojeIso, onAbrirCard, aoVivo, aberto, onToggle, filtro, onFiltro, Titulo, fmtMin }) {
-  const h = React.createElement;
+function DashAguardando({ cards, cfg, hojeIso, onAbrirCard, aoVivo, aberto, onToggle, filtro, onFiltro }) {
+  const h = React.createElement, fmtMin = dashFmtMin, entrou = useDashEntrou();
   const [agora, setAgora] = useState(() => Date.now());
   useEffect(() => { const iv = setInterval(() => setAgora(Date.now()), 30000); return () => clearInterval(iv); }, []);
   const a = dashAguardando(cards, agora, cfg, hojeIso);
@@ -991,102 +1565,133 @@ function DashAguardando({ cards, cfg, hojeIso, onAbrirCard, aoVivo, aberto, onTo
   const ordenados = [...a.itens].filter(i => !soVerm || i.vermelho).sort((x, y) => (y.min === null ? -1 : y.min) - (x.min === null ? -1 : x.min));
   const maior = a.itens.reduce((m, i) => (i.min !== null && i.min > m ? i.min : m), 0);
   const gravRot = k => (GRAVS.find(g => g[0] === (GRAVS.slice(0, 4).some(x => x[0] === k) ? k : "")) || GRAVS[4]);
-  return h("div", { id: "bloco-aguardando", style: DASH_CARTAO },
-    h(Titulo, {
-      extra: aoVivo ? "Kanban ao vivo · renova a cada 30 s" : "última publicação do Kanban",
+  const nPend = a.itens.filter(i => i.c.col_id === "pendente").length, nAc = a.itens.length - nPend;
+  const stat = (rot, val, cor) => h("div", null, h("div", { className: "dsh-stat__l" }, rot), h("div", { className: "dsh-stat__v dsh-num", style: cor ? { color: cor } : null }, val));
+  return h(DashCard, { id: "bloco-aguardando" },
+    h(DashTitulo, {
+      icone: "hourglass",
+      extra: aoVivo ? h("span", { style: { display: "inline-flex", alignItems: "center", gap: 6 } }, h("span", { className: "dsh-live" }), "Kanban ao vivo · renova a cada 30 s") : "última publicação do Kanban",
       tooltip: "Pacientes que ainda dependem de alguma ação: esperando a CROSS aceitar (o tempo conta desde o pedido) ou já aceitos e esperando a ambulância (conta desde a finalização da CROSS). Vem só do Kanban, que se atualiza sozinho a cada 30 segundos. Card sem data e hora de início aparece como “sem horário”. Os limites de alerta são os que você cadastrou em Configurações."
     }, "Pacientes aguardando agora"),
-    a.itens.length === 0 ? h("div", { style: { fontSize: 12, color: "#15803D", padding: "4px 0 2px" } }, "Nenhum paciente aguardando aceite ou ambulância.") : h(React.Fragment, null,
-      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 10, marginBottom: 12 } },
-        GRAVS.map(([k, rot, cor]) => h("div", { key: rot, style: { background: "#F8FAFC", borderRadius: 12, padding: "10px 12px", borderTop: `3px solid ${cor}`, opacity: conta(k) ? 1 : 0.5 } },
-          h("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em" } }, rot),
-          h("div", { style: { fontSize: 24, fontWeight: 700, color: "#0F172A", lineHeight: 1.1, fontVariantNumeric: "tabular-nums" } }, conta(k))))),
-      h("div", { style: { fontSize: 11.5, color: "#64748B", marginBottom: 8 } },
-        `${a.itens.length} paciente${a.itens.length !== 1 ? "s" : ""} · maior espera `, h("b", { style: { color: "#0F172A" } }, fmtMin(maior || null)),
-        a.acima !== null && ` · ${a.acima.length} acima de ${a.limEspera} min`,
-        a.acimaVerm !== null && ` · ${a.acimaVerm.length} vermelho${a.acimaVerm.length !== 1 ? "s" : ""} acima de ${a.limVerm} min`,
-        a.limEspera === null && a.limVerm === null && " · sem limite de alerta cadastrado"),
-      h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", margin: "2px 0 6px" } },
-        h("button", { type: "button", "aria-expanded": !!aberto, onClick: onToggle,
-          style: { padding: "5px 12px", borderRadius: 8, border: "1px solid #CBD5E1", background: aberto ? "#F1F5F9" : "#fff", color: "#334155", fontSize: 12, fontWeight: 650, cursor: "pointer", fontFamily: "inherit" } },
-          aberto ? "▾ Ocultar a lista" : `▸ Mostrar a lista (${a.itens.length})`),
-        aberto && [["todos", `Todos (${a.itens.length})`], ["vermelhos", `Só vermelhos (${a.itens.filter(i => i.vermelho).length})`]].map(([f, rot]) => h("button", { key: f, type: "button", "aria-pressed": (filtro || "todos") === f, onClick: () => onFiltro(f),
-          style: { padding: "5px 12px", borderRadius: 8, border: "none", fontSize: 12, fontFamily: "inherit", cursor: "pointer", fontWeight: (filtro || "todos") === f ? 650 : 450, background: (filtro || "todos") === f ? "#0F172A" : "#F1F5F9", color: (filtro || "todos") === f ? "#fff" : "#64748B" } }, rot))),
-      aberto && ordenados.length === 0 && h("div", { style: { fontSize: 12, color: "#15803D", padding: "4px 0" } }, "Nenhum vermelho aguardando."),
-      aberto && ordenados.slice(0, 10).map((i, k) => {
-        const [, grot, gcor] = gravRot(i.c.grav);
-        const estouro = (a.limEspera !== null && i.min !== null && i.min > a.limEspera) || (i.vermelho && a.limVerm !== null && i.min !== null && i.min > a.limVerm);
-        return h("div", { key: i.c.id, style: { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", padding: "8px 4px", borderTop: k ? "1px solid #F1F5F9" : "none", fontSize: 12 } },
-          h("span", { style: { width: 8, height: 8, borderRadius: 99, background: gcor, flexShrink: 0, alignSelf: "center" } }),
-          h("span", { style: { fontWeight: 600, color: "#0F172A" } }, i.c.nome || "(sem nome)"),
-          h("span", { style: { color: "#94A3B8", fontSize: 11 } }, DASH_COLUNAS_AGUARDANDO[i.c.col_id] + " · " + grot),
-          h("span", { style: { marginLeft: "auto", fontWeight: 700, color: estouro ? "#B91C1C" : "#475569", fontVariantNumeric: "tabular-nums" } }, i.min === null ? "sem horário" : fmtMin(i.min)),
-          onAbrirCard && h("button", { type: "button", onClick: () => onAbrirCard(i.c.id), style: { padding: "3px 10px", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: "1px solid #CBD5E1", background: "transparent", color: "#475569" } }, "abrir card →"));
-      }),
-      aberto && ordenados.length > 10 && h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "6px 4px" } }, `Mostrando os 10 que esperam há mais tempo, de ${ordenados.length}.`)));
+    a.itens.length === 0 ? h(DashVazio, { ok: true }, "Nenhum paciente aguardando aceite ou ambulância.") : h(React.Fragment, null,
+      h("div", { className: "dsh-ag__top" },
+        h("div", null,
+          h("div", { className: "dsh-big dsh-num" }, h(DashNum, { valor: a.itens.length })),
+          h("div", { className: "dsh-sub", style: { marginTop: 4 } }, `${nPend} aguardando aceite · ${nAc} aguardando ambulância`)),
+        h("div", { className: "dsh-ag__stats" },
+          stat("Maior espera", fmtMin(maior || null)),
+          a.acima !== null && stat(`Acima de ${a.limEspera} min`, a.acima.length, a.acima.length ? "var(--bad)" : "var(--ok)"),
+          a.acimaVerm !== null && stat(`Vermelhos acima de ${a.limVerm} min`, a.acimaVerm.length, a.acimaVerm.length ? "var(--bad)" : "var(--ok)"),
+          a.limEspera === null && a.limVerm === null && h("div", { className: "dsh-sub", style: { alignSelf: "center" } }, "sem limite de alerta cadastrado"))),
+      h(DashEmpilhada, { alto: "lg", segs: GRAVS.map(([k, rot, cor]) => ({ id: rot, rot, valor: conta(k), cor })) }),
+      h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", margin: "20px 0 4px" } },
+        h("button", { type: "button", className: "dsh-btn dsh-btn--sm", "aria-expanded": !!aberto, onClick: onToggle },
+          h("span", { style: { display: "inline-flex", transform: aberto ? "rotate(180deg)" : "none", transition: "transform .15s" } }, h(DashIcone, { n: "chevron", tam: 14 })),
+          aberto ? "Ocultar a lista" : `Mostrar a lista (${a.itens.length})`),
+        aberto && h("div", { className: "dsh-seg dsh-seg--sm", role: "group", "aria-label": "Filtro da lista" },
+          [["todos", `Todos (${a.itens.length})`], ["vermelhos", `Só vermelhos (${a.itens.filter(i => i.vermelho).length})`]].map(([f, rot]) =>
+            h("button", { key: f, type: "button", "aria-pressed": (filtro || "todos") === f, onClick: () => onFiltro(f) }, rot)))),
+      aberto && ordenados.length === 0 && h(DashVazio, { ok: true }, "Nenhum vermelho aguardando."),
+      aberto && ordenados.length > 0 && h("div", { style: { marginTop: 8 } },
+        ordenados.slice(0, 10).map(i => {
+          const [, grot, gcor] = gravRot(i.c.grav);
+          const estouro = (a.limEspera !== null && i.min !== null && i.min > a.limEspera) || (i.vermelho && a.limVerm !== null && i.min !== null && i.min > a.limVerm);
+          return h("div", { key: i.c.id, className: "dsh-ag__row" },
+            h("span", { className: "dsh-dot", style: { background: gcor } }),
+            h("div", { style: { minWidth: 0 } },
+              h("div", { className: "dsh-ag__n" }, i.c.nome || "(sem nome)"),
+              h("div", { className: "dsh-sub" }, DASH_COLUNAS_AGUARDANDO[i.c.col_id] + " · " + grot)),
+            h("div", { className: "dsh-track" }, h("i", { style: { width: entrou && i.min !== null && maior ? i.min / maior * 100 + "%" : "0%", background: estouro ? "#DC2626" : "#94A3B8" } })),
+            h("div", { style: { display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-end" } },
+              h("span", { className: "dsh-ag__t dsh-num", style: { color: estouro ? "var(--bad)" : "var(--ink2)" } }, i.min === null ? "sem horário" : fmtMin(i.min)),
+              onAbrirCard && h("button", { type: "button", className: "dsh-btn dsh-btn--sm", onClick: () => onAbrirCard(i.c.id) }, "abrir card")));
+        })),
+      aberto && ordenados.length > 10 && h("div", { className: "dsh-nota", style: { marginTop: 8 } }, `Mostrando os 10 que esperam há mais tempo, de ${ordenados.length}.`)));
 }
 
 /* ─── Cumprimento da meta de tempo por gravidade ─────────────────────────────── */
-function DashSLA({ sla, semGrav, Titulo, fmtMin }) {
-  const h = React.createElement;
+function DashSLA({ sla, semGrav }) {
+  const h = React.createElement, fmtMin = dashFmtMin, entrou = useDashEntrou();
   const [sel, setSel] = useState(null);
   const COR = { Vermelho: "#EF4444", Amarelo: "#EAB308", Verde: "#22C55E", Cinza: "#94A3B8" };
-  const GRID = "minmax(110px,1.4fr) repeat(5,minmax(64px,1fr))";
-  const cel = (t, extra) => h("span", { style: Object.assign({ textAlign: "right", fontSize: 12, color: "#475569", fontVariantNumeric: "tabular-nums" }, extra) }, t);
   const aberto = sel ? sla.find(s => s.grav === sel) : null;
   const temAlgumaMeta = sla.some(s => s.alvo !== null);
-  return h("div", { id: "bloco-sla", style: DASH_CARTAO },
-    h(Titulo, {
+  const totAval = sla.reduce((t, s) => t + s.avaliadas, 0), totDentro = sla.reduce((t, s) => t + s.dentro, 0);
+  const maxMed = Math.max(1, ...sla.map(s => s.mediana || 0));
+  return h(DashCard, { id: "bloco-sla" },
+    h(DashTitulo, {
+      icone: "target",
       extra: "finalização da CROSS → saída da ambulância",
       tooltip: "Compara, em cada remoção, o tempo entre a CROSS finalizar a ficha e a ambulância sair com a meta daquela gravidade. É a parte que a Santa Casa controla. A meta é a que você cadastrou em Configurações, valendo na data do pedido. Sem meta cadastrada, o painel só mostra o tempo, sem dizer se foi bom ou ruim. Remoções sem gravidade ou sem os dois horários ficam de fora."
     }, "Cumprimento da meta de tempo"),
-    !temAlgumaMeta && h("div", { style: { fontSize: 11.5, color: "#92400E", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 10, padding: "9px 12px", marginBottom: 10 } },
-      "Nenhuma meta cadastrada. Defina o tempo máximo por gravidade em Configurações (no fim da página); até lá o painel mostra apenas os tempos."),
-    h("div", { style: { display: "grid", gridTemplateColumns: GRID, gap: "0 10px", fontSize: 10, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", padding: "0 6px 6px" } },
-      h("span", null, "Gravidade"), cel("Meta"), cel("Medidas"), cel("Dentro"), cel("Fora"), cel("Mediana")),
-    sla.map(s => h("div", { key: s.grav, style: { display: "grid", gridTemplateColumns: GRID, gap: "0 10px", alignItems: "baseline", padding: "8px 6px", borderTop: "1px solid #F1F5F9" } },
-      h("span", { style: { fontSize: 12.5, fontWeight: 600, color: "#0F172A", display: "flex", alignItems: "center", gap: 7 } }, h("span", { style: { width: 8, height: 8, borderRadius: 99, background: COR[s.grav] } }), s.grav),
-      cel(s.alvo === null ? "sem meta" : fmtMin(s.alvo), { color: s.alvo === null ? "#B45309" : "#475569" }),
-      cel(s.n),
-      cel(s.avaliadas ? Math.round(s.dentro / s.avaliadas * 100) + "%" : "—", { fontWeight: 700, color: "#15803D" }),
-      s.fora.length ? h("button", { type: "button", onClick: () => setSel(s.grav), style: { background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "right", fontSize: 12, fontWeight: 700, color: "#B91C1C", fontVariantNumeric: "tabular-nums", padding: 0 } }, `${s.fora.length} (${Math.round(s.fora.length / s.avaliadas * 100)}%)`)
-        : cel(s.avaliadas ? "0" : "—"),
-      cel(fmtMin(s.mediana)))),
-    h("dl", { style: { margin: "12px 6px 0", padding: "12px 14px", background: "#F8FAFC", borderRadius: 12, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))", gap: "10px 22px" } },
-      [["Meta", "o tempo máximo aceito, para aquela gravidade, entre a finalização da ficha na CROSS e a saída da ambulância. Você define em Configurações."],
-       ["Medidas", "quantas remoções daquela gravidade entram na conta: as que têm data e horário da finalização e da saída."],
-       ["Dentro", "a porcentagem das remoções que saíram dentro da meta (no tempo da meta ou antes)."],
-       ["Fora", "quantas saíram depois da meta, e a porcentagem. Clique no número para ver quais foram."],
-       ["Mediana", "o tempo do meio: metade das remoções levou menos que isso e metade levou mais. Um caso muito demorado não distorce."]
-      ].map(([t, d]) => h("div", { key: t },
-        h("dt", { style: { fontSize: 11, fontWeight: 700, color: "#0F172A", textTransform: "uppercase", letterSpacing: ".04em" } }, t),
-        h("dd", { style: { margin: "2px 0 0", fontSize: 11.5, color: "#64748B", lineHeight: 1.5 } }, d)))),
-    sla.some(x => x.avaliadas < x.n) && h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "8px 6px 0" } }, "Dentro e Fora só contam as remoções julgadas pela meta que valia no dia do pedido; por isso podem ser menos que as Medidas quando a meta foi cadastrada depois de algumas remoções."),
-    semGrav > 0 && h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "8px 6px 0" } }, `${semGrav} remoç${semGrav !== 1 ? "ões" : "ão"} com os dois horários, mas sem gravidade, ficaram fora desta conta (veja Saneamento de falhas).`),
+    !temAlgumaMeta && h("div", { className: "dsh-aviso" }, "Nenhuma meta cadastrada. Defina o tempo máximo por gravidade em Configurações (no fim da página); até lá o painel mostra apenas os tempos."),
+    temAlgumaMeta && h("div", { className: "dsh-hero" },
+      h("div", { className: "dsh-hero__num" },
+        h("div", { className: "dsh-big dsh-num", style: { color: totAval ? "var(--ok)" : "var(--faint)" } }, totAval ? h(DashNum, { valor: Math.round(totDentro / totAval * 100), sufixo: "%" }) : "—"),
+        h("div", { className: "dsh-sub" }, totAval ? `dentro da meta (${totDentro} de ${totAval})` : "nenhuma remoção avaliada")),
+      h("div", { className: "dsh-hero__bar" },
+        h(DashEmpilhada, { alto: "lg", segs: [
+          { id: "dentro", rot: "Dentro da meta", valor: totDentro, cor: "#16A34A" },
+          { id: "fora", rot: "Fora da meta", valor: totAval - totDentro, cor: "#DC2626" }] }))),
+    h("div", { className: "dsh-rows" },
+      sla.map(s => {
+        const foraN = s.fora.length, semMeta = s.n - s.avaliadas;
+        return h("div", { key: s.grav, className: "dsh-linha" },
+          h("div", { className: "dsh-linha__n", style: { display: "flex", alignItems: "center", gap: 8 } },
+            h("span", { className: "dsh-dot", style: { background: COR[s.grav] } }),
+            h("span", null, s.grav, h("small", null, s.alvo === null ? "sem meta" : "meta " + fmtMin(s.alvo)))),
+          h("div", { className: "dsh-linha__bar" },
+            s.n === 0 ? h("div", { className: "dsh-sub" }, "sem remoções medidas")
+              : s.avaliadas > 0
+                ? h(DashEmpilhada, { alto: "lg", legenda: false, segs: [
+                    { id: "d", rot: "Dentro", valor: s.dentro, cor: "#16A34A" }, { id: "f", rot: "Fora", valor: foraN, cor: "#DC2626" }, { id: "s", rot: "Sem meta na data", valor: semMeta, cor: "#E2E8F0" }] })
+                : h("div", { className: "dsh-track dsh-track--lg" }, h("i", { style: { width: entrou ? (s.mediana || 0) / maxMed * 100 + "%" : "0%", background: COR[s.grav] } })),
+            h("div", { className: "dsh-sub", style: { marginTop: 4, display: "flex", gap: 12, flexWrap: "wrap" } },
+              h("span", null, `${s.n} medida${s.n !== 1 ? "s" : ""}`),
+              s.avaliadas > 0 && h("span", { style: { color: "var(--ok)", fontWeight: 600 } }, `${Math.round(s.dentro / s.avaliadas * 100)}% dentro`),
+              foraN > 0 && h("button", { type: "button", onClick: () => setSel(s.grav), style: { background: "none", border: 0, padding: 0, cursor: "pointer", color: "var(--bad)", fontWeight: 650, fontSize: 12, textDecoration: "underline" } },
+                `${foraN} fora (${Math.round(foraN / s.avaliadas * 100)}%)`))),
+          h("div", { style: { textAlign: "right" } },
+            h("div", { className: "dsh-pct dsh-num" }, fmtMin(s.mediana)),
+            h("div", { className: "dsh-sub" }, "mediana")));
+      })),
+    h(DashLegenda, { itens: [
+      ["Meta", "O tempo máximo aceito, para aquela gravidade, entre a finalização da ficha na CROSS e a saída da ambulância. Você define em Configurações."],
+      ["Barra", "Verde: saíram dentro da meta (no tempo da meta ou antes). Vermelho: passaram da meta. Cinza claro: remoções medidas em uma data em que ainda não havia meta cadastrada."],
+      ["Medidas", "Quantas remoções daquela gravidade entram na conta: as que têm data e horário da finalização e da saída."],
+      ["Fora", "Quantas saíram depois da meta, e a porcentagem. Clique no número para ver quais foram."],
+      ["Mediana", "O tempo do meio: metade das remoções levou menos que isso e metade levou mais. Um caso muito demorado não distorce."]] }),
+    sla.some(x => x.avaliadas < x.n) && h("div", { className: "dsh-nota", style: { marginTop: 12 } }, "Dentro e Fora só contam as remoções julgadas pela meta que valia no dia do pedido; por isso podem ser menos que as Medidas quando a meta foi cadastrada depois de algumas remoções."),
+    semGrav > 0 && h("div", { className: "dsh-nota", style: { marginTop: 8 } }, `${semGrav} remoç${semGrav !== 1 ? "ões" : "ão"} com os dois horários, mas sem gravidade, ficaram fora desta conta (veja Saneamento de falhas).`),
     aberto && h(DashListaModal, { titulo: `Fora da meta · ${aberto.grav}`, subtitulo: `meta de ${fmtMin(aberto.alvo)}`, itens: aberto.fora, onClose: () => setSel(null) }));
 }
 
 /* ─── Reinserção ─────────────────────────────────────────────────────────────── */
-function DashReinsercao({ rein, Titulo }) {
+function DashReinsercao({ rein }) {
   const h = React.createElement;
   const [sel, setSel] = useState(false);
   const total = rein.porStatus.length + rein.soTexto.length;
   const itens = rein.porStatus.concat(rein.soTexto);
-  return h("div", { id: "bloco-reinsercao", style: DASH_CARTAO },
-    h(Titulo, {
+  return h(DashCard, { id: "bloco-reinsercao" },
+    h(DashTitulo, {
+      icone: "repeat",
       extra: rein.base ? `${(total / rein.base * 100).toFixed(1).replace(".", ",")}% das linhas CROSS` : "",
       tooltip: "Fichas que precisaram ser colocadas de novo na CROSS. A contagem usa o status REINSERIDA e também observações escritas à mão que citam “reinserida”. Hoje não existe um campo próprio nem o motivo da reinserção."
     }, "Reinserções"),
-    h("div", { style: { display: "flex", gap: 16, flexWrap: "wrap", alignItems: "baseline" } },
-      h("div", { style: { fontSize: 30, fontWeight: 700, color: "#EA580C", fontVariantNumeric: "tabular-nums" } }, total),
-      h("div", { style: { fontSize: 12, color: "#475569", lineHeight: 1.6 } },
-        h("div", null, h("b", null, rein.porStatus.length), " pelo status REINSERIDA"),
-        h("div", null, h("b", null, rein.soTexto.length), " só pelo texto da observação")),
-      total > 0 && h("button", { type: "button", onClick: () => setSel(true), style: { marginLeft: "auto", padding: "5px 12px", borderRadius: 8, border: "1px solid #CBD5E1", background: "transparent", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" } }, "ver os casos")),
-    h("div", { style: { marginTop: 12, padding: "10px 14px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12, fontSize: 11.5, color: "#78350F", lineHeight: 1.6 } },
-      h("b", null, "Atenção, gestor: "), "parte desta contagem vem de TEXTO LIVRE e pode errar (conta quem escreveu “reinserida/reinserido”; não pega “nova ficha” nem outras grafias, e uma observação como “não foi reinserida” seria contada). ",
-      "Decida como resolver: (1) usar sempre o status REINSERIDA, que já está na lista da planilha, e passar os casos do texto para ele; ou (2) criar um campo próprio com o motivo da reinserção (não encaminhado, falta de atualização, indisponibilidade…). ",
-      "Os casos que só aparecem pelo texto estão em Saneamento de falhas, para você converter."),
+    h("div", { className: "dsh-hero" },
+      h("div", { className: "dsh-hero__num" },
+        h("div", { className: "dsh-big dsh-num", style: { color: "#EA580C" } }, h(DashNum, { valor: total })),
+        h("div", { className: "dsh-sub" }, total === 1 ? "reinserção no período" : "reinserções no período")),
+      h("div", { className: "dsh-hero__bar" },
+        h(DashEmpilhada, { alto: "lg", segs: [
+          { id: "st", rot: "pelo status REINSERIDA", valor: rein.porStatus.length, cor: "#EA580C" },
+          { id: "tx", rot: "só pelo texto da observação", valor: rein.soTexto.length, cor: "#FDBA74" }] })),
+      total > 0 && h("button", { type: "button", className: "dsh-btn", onClick: () => setSel(true) }, "Ver os casos")),
+    h("div", { className: "dsh-banner" },
+      h(DashIcone, { n: "alert", tam: 16 }),
+      h("div", null, h("b", null, "Atenção, gestor: "), "parte desta contagem vem de TEXTO LIVRE e pode errar (conta quem escreveu “reinserida/reinserido”; não pega “nova ficha” nem outras grafias, e uma observação como “não foi reinserida” seria contada). ",
+        "Decida como resolver: (1) usar sempre o status REINSERIDA, que já está na lista da planilha, e passar os casos do texto para ele; ou (2) criar um campo próprio com o motivo da reinserção (não encaminhado, falta de atualização, indisponibilidade…). ",
+        "Os casos que só aparecem pelo texto estão em Saneamento de falhas, para você converter.")),
     sel && h(DashListaModal, { titulo: "Reinserções", subtitulo: "status REINSERIDA e observação com “reinserida/reinserido”", itens, onClose: () => setSel(false) }));
 }
 
@@ -1096,28 +1701,30 @@ function DashPainelLista({ titulo, sub, linhas, vazio, rodape, onFechar, onIr })
   const h = React.createElement;
   const LIM = 10;
   const ir = onIr || (alvo => { const el = document.getElementById(alvo); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" }); });
-  return h("div", { role: "region", "aria-label": titulo, style: Object.assign({}, DASH_CARTAO, { marginBottom: 14, borderColor: "#CBD5E1" }) },
-    h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 6 } },
-      h("div", null, h("div", { style: { fontSize: 13, fontWeight: 700, color: "#0F172A" } }, titulo), sub && h("div", { style: { fontSize: 11, color: "#94A3B8", marginTop: 2 } }, sub)),
-      h("button", { type: "button", onClick: onFechar, "aria-label": "Fechar", style: { background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 18, lineHeight: 1, padding: 2 } }, "✕")),
-    linhas.length === 0 ? h("div", { style: { fontSize: 12, color: "#15803D", padding: "4px 0" } }, vazio)
-      : linhas.slice(0, LIM).map((l, i) => {
-          const estilo = { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", padding: "8px 2px", borderTop: i ? "1px solid #F1F5F9" : "none", fontSize: 12, color: "#475569", textDecoration: "none" };
-          const corpo = [
-            h("span", { key: "n", style: { fontWeight: 600, color: "#0F172A" } }, l.nome),
-            l.ficha && h("span", { key: "f", style: { color: "#94A3B8", fontSize: 11 } }, l.ficha),
-            h("span", { key: "t", style: { flex: "1 1 220px" } }, l.texto),
-            l.fn && h("button", { key: "b", type: "button", onClick: l.fn, style: { marginLeft: "auto", padding: "3px 10px", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: "1px solid #CBD5E1", background: "transparent", color: "#475569" } }, l.rotFn || "abrir →"),
-            l.href && h("span", { key: "l", style: { marginLeft: "auto", fontWeight: 700, color: "#B45309", whiteSpace: "nowrap" } }, "abrir linha →")
-          ];
-          return l.href ? h("a", { key: i, href: l.href, style: estilo }, corpo) : h("div", { key: i, style: estilo }, corpo);
-        }),
-    linhas.length > LIM && h("div", { style: { fontSize: 11, color: "#94A3B8", padding: "6px 2px" } }, `Mostrando ${LIM} de ${linhas.length}.`),
-    rodape && h("button", { type: "button", onClick: () => ir(rodape.alvo), style: { marginTop: 8, background: "none", border: "1px solid #E2E8F0", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, color: "#64748B", cursor: "pointer", fontFamily: "inherit" } }, rodape.rot));
+  return h(DashCard, { style: { marginBottom: 16, borderColor: "#CBD5E1" } },
+    h("div", { role: "region", "aria-label": titulo },
+      h("div", { className: "dsh-title", style: { marginBottom: 8 } },
+        h("div", null, h("div", { className: "dsh-title__t" }, titulo), sub && h("div", { className: "dsh-sub" }, sub)),
+        h("button", { type: "button", className: "dsh-x", onClick: onFechar, "aria-label": "Fechar" }, h(DashIcone, { n: "x", tam: 18 }))),
+      linhas.length === 0 ? h(DashVazio, { ok: true }, vazio)
+        : h("ul", { className: "dsh-list" },
+            linhas.slice(0, LIM).map((l, i) => {
+              const corpo = [
+                h("span", { key: "n", style: { fontWeight: 600, color: "var(--ink)" } }, l.nome),
+                l.ficha && h("span", { key: "f", className: "dsh-sub" }, l.ficha),
+                h("span", { key: "t", style: { flex: "1 1 220px", color: "var(--muted)" } }, l.texto),
+                l.fn && h("button", { key: "b", type: "button", onClick: l.fn, className: "dsh-btn dsh-btn--sm", style: { marginLeft: "auto" } }, l.rotFn || "abrir"),
+                l.href && h("span", { key: "l", className: "dsh-link", style: { marginLeft: "auto" } }, "abrir linha", h(DashIcone, { n: "external", tam: 13 }))
+              ];
+              return h("li", { key: i, className: "dsh-list__i", style: { padding: "4px 0" } },
+                l.href ? h("a", { href: l.href, className: "dsh-pill-link" }, corpo) : h("div", { className: "dsh-pill-link" }, corpo));
+            })),
+      linhas.length > LIM && h("div", { className: "dsh-nota", style: { padding: "6px 0" } }, `Mostrando ${LIM} de ${linhas.length}.`),
+      rodape && h("button", { type: "button", className: "dsh-btn dsh-btn--sm", style: { marginTop: 8 }, onClick: () => ir(rodape.alvo) }, rodape.rot)));
 }
 
 function DashAlertas({ cards, cfg, hojeIso, sla, rein, qualidade, nCorrigir, emRemocao, naoAtendidas, aba, agAberto, agFiltro, onTile, onIr, painel }) {
-  const h = React.createElement;
+  const h = React.createElement, entrou = useDashEntrou();
   const [agora, setAgora] = useState(() => Date.now());
   useEffect(() => { const iv = setInterval(() => setAgora(Date.now()), 30000); return () => clearInterval(iv); }, []);
   const a = dashAguardando(cards, agora, cfg, hojeIso);
@@ -1135,39 +1742,42 @@ function DashAlertas({ cards, cfg, hojeIso, sla, rein, qualidade, nCorrigir, emR
   const nAlertas = chips.filter(c => c.n !== null && c.n > 0 && !c.neutro).length;
   const maiorVerm = a.itens.filter(i => i.vermelho && i.min !== null).reduce((m, i) => Math.max(m, i.min), 0);
   const faixa = [
-    { id: "aguardando", rot: "Aguardando", n: a.itens.length, sub: `${a.itens.filter(i => i.c.col_id === "pendente").length} aceite · ${a.itens.filter(i => i.c.col_id === "aceite").length} ambulância`, cor: "#0F172A", ativa: agAberto && agFiltro === "todos" },
-    { id: "verm", rot: "Vermelhos aguardando", n: nVerm, sub: nVerm && maiorVerm ? "maior espera " + dashFmtMin(maiorVerm) : "ninguém esperando", cor: nVerm ? "#B91C1C" : "#0F172A", ativa: agAberto && agFiltro === "vermelhos" },
-    { id: "remocao", rot: "Em remoção", n: emRemocao, sub: "ambulância na rua (Kanban)", cor: "#0F172A", ativa: aba === "remocao" },
-    { id: "nao", rot: "Não atendidas", n: naoAtendidas, sub: "no período, pelo status", cor: naoAtendidas ? "#C2410C" : "#0F172A", ativa: aba === "nao" },
-    { id: "alertas", rot: "Alertas ativos", n: nAlertas, sub: nAlertas ? "clique para ver quais" : "tudo dentro dos limites", cor: nAlertas ? "#B91C1C" : "#15803D", ativa: aba === "alertas" },
-    { id: "falhas", rot: "Falhas a corrigir", n: nCorrigir, sub: "nos registros", cor: nCorrigir ? "#B45309" : "#15803D", ativa: aba === "falhas" }
+    { id: "aguardando", rot: "Aguardando", ic: "hourglass", n: a.itens.length, sub: `${a.itens.filter(i => i.c.col_id === "pendente").length} aceite · ${a.itens.filter(i => i.c.col_id === "aceite").length} ambulância`, cor: "#0F172A", tom: "#F1F5F9", ativa: agAberto && agFiltro === "todos" },
+    { id: "verm", rot: "Vermelhos aguardando", ic: "zap", n: nVerm, sub: nVerm && maiorVerm ? "maior espera " + dashFmtMin(maiorVerm) : "ninguém esperando", cor: nVerm ? "#B91C1C" : "#0F172A", tom: nVerm ? "#FEE2E2" : "#F1F5F9", ativa: agAberto && agFiltro === "vermelhos" },
+    { id: "remocao", rot: "Em remoção", ic: "truck", n: emRemocao, sub: "ambulância na rua (Kanban)", cor: "#0F172A", tom: "#DBEAFE", ativa: aba === "remocao" },
+    { id: "nao", rot: "Não atendidas", ic: "x", n: naoAtendidas, sub: "no período, pelo status", cor: naoAtendidas ? "#C2410C" : "#0F172A", tom: naoAtendidas ? "#FFEDD5" : "#F1F5F9", ativa: aba === "nao" },
+    { id: "alertas", rot: "Alertas ativos", ic: "alert", n: nAlertas, sub: nAlertas ? "clique para ver quais" : "tudo dentro dos limites", cor: nAlertas ? "#B91C1C" : "#15803D", tom: nAlertas ? "#FEE2E2" : "#DCFCE7", ativa: aba === "alertas" },
+    { id: "falhas", rot: "Falhas a corrigir", ic: "wrench", n: nCorrigir, sub: "nos registros", cor: nCorrigir ? "#B45309" : "#15803D", tom: nCorrigir ? "#FEF3C7" : "#DCFCE7", ativa: aba === "falhas" }
   ];
-  return h("div", { id: "bloco-alertas", style: { marginBottom: 18 } },
-    h("div", { role: "tablist", "aria-label": "Situação agora", style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 8 } },
-      faixa.map(f => h("div", { key: f.id, role: "tab", tabIndex: 0, "aria-selected": f.ativa, onClick: () => onTile(f.id),
+  return h("div", { id: "bloco-alertas", style: { marginBottom: 16 } },
+    h("div", { role: "tablist", "aria-label": "Situação agora", className: "dsh-grid dsh-grid--tight", style: { gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,150px),1fr))", marginBottom: 12 } },
+      faixa.map(f => h("div", { key: f.id, role: "tab", tabIndex: 0, "aria-selected": f.ativa, className: "dsh-tile", onClick: () => onTile(f.id),
         onKeyDown: e => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onTile(f.id); } },
-        title: f.ativa ? "Clique para fechar" : "Clique para ver os casos aqui embaixo",
-        style: { textAlign: "left", background: f.ativa ? "#F8FAFC" : "#fff", border: "1px solid " + (f.ativa ? "#0F172A" : "#E8EDF3"), boxShadow: f.ativa ? "0 0 0 1px #0F172A" : "none", borderRadius: 14, padding: "14px 16px", cursor: "pointer", fontFamily: "inherit" } },
-        h("div", { style: { fontSize: 10.5, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" } },
-          h("span", { style: { display: "inline-flex", alignItems: "center" } }, f.rot, h(DashDica, { texto: (DASH_GLOSSARIO.find(g => g[0] === f.rot) || [])[1] || f.rot, rotulo: f.rot })),
-          h("span", { "aria-hidden": "true", style: { fontSize: 9 } }, f.ativa ? "▲" : "▼")),
-        h("div", { style: { fontSize: 28, fontWeight: 700, color: f.cor, lineHeight: 1, fontVariantNumeric: "tabular-nums" } }, f.n),
-        h("div", { style: { fontSize: 10.5, color: "#94A3B8", marginTop: 6 } }, f.sub)))),
-    qualidade.pct !== null && h("div", { style: { textAlign: "right", fontSize: 11.5, marginBottom: 10, color: qualidade.pct >= 95 ? "#15803D" : "#B45309" }, title: "Linhas do período sem nenhuma falha de dados a corrigir (as com falha ficam fora de parte das contas)" },
-      `Qualidade dos registros: ${qualidade.pct.toFixed(0)}% das linhas sem falha · ${qualidade.comFalha} com falha`),
-    aba === "alertas" && h("div", { role: "region", "aria-label": "Alertas do gestor", style: Object.assign({}, DASH_CARTAO, { marginBottom: 14, borderColor: "#CBD5E1" }) },
-      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 } },
-        h("div", { style: { fontSize: 13, fontWeight: 700, color: "#0F172A" } }, "Alertas do gestor"),
-        h("button", { type: "button", onClick: () => onTile("alertas"), "aria-label": "Fechar", style: { background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 18, lineHeight: 1, padding: 2 } }, "✕")),
-      h("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
-        chips.map(c => {
-          const semLimite = c.n === null, ativo = !semLimite && c.n > 0 && !c.neutro;
-          const cor = semLimite ? ["#94A3B8", "#F8FAFC"] : ativo ? ["#B91C1C", "#FEE2E2"] : c.neutro && c.n > 0 ? ["#C2410C", "#FFEDD5"] : ["#15803D", "#F0FDF4"];
-          return h("button", { key: c.id, type: "button", onClick: () => ir(c.alvo), title: semLimite ? "Cadastre o limite em Configurações (no fim da página)" : "Ir para o bloco com os casos",
-            style: { display: "flex", alignItems: "baseline", gap: 8, padding: "8px 12px", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", background: cor[1], color: cor[0] } },
-            !semLimite && h("span", { style: { fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" } }, c.n),
-            h("span", { style: { fontSize: 12, fontWeight: 600 } }, c.rot));
-        }))),
+        title: f.ativa ? "Clique para fechar" : "Clique para ver os casos aqui embaixo" },
+        h("div", { className: "dsh-tile__h" },
+          h("span", { className: "dsh-tile__ic", style: { background: f.tom, color: f.cor } }, h(DashIcone, { n: f.ic, tam: 16 })),
+          h("span", { className: "dsh-tile__lbl" }, f.rot, h(DashDica, { texto: (DASH_GLOSSARIO.find(g => g[0] === f.rot) || [])[1] || f.rot, rotulo: f.rot }))),
+        h("div", { className: "dsh-tile__v dsh-num", style: { color: f.cor } }, h(DashNum, { valor: f.n })),
+        h("div", { className: "dsh-tile__s" }, f.sub)))),
+    qualidade.pct !== null && h("div", { className: "dsh-qual", title: "Linhas do período sem nenhuma falha de dados a corrigir (as com falha ficam fora de parte das contas)" },
+      h("span", { style: { fontWeight: 600, color: "var(--ink2)" } }, "Qualidade dos registros"),
+      h("div", { className: "dsh-track" }, h("i", { style: { width: entrou ? qualidade.pct + "%" : "0%", background: qualidade.pct >= 95 ? "#16A34A" : "#F59E0B" } })),
+      h("b", { className: "dsh-num", style: { color: qualidade.pct >= 95 ? "var(--ok)" : "var(--warn)" } }, qualidade.pct.toFixed(0) + "%"),
+      h("span", null, `${qualidade.comFalha} linha${qualidade.comFalha !== 1 ? "s" : ""} com falha`)),
+    aba === "alertas" && h(DashCard, { style: { marginBottom: 16, borderColor: "#CBD5E1" } },
+      h("div", { role: "region", "aria-label": "Alertas do gestor" },
+        h("div", { className: "dsh-title", style: { marginBottom: 12 } },
+          h("div", { className: "dsh-title__t" }, "Alertas do gestor"),
+          h("button", { type: "button", className: "dsh-x", onClick: () => onTile("alertas"), "aria-label": "Fechar" }, h(DashIcone, { n: "x", tam: 18 }))),
+        h("div", { className: "dsh-chips" },
+          chips.map(c => {
+            const semLimite = c.n === null, ativo = !semLimite && c.n > 0 && !c.neutro;
+            const cor = semLimite ? ["#64748B", "#F1F5F9"] : ativo ? ["#B91C1C", "#FEE2E2"] : c.neutro && c.n > 0 ? ["#C2410C", "#FFEDD5"] : ["#15803D", "#DCFCE7"];
+            return h("button", { key: c.id, type: "button", className: "dsh-chipbtn", onClick: () => ir(c.alvo), title: semLimite ? "Cadastre o limite em Configurações (no fim da página)" : "Ir para o bloco com os casos",
+              style: { background: cor[1], color: cor[0] } },
+              !semLimite && h("span", { className: "dsh-num", style: { fontSize: 16, fontWeight: 800 } }, c.n),
+              h("span", null, c.rot));
+          })))),
     painel);
 }
 
@@ -1207,43 +1817,44 @@ function DashConfig({ cfg, userNome, recarregar, showT, hojeIso }) {
     } catch (e) { showT("Não consegui excluir: " + e.message, "err"); }
   }
   const historico = [...cfg].sort((a, b) => String(b.vigente_desde).localeCompare(String(a.vigente_desde)) || String(b.criado_em || "").localeCompare(String(a.criado_em || "")));
-  const inp = { padding: "6px 9px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 12.5, fontFamily: "inherit", width: 110, background: "#fff", color: "#0F172A" };
-  return h("div", { id: "bloco-config", className: "dash-no-print", style: DASH_CARTAO },
+  return h(DashCard, { id: "bloco-config", className: "dash-no-print" },
     h("button", { type: "button", "aria-expanded": aberto, onClick: () => setAberto(v => !v),
-      style: { width: "100%", display: "flex", justifyContent: "space-between", alignItems: "baseline", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left" } },
-      h("span", { style: { fontSize: 12, fontWeight: 700, color: "#0F172A" } }, "⚙ Configurações do painel"),
-      h("span", { style: { fontSize: 11, color: "#94A3B8" } }, "frota, metas de tempo e limites de alerta " + (aberto ? "▴" : "▾"))),
-    aberto && h("div", { style: { marginTop: 14 } },
-      h("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "10px 12px", background: "#F8FAFC", borderRadius: 10, marginBottom: 12 } },
-        h("label", { style: { fontSize: 12, fontWeight: 600, color: "#334155" }, htmlFor: "cfg-vigencia" }, "Os valores abaixo passam a valer em"),
-        h("input", { id: "cfg-vigencia", type: "date", value: vigencia, onChange: e => setVigencia(e.target.value), style: Object.assign({}, inp, { width: 150 }) }),
-        h("span", { style: { fontSize: 11, color: "#94A3B8" } }, "Pode ser uma data futura. Os períodos antigos continuam usando os valores que valiam na época.")),
-      GRUPOS.map(([g, titulo, ajuda]) => h("div", { key: g, style: { marginBottom: 14 } },
-        h("div", { style: { fontSize: 12.5, fontWeight: 700, color: "#0F172A" } }, titulo),
-        h("div", { style: { fontSize: 11, color: "#94A3B8", marginBottom: 8 } }, ajuda),
-        h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))", gap: "8px 16px" } },
-          DASH_CFG_CHAVES.filter(c => c.grupo === g).map(c => {
-            const atual = dashCfgEm(cfg, c.chave, hojeIso);
-            return h("div", { key: c.chave },
-              h("div", { style: { display: "flex", alignItems: "center", marginBottom: 3 } },
-                h("label", { htmlFor: "cfg-" + c.chave, style: { fontSize: 11.5, color: "#475569" } }, c.rotulo + (c.unid ? " (" + c.unid + ")" : "")),
-                h(DashDica, { texto: DASH_CFG_DICA[c.chave], rotulo: c.rotulo })),
-              h("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
-                h("input", { id: "cfg-" + c.chave, type: "text", inputMode: "decimal", value: campos[c.chave] == null ? "" : campos[c.chave], placeholder: atual ? String(atual.valor) : "—",
-                  onChange: e => setCampos(p => Object.assign({}, p, { [c.chave]: e.target.value })), style: inp }),
-                h("span", { style: { fontSize: 10.5, color: "#94A3B8" } }, atual ? `hoje: ${atual.valor} (desde ${dashFmtBR(String(atual.vigente_desde).slice(0, 10))})` : "não cadastrado")));
-          })))),
-      h("button", { type: "button", disabled: salvando, onClick: salvar,
-        style: { padding: "8px 18px", borderRadius: 9, border: "none", background: "#0F172A", color: "#fff", fontWeight: 700, fontSize: 12.5, cursor: salvando ? "default" : "pointer", opacity: salvando ? 0.6 : 1, fontFamily: "inherit" } }, salvando ? "Salvando…" : "Registrar valores"),
-      h("span", { style: { fontSize: 11, color: "#94A3B8", marginLeft: 10 } }, "Só os campos preenchidos são registrados."),
-      h("div", { style: { marginTop: 18, fontSize: 12, fontWeight: 700, color: "#0F172A" } }, `Histórico (${historico.length})`),
-      historico.length === 0 ? h("div", { style: { fontSize: 11.5, color: "#CBD5E1", padding: "8px 0" } }, "Nada cadastrado ainda.")
-        : h("div", { style: { maxHeight: 260, overflowY: "auto", marginTop: 6 } },
-            historico.map(c => h("div", { key: c.id, style: { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", padding: "6px 2px", borderTop: "1px solid #F1F5F9", fontSize: 11.5, color: "#475569" } },
-              h("span", { style: { fontWeight: 600, color: "#0F172A", minWidth: 210 } }, DASH_CFG_ROTULO[c.chave] || c.chave),
-              h("span", { style: { fontWeight: 700 } }, String(c.valor)),
-              h("span", { style: { color: "#94A3B8" } }, "desde " + dashFmtBR(String(c.vigente_desde).slice(0, 10)) + (c.criado_por ? " · por " + c.criado_por : "")),
-              h("button", { type: "button", onClick: () => excluir(c), style: { marginLeft: "auto", background: "none", border: "none", color: "#B91C1C", cursor: "pointer", fontSize: 11, fontFamily: "inherit" } }, "excluir"))))));
+      style: { width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", color: "inherit" } },
+      h("span", { className: "dsh-title__t" }, h("span", { className: "dsh-title__icon" }, h(DashIcone, { n: "sliders", tam: 16 })), "Configurações do painel"),
+      h("span", { className: "dsh-title__x", style: { display: "inline-flex", alignItems: "center", gap: 6 } }, "frota, metas de tempo e limites de alerta",
+        h("span", { style: { display: "inline-flex", transform: aberto ? "rotate(180deg)" : "none", transition: "transform .15s" } }, h(DashIcone, { n: "chevron", tam: 16 })))),
+    aberto && h("div", { style: { marginTop: 20 } },
+      h("div", { style: { display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "12px 16px", background: "var(--bg)", borderRadius: 12, marginBottom: 16 } },
+        h("label", { style: { fontSize: 13, fontWeight: 600, color: "var(--ink2)" }, htmlFor: "cfg-vigencia" }, "Os valores abaixo passam a valer em"),
+        h("input", { id: "cfg-vigencia", type: "date", className: "dsh-in", value: vigencia, onChange: e => setVigencia(e.target.value) }),
+        h("span", { className: "dsh-sub" }, "Pode ser uma data futura. Os períodos antigos continuam usando os valores que valiam na época.")),
+      h("div", { className: "dsh-grid dsh-g2" },
+        GRUPOS.map(([g, titulo, ajuda]) => h("div", { key: g, className: "dsh-cfg__g" },
+          h("div", { style: { fontSize: 14, fontWeight: 650 } }, titulo),
+          h("div", { className: "dsh-sub", style: { marginBottom: 12 } }, ajuda),
+          h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 12 } },
+            DASH_CFG_CHAVES.filter(c => c.grupo === g).map(c => {
+              const atual = dashCfgEm(cfg, c.chave, hojeIso);
+              return h("div", { key: c.chave, className: "dsh-cfg__f" },
+                h("div", { style: { display: "flex", alignItems: "center" } },
+                  h("label", { htmlFor: "cfg-" + c.chave }, c.rotulo + (c.unid ? " (" + c.unid + ")" : "")),
+                  h(DashDica, { texto: DASH_CFG_DICA[c.chave], rotulo: c.rotulo })),
+                h("input", { id: "cfg-" + c.chave, type: "text", inputMode: "decimal", className: "dsh-in", value: campos[c.chave] == null ? "" : campos[c.chave], placeholder: atual ? String(atual.valor) : "—",
+                  onChange: e => setCampos(p => Object.assign({}, p, { [c.chave]: e.target.value })) }),
+                h("span", { className: "dsh-sub" }, atual ? `hoje: ${atual.valor} (desde ${dashFmtBR(String(atual.vigente_desde).slice(0, 10))})` : "não cadastrado"));
+            }))))),
+      h("div", { style: { display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 4 } },
+        h("button", { type: "button", className: "dsh-btn dsh-btn--primary", disabled: salvando, onClick: salvar }, salvando ? "Salvando…" : "Registrar valores"),
+        h("span", { className: "dsh-sub" }, "Só os campos preenchidos são registrados.")),
+      h("div", { className: "dsh-sep" }),
+      h("div", { style: { fontSize: 14, fontWeight: 650 } }, `Histórico (${historico.length})`),
+      historico.length === 0 ? h("div", { className: "dsh-sub", style: { padding: "8px 0" } }, "Nada cadastrado ainda.")
+        : h("div", { style: { maxHeight: 280, overflowY: "auto", marginTop: 8 } },
+            historico.map(c => h("div", { key: c.id, className: "dsh-cfg__hist" },
+              h("span", { style: { fontWeight: 600, color: "var(--ink)", minWidth: 220 } }, DASH_CFG_ROTULO[c.chave] || c.chave),
+              h("b", null, String(c.valor)),
+              h("span", { className: "dsh-sub" }, "desde " + dashFmtBR(String(c.vigente_desde).slice(0, 10)) + (c.criado_por ? " · por " + c.criado_por : "")),
+              h("button", { type: "button", className: "dsh-btn dsh-btn--sm dsh-btn--ghost dsh-btn--danger", style: { marginLeft: "auto" }, onClick: () => excluir(c) }, "excluir"))))));
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
@@ -1307,67 +1918,6 @@ const DASH_GLOSSARIO = [
   ["Kanban e Livro de Saída", "Kanban: o quadro dos pedidos em andamento (pendente, aceito, em remoção…). Livro de Saída: o registro feito pela equipe quando a ambulância sai e volta, que pode ser ligado à planilha."]
 ];
 
-/* O "?" ao lado de um nome: abre ao passar o mouse, ao focar com o teclado ou ao clicar/tocar (clicar fixa aberto). */
-function DashDica({ texto, rotulo }) {
-  const h = React.createElement;
-  const [hover, setHover] = useState(false), [fixa, setFixa] = useState(false), [dir, setDir] = useState(false);
-  const ref = React.useRef(null);
-  const visivel = hover || fixa;
-  useEffect(() => {
-    if (!visivel) return;
-    const el = ref.current;
-    if (el && el.getBoundingClientRect) { const r = el.getBoundingClientRect(); setDir(r.left + 300 > (window.innerWidth || 1200)); }
-  }, [visivel]);
-  useEffect(() => {
-    if (!fixa) return;
-    const fora = e => { if (ref.current && !ref.current.contains(e.target)) setFixa(false); };
-    const esc = e => { if (e.key === "Escape") setFixa(false); };
-    document.addEventListener("mousedown", fora); document.addEventListener("keydown", esc);
-    return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("keydown", esc); };
-  }, [fixa]);
-  return h("span", { ref, className: "dash-dica dash-no-print", style: { position: "relative", display: "inline-flex", marginLeft: 5, verticalAlign: "middle", textTransform: "none", letterSpacing: "normal" },
-    onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false) },
-    h("span", { role: "button", tabIndex: 0, "aria-label": "O que significa" + (rotulo ? ": " + rotulo : ""), "aria-expanded": visivel,
-      onClick: e => { e.stopPropagation(); e.preventDefault(); setFixa(v => !v); },
-      onKeyDown: e => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); e.preventDefault(); setFixa(v => !v); } },
-      onFocus: () => setHover(true), onBlur: () => setHover(false),
-      style: { width: 15, height: 15, borderRadius: 99, border: "1px solid " + (visivel ? "#475569" : "#CBD5E1"), color: visivel ? "#0F172A" : "#94A3B8", background: visivel ? "#F1F5F9" : "#fff",
-        fontSize: 9.5, fontWeight: 800, lineHeight: "13px", textAlign: "center", cursor: "help", userSelect: "none", flexShrink: 0 } }, "?"),
-    visivel && h("span", { role: "tooltip", style: { position: "absolute", top: "calc(100% + 6px)", [dir ? "right" : "left"]: 0, zIndex: 3000, width: 290, maxWidth: "80vw", background: "#0F172A", color: "#F1F5F9",
-      padding: "10px 12px", borderRadius: 10, fontSize: 11.5, lineHeight: 1.55, fontWeight: 400, textAlign: "left", whiteSpace: "normal", boxShadow: "0 10px 30px rgba(15,23,42,.35)", textTransform: "none", letterSpacing: "normal" } }, texto));
-}
-
-/* Legenda escrita (sempre visível) embaixo de uma tabela: o que cada coluna quer dizer, em linguagem simples. */
-function DashLegenda({ itens, titulo }) {
-  const h = React.createElement;
-  return h("div", { className: "dash-legenda", style: { margin: "12px 6px 0", padding: "12px 14px", background: "#F8FAFC", borderRadius: 12 } },
-    h("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 8 } }, titulo || "O que cada coluna quer dizer"),
-    h("dl", { style: { margin: 0, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))", gap: "10px 22px" } },
-      itens.map(([t, d]) => h("div", { key: t },
-        h("dt", { style: { fontSize: 11, fontWeight: 700, color: "#0F172A", textTransform: "uppercase", letterSpacing: ".04em" } }, t),
-        h("dd", { style: { margin: "2px 0 0", fontSize: 11.5, color: "#64748B", lineHeight: 1.5 } }, d)))));
-}
-
-/* Janela com o glossário completo. */
-function DashGlossario({ onClose }) {
-  const h = React.createElement;
-  const [q, setQ] = useState("");
-  useEffect(() => { const f = e => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", f); return () => window.removeEventListener("keydown", f); }, []);
-  const lista = DASH_GLOSSARIO.filter(([t, d]) => !q.trim() || (t + " " + d).toLowerCase().includes(q.trim().toLowerCase()));
-  return h("div", { onClick: e => { if (e.target === e.currentTarget) onClose(); }, className: "dash-no-print",
-    style: { position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2500, padding: 16 } },
-    h("div", { role: "dialog", "aria-modal": "true", "aria-label": "Glossário do painel", style: { background: "#fff", borderRadius: 16, width: "100%", maxWidth: 640, maxHeight: "88vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,.35)", overflow: "hidden" } },
-      h("div", { style: { padding: "16px 20px", borderBottom: "1px solid #F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 } },
-        h("div", null, h("div", { style: { fontWeight: 700, fontSize: 15, color: "#0F172A" } }, "Glossário do painel"), h("div", { style: { fontSize: 11.5, color: "#64748B", marginTop: 3 } }, "Os termos do painel, em palavras simples.")),
-        h("button", { type: "button", onClick: onClose, "aria-label": "Fechar", style: { background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 22, lineHeight: 1, padding: 4 } }, "×")),
-      h("div", { style: { padding: "10px 20px 0" } },
-        h("input", { type: "search", "aria-label": "Procurar no glossário", placeholder: "Procurar um termo…", value: q, onChange: e => setQ(e.target.value), style: { width: "100%", boxSizing: "border-box", padding: "8px 11px", border: "1px solid #E2E8F0", borderRadius: 9, fontSize: 13, fontFamily: "inherit" } })),
-      h("dl", { style: { overflowY: "auto", margin: 0, padding: "6px 20px 18px" } },
-        lista.length === 0 ? h("div", { style: { padding: "20px 0", color: "#94A3B8", fontSize: 13, textAlign: "center" } }, "Nenhum termo encontrado.")
-          : lista.map(([t, d]) => h("div", { key: t, style: { padding: "10px 0", borderBottom: "1px solid #F1F5F9" } },
-              h("dt", { style: { fontSize: 13, fontWeight: 700, color: "#0F172A" } }, t),
-              h("dd", { style: { margin: "3px 0 0", fontSize: 12.5, color: "#475569", lineHeight: 1.6 } }, d))))));
-}
 
 const DASH_CSS_IMPRESSAO = `
 .dash-print-only { display: none; }
@@ -1380,10 +1930,13 @@ const DASH_CSS_IMPRESSAO = `
   .dash-secao + .dash-secao { break-before: page; }
   [id^="bloco-"] { break-inside: avoid; }
   #dash-print-root { padding: 0 !important; opacity: 1 !important; }
+  .dsh-card { box-shadow: none !important; }
+  .dsh-click:hover, .dsh-tile:hover { transform: none !important; box-shadow: none !important; }
 }`;
-/* Imprimir / salvar em PDF: esconde, só durante a impressão, tudo o que não é o painel (cabeçalho, menus, botões flutuantes). */
+/* Imprimir / salvar em PDF: esconde, só durante a impressão, tudo o que não é o painel (cabeçalho, menus, botões flutuantes).
+ * As explicações "Como ler esta parte" também abrem durante a impressão e voltam a fechar depois.                          */
 function dashIsolarParaImpressao(raiz) {
-  const ocultos = [];
+  const ocultos = [], abertas = [];
   let no = raiz;
   while (no && no.parentElement && no !== document.body) {
     Array.prototype.forEach.call(no.parentElement.children, irm => {
@@ -1391,23 +1944,24 @@ function dashIsolarParaImpressao(raiz) {
     });
     no = no.parentElement;
   }
-  return () => ocultos.forEach(([el, d]) => { el.style.display = d; });
+  raiz.querySelectorAll("details.dsh-legenda").forEach(d => { if (!d.open) { d.open = true; abertas.push(d); } });
+  return () => { ocultos.forEach(([el, d]) => { el.style.display = d; }); abertas.forEach(d => { d.open = false; }); };
 }
 
 function DashSecao({ id, ativa, children }) {
   if (!ativa) return null;   // aba: só o conteúdo da seção escolhida existe na tela
   const h = React.createElement;
   const s = DASH_SECOES.find(x => x.id === id);
-  return h("section", { id, className: "dash-secao", role: "tabpanel", "aria-labelledby": "tab-" + id, style: { scrollMarginTop: 12, marginBottom: 30 } },
-    h("div", { style: { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", margin: "0 0 12px", paddingBottom: 8, borderBottom: "1px solid #E2E8F0" } },
-      h("span", { "aria-hidden": "true", style: { width: 22, height: 22, borderRadius: 99, background: "#0F172A", color: "#fff", fontSize: 11, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, alignSelf: "center" } }, s.n),
-      h("h2", { id: id + "-t", style: { margin: 0, fontSize: 16, fontWeight: 700, color: "#0F172A", letterSpacing: "-.01em" } }, s.titulo),
-      h("span", { style: { fontSize: 11.5, color: "#94A3B8", flex: "1 1 260px" } }, s.sub)),
+  return h("section", { id, className: "dash-secao", role: "tabpanel", "aria-labelledby": "tab-" + id, style: { scrollMarginTop: 12, marginBottom: 32 } },
+    h("div", { className: "dsh-sec__h" },
+      h("h2", { id: id + "-t", className: "dsh-sec__t" }, s.titulo),
+      h("div", { className: "dsh-sec__s" }, s.sub)),
     React.Children.toArray(children));   // toArray dá uma chave a cada filho (sem aviso do React)
 }
 
-/* A linha numerada (1 Agora · 2 Atrasos · 3 Capacidade…) são ABAS: clicar mostra só aquela seção, sem rolar a página. */
-function DashNavSecoes({ ativa, onSelect }) {
+/* A linha de abas (1 Agora · 2 Atrasos · 3 Capacidade…): clicar mostra só aquela seção, sem rolar a página.
+ * `badges` põe um número em uma aba (ex.: pacientes aguardando, falhas a corrigir).                         */
+function DashNavSecoes({ ativa, onSelect, badges }) {
   const h = React.createElement;
   const teclas = (e, i) => {
     const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
@@ -1417,20 +1971,20 @@ function DashNavSecoes({ ativa, onSelect }) {
     onSelect(alvo.id);
     const el = document.getElementById("tab-" + alvo.id); if (el && el.focus) el.focus();
   };
-  return h("div", { role: "tablist", "aria-label": "Seções do painel", className: "dash-no-print", style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 } },
+  return h("div", { role: "tablist", "aria-label": "Seções do painel", className: "dsh-tabs dash-no-print" },
     DASH_SECOES.map((sc, i) => {
-      const on = sc.id === ativa;
+      const on = sc.id === ativa, b = badges && badges[sc.id];
       return h("button", { key: sc.id, id: "tab-" + sc.id, type: "button", role: "tab", "aria-selected": on, "aria-controls": sc.id, tabIndex: on ? 0 : -1,
-        onClick: () => onSelect(sc.id), onKeyDown: e => teclas(e, i),
-        style: { display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 14px", borderRadius: 99, border: "none", cursor: "pointer", fontFamily: "inherit",
-          background: on ? "#0F172A" : "#F1F5F9", color: on ? "#fff" : "#475569", fontSize: 12.5, fontWeight: on ? 700 : 600 } },
-        h("span", { style: { width: 17, height: 17, borderRadius: 99, background: on ? "#fff" : "#CBD5E1", color: on ? "#0F172A" : "#fff", fontSize: 10, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, sc.n), sc.rot);
+        className: "dsh-tab", onClick: () => onSelect(sc.id), onKeyDown: e => teclas(e, i) },
+        h("span", { style: { opacity: 0.5, fontWeight: 700, fontSize: 12 } }, sc.n),
+        sc.rot,
+        b && h("span", { className: "dsh-tab__n" + (b.tom === "warn" ? " dsh-tab__n--warn" : "") }, b.n));
     }));
 }
 
 /* ─── Tabela de exceções: um só lugar com os casos individuais, do mais urgente ao menos urgente ─── */
-function DashExcecoes({ cards, cfg, hojeIso, plan, onAbrirCard, Titulo, fmtMin }) {
-  const h = React.createElement;
+function DashExcecoes({ cards, cfg, hojeIso, plan, onAbrirCard }) {
+  const h = React.createElement, fmtMin = dashFmtMin;
   const [agora, setAgora] = useState(() => Date.now());
   const [filtro, setFiltro] = useState("todas");
   const [todos, setTodos] = useState(false);
@@ -1445,38 +1999,37 @@ function DashExcecoes({ cards, cfg, hojeIso, plan, onAbrirCard, Titulo, fmtMin }
   const conta = o => o === "todas" ? todas.length : todas.filter(x => x.origem === o).length;
   const lista = (filtro === "todas" ? todas : todas.filter(x => x.origem === filtro));
   const vista = todos ? lista : lista.slice(0, 15);
-  const COR = { 1: ["#B91C1C", "#FEE2E2", "urgente"], 2: ["#C2410C", "#FFEDD5", "alta"], 3: ["#92400E", "#FEF3C7", "média"] };
-  const GRID = "74px minmax(150px,2fr) 84px minmax(130px,1.4fr) 78px minmax(170px,2.4fr) 92px";
-  const cel = (t, extra) => h("span", { style: Object.assign({ fontSize: 12, color: "#475569", minWidth: 0 }, extra) }, t);
-  return h("div", { id: "bloco-excecoes", style: DASH_CARTAO },
-    h(Titulo, {
+  const COR = { 1: ["#B91C1C", "#FEE2E2", "urgente", "#DC2626"], 2: ["#C2410C", "#FFEDD5", "alta", "#F97316"], 3: ["#92400E", "#FEF3C7", "média", "#F59E0B"] };
+  const GCOR = { Vermelho: "#EF4444", Amarelo: "#EAB308", Verde: "#22C55E", Cinza: "#94A3B8" };
+  return h(DashCard, { id: "bloco-excecoes" },
+    h(DashTitulo, {
+      icone: "list",
       extra: `${todas.length} caso${todas.length !== 1 ? "s" : ""}`,
-      tooltip: "Os casos, um a um, por trás dos alertas, numa só tabela: pacientes esperando mais que o limite, remoções que saíram fora da meta, atrasos do protocolo de AVC e remoções não realizadas. A ordem vai do mais urgente (vermelho ou AVC) ao menos urgente; dentro de cada nível, a que espera há mais tempo. Sem limites ou metas cadastrados em Configurações, esses casos não são apontados."
+      tooltip: "Os casos, um a um, por trás dos alertas, numa só lista: pacientes esperando mais que o limite, remoções que saíram fora da meta, atrasos do protocolo de AVC e remoções não realizadas. A ordem vai do mais urgente (vermelho ou AVC) ao menos urgente; dentro de cada nível, a que espera há mais tempo. Sem limites ou metas cadastrados em Configurações, esses casos não são apontados."
     }, "Casos para atenção"),
-    h("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 } },
-      ORIGENS.map(([id, rot]) => h("button", { key: id, type: "button", "aria-pressed": filtro === id, onClick: () => { setFiltro(id); setTodos(false); },
-        style: { padding: "5px 12px", borderRadius: 8, border: "none", fontSize: 12, fontFamily: "inherit", cursor: "pointer", fontWeight: filtro === id ? 650 : 450, background: filtro === id ? "#0F172A" : "#F1F5F9", color: filtro === id ? "#fff" : "#64748B" } },
-        rot, h("span", { style: { marginLeft: 6, opacity: 0.75, fontVariantNumeric: "tabular-nums" } }, conta(id))))),
+    h("div", { className: "dsh-seg dsh-seg--sm", role: "group", "aria-label": "Filtrar casos", style: { marginBottom: 12 } },
+      ORIGENS.map(([id, rot]) => h("button", { key: id, type: "button", "aria-pressed": filtro === id, onClick: () => { setFiltro(id); setTodos(false); } },
+        rot, h("span", { className: "dsh-num", style: { marginLeft: 6, opacity: 0.6 } }, conta(id))))),
     lista.length === 0
-      ? h("div", { style: { fontSize: 12, color: "#15803D", padding: "6px 0" } }, "Nenhum caso nesta categoria.")
-      : h("div", { role: "table", "aria-label": "Casos para atenção", style: { overflowX: "auto" } },
-          h("div", { style: { minWidth: 760 } },
-            h("div", { role: "row", style: { display: "grid", gridTemplateColumns: GRID, gap: "0 10px", fontSize: 10, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", padding: "0 6px 6px" } },
-              ["Prioridade", "Paciente", "Gravidade", "Situação", "Tempo", "Motivo", ""].map((t, i) => h("span", { key: i, role: "columnheader" }, t))),
-            vista.map((x, i) => {
-              const [cor, bg, rot] = COR[x.pri] || COR[3];
-              return h("div", { key: i, role: "row", style: { display: "grid", gridTemplateColumns: GRID, gap: "0 10px", alignItems: "baseline", padding: "9px 6px", borderTop: "1px solid #F1F5F9" } },
-                h("span", { role: "cell" }, h("span", { style: { fontSize: 10.5, fontWeight: 700, color: cor, background: bg, borderRadius: 99, padding: "2px 9px" } }, rot)),
-                h("span", { role: "cell", style: { fontSize: 12.5, fontWeight: 600, color: "#0F172A", minWidth: 0 } }, x.nome, x.ficha && h("span", { style: { marginLeft: 6, fontWeight: 400, color: "#94A3B8", fontSize: 11 } }, x.ficha)),
-                cel(x.grav, { role: "cell" }), cel(x.situacao, { role: "cell" }),
-                cel(x.min === null || x.min === undefined ? "—" : fmtMin(x.min), { role: "cell", fontWeight: 700, color: cor, fontVariantNumeric: "tabular-nums" }),
-                cel(x.motivo, { role: "cell" }),
-                h("span", { role: "cell", style: { textAlign: "right" } },
-                  x.card && onAbrirCard ? h("button", { type: "button", onClick: () => onAbrirCard(x.card), style: { padding: "3px 10px", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: "1px solid #CBD5E1", background: "transparent", color: "#475569" } }, "abrir card")
-                    : x.id ? h("a", { href: `remocao.html?foco=${encodeURIComponent(x.id)}&campo=${encodeURIComponent(x.campo || "nome_paciente")}`, style: { fontSize: 11, fontWeight: 700, color: "#B45309", textDecoration: "none", whiteSpace: "nowrap" } }, "abrir linha →") : null));
-            }))),
-    lista.length > 15 && h("button", { type: "button", onClick: () => setTodos(v => !v),
-      style: { marginTop: 8, background: "none", border: "1px solid #E2E8F0", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, color: "#64748B", cursor: "pointer", fontFamily: "inherit" } },
+      ? h(DashVazio, { ok: true }, "Nenhum caso nesta categoria.")
+      : h("ul", { className: "dsh-list", "aria-label": "Casos para atenção" },
+          vista.map((x, i) => {
+            const [cor, bg, rot, faixa] = COR[x.pri] || COR[3];
+            return h("li", { key: i, className: "dsh-exc" },
+              h("span", { className: "dsh-exc__bar", style: { background: faixa } }),
+              h("div", { style: { minWidth: 0 } },
+                h("div", null, h("span", { className: "dsh-exc__n" }, x.nome), x.ficha && h("span", { className: "dsh-sub", style: { marginLeft: 8 } }, x.ficha)),
+                h("div", { className: "dsh-exc__m" },
+                  h("span", { className: "dsh-exc__t dsh-num", style: { color: cor } }, x.min === null || x.min === undefined ? "—" : fmtMin(x.min)),
+                  h("span", { className: "dsh-chip", style: { color: cor, background: bg } }, rot),
+                  h("span", { style: { display: "inline-flex", alignItems: "center", gap: 6 } }, h("span", { className: "dsh-dot", style: { background: GCOR[x.grav] || "#CBD5E1" } }), x.grav),
+                  h("span", null, x.situacao),
+                  h("span", null, x.motivo))),
+              h("div", { className: "dsh-exc__act" },
+                x.card && onAbrirCard ? h("button", { type: "button", className: "dsh-btn dsh-btn--sm", onClick: () => onAbrirCard(x.card) }, "abrir card")
+                  : x.id ? h("a", { href: `remocao.html?foco=${encodeURIComponent(x.id)}&campo=${encodeURIComponent(x.campo || "nome_paciente")}`, className: "dsh-btn dsh-btn--sm" }, "abrir linha", h(DashIcone, { n: "external", tam: 13 })) : null));
+          })),
+    lista.length > 15 && h("button", { type: "button", className: "dsh-btn dsh-btn--sm", style: { marginTop: 12 }, onClick: () => setTodos(v => !v) },
       todos ? "mostrar só os 15 primeiros" : `ver todos os ${lista.length}`),
     todas.length > 0 && h(DashLegenda, { itens: [
       ["Prioridade", "Urgente: paciente vermelho ou protocolo de AVC. Alta: amarelo ou reinserção. Média: os demais. Dentro de cada nível, o mais demorado vem primeiro."],
@@ -2146,130 +2699,17 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
     return out;
   }, [sla, protocolos, situacao]);
 
-  /* ═══ Animação de entrada ═════════════════════════════════════════════
-   * Números sobem até o valor e barras preenchem ao montar. easeOutCubic:
-   * começa rápido e desacelera — dá a sensação de chegar ao número, em vez
-   * de contar mecanicamente. ~900ms, curto o bastante para não atrasar a
-   * leitura de quem só quer conferir um dado.
-   * Respeita prefers-reduced-motion: quem pediu menos movimento no sistema
-   * recebe o valor final direto, sem animação nenhuma.
-   */
-  const semMovimento = typeof window !== "undefined" && window.matchMedia
-    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-  function useContagem(alvo, dur = 900) {
-    const [v, setV] = useState(semMovimento ? alvo : 0);
-    useEffect(() => {
-      if (semMovimento || typeof alvo !== "number" || !isFinite(alvo)) { setV(alvo); return; }
-      let raf, t0 = null;
-      const passo = t => {
-        if (t0 === null) t0 = t;
-        const p = Math.min((t - t0) / dur, 1);
-        setV(alvo * (1 - Math.pow(1 - p, 3)));
-        if (p < 1) raf = requestAnimationFrame(passo);
-      };
-      raf = requestAnimationFrame(passo);
-      return () => cancelAnimationFrame(raf);
-    }, [alvo, dur]);
-    return v;
-  }
-
-  // Dispara uma vez, logo após a montagem: as barras saem de 0 e crescem.
-  const [entrou, setEntrou] = useState(semMovimento);
-  useEffect(() => {
-    if (semMovimento) return;
-    const t = setTimeout(() => setEntrou(true), 40);
-    return () => clearTimeout(t);
-  }, []);
-
-  const Num = ({ valor, sufixo = "", casas = 0 }) => {
-    const v = useContagem(typeof valor === "number" ? valor : null);
-    if (typeof valor !== "number") return valor;
-    return /*#__PURE__*/React.createElement(React.Fragment, null, v.toFixed(casas), sufixo);
-  };
-
-  /* ═══ Primitivas visuais ══════════════════════════════════════════════ */
-  const Card = ({ children, style, onClick }) => /*#__PURE__*/React.createElement("div", {
-    onClick, className: onClick ? "ge-click" : undefined,
-    role: onClick ? "button" : undefined, tabIndex: onClick ? 0 : undefined,
-    onKeyDown: onClick ? (e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }) : undefined,
-    style: { background: "#fff", border: "1px solid #E8EDF3", borderRadius: 14,
-             padding: "16px 18px", cursor: onClick ? "pointer" : undefined,
-             transition: "box-shadow .15s, transform .15s", ...style }
-  }, children);
-
-  const Titulo = ({ children, extra, tooltip }) => /*#__PURE__*/React.createElement("div", {
-    style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }
-  },
-    /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#0F172A", letterSpacing: ".01em", display:"flex", alignItems:"center", gap:3 } }, children, tooltip && React.createElement(TipIcon,{texto:tooltip})),
-    extra && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10.5, color: "#94A3B8" } }, extra)
-  );
-
-  // Cobertura: quantos registros informaram o campo. Sem isto, um percentual
-  // sobre 56% da base parece um fato sobre 100%.
-  const Cobertura = ({ g }) => {
-    const baixa = g.cobertura < 80;
-    return /*#__PURE__*/React.createElement("div", {
-      title: `${g.informados} de ${g.total} registros informaram este campo`,
-      style: { fontSize: 10.5, color: baixa ? "#B45309" : "#94A3B8",
-               background: baixa ? "#FFFBEB" : "transparent",
-               border: baixa ? "1px solid #FDE68A" : "1px solid transparent",
-               borderRadius: 6, padding: baixa ? "1px 6px" : "1px 0" }
-    }, `${g.informados}/${g.total} informados`);
-  };
-
-  const Barra = ({ label, n, pct, max, cor, tag }) => /*#__PURE__*/React.createElement("div", {
-    style: { marginBottom: 9 }
-  },
-    /*#__PURE__*/React.createElement("div", {
-      style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4, gap: 8 }
-    },
-      /*#__PURE__*/React.createElement("span", {
-        style: { fontSize: 12, color: "#334155", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }
-      }, label,
-        tag && /*#__PURE__*/React.createElement("span", {
-          style: { marginLeft: 6, fontSize: 9, fontWeight: 700, color: "#6D28D9",
-                   background: "#F5F3FF", borderRadius: 4, padding: "1px 5px", verticalAlign: "middle" }
-        }, tag)),
-      /*#__PURE__*/React.createElement("span", {
-        style: { fontSize: 11.5, color: "#64748B", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }
-      }, /*#__PURE__*/React.createElement(Num, { valor: n }),
-         /*#__PURE__*/React.createElement("span", { style: { color: "#CBD5E1" } },
-           "  ", /*#__PURE__*/React.createElement(Num, { valor: pct, sufixo: "%" })))),
-    /*#__PURE__*/React.createElement("div", { style: { height: 6, background: "#F1F5F9", borderRadius: 99, overflow: "hidden" } },
-      /*#__PURE__*/React.createElement("div", {
-        style: { height: "100%", width: entrou ? `${max ? (n / max * 100) : 0}%` : "0%",
-                 background: cor, borderRadius: 99,
-                 transition: "width .75s cubic-bezier(.22,.9,.3,1)" } }))
-  );
-
-  const Vazio = ({ children }) => /*#__PURE__*/React.createElement("div", {
-    style: { fontSize: 11.5, color: "#CBD5E1", padding: "14px 0", textAlign: "center" }
-  }, children);
-
-  function TipIcon(props) { return React.createElement(DashDica, { texto: props.texto }); }
-  const Kpi = ({ label, valor, sub, cor, alerta, tooltip, onClick, ativo, topo }) => /*#__PURE__*/React.createElement(Card, {
-    onClick,
-    style: { ...(alerta ? { borderColor: "#FDE68A", background: "#FFFBEB" } : null), ...(ativo ? { borderColor: cor || "#0F172A", boxShadow: `0 0 0 1px ${cor || "#0F172A"}` } : null), ...(topo ? { borderTop: `3px solid ${topo}` } : null) }
-  },
-    /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 10.5, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 8, display:"flex", alignItems:"center", gap:2 }
-    }, label, tooltip && React.createElement(TipIcon, {texto: tooltip})),
-    /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 27, fontWeight: 700, color: cor || "#0F172A", lineHeight: 1, fontVariantNumeric: "tabular-nums" }
-    }, typeof valor === "number" ? /*#__PURE__*/React.createElement(Num, { valor }) : valor),
-    sub && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10.5, color: "#94A3B8", marginTop: 6 } }, sub)
-  );
+  /* ═══ Montagem da tela ═══════════════════════════════════════════════════
+   * Tudo acima (estados, filtros e contas) é o mesmo de antes; daqui para baixo é só a apresentação. Nenhum hook novo
+   * depois dos `return` de carregamento: a ordem dos hooks tem que ser sempre a mesma.                                */
+  const h = React.createElement;
 
   /* ─── Estados de carga ─────────────────────────────────────────────── */
-  if (carregando) return /*#__PURE__*/React.createElement("div", {
-    style: { padding: 60, textAlign: "center", color: "#94A3B8", fontSize: 13 }
-  }, "Carregando indicadores…");
+  if (carregando) return h("div", { className: "dsh dsh-estado" }, "Carregando indicadores…");
 
-  if (erro) return /*#__PURE__*/React.createElement("div", {
-    style: { padding: 28, margin: 20, background: "#FEF2F2", border: "1px solid #FECACA",
-             borderRadius: 12, color: "#991B1B", fontSize: 13, lineHeight: 1.6 }
-  }, /*#__PURE__*/React.createElement("b", null, "Não foi possível carregar as remoções."), " ", erro);
+  if (erro) return h("div", { className: "dsh", style: { padding: 20 } },
+    h("div", { className: "dsh-banner", style: { background: "#FEF2F2", borderColor: "#FECACA", color: "#991B1B" } },
+      h(DashIcone, { n: "alert", tam: 16 }), h("div", null, h("b", null, "Não foi possível carregar as remoções."), " ", erro)));
 
   const fmtDia = d => new Date(d + "T00:00:00").toLocaleDateString("pt-BR");
   const [deDia, ateDia] = tudo ? [amplitude.min, amplitude.max] : [fIni, fFim];
@@ -2322,292 +2762,218 @@ function Dashboard({ cards, cols, dashMode, setDashMode, isAdmin, lastPub, curre
   const recursos = gEspec.itens.filter(i => i.grupo === "recurso");
   const naoClass = gEspec.itens.filter(i => !i.grupo);
 
-  const btnEscala = (id, txt) => {
-    const on = escalaEfetiva === id, livre = escalaLiberada[id];
-    return /*#__PURE__*/React.createElement("button", {
-      key: id, onClick: () => livre && setEscala(id), disabled: !livre,
-      title: livre ? DICA_ESCALA[id] : motivoBloqueio[id],
-      style: { padding: "5px 13px", borderRadius: 7, border: "none", fontSize: 12,
-               fontWeight: on ? 650 : 450, cursor: livre ? "pointer" : "not-allowed",
-               background: on ? "#0F172A" : "transparent",
-               color: on ? "#fff" : livre ? "#64748B" : "#CBD5E1", fontFamily: "inherit" }
-    }, txt);
-  };
-
+  /* ─── Controles de período e escala ─── */
   const DICA_PERIODO = { tudo: "Todas as remoções da planilha, de qualquer data.", hoje: "Só as remoções pedidas hoje.", "7d": "Os últimos 7 dias, contando hoje.", mes: "Um mês inteiro, que você escolhe ao lado.", custom: "Um período à sua escolha: de uma data a outra." };
   const DICA_ESCALA = { dia: "O gráfico mostra um ponto por dia.", semana: "O gráfico mostra um ponto por semana (de segunda a domingo).", mes: "O gráfico mostra um ponto por mês." };
-  const btnPeriodo = (id, txt) => /*#__PURE__*/React.createElement("button", {
-    key: id, title: DICA_PERIODO[id],
+  const btnEscala = (id, txt) => {
+    const on = escalaEfetiva === id, livre = escalaLiberada[id];
+    return h("button", { key: id, type: "button", "aria-pressed": on, disabled: !livre, onClick: () => livre && setEscala(id), title: livre ? DICA_ESCALA[id] : motivoBloqueio[id] }, txt);
+  };
+  const btnPeriodo = (id, txt) => h("button", { key: id, type: "button", "aria-pressed": periodo === id, title: DICA_PERIODO[id],
     onClick: () => {
       setPeriodo(id);
       if (id === "custom" && (!ini || !fim)) { setIni(iso(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 29))); setFim(hojeIso); }
-    },
-    style: { padding: "5px 13px", borderRadius: 7, border: "none", fontSize: 12,
-             fontWeight: periodo === id ? 650 : 450, cursor: "pointer",
-             background: periodo === id ? "#E2E8F0" : "transparent",
-             color: periodo === id ? "#0F172A" : "#64748B", fontFamily: "inherit" }
-  }, txt);
+    } }, txt);
   const NOMES_MES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
   const anos = []; for (let y = 2025; y <= hoje.getFullYear(); y++) anos.push(y);
-  const estiloSel = { padding: "5px 9px", border: "1px solid #E2E8F0", borderRadius: 7, fontSize: 12, background: "#fff", color: "#0F172A", fontFamily: "inherit" };
 
-  return /*#__PURE__*/React.createElement("div", {
-    id: "dash-print-root",
+  /* ─── Números de apoio para o resumo do topo e para as abas ─── */
+  const porDia = diasNoPeriodo ? (totaisGraf.saidas / diasNoPeriodo).toFixed(1).replace(".", ",") : null;
+  const slaAval = sla.reduce((t, s) => t + s.avaliadas, 0), slaDentro = sla.reduce((t, s) => t + s.dentro, 0);
+  const nAguardando = cards.filter(c => DASH_COLUNAS_AGUARDANDO[c.col_id]).length;
+  const badges = {
+    "sec-agora": nAguardando > 0 ? { n: nAguardando } : null,
+    "sec-problemas": qualidade.nCorrigir > 0 ? { n: qualidade.nCorrigir, tom: "warn" } : null
+  };
+  const periodoTxt = deDia ? `${fmtDia(deDia)}${ateDia && ateDia !== deDia ? " a " + fmtDia(ateDia) : ""}` : "";
+
+  return h("div", { id: "dash-print-root", className: "dsh",
     // ao trocar de período a tela fica visível, só mais clara, até chegar o dado novo
-    style: { padding: "4px 0 40px", opacity: atualizando ? 0.6 : 1, transition: "opacity .15s" }
-  },
-    /*#__PURE__*/React.createElement("style", null, DASH_CSS_IMPRESSAO),
-    /*#__PURE__*/React.createElement("div", { className: "dash-print-only", style: { marginBottom: 14, paddingBottom: 8, borderBottom: "2px solid #0F172A" } },
-      /*#__PURE__*/React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#0F172A" } }, "Gerência de Enfermagem · Santa Casa de Francisco Morato — Painel de regulação"),
-      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11.5, color: "#475569", marginTop: 3 } },
-        `${periodo === "tudo" ? "Todos os registros" : "Período"}${deDia ? ": " + fmtDia(deDia) + (ateDia && ateDia !== deDia ? " a " + fmtDia(ateDia) : "") : ""} · ${totaisGraf.saidas} saídas de ambulância${diasNoPeriodo ? " (" + (totaisGraf.saidas / diasNoPeriodo).toFixed(1).replace(".", ",") + " por dia)" : ""} · ${dados.length} linhas · gerado em ${new Date().toLocaleString("pt-BR")}`)),
+    style: { padding: "4px 0 40px", opacity: atualizando ? 0.6 : 1, transition: "opacity .15s" } },
+    h("style", null, DASH_CSS_IMPRESSAO),
+    h("div", { className: "dash-print-only", style: { marginBottom: 14, paddingBottom: 8, borderBottom: "2px solid #0F172A" } },
+      h("div", { style: { fontSize: 16, fontWeight: 700, color: "#0F172A" } }, "Gerência de Enfermagem · Santa Casa de Francisco Morato — Painel de regulação"),
+      h("div", { style: { fontSize: 11.5, color: "#475569", marginTop: 3 } },
+        `${periodo === "tudo" ? "Todos os registros" : "Período"}${deDia ? ": " + fmtDia(deDia) + (ateDia && ateDia !== deDia ? " a " + fmtDia(ateDia) : "") : ""} · ${totaisGraf.saidas} saídas de ambulância${diasNoPeriodo ? " (" + porDia + " por dia)" : ""} · ${dados.length} linhas · gerado em ${new Date().toLocaleString("pt-BR")}`)),
 
-    /* ══ Controles ══ */
-    /*#__PURE__*/React.createElement("div", {
-      className: "dash-no-print",
-      style: { display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", marginBottom: 18 }
-    },
-      /*#__PURE__*/React.createElement("div", {
-        style: { display: "flex", gap: 2, background: "#F1F5F9", borderRadius: 9, padding: 3 }
-      }, [["tudo", "Tudo"], ["hoje", "Hoje"], ["7d", "Últimos 7 dias"], ["mes", "Mês"], ["custom", "Período"]].map(([id, txt]) => btnPeriodo(id, txt))),
+    /* ══ Barra de controles ══ */
+    h("div", { className: "dsh-bar-tools dash-no-print" },
+      h("div", { className: "dsh-seg", role: "group", "aria-label": "Período" }, [["tudo", "Tudo"], ["hoje", "Hoje"], ["7d", h(React.Fragment, null, h("span", { className: "dsh-hide-sm" }, "Últimos "), "7 dias")], ["mes", "Mês"], ["custom", "Período"]].map(([id, txt]) => btnPeriodo(id, txt))),
+      periodo === "mes" && h("div", { style: { display: "flex", gap: 6 } },
+        h("select", { "aria-label": "Mês", className: "dsh-in", value: mesSel, onChange: e => setMesSel(Number(e.target.value)) }, NOMES_MES.map((n, i) => h("option", { key: i, value: i }, n))),
+        h("select", { "aria-label": "Ano", className: "dsh-in", value: anoSel, onChange: e => setAnoSel(Number(e.target.value)) }, anos.map(y => h("option", { key: y, value: y }, y)))),
+      periodo === "custom" && h("div", { style: { display: "flex", gap: 6, alignItems: "center", fontSize: 13, color: "var(--muted)" } },
+        "de", h("input", { type: "date", className: "dsh-in", "aria-label": "Data inicial", value: ini, max: fim || undefined, onChange: e => setIni(e.target.value) }),
+        "a", h("input", { type: "date", className: "dsh-in", "aria-label": "Data final", value: fim, min: ini || undefined, onChange: e => setFim(e.target.value) })),
+      h("div", { className: "dsh-seg", role: "group", "aria-label": "Escala do gráfico" }, [["dia", "Diária"], ["semana", "Semanal"], ["mes", "Mensal"]].map(([i, t]) => btnEscala(i, t))),
+      h("span", { className: "dsh-bar-tools__sp" }),
+      h("button", { type: "button", className: "dsh-btn", onClick: () => setVerGlossario(true), title: "Explica, em palavras simples, cada termo do painel (mediana, P95, fora da unidade…)." }, h(DashIcone, { n: "book", tam: 15 }), "Glossário"),
+      h("button", { type: "button", className: "dsh-btn", onClick: imprimir, disabled: imprimindo, title: "Abre a impressão com todas as seções do painel, uma por página. Escolha “Salvar como PDF” para gerar o arquivo." },
+        h(DashIcone, { n: "printer", tam: 15 }), imprimindo ? "Preparando…" : "Imprimir / PDF")),
 
-      periodo === "mes" && /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6 } },
-        /*#__PURE__*/React.createElement("select", { "aria-label": "Mês", value: mesSel, onChange: e => setMesSel(Number(e.target.value)), style: estiloSel },
-          NOMES_MES.map((n, i) => /*#__PURE__*/React.createElement("option", { key: i, value: i }, n))),
-        /*#__PURE__*/React.createElement("select", { "aria-label": "Ano", value: anoSel, onChange: e => setAnoSel(Number(e.target.value)), style: estiloSel },
-          anos.map(y => /*#__PURE__*/React.createElement("option", { key: y, value: y }, y)))),
-
-      periodo === "custom" && /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: "#64748B" } },
-        "de", /*#__PURE__*/React.createElement("input", { type: "date", "aria-label": "Data inicial", value: ini, max: fim || undefined, onChange: e => setIni(e.target.value), style: estiloSel }),
-        "a", /*#__PURE__*/React.createElement("input", { type: "date", "aria-label": "Data final", value: fim, min: ini || undefined, onChange: e => setFim(e.target.value), style: estiloSel })),
-
-      /*#__PURE__*/React.createElement("div", {
-        style: { display: "flex", gap: 2, background: "#F1F5F9", borderRadius: 9, padding: 3 }
-      }, [["dia", "Diária"], ["semana", "Semanal"], ["mes", "Mensal"]].map(([i, t]) => btnEscala(i, t))),
-
-      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#94A3B8", marginLeft: "auto" } },
-        totaisGraf.saidas, " saídas de ambulância", diasNoPeriodo ? " (" + (totaisGraf.saidas / diasNoPeriodo).toFixed(1).replace(".", ",") + " por dia)" : "", " · ", dados.length, " linhas",
-        deDia && ` · ${fmtDia(deDia)}${ateDia && ateDia !== deDia ? " a " + fmtDia(ateDia) : ""}`,
-        atualizando && " · atualizando…"),
-      /*#__PURE__*/React.createElement("button", { type: "button", onClick: () => setVerGlossario(true), title: "Explica, em palavras simples, cada termo do painel (mediana, P95, fora da unidade…).",
-        style: { padding: "6px 12px", borderRadius: 9, border: "1px solid #CBD5E1", background: "#fff", color: "#334155", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" } }, "📖 Glossário"),
-      /*#__PURE__*/React.createElement("button", { type: "button", onClick: imprimir, disabled: imprimindo, title: "Abre a impressão com todas as seções do painel, uma por página. Escolha “Salvar como PDF” para gerar o arquivo.",
-        style: { padding: "6px 12px", borderRadius: 9, border: "1px solid #CBD5E1", background: "#fff", color: "#334155", fontSize: 12, fontWeight: 600, cursor: imprimindo ? "default" : "pointer", fontFamily: "inherit", opacity: imprimindo ? 0.6 : 1 } }, imprimindo ? "Preparando…" : "🖨 Imprimir / PDF")
-    ),
-
-    !faixa && /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 11.5, color: "#92400E", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 9, padding: "9px 13px", marginBottom: 16 }
-    }, "Escolha a data inicial e a final do período (a inicial não pode ser depois da final)."),
+    !faixa && h("div", { className: "dsh-aviso" }, "Escolha a data inicial e a final do período (a inicial não pode ser depois da final)."),
     /* Escala indisponível: diz o porquê em vez de esconder o botão */
-    !escalaLiberada[escala] && escala !== "dia" && /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 11.5, color: "#92400E", background: "#FFFBEB", border: "1px solid #FDE68A",
-               borderRadius: 9, padding: "9px 13px", marginBottom: 16 }
-    }, "Escala ", escala === "mes" ? "mensal" : "semanal", " ainda não disponível — ", motivoBloqueio[escala],
-       ". Mostrando a diária."),
-    /*#__PURE__*/React.createElement(DashNavSecoes, { ativa: secao, onSelect: setSecao }),
-    /*#__PURE__*/React.createElement(DashSecao, { id: "sec-agora", ativa: ativaSec("sec-agora") },
-    /* ══ Alertas do gestor + qualidade dos registros: cada chip leva ao bloco ══ */
-    /*#__PURE__*/React.createElement(DashAlertas, {
-      aba, agAberto, agFiltro, painel: painelAba, onIr: irParaBloco,
-      onTile: id => {
-        if (id === "aguardando" || id === "verm") {   // estes dois abrem a lista de aguardando, que fica logo abaixo
-          const f = id === "verm" ? "vermelhos" : "todos";
-          if (agAberto && agFiltro === f) setAgAberto(false); else { setAgAberto(true); setAgFiltro(f); }
-          setAba(null);
-        } else setAba(x => x === id ? null : id);
-      },
-      cards, cfg, hojeIso, sla, rein: reinsercao, qualidade, nCorrigir: qualidade.nCorrigir, emRemocao: cards.filter(c => c.col_id === "andamento").length, naoAtendidas: situacao.filter(c => c.id.startsWith("st:")).reduce((t, c) => t + c.itens.length, 0)
-    }),
-    /* ══ Pacientes aguardando agora (Kanban): aceite pendente e aceitos sem ambulância ══ */
-    /*#__PURE__*/React.createElement(DashAguardando, { cards, cfg, hojeIso, onAbrirCard, aoVivo: isAdmin, aberto: agAberto, onToggle: () => setAgAberto(v => !v), filtro: agFiltro, onFiltro: setAgFiltro, Titulo, fmtMin }),
-    /* ══ Pulso operacional — única seção que vem do Kanban (cartões clicáveis) ══ */
-    /*#__PURE__*/React.createElement("div", { id: "bloco-fila" }, /*#__PURE__*/React.createElement(DashFilaKanban, {
-      cols, cards, Card, Num,
-      titulo: isAdmin ? "Agora · fila do Kanban" : "Última publicação · fila do Kanban"
-    })),
-    ),
-    /*#__PURE__*/React.createElement(DashSecao, { id: "sec-atrasos", ativa: ativaSec("sec-atrasos") },
-    /* ══ Onde o tempo é gasto: as etapas do caminho e o tempo total ══ */
-    
-    /* ══ Tempo interno por motivo ══ */
-    /*#__PURE__*/React.createElement(DashMotivos, { linhas: temposLinha, limMotivo, Titulo, fmtMin }),
+    !escalaLiberada[escala] && escala !== "dia" && h("div", { className: "dsh-aviso" },
+      "Escala ", escala === "mes" ? "mensal" : "semanal", " ainda não disponível — ", motivoBloqueio[escala], ". Mostrando a diária."),
 
-    /* ══ Cumprimento da meta de tempo por gravidade (metas em Configurações) ══ */
-    /*#__PURE__*/React.createElement(DashSLA, { sla, semGrav: slaSemGrav, Titulo, fmtMin }),
-    /* ══ Tempos do caminho da remoção: 5 intervalos, clique para ver por gravidade ══ */
-    /*#__PURE__*/React.createElement(DashTempos, { intervalos, total: tempoTotal, Card, Kpi, Titulo, fmtMin }),
-    /* ══ Protocolo de AVC (Livro de Remoção): meta de saída em até 1h da finalização da CROSS ══ */
-    /*#__PURE__*/React.createElement(DashProtocoloAVC, { protocolos, totalRemocoes: dados.length, Card, Kpi, Titulo, Vazio, fmtMin }),
-    ),
-    /*#__PURE__*/React.createElement(DashSecao, { id: "sec-capacidade", ativa: ativaSec("sec-capacidade") },
-    /* ══ Frota e capacidade ══ */
-    /*#__PURE__*/React.createElement(DashFrota, { frota: frotaHoje, fora: foraStats, longas: longasFora, cobertura: coberturaFrota, Titulo, fmtMin }),
-    /* ══ Volume: saídas (barras) + pedidos à CROSS e finalizações da CROSS (linhas) ══ */
-    /*#__PURE__*/React.createElement(DashVolume, {
-      serie, escala: escalaEfetiva, rotulo: rotuloSerie, rotuloLongo: rotuloLongoSerie, entrou,
-      totais: totaisGraf, notas: notasGraf, Titulo, Vazio
-    }),
-    ),
-    /*#__PURE__*/React.createElement(DashSecao, { id: "sec-problemas", ativa: ativaSec("sec-problemas") },
-    /*#__PURE__*/React.createElement(DashReinsercao, { rein: reinsercao, Titulo }),
-    /* ══ Saneamento de falhas: substitui o balão. Tudo o que ficou fora da conta ou pede atenção, com link ou botão para abrir ══ */
-    /*#__PURE__*/React.createElement(DashSaneamento, {
-      grupos: problemas.grupos, total: dados.length, Titulo,
-      onAbrirCard, onAbrirAcoes, onAbrirLivro, podeJustificar,
-      onJustificar: d => { setJustModal(d); setJustTexto(""); }
-    }),
-    ),
-    /*#__PURE__*/React.createElement(DashSecao, { id: "sec-analise", ativa: ativaSec("sec-analise") },
-    /* ══ Remoções na planilha: CROSS + outras = total de linhas ══ */
-    /*#__PURE__*/React.createElement("div", { style: { marginBottom: 22 } },
-      /*#__PURE__*/React.createElement(Titulo, {
-        extra: "CROSS + outras = total de linhas",
-        tooltip: "Cada linha da planilha é uma remoção. Remoção CROSS é a que tem o número da ficha da CROSS; as outras (altas, hemodiálise, exames…) não têm ficha. As duas somam o total de linhas do período. Para comparar com a planilha inteira, escolha Tudo."
-      }, "Remoções na planilha"),
-      /*#__PURE__*/React.createElement("div", {
-        style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 12 }
-      },
-        /*#__PURE__*/React.createElement(Kpi, {
-          label: "Total de linhas", valor: tipos.total, sub: "remoções CROSS + outras remoções",
-          tooltip: "Todas as linhas da planilha no período escolhido. É sempre a soma dos dois cartões ao lado." }),
-        /*#__PURE__*/React.createElement(Kpi, {
-          label: "Remoções CROSS", valor: tipos.cross, cor: "#0369A1", sub: `${pctCross}% do total · com ficha CROSS`,
-          tooltip: "Linhas com o Nº da ficha CROSS preenchido." }),
-        /*#__PURE__*/React.createElement(Kpi, {
-          label: "Outras remoções", valor: tipos.outras, cor: "#475569", sub: `${pctOutras}% do total · sem ficha CROSS`,
-          tooltip: "Linhas sem ficha CROSS: altas, hemodiálise, exames etc." })),
-      tipos.total > 0 && /*#__PURE__*/React.createElement("div", {
-        title: `${tipos.cross} com ficha CROSS · ${tipos.outras} sem ficha`,
-        style: { display: "flex", height: 8, borderRadius: 99, overflow: "hidden", background: "#F1F5F9", marginTop: 12 }
-      },
-        /*#__PURE__*/React.createElement("div", { style: { width: entrou ? `${tipos.cross / tipos.total * 100}%` : "0%", background: "#0369A1", transition: "width .8s cubic-bezier(.22,.9,.3,1)" } }),
-        /*#__PURE__*/React.createElement("div", { style: { flex: 1, background: "#CBD5E1" } })),
-      !tudo && anomalas.some(r => !r.data_solicitacao) && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#B45309", marginTop: 8 } },
-        `${anomalas.filter(r => !r.data_solicitacao).length} linha${anomalas.filter(r => !r.data_solicitacao).length !== 1 ? "s" : ""} da planilha sem data de solicitação não pertence${anomalas.filter(r => !r.data_solicitacao).length !== 1 ? "m" : ""} a período nenhum e não entra${anomalas.filter(r => !r.data_solicitacao).length !== 1 ? "m" : ""} nestes totais (veja Saneamento de falhas).`)),
-    /*#__PURE__*/React.createElement(DashDestinos, { destinos, Titulo, fmtMin }),
-    /*#__PURE__*/React.createElement(DashPermanece, { tempos: temposLinha, C, geral: perm, Titulo, fmtMin }),
-    /* ══ Distribuições ══ */
-    /*#__PURE__*/React.createElement("div", {
-      style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(310px,1fr))", gap: 14 }
-    },
+    /* ══ Resumo do período: os quatro números que respondem "como estamos?" ══ */
+    h("div", { className: "dsh-grid dsh-g4 dsh-grid--tight dsh-resumo-grid", style: { marginBottom: 8 } },
+      h(DashKpi, { label: "Remoções no período", valor: tipos.total, sub: `${tipos.cross} CROSS · ${tipos.outras} outras`,
+        tooltip: "Todas as linhas da planilha no período escolhido (remoções CROSS + outras remoções)." }),
+      h(DashKpi, { label: "Saídas de ambulância", valor: totaisGraf.saidas, cor: "#2563EB", sub: porDia ? `${porDia} por dia` : "no período",
+        tooltip: "Quantas vezes a ambulância saiu da Santa Casa no período (qualquer linha, CROSS ou outras, com data e horário de saída)." }),
+      h(DashKpi, { label: "Dentro da meta", valor: slaAval ? Math.round(slaDentro / slaAval * 100) + "%" : "—", cor: slaAval ? "#15803D" : "#94A3B8",
+        sub: slaAval ? `${slaDentro} de ${slaAval} remoções avaliadas` : "sem meta cadastrada ou sem remoções medidas",
+        tooltip: "Das remoções que têm gravidade e os dois horários, quantas saíram no tempo da meta cadastrada em Configurações para a gravidade delas." }),
+      h(DashKpi, { label: "Tempo total (mediana)", valor: fmtMin(tempoTotal.mediana), cor: "#0F766E",
+        sub: tempoTotal.n ? `solicitação → retorno · ${tempoTotal.n} remoç${tempoTotal.n !== 1 ? "ões" : "ão"}` : "nenhuma remoção com todos os momentos",
+        tooltip: "Da solicitação à CROSS até a ambulância voltar, remoção por remoção, só nas que têm todos os horários preenchidos." })),
+    periodoTxt && h("div", { className: "dsh-resumo dash-no-print", style: { marginBottom: 16 } }, `${periodo === "tudo" ? "Todos os registros" : "Período"}: ${periodoTxt}${atualizando ? " · atualizando…" : ""}`),
 
-      /* Gravidade — proporção importa mais que valor absoluto */
-      /*#__PURE__*/React.createElement(Card, null,
-        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gGrav }), tooltip: "Quantos pacientes há em cada nível de urgência, segundo a prioridade da ficha da CROSS: vermelho = emergência, amarelo = urgência, verde = menos grave, cinza = agendamento." }, "Gravidade"),
-        gGrav.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
-        /*#__PURE__*/React.createElement(React.Fragment, null,
-          /*#__PURE__*/React.createElement("div", {
-            style: { display: "flex", height: 10, borderRadius: 99, overflow: "hidden", marginBottom: 14, background: "#F1F5F9" }
-          }, (C ? C.GRAVIDADE_ORDEM : []).map(g => {
-            const it = gGrav.itens.find(i => i.canonico === g); if (!it) return null;
-            return /*#__PURE__*/React.createElement("div", {
-              key: g, title: `${g}: ${it.n} (${it.pct.toFixed(0)}%)`,
-              style: { width: entrou ? `${it.pct}%` : "0%", background: C.GRAVIDADE_COR[g],
-                       transition: "width .8s cubic-bezier(.22,.9,.3,1)" } });
-          })),
-          (C ? C.GRAVIDADE_ORDEM : []).map(g => {
-            const it = gGrav.itens.find(i => i.canonico === g); if (!it) return null;
-            return /*#__PURE__*/React.createElement(Barra, {
-              key: g, label: g, n: it.n, pct: it.pct,
-              max: Math.max(...gGrav.itens.map(i => i.n)), cor: C.GRAVIDADE_COR[g] });
-          }))),
+    h(DashNavSecoes, { ativa: secao, onSelect: setSecao, badges }),
 
-      /* Especialidades — recursos apartados das clínicas */
-      /*#__PURE__*/React.createElement(Card, null,
-        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gEspec }), tooltip: "O que foi pedido à CROSS: especialidades médicas (clínica, ortopedia…) e recursos (exames, procedimentos). Os recursos ficam separados porque não disputam as mesmas vagas dos leitos." }, "Recursos solicitados"),
-        gEspec.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
-        /*#__PURE__*/React.createElement(React.Fragment, null,
-          recursos.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null,
-            recursos.map(i => /*#__PURE__*/React.createElement(Barra, {
-              key: i.canonico, label: i.canonico, n: i.n, pct: i.pct, tag: "recurso",
-              max: Math.max(...gEspec.itens.map(x => x.n)), cor: "#8B5CF6" })),
-            /*#__PURE__*/React.createElement("div", {
-              style: { height: 1, background: "#F1F5F9", margin: "12px 0 13px" } })),
-          clinicas.map(i => /*#__PURE__*/React.createElement(Barra, {
-            key: i.canonico, label: i.canonico, n: i.n, pct: i.pct,
-            max: Math.max(...gEspec.itens.map(x => x.n)), cor: "#6366F1" })),
-          naoClass.map(i => /*#__PURE__*/React.createElement(Barra, {
-            key: "nc", label: "Não classificado", n: i.n, pct: i.pct,
-            max: Math.max(...gEspec.itens.map(x => x.n)), cor: "#CBD5E1" })))),
+    /* ══ 1 · Agora ══ */
+    h(DashSecao, { id: "sec-agora", ativa: ativaSec("sec-agora") },
+      h(DashAlertas, {
+        aba, agAberto, agFiltro, painel: painelAba, onIr: irParaBloco,
+        onTile: id => {
+          if (id === "aguardando" || id === "verm") {   // estes dois abrem a lista de aguardando, que fica logo abaixo
+            const f = id === "verm" ? "vermelhos" : "todos";
+            if (agAberto && agFiltro === f) setAgAberto(false); else { setAgAberto(true); setAgFiltro(f); }
+            setAba(null);
+          } else setAba(x => x === id ? null : id);
+        },
+        cards, cfg, hojeIso, sla, rein: reinsercao, qualidade, nCorrigir: qualidade.nCorrigir, emRemocao: cards.filter(c => c.col_id === "andamento").length,
+        naoAtendidas: situacao.filter(c => c.id.startsWith("st:")).reduce((t, c) => t + c.itens.length, 0)
+      }),
+      h(DashAguardando, { cards, cfg, hojeIso, onAbrirCard, aoVivo: isAdmin, aberto: agAberto, onToggle: () => setAgAberto(v => !v), filtro: agFiltro, onFiltro: setAgFiltro }),
+      h(DashFilaKanban, { cols, cards, titulo: isAdmin ? "Agora · fila do Kanban" : "Última publicação · fila do Kanban" })),
 
-      /* Status */
-      /*#__PURE__*/React.createElement("div", { id: "bloco-desfecho", style: { display: "contents" } }, /*#__PURE__*/React.createElement(Card, null,
-        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gStatus }), tooltip: "O que aconteceu com cada pedido, segundo o status da planilha: finalizada pela CROSS, cancelada, paciente evadiu, resolvido no próprio hospital etc." }, "Desfecho"),
-        gStatus.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
-        gStatus.itens.map(i => /*#__PURE__*/React.createElement(Barra, {
-          key: i.canonico,
-          label: i.canonico === (C && C.NAO_CLASSIFICADO) ? "Não classificado" : i.canonico,
-          n: i.n, pct: i.pct, max: gStatus.itens[0].n,
-          cor: i.canonico === (C && C.NAO_CLASSIFICADO) ? "#CBD5E1" : "#64748B" })))),
+    /* ══ 2 · Atrasos ══ */
+    h(DashSecao, { id: "sec-atrasos", ativa: ativaSec("sec-atrasos") },
+      h(DashTempos, { intervalos, total: tempoTotal }),
+      h("div", { className: "dsh-grid dsh-g2" },
+        h(DashSLA, { sla, semGrav: slaSemGrav }),
+        h(DashMotivos, { linhas: temposLinha, limMotivo })),
+      h(DashProtocoloAVC, { protocolos, totalRemocoes: dados.length })),
 
-      /* Ambulância */
-      /*#__PURE__*/React.createElement(Card, null,
-        /*#__PURE__*/React.createElement(Titulo, { extra: /*#__PURE__*/React.createElement(Cobertura, { g: gAmb }), tooltip: "Básica: técnico e motorista. Avançada: tem médico a bordo, usada em casos graves; a UTI móvel conta como avançada. A porcentagem é sobre as linhas que têm o tipo preenchido (o número aparece no canto do cartão); as linhas sem tipo ficam de fora." }, "Tipo de ambulância"),
-        gAmb.itens.length === 0 ? /*#__PURE__*/React.createElement(Vazio, null, "Sem dados") :
-        gAmb.itens.map(i => /*#__PURE__*/React.createElement(Barra, {
-          key: i.canonico, label: i.canonico === (C && C.NAO_CLASSIFICADO) ? "Outro / não classificado" : i.canonico, n: i.n, pct: i.pct, max: gAmb.itens[0].n,
-          cor: i.canonico === "AVANÇADA" ? "#F59E0B" : "#64748B" })),
-        gAmb.total - gAmb.informados > 0 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: gAmb.cobertura < 80 ? "#B45309" : "#94A3B8", marginTop: 8, lineHeight: 1.5 } },
-          `${gAmb.total - gAmb.informados} linha${gAmb.total - gAmb.informados !== 1 ? "s" : ""} sem tipo de ambulância ficam fora desta conta${gAmb.cobertura < 80 ? ", então a porcentagem de avançadas pode estar subestimada" : ""}.`))
-    ),
-    ),
-    /*#__PURE__*/React.createElement(DashSecao, { id: "sec-excecoes", ativa: ativaSec("sec-excecoes") },
-    /*#__PURE__*/React.createElement(DashExcecoes, { cards, cfg, hojeIso, plan: excecoesPlan, onAbrirCard, Titulo, fmtMin }),
-    ),
+    /* ══ 3 · Capacidade ══ */
+    h(DashSecao, { id: "sec-capacidade", ativa: ativaSec("sec-capacidade") },
+      h(DashFrota, { frota: frotaHoje, fora: foraStats, longas: longasFora, cobertura: coberturaFrota }),
+      h(DashVolume, { serie, escala: escalaEfetiva, rotulo: rotuloSerie, rotuloLongo: rotuloLongoSerie, totais: totaisGraf, notas: notasGraf })),
+
+    /* ══ 4 · Problemas ══ */
+    h(DashSecao, { id: "sec-problemas", ativa: ativaSec("sec-problemas") },
+      h(DashReinsercao, { rein: reinsercao }),
+      h(DashSaneamento, {
+        grupos: problemas.grupos, total: dados.length,
+        onAbrirCard, onAbrirAcoes, onAbrirLivro, podeJustificar,
+        onJustificar: d => { setJustModal(d); setJustTexto(""); }
+      })),
+
+    /* ══ 5 · Análise ══ */
+    h(DashSecao, { id: "sec-analise", ativa: ativaSec("sec-analise") },
+      /* Remoções na planilha: CROSS + outras = total de linhas */
+      h(DashCard, { id: "bloco-planilha" },
+        h(DashTitulo, {
+          icone: "list", extra: "CROSS + outras = total de linhas",
+          tooltip: "Cada linha da planilha é uma remoção. Remoção CROSS é a que tem o número da ficha da CROSS; as outras (altas, hemodiálise, exames…) não têm ficha. As duas somam o total de linhas do período. Para comparar com a planilha inteira, escolha Tudo."
+        }, "Remoções na planilha"),
+        h("div", { className: "dsh-hero", style: { marginBottom: 0 } },
+          h("div", { className: "dsh-hero__num" },
+            h("div", { className: "dsh-big dsh-num" }, h(DashNum, { valor: tipos.total })),
+            h("div", { className: "dsh-sub" }, "linhas no período")),
+          h("div", { className: "dsh-hero__bar" },
+            h(DashEmpilhada, { alto: "lg", segs: [
+              { id: "cross", rot: "Remoções CROSS (com ficha)", valor: tipos.cross, cor: "#0369A1" },
+              { id: "outras", rot: "Outras remoções (sem ficha)", valor: tipos.outras, cor: "#CBD5E1" }] }))),
+        !tudo && anomalas.some(r => !r.data_solicitacao) && h("div", { className: "dsh-nota dsh-nota--warn", style: { marginTop: 12 } },
+          `${anomalas.filter(r => !r.data_solicitacao).length} linha${anomalas.filter(r => !r.data_solicitacao).length !== 1 ? "s" : ""} da planilha sem data de solicitação não pertence${anomalas.filter(r => !r.data_solicitacao).length !== 1 ? "m" : ""} a período nenhum e não entra${anomalas.filter(r => !r.data_solicitacao).length !== 1 ? "m" : ""} nestes totais (veja Saneamento de falhas).`)),
+      h(DashDestinos, { destinos }),
+      h(DashPermanece, { tempos: temposLinha, C, geral: perm }),
+
+      /* Distribuições */
+      h("div", { className: "dsh-grid dsh-g2" },
+        /* Gravidade — proporção importa mais que valor absoluto */
+        h(DashCard, null,
+          h(DashTitulo, { icone: "alert", extra: h(DashCobertura, { g: gGrav }), tooltip: "Quantos pacientes há em cada nível de urgência, segundo a prioridade da ficha da CROSS: vermelho = emergência, amarelo = urgência, verde = menos grave, cinza = agendamento." }, "Gravidade"),
+          gGrav.itens.length === 0 ? h(DashVazio, null, "Sem dados") : (() => {
+            const ordem = (C ? C.GRAVIDADE_ORDEM : []).map(g => ({ g, it: gGrav.itens.find(i => i.canonico === g) })).filter(x => x.it);
+            return h("div", { className: "dsh-rosca-box" },
+              h(DashRosca, { centro: gGrav.informados, sub: "com gravidade", segs: ordem.map(({ g, it }) => ({ id: g, rot: g, valor: it.n, cor: C.GRAVIDADE_COR[g] })) }),
+              h("div", { className: "dsh-lista-leg" },
+                ordem.map(({ g, it }) => h("div", { key: g },
+                  h("span", { className: "dsh-dot", style: { background: C.GRAVIDADE_COR[g] } }),
+                  h("span", { className: "dsh-lista-leg__n" }, g),
+                  h("b", { className: "dsh-num" }, it.n),
+                  h("span", { className: "dsh-leg__p", style: { minWidth: 36, textAlign: "right" } }, Math.round(it.pct) + "%")))));
+          })()),
+
+        /* Especialidades — recursos apartados das clínicas */
+        h(DashCard, null,
+          h(DashTitulo, { icone: "bars", extra: h(DashCobertura, { g: gEspec }), tooltip: "O que foi pedido à CROSS: especialidades médicas (clínica, ortopedia…) e recursos (exames, procedimentos). Os recursos ficam separados porque não disputam as mesmas vagas dos leitos." }, "Recursos solicitados"),
+          gEspec.itens.length === 0 ? h(DashVazio, null, "Sem dados") :
+          h(React.Fragment, null,
+            recursos.length > 0 && h(React.Fragment, null,
+              recursos.map(i => h(DashBarra, { key: i.canonico, label: i.canonico, n: i.n, pct: i.pct, tag: "recurso", max: Math.max(...gEspec.itens.map(x => x.n)), cor: "#8B5CF6" })),
+              h("div", { className: "dsh-sep", style: { margin: "12px 0" } })),
+            clinicas.map(i => h(DashBarra, { key: i.canonico, label: i.canonico, n: i.n, pct: i.pct, max: Math.max(...gEspec.itens.map(x => x.n)), cor: "#6366F1" })),
+            naoClass.map(i => h(DashBarra, { key: "nc", label: "Não classificado", n: i.n, pct: i.pct, max: Math.max(...gEspec.itens.map(x => x.n)), cor: "#CBD5E1" })))),
+
+        /* Status */
+        h(DashCard, { id: "bloco-desfecho" },
+          h(DashTitulo, { icone: "check", extra: h(DashCobertura, { g: gStatus }), tooltip: "O que aconteceu com cada pedido, segundo o status da planilha: finalizada pela CROSS, cancelada, paciente evadiu, resolvido no próprio hospital etc." }, "Desfecho"),
+          gStatus.itens.length === 0 ? h(DashVazio, null, "Sem dados") :
+          gStatus.itens.map(i => h(DashBarra, { key: i.canonico, label: i.canonico === (C && C.NAO_CLASSIFICADO) ? "Não classificado" : i.canonico,
+            n: i.n, pct: i.pct, max: gStatus.itens[0].n, cor: i.canonico === (C && C.NAO_CLASSIFICADO) ? "#CBD5E1" : "#64748B" }))),
+
+        /* Ambulância */
+        h(DashCard, null,
+          h(DashTitulo, { icone: "truck", extra: h(DashCobertura, { g: gAmb }), tooltip: "Básica: técnico e motorista. Avançada: tem médico a bordo, usada em casos graves; a UTI móvel conta como avançada. A porcentagem é sobre as linhas que têm o tipo preenchido (o número aparece no canto do cartão); as linhas sem tipo ficam de fora." }, "Tipo de ambulância"),
+          gAmb.itens.length === 0 ? h(DashVazio, null, "Sem dados") :
+          h(DashEmpilhada, { alto: "lg", segs: gAmb.itens.map(i => ({
+            id: i.canonico, rot: i.canonico === (C && C.NAO_CLASSIFICADO) ? "Outro / não classificado" : i.canonico, valor: i.n,
+            cor: i.canonico === (C && C.NAO_CLASSIFICADO) ? "#CBD5E1" : i.canonico === "AVANÇADA" ? "#F59E0B" : "#64748B" })) }),
+          gAmb.total - gAmb.informados > 0 && h("div", { className: "dsh-nota" + (gAmb.cobertura < 80 ? " dsh-nota--warn" : ""), style: { marginTop: 12 } },
+            `${gAmb.total - gAmb.informados} linha${gAmb.total - gAmb.informados !== 1 ? "s" : ""} sem tipo de ambulância ficam fora desta conta${gAmb.cobertura < 80 ? ", então a porcentagem de avançadas pode estar subestimada" : ""}.`)))),
+
+    /* ══ 6 · Exceções ══ */
+    h(DashSecao, { id: "sec-excecoes", ativa: ativaSec("sec-excecoes") },
+      h(DashExcecoes, { cards, cfg, hojeIso, plan: excecoesPlan, onAbrirCard })),
+
     /* ── Modal de justificativa ── */
-    justModal && React.createElement("div", {
-      onClick:function(e){if(e.target===e.currentTarget)setJustModal(null);},
-      style:{position:"fixed",inset:0,background:"rgba(15,23,42,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:16}
-    },
-      React.createElement("div", {style:{background:"#fff",borderRadius:16,width:"100%",maxWidth:460,boxShadow:"0 20px 60px rgba(0,0,0,.25)",overflow:"hidden"}},
-        React.createElement("div", {style:{padding:"14px 20px",borderBottom:"1px solid #F1F5F9",background:"#FEF2F2"}},
-          React.createElement("div", {style:{fontSize:10,fontWeight:700,color:"#B91C1C",textTransform:"uppercase",letterSpacing:".05em"}}, "Justificativa de discrepância"),
-          React.createElement("div", {style:{fontWeight:700,fontSize:14,color:"#0F172A",marginTop:2}}, "Por que este paciente tem prioridade?")
-        ),
-        React.createElement("div", {style:{padding:"16px 20px"}},
-          React.createElement("div", {style:{background:"#F8FAFC",border:"1px solid #E2E8F0",borderRadius:8,padding:"10px 12px",marginBottom:14,fontSize:12}},
-            React.createElement("div", {style:{fontWeight:700,marginBottom:2}}, justModal.aceitado.nome,
-              React.createElement("span", {style:{fontWeight:400,color:"#94A3B8",marginLeft:6,fontSize:11}},
-                "(" + ((GC[justModal.aceitado.grav]&&GC[justModal.aceitado.grav].label)||"") + ") \u2022 " + (justModal.aceitado.rec||""))),
-            React.createElement("div", {style:{fontSize:11,color:"#64748B",marginTop:4}},
-              "Aguarda: ", justModal.pendente.nome, " (", (GC[justModal.pendente.grav]&&GC[justModal.pendente.grav].label)||"", ")")
-          ),
-          React.createElement("label", {style:{fontSize:11,fontWeight:700,color:"#374151",display:"block",marginBottom:6}}, "Justificativa cl\xednica *"),
-          React.createElement("textarea", {
-            rows:4, value:justTexto,
-            onChange:function(e){setJustTexto(e.target.value);},
-            placeholder:"Ex: Protocolo de dor tor\xe1cica, aguarda exame. Complicação aguda justifica prioridade...",
-            style:{width:"100%",padding:"9px 11px",border:"1.5px solid #E2E8F0",borderRadius:8,fontSize:13,fontFamily:"inherit",resize:"vertical",outline:"none",lineHeight:1.5}
-          })
-        ),
-        React.createElement("div", {style:{padding:"10px 20px",borderTop:"1px solid #F1F5F9",display:"flex",gap:8,justifyContent:"flex-end"}},
-          React.createElement("button", {onClick:function(){setJustModal(null);},style:{padding:"7px 16px",borderRadius:8,border:"1px solid #E2E8F0",background:"none",color:"#64748B",fontWeight:600,fontSize:13,cursor:"pointer"}}, "Cancelar"),
-          React.createElement("button", {
-            disabled:!justTexto.trim()||justSaving,
-            onClick:async function(){
-              if(!justTexto.trim())return; setJustSaving(true);
-              var d=justModal;
-              try{
-                const rj=await fetch(SB_URL+"/rest/v1/discrepancia_justificativas",{method:"POST",headers:Object.assign({},H(),{Prefer:"return=minimal"}),body:JSON.stringify({card_id:d.aceitado.id,card_nome:d.aceitado.nome,card_grav:d.aceitado.grav,conflito_card_id:d.pendente.id,conflito_card_nome:d.pendente.nome,conflito_card_grav:d.pendente.grav,justificativa:justTexto.trim(),justificado_por_nome:(currentUser&&currentUser.nome)||""})});
-                if(!rj.ok) throw new Error(await rj.text());
-                setJustModal(null); showT("Justificativa registrada.");
-              }catch(ex){showT("Erro ao salvar: "+ex.message,"err");}
-              setJustSaving(false);
-            },
-            style:{padding:"7px 20px",borderRadius:8,border:"none",background:"#0F172A",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",opacity:(!justTexto.trim()||justSaving)?0.6:1}
-          }, justSaving?"Salvando...":"Registrar")
-        )
-      )
-    ),
+    justModal && h(DashModal, { titulo: "Por que este paciente tem prioridade?", sub: "Justificativa de discrepância", onClose: () => setJustModal(null), largura: 480 },
+      h("div", { style: { background: "var(--bg)", borderRadius: 12, padding: "12px 16px", marginBottom: 16, fontSize: 13 } },
+        h("div", { style: { fontWeight: 700 } }, justModal.aceitado.nome,
+          h("span", { className: "dsh-sub", style: { marginLeft: 6 } }, "(" + ((GC[justModal.aceitado.grav] && GC[justModal.aceitado.grav].label) || "") + ") • " + (justModal.aceitado.rec || ""))),
+        h("div", { className: "dsh-sub", style: { marginTop: 4 } }, "Aguarda: ", justModal.pendente.nome, " (", (GC[justModal.pendente.grav] && GC[justModal.pendente.grav].label) || "", ")")),
+      h("label", { htmlFor: "dash-just-texto", style: { fontSize: 13, fontWeight: 650, display: "block", marginBottom: 6 } }, "Justificativa clínica *"),
+      h("textarea", { id: "dash-just-texto", rows: 4, value: justTexto, onChange: e => setJustTexto(e.target.value),
+        placeholder: "Ex: Protocolo de dor torácica, aguarda exame. Complicação aguda justifica prioridade...",
+        className: "dsh-in", style: { width: "100%", height: "auto", padding: "10px 12px", resize: "vertical", lineHeight: 1.5 } }),
+      h("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 } },
+        h("button", { type: "button", className: "dsh-btn", onClick: () => setJustModal(null) }, "Cancelar"),
+        h("button", { type: "button", className: "dsh-btn dsh-btn--primary", disabled: !justTexto.trim() || justSaving,
+          onClick: async () => {
+            if (!justTexto.trim()) return; setJustSaving(true);
+            const d = justModal;
+            try {
+              const rj = await fetch(SB_URL + "/rest/v1/discrepancia_justificativas", { method: "POST", headers: Object.assign({}, H(), { Prefer: "return=minimal" }),
+                body: JSON.stringify({ card_id: d.aceitado.id, card_nome: d.aceitado.nome, card_grav: d.aceitado.grav, conflito_card_id: d.pendente.id, conflito_card_nome: d.pendente.nome, conflito_card_grav: d.pendente.grav, justificativa: justTexto.trim(), justificado_por_nome: (currentUser && currentUser.nome) || "" }) });
+              if (!rj.ok) throw new Error(await rj.text());
+              setJustModal(null); showT("Justificativa registrada.");
+            } catch (ex) { showT("Erro ao salvar: " + ex.message, "err"); }
+            setJustSaving(false);
+          } }, justSaving ? "Salvando..." : "Registrar"))),
+
     /* ══ Configurações do painel (frota, metas e limites): só administrador ══ */
-    isAdmin && /*#__PURE__*/React.createElement(DashConfig, { cfg, userNome, recarregar: recarregarCfg, showT, hojeIso }),
-    verGlossario && /*#__PURE__*/React.createElement(DashGlossario, { onClose: () => setVerGlossario(false) }),
+    isAdmin && h(DashConfig, { cfg, userNome, recarregar: recarregarCfg, showT, hojeIso }),
+    verGlossario && h(DashGlossario, { onClose: () => setVerGlossario(false) }),
 
     /* Rodapé honesto sobre a base */
-    /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 10.5, color: "#CBD5E1", marginTop: 18, lineHeight: 1.6 }
-    }, "Indicadores calculados sobre a planilha de remoções. ",
-       "Percentuais usam como denominador os registros que informaram cada campo — o número aparece ao lado de cada bloco.")
+    h("div", { className: "dsh-nota", style: { marginTop: 24, color: "var(--faint)" } },
+      "Indicadores calculados sobre a planilha de remoções. ",
+      "Percentuais usam como denominador os registros que informaram cada campo — o número aparece ao lado de cada bloco.")
   );
 }
 
