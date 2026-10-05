@@ -1321,40 +1321,54 @@ function DuplicatesModal({rows,onClose,onDelete,rotulo}){
   const [selected,setSelected]=React.useState(new Set());
   const [deleted,setDeleted]=React.useState(new Set());
   const [confirming,setConfirming]=React.useState(false);
+  const [armado,setArmado]=React.useState(false);   // 1º clique arma o botão; o 2º exclui
+  const [falhas,setFalhas]=React.useState(0);       // quantos o servidor recusou na última exclusão
 
-  // Agrupa por nome normalizado
+  // Duplicata = mesmo nome + mesma data de solicitação + mesma ficha CROSS.
+  // Só o nome não basta: o mesmo paciente pode ter sido removido em dias diferentes, e isso é legítimo.
+  // Dentro de cada grupo, o mais antigo (created_at) vem primeiro: é o que "Marcar duplicatas" preserva.
   const groups=React.useMemo(()=>{
     const norm=s=>(s||"").trim().toUpperCase().replace(/\s+/g," ");
     const map={};
     rows.forEach(r=>{
-      const k=norm(r.nome_paciente);
+      if(!norm(r.nome_paciente)) return;   // sem nome não dá para dizer que é duplicata
+      const k=[norm(r.nome_paciente),r.data_solicitacao||"",norm(r.ficha_cross)].join("|");
       if(!map[k])map[k]=[];
       map[k].push(r);
     });
-    return Object.values(map).filter(g=>g.length>1);
+    return Object.values(map)
+      .filter(g=>g.length>1)
+      .map(g=>[...g].sort((a,b)=>String(a.created_at||"").localeCompare(String(b.created_at||""))));
   },[rows]);
 
   if(groups.length===0) return(
     <div className="mbk">
       <div className="mdl" style={{maxWidth:420}}>
-        <div className="mhd"><div><h2>✅ Sem duplicatas</h2><p>Nenhum nome repetido encontrado{rotulo?` em: ${rotulo}`:""}.</p></div>
+        <div className="mhd"><div><h2>✅ Sem duplicatas</h2><p>Nenhum registro repetido (mesmo nome, data e ficha){rotulo?` em: ${rotulo}`:""}.</p></div>
           <button className="btn btn-g btn-sm" onClick={onClose}><Ico n="x" s={13}/></button></div>
-        <div className="mbd"><p style={{color:"#64748B",fontSize:13}}>Todos os registros{rotulo?" do período exibido":""} têm nomes únicos.</p></div>
+        <div className="mbd"><p style={{color:"#64748B",fontSize:13}}>Nenhum paciente aparece duas vezes com a mesma data de solicitação e a mesma ficha{rotulo?" no período exibido":""}.</p></div>
         <div className="mft"><button className="btn btn-p" onClick={onClose}>Fechar</button></div>
       </div>
     </div>
   );
 
-  function toggleSel(id){ setSelected(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;}); }
+  function toggleSel(id){ setArmado(false); setFalhas(0); setSelected(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;}); }
   function selectDups(group){
-    // seleciona todos exceto o primeiro (mais antigo)
+    // seleciona todos exceto o primeiro (o mais antigo, pela ordenação do grupo)
+    setArmado(false); setFalhas(0);
     setSelected(p=>{const n=new Set(p);group.slice(1).forEach(r=>n.add(r.id));return n;});
   }
 
   async function handleDelete(){
     setConfirming(true);
+    setArmado(false);
     const ids=[...selected];
-    for(const id of ids){ try{ await onDelete(id); setDeleted(p=>new Set([...p,id])); }catch{} }
+    let falhou=0;
+    for(const id of ids){
+      try{ await onDelete(id); setDeleted(p=>new Set([...p,id])); }
+      catch{ falhou++; }   // só marca como excluído quando o servidor confirmou
+    }
+    setFalhas(falhou);
     setSelected(new Set());
     setConfirming(false);
   }
@@ -1370,7 +1384,7 @@ function DuplicatesModal({rows,onClose,onDelete,rotulo}){
         <div className="mhd">
           <div>
             <h2>🔍 Verificação de duplicatas</h2>
-            <p style={{marginTop:3,fontSize:12,color:"#64748B"}}>{groups.length} nome{groups.length!==1?"s":""} repetido{groups.length!==1?"s":""} · {groups.reduce((a,g)=>a+g.length,0)} registros envolvidos{rotulo?` · ${rotulo}`:""}</p>
+            <p style={{marginTop:3,fontSize:12,color:"#64748B"}}>{groups.length} grupo{groups.length!==1?"s":""} de registros repetidos (mesmo nome, data e ficha) · {groups.reduce((a,g)=>a+g.length,0)} registros envolvidos{rotulo?` · ${rotulo}`:""}</p>
           </div>
           <button className="btn btn-g btn-sm" onClick={onClose}><Ico n="x" s={13}/></button>
         </div>
@@ -1382,7 +1396,7 @@ function DuplicatesModal({rows,onClose,onDelete,rotulo}){
               <div key={gi} style={{marginBottom:20,background:"#F8FAFC",borderRadius:10,border:"1px solid #E2E8F0",overflow:"hidden"}}>
                 {/* cabeçalho do grupo */}
                 <div style={{padding:"8px 12px",background:"#EFF6FF",borderBottom:"1px solid #DBEAFE",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-                  <div style={{fontWeight:700,fontSize:12,color:"#1E40AF"}}>{visibles[0].nome_paciente} <span style={{fontWeight:400,color:"#64748B"}}>({visibles.length} registros)</span></div>
+                  <div style={{fontWeight:700,fontSize:12,color:"#1E40AF"}}>{visibles[0].nome_paciente} <span style={{fontWeight:400,color:"#64748B"}}>({visibles.length} registros{visibles[0].data_solicitacao?` · solicitação ${fmtD(visibles[0].data_solicitacao)}`:""})</span></div>
                   <button className="btn btn-g btn-sm" onClick={()=>selectDups(visibles)} title="Marcar duplicatas para excluir">Marcar duplicatas</button>
                 </div>
                 {/* cards lado a lado */}
@@ -1418,11 +1432,11 @@ function DuplicatesModal({rows,onClose,onDelete,rotulo}){
           )}
         </div>
         <div className="mft" style={{justifyContent:"space-between"}}>
-          <div style={{fontSize:12,color:"#64748B"}}>{selected.size>0?`${selected.size} selecionado${selected.size!==1?"s":""} para excluir`:"Clique nos cards para selecionar"}</div>
+          <div style={{fontSize:12,color:falhas>0?"#DC2626":"#64748B"}}>{falhas>0?`${falhas} registro${falhas!==1?"s":""} não pôde${falhas!==1?"ram":""} ser excluído${falhas!==1?"s":""} (o servidor recusou). Recarregue a lista e tente de novo.`:selected.size>0?`${selected.size} selecionado${selected.size!==1?"s":""} para excluir`:"Clique nos cards para selecionar"}</div>
           <div style={{display:"flex",gap:8}}>
             <button className="btn btn-g" onClick={onClose}>Fechar</button>
-            <button className="btn" style={{background:"#DC2626",color:"#fff",opacity:selected.size===0||confirming?0.5:1}} disabled={selected.size===0||confirming} onClick={handleDelete}>
-              {confirming?"Excluindo…":`🗑 Excluir ${selected.size} selecionado${selected.size!==1?"s":""}`}
+            <button className="btn" style={{background:"#DC2626",color:"#fff",opacity:selected.size===0||confirming?0.5:1}} disabled={selected.size===0||confirming} onClick={()=>armado?handleDelete():setArmado(true)}>
+              {confirming?"Excluindo…":armado?`Confirmar: excluir ${selected.size}`:`🗑 Excluir ${selected.size} selecionado${selected.size!==1?"s":""}`}
             </button>
           </div>
         </div>
@@ -1814,17 +1828,23 @@ function App(){
     }catch(e){push(e.message,"err");}
   };
 
-  const handleDelete=async(id)=>{
+  // Exclui UM registro, sem perguntar nada. Se o servidor recusar, LANÇA o erro: quem chamou decide o que mostrar.
+  // (Antes, o erro era engolido e o modal de Duplicatas dava a linha como excluída mesmo sem ter sido.)
+  const excluirPorId=async(id)=>{
+    if(!id) throw new Error("Registro sem ID válido — recarregue a página.");
+    await api({action:"delete",id});
+    setRows(r=>r.filter(x=>x.id!==id));
+  };
+
+  // Pedido de exclusão aguardando confirmação no modal: {tipo:"um",id,nome,data} ou {tipo:"periodo"}
+  const [pedidoExclusao,setPedidoExclusao]=useState(null);
+  const [textoConfirma,setTextoConfirma]=useState("");
+
+  const handleDelete=(id)=>{
     if(!id){push("Este registro não tem ID válido — recarregue a página e tente novamente.","err");return;}
-    if(!confirm("Excluir este registro permanentemente?"))return;
-    try{
-      await api({action:"delete",id});
-      push("Excluído");
-      setRows(r=>r.filter(x=>x.id!==id));
-    }catch(e){
-      push("Erro ao excluir: "+(e.message||"desconhecido")+" — recarregando a lista.","err");
-      await load();
-    }
+    const r=rows.find(x=>x.id===id);
+    setTextoConfirma("");
+    setPedidoExclusao({tipo:"um",id,nome:r?.nome_paciente||"(sem nome)",data:r?.data_solicitacao||null});
   };
 
   // Feature 4: deletar linhas selecionadas
@@ -1845,19 +1865,36 @@ function App(){
   };
 
   // Só apaga o que está CARREGADO, ou seja, o período exibido. Os outros períodos não são tocados.
-  const handleDeleteAll=async()=>{
+  const handleDeleteAll=()=>{
     if(rows.length===0)return;
-    const conf=prompt(`Isso vai excluir TODOS os ${rows.length} registros do período exibido (${faixa.rotulo}), permanentemente. Registros de outros períodos não são afetados. Digite EXCLUIR para confirmar:`);
-    if(conf!=="EXCLUIR")return;
+    setTextoConfirma("");
+    setPedidoExclusao({tipo:"periodo"});
+  };
+
+  // Executa o que o modal de confirmação (um registro ou período) pediu
+  const executarExclusao=async()=>{
+    const pe=pedidoExclusao;
+    if(!pe||saving)return;
+    if(pe.tipo==="periodo"&&textoConfirma.trim()!=="EXCLUIR")return;
     setSaving(true);
-    let ok=0,fail=0;
-    for(const r of rows){
-      try{await api({action:"delete",id:r.id});ok++;}
-      catch{fail++;}
+    if(pe.tipo==="um"){
+      try{ await excluirPorId(pe.id); push("Excluído"); }
+      catch(e){
+        push("Erro ao excluir: "+(e.message||"desconhecido")+" — recarregando a lista.","err");
+        await load();
+      }
+    }else{
+      let ok=0,fail=0;
+      for(const r of rows){
+        try{await api({action:"delete",id:r.id});ok++;}
+        catch{fail++;}
+      }
+      push(`${ok} registro${ok!==1?"s":""} excluído${ok!==1?"s":""}${fail>0?` (${fail} falharam)`:""}`,fail>0?"err":"ok");
+      await load();
     }
     setSaving(false);
-    push(`${ok} registro${ok!==1?"s":""} excluído${ok!==1?"s":""}${fail>0?` (${fail} falharam)`:""}`,fail>0?"err":"ok");
-    await load();
+    setPedidoExclusao(null);
+    setTextoConfirma("");
   };
 
   const [showPaste,setShowPaste]=useState(false);
@@ -2416,7 +2453,16 @@ function App(){
           <div className="confirm-modal">
             <div style={{marginBottom:16}}>
               <div style={{fontWeight:700,fontSize:15,color:"#0F172A",marginBottom:6}}>Excluir {selectedRows.size} registro{selectedRows.size!==1?"s":""}?</div>
-              <div style={{fontSize:13,color:"#64748B",lineHeight:1.5}}>Esta ação é permanente e não pode ser desfeita. Os registros selecionados serão removidos do banco de dados.</div>
+              <div style={{fontSize:13,color:"#64748B",lineHeight:1.5}}>Os registros saem da planilha e do dashboard. O banco guarda uma cópia de cada um, que só pode ser restaurada por quem administra o Supabase.</div>
+              {(()=>{
+                const sel=rows.filter(r=>selectedRows.has(r.id));
+                return sel.length>0&&(
+                  <div style={{marginTop:12,padding:"8px 10px",background:"#F8FAFC",border:"1px solid #E2E8F0",borderRadius:8,fontSize:12,color:"#374151",lineHeight:1.6,maxHeight:140,overflowY:"auto"}}>
+                    {sel.slice(0,8).map(r=><div key={r.id}>{r.nome_paciente||"(sem nome)"}{r.data_solicitacao?<span style={{color:"#94A3B8"}}> · {fmtD(r.data_solicitacao)}</span>:null}</div>)}
+                    {sel.length>8&&<div style={{color:"#94A3B8"}}>e mais {sel.length-8}</div>}
+                  </div>
+                );
+              })()}
             </div>
             <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
               <button className="btn btn-g" onClick={()=>setShowDeleteConfirm(false)} disabled={saving}>Cancelar</button>
@@ -2432,7 +2478,47 @@ function App(){
       {showPaste&&<PasteModal onClose={()=>setShowPaste(false)} onImport={handleImportPaste}/>}
       {importErrors&&<ImportResultModal data={importErrors} onClose={()=>setImportErrors(null)}/>}
       {exportResult&&<ExportResultModal data={exportResult} onClose={()=>setExportResult(null)}/>}
-      {showDuplicates&&<DuplicatesModal rows={rows} rotulo={faixa.rotulo} onClose={()=>setShowDuplicates(false)} onDelete={async(id)=>{await handleDelete(id);}}/>}
+      {pedidoExclusao&&(()=>{
+        const pe=pedidoExclusao, periodo=pe.tipo==="periodo";
+        const datas=rows.map(r=>r.data_solicitacao).filter(Boolean).sort();
+        const podeConfirmar=!saving&&(!periodo||textoConfirma.trim()==="EXCLUIR");
+        return(
+          <div className="mbk" onClick={()=>{if(!saving){setPedidoExclusao(null);setTextoConfirma("");}}}>
+            <div className="confirm-modal" style={{maxWidth:440}} onClick={e=>e.stopPropagation()}>
+              <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+                <div style={{width:36,height:36,borderRadius:10,background:"#FEF2F2",color:"#DC2626",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ico n="trash" s={16}/></div>
+                <div style={{minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:15,color:"#0F172A"}}>{periodo?`Excluir ${rows.length} registro${rows.length!==1?"s":""} do período?`:"Excluir este registro?"}</div>
+                  <div style={{fontSize:13,color:"#64748B",lineHeight:1.5,marginTop:4}}>
+                    {periodo
+                      ?<>Período exibido: <strong style={{color:"#0F172A"}}>{faixa.rotulo}</strong>{datas.length>0&&<> (solicitações de {fmtD(datas[0])} a {fmtD(datas[datas.length-1])})</>}. Registros de outros períodos não são afetados.</>
+                      :<><strong style={{color:"#0F172A"}}>{pe.nome}</strong>{pe.data&&<> · solicitação em {fmtD(pe.data)}</>}.</>}
+                    {" "}Os registros saem da planilha e do dashboard. O banco guarda uma cópia de cada um, que só pode ser restaurada por quem administra o Supabase.
+                  </div>
+                </div>
+              </div>
+              {periodo&&(
+                <div style={{marginTop:16}}>
+                  <label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:6}}>Digite EXCLUIR para confirmar</label>
+                  <input autoFocus value={textoConfirma} onChange={e=>setTextoConfirma(e.target.value)}
+                    onKeyDown={e=>{if(e.key==="Enter"&&podeConfirmar)executarExclusao();}}
+                    placeholder="EXCLUIR" disabled={saving}
+                    style={{width:"100%",height:38,padding:"0 12px",border:"1px solid #CBD5E1",borderRadius:8,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+                </div>
+              )}
+              <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:20}}>
+                <button className="btn btn-g" disabled={saving} onClick={()=>{setPedidoExclusao(null);setTextoConfirma("");}}>Cancelar</button>
+                <button className="btn" disabled={!podeConfirmar}
+                  style={{background:"#DC2626",color:"#fff",padding:"7px 16px",opacity:podeConfirmar?1:0.45,cursor:podeConfirmar?"pointer":"not-allowed"}}
+                  onClick={executarExclusao}>
+                  {saving?"Excluindo…":periodo?"Excluir período":"Excluir"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+      {showDuplicates&&<DuplicatesModal rows={rows} rotulo={faixa.rotulo} onClose={()=>setShowDuplicates(false)} onDelete={excluirPorId}/>}
       {modal!==null&&<FormModal row={modal} onClose={()=>setModal(null)} onSave={handleSave} saving={saving}/>}
       {tipAtivo&&<div className="tipfix" style={{left:tipAtivo.x,top:tipAtivo.y}}>
         <strong>Planilha:</strong> {tipAtivo.planilha}<br/>
