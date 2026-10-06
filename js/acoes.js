@@ -1,10 +1,11 @@
 /* ============================================================================
    Ações de Enfermagem — v3
    - Cada pessoa abre direto na SUA lista (Atrasadas, Hoje, Próximos dias, Sem prazo, Programadas)
+   - Qualquer pessoa cria tarefas e rotinas PARA SI; só quem gerencia atribui a outras pessoas
    - Aba "Equipe" (quem gerencia) mostra todo mundo, agrupado por responsável
    - Tarefas programadas: aparecem na lista só a partir do dia escolhido
    - Rotinas: repetem todo dia, dias úteis, dias da semana, todo mês ou a cada N dias
-   Precisa da função acoes-write v3 e do SQL 01_banco_acoes.sql já aplicados.
+   Precisa da função acoes-write v4 e do SQL 01_banco_acoes.sql já aplicados.
    Tudo fica dentro desta função anônima para não colidir com nomes de outros arquivos.
    ============================================================================ */
 (function () {
@@ -274,11 +275,11 @@
           a.tempo_min > 0 && h(Chip, { icone: "timer" }, fmtTempo(a.tempo_min)),
           c.mostrarResp && h(Chip, { icone: "user" }, a.responsavel_nome || "Sem responsável")
         ),
-        (podeAgir || c.podeGerir) && h("div", { className: "ac-actions" },
+        (podeAgir || c.podeEditar(a)) && h("div", { className: "ac-actions" },
           podeAgir && (a.status === "pendente" || a.status === "pausada") && h("button", { type: "button", className: "ac-btn ac-btn--secondary ac-btn--sm", onClick: function () { c.iniciar(a); } }, h(Ic, { n: "play", size: 13 }), a.status === "pausada" ? "Retomar" : "Iniciar"),
           podeAgir && a.status === "iniciada" && h("button", { type: "button", className: "ac-btn ac-btn--secondary ac-btn--sm", onClick: function () { c.pausar(a); } }, h(Ic, { n: "pause", size: 13 }), "Pausar"),
-          c.podeGerir && h("button", { type: "button", className: "ac-icon-btn", "aria-label": "Editar", title: "Editar", onClick: function () { c.editar(a); } }, h(Ic, { n: "pencil", size: 16 })),
-          c.podeGerir && h("button", { type: "button", className: "ac-icon-btn is-danger", "aria-label": "Excluir", title: "Excluir", onClick: function () { c.excluir(a); } }, h(Ic, { n: "trash", size: 16 }))
+          c.podeEditar(a) && h("button", { type: "button", className: "ac-icon-btn", "aria-label": "Editar", title: "Editar", onClick: function () { c.editar(a); } }, h(Ic, { n: "pencil", size: 16 })),
+          c.podeEditar(a) && h("button", { type: "button", className: "ac-icon-btn is-danger", "aria-label": "Excluir", title: "Excluir", onClick: function () { c.excluir(a); } }, h(Ic, { n: "trash", size: 16 }))
         )
       )
     );
@@ -298,7 +299,7 @@
           h(Chip, null, "Desde " + fmtDia(r.data_inicio)),
           !r.ativa && h(Chip, { tom: "warn", icone: "pause" }, "Rotina pausada")
         ),
-        h("div", { className: "ac-actions" },
+        p.podeEditar && h("div", { className: "ac-actions" },
           h("button", { type: "button", className: "ac-btn ac-btn--secondary ac-btn--sm", onClick: function () { p.ativar(r); } }, h(Ic, { n: r.ativa ? "pause" : "play", size: 13 }), r.ativa ? "Pausar rotina" : "Retomar rotina"),
           h("button", { type: "button", className: "ac-icon-btn", "aria-label": "Editar rotina", title: "Editar", onClick: function () { p.editar(r); } }, h(Ic, { n: "pencil", size: 16 })),
           h("button", { type: "button", className: "ac-icon-btn is-danger", "aria-label": "Excluir rotina", title: "Excluir", onClick: function () { p.excluir(r); } }, h(Ic, { n: "trash", size: 16 }))
@@ -400,13 +401,13 @@
             h(Campo, { id: "ac-desc", rotulo: "Descrição (opcional)", cheio: true }, h("textarea", { id: "ac-desc", className: "ac-textarea", value: f.descricao, onChange: function (e) { set("descricao", e.target.value); }, placeholder: "O que precisa ser feito, detalhes importantes…" })))),
 
         h("div", { className: "ac-group" },
-          h("h3", { className: "ac-group-t" }, "Quem faz"),
+          h("h3", { className: "ac-group-t" }, p.podeGerir ? "Quem faz" : "Prioridade"),
           h("div", { className: "ac-grid" },
-            h(Campo, { id: "ac-resp", rotulo: "Responsável", cheio: true },
+            p.podeGerir && h(Campo, { id: "ac-resp", rotulo: "Responsável", cheio: true },
               h("select", { id: "ac-resp", className: "ac-select", value: f.responsavel_id, onChange: function (e) { set("responsavel_id", e.target.value); } },
                 h("option", { value: "" }, "Sem responsável"),
                 p.users.map(function (u) { return h("option", { key: u.id, value: u.id }, u.nome + (u.tipo ? " (" + u.tipo + " " + (u.coren || u.crm || "") + ")" : "")); }))),
-            h(Campo, { id: "ac-pri", rotulo: "Prioridade", dica: "1 é a mais urgente." }, h("input", { id: "ac-pri", className: "ac-input", type: "number", min: 1, step: 1, value: f.prioridade, onChange: function (e) { set("prioridade", e.target.value); }, placeholder: "Opcional" })))),
+            h(Campo, { id: "ac-pri", rotulo: p.podeGerir ? "Prioridade" : "Prioridade (opcional)", cheio: !p.podeGerir, dica: p.podeGerir ? "1 é a mais urgente." : "1 é a mais urgente. Esta tarefa será só sua." }, h("input", { id: "ac-pri", className: "ac-input", type: "number", min: 1, step: 1, value: f.prioridade, onChange: function (e) { set("prioridade", e.target.value); }, placeholder: "Opcional" })))),
 
         h("div", { className: "ac-group" },
           h("h3", { className: "ac-group-t" }, "Quando"),
@@ -509,9 +510,7 @@
       } catch (e) {
         if (vivo.current) setErroLoad(e.message || "Não foi possível carregar as tarefas.");
       }
-      if (podeGerir) {
-        try { var rr = await getJSON("acoes_recorrentes?order=created_at.asc&limit=300"); if (vivo.current && Array.isArray(rr)) setRotinas(rr); } catch (e) { /* tabela ainda não criada: aba Rotinas fica vazia */ }
-      }
+      try { var rr = await getJSON("acoes_recorrentes?order=created_at.asc&limit=300" + filtro); if (vivo.current && Array.isArray(rr)) setRotinas(rr); } catch (e) { /* tabela ainda não criada: aba Rotinas fica vazia */ }
       if (vivo.current) setLoading(false);
     }
 
@@ -570,6 +569,7 @@
     /* Devolve um texto de erro (fica no formulário) ou nada (deu certo e fecha). */
     async function salvar(tipo, corpo) {
       var ed = form.editando;
+      if (!podeGerir) corpo.responsavel_id = meuId || null;   // sem permissão de gerência: sempre para si mesmo
       if (tipo === "tarefa") {
         /* A prioridade vale por pessoa entre tarefas avulsas em aberto (rotinas e programadas ficam de fora da regra). */
         if (corpo.prioridade && corpo.responsavel_id) {
@@ -614,12 +614,15 @@
     var programadasEquipe = ativas.filter(function (a) { return a.status === "agendada"; }).sort(function (a, b) { return String(a.disponivel_em).localeCompare(String(b.disponivel_em)); });
     var atrasadasTotal = minhas.filter(function (a) { return secaoDe(a) === "atrasadas"; }).length;
 
-    var ctx = { meuId: meuId, podeGerir: podeGerir, concluir: concluir, iniciar: iniciar, pausar: pausar,
+    /* Gerência edita tudo. As demais pessoas só editam o que elas mesmas criaram para si. */
+    function podeEditar(x) { return podeGerir || (!!meuId && x.criada_por_id === meuId && x.responsavel_id === meuId); }
+
+    var ctx = { meuId: meuId, podeGerir: podeGerir, podeEditar: podeEditar, concluir: concluir, iniciar: iniciar, pausar: pausar,
       editar: function (a) { setForm({ modo: "tarefa", editando: a }); }, excluir: excluirTarefa, mostrarResp: false };
     var ctxEquipe = Object.assign({}, ctx, { mostrarResp: false });
     var ctxProg = Object.assign({}, ctx, { mostrarResp: true });
 
-    var botaoNova = podeGerir && h("button", { type: "button", className: "ac-btn ac-btn--primary", onClick: function () { setForm({ modo: "tarefa", editando: null }); } }, h(Ic, { n: "plus", size: 16 }), h("span", { className: "ac-btn-label" }, "Nova tarefa"));
+    var botaoNova = h("button", { type: "button", className: "ac-btn ac-btn--primary", onClick: function () { setForm({ modo: "tarefa", editando: null }); } }, h(Ic, { n: "plus", size: 16 }), h("span", { className: "ac-btn-label" }, "Nova tarefa"));
 
     function tab(id, rotulo, n, tomErr) {
       return h("button", { key: id, type: "button", role: "tab", "aria-selected": aba === id, className: "ac-tab", onClick: function () { setAba(id); } }, rotulo,
@@ -637,7 +640,7 @@
     else if (aba === "minhas") {
       var tudoVazio = !minhas.length;
       conteudo = tudoVazio
-        ? h(Vazio, { icone: "circleCheck", titulo: "Tudo em dia", texto: podeGerir ? "Você não tem tarefas em aberto. Crie uma tarefa, programe para depois ou monte uma rotina." : "Você não tem tarefas em aberto no momento.", acao: botaoNova || null })
+        ? h(Vazio, { icone: "circleCheck", titulo: "Tudo em dia", texto: "Você não tem tarefas em aberto. Crie uma tarefa para você, programe para depois ou monte uma rotina.", acao: botaoNova })
         : h("div", null,
             grupos.atrasadas.length > 0 && h(Secao, { titulo: "Atrasadas", tom: "err", itens: grupos.atrasadas }, grupos.atrasadas.map(function (a) { return h(CartaoTarefa, { key: a.id, a: a, ctx: ctx }); })),
             grupos.hoje.length > 0 && h(Secao, { titulo: "Hoje", itens: grupos.hoje }, grupos.hoje.map(function (a) { return h(CartaoTarefa, { key: a.id, a: a, ctx: ctx }); })),
@@ -665,10 +668,10 @@
     }
     else if (aba === "rotinas") {
       conteudo = h("div", null,
-        h("div", { className: "ac-banner is-info" }, h(Ic, { n: "info", size: 16 }), h("div", null, "Cada rotina cria uma tarefa no dia combinado, para o responsável, e isso acontece quando alguém abre as Ações no dia. Se ninguém abrir por mais de 2 dias, os dias mais antigos não são criados.")),
+        h("div", { className: "ac-banner is-info" }, h(Ic, { n: "info", size: 16 }), h("div", null, podeGerir ? "Cada rotina cria sozinha uma tarefa no dia combinado para o responsável, mesmo com o app fechado." : "Cada rotina cria sozinha uma tarefa no dia combinado para você, mesmo com o app fechado.")),
         !rotinas.length
           ? h(Vazio, { icone: "repeat", titulo: "Nenhuma rotina ainda", texto: "Use rotinas para o que se repete: passagem de plantão, conferência de carrinho de emergência, checagem de materiais…", acao: h("button", { type: "button", className: "ac-btn ac-btn--primary", onClick: function () { setForm({ modo: "tarefa", editando: null, quandoInicial: "repetir" }); } }, h(Ic, { n: "plus", size: 16 }), "Criar rotina") })
-          : h("div", { className: "ac-list" }, rotinas.map(function (r) { return h(CartaoRotina, { key: r.id, r: r, ativar: ativarRotina, editar: function (x) { setForm({ modo: "rotina", editando: x }); }, excluir: excluirRotina }); })));
+          : h("div", { className: "ac-list" }, rotinas.map(function (r) { return h(CartaoRotina, { key: r.id, r: r, podeEditar: podeEditar(r), ativar: ativarRotina, editar: function (x) { setForm({ modo: "rotina", editando: x }); }, excluir: excluirRotina }); })));
     }
     else {
       var porDia = [];
@@ -690,7 +693,7 @@
                   h("div", { style: { flex: 1, minWidth: 0 } },
                     h("h4", { className: "ac-title" }, a.titulo),
                     h("div", { className: "ac-done-meta" }, [(podeGerir && a.responsavel_nome) ? a.responsavel_nome : null, a.concluida_por_nome ? "concluída por " + a.concluida_por_nome : null, a.concluida_em ? fmtHora(new Date(a.concluida_em)) : null, a.tempo_min > 0 ? fmtTempo(a.tempo_min) : null].filter(Boolean).join(" · "))),
-                  podeGerir && h("button", { type: "button", className: "ac-btn ac-btn--ghost ac-btn--sm", onClick: function () { reabrir(a); } }, h(Ic, { n: "undo", size: 13 }), "Reabrir"));
+                  podeEditar(a) && h("button", { type: "button", className: "ac-btn ac-btn--ghost ac-btn--sm", onClick: function () { reabrir(a); } }, h(Ic, { n: "undo", size: 13 }), "Reabrir"));
               })));
           }));
     }
@@ -704,12 +707,12 @@
           h("div", { className: "ac-head-act" }, botaoNova,
             h("button", { type: "button", className: "ac-icon-btn", "aria-label": "Fechar", onClick: onClose }, h(Ic, { n: "x", size: 20 })))),
         h("nav", { className: "ac-tabs", role: "tablist", "aria-label": "Visões" },
-          tab("minhas", podeGerir ? "Minhas" : "Minhas tarefas", minhasAbertas, atrasadasTotal > 0),
+          tab("minhas", "Minhas", minhasAbertas, atrasadasTotal > 0),
           podeGerir && tab("equipe", "Equipe", contAbertasEquipe),
-          podeGerir && tab("rotinas", "Rotinas", rotinas.length),
+          tab("rotinas", "Rotinas", rotinas.length),
           tab("concluidas", "Concluídas", concluidas.length)),
         h("div", { className: "ac-body", role: "tabpanel" }, conteudo),
-        form && h(Formulario, { key: (form.editando ? form.editando.id : "nova") + form.modo, modo: form.modo, editando: form.editando, quandoInicial: form.quandoInicial, users: users, onSalvar: salvar, onCancelar: function () { setForm(null); } }),
+        form && h(Formulario, { key: (form.editando ? form.editando.id : "nova") + form.modo, modo: form.modo, editando: form.editando, quandoInicial: form.quandoInicial, users: users, podeGerir: podeGerir, onSalvar: salvar, onCancelar: function () { setForm(null); } }),
         conf && h("div", { className: "ac-confirm", onMouseDown: function (e) { if (e.target === e.currentTarget) setConf(null); } },
           h("div", { className: "ac-confirm-box", role: "alertdialog", "aria-modal": "true", "aria-labelledby": "ac-conf-t" },
             h("h3", { id: "ac-conf-t" }, conf.titulo), h("p", null, conf.msg),
