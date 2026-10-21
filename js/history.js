@@ -6,15 +6,10 @@ function HistoryPanel() {
   const [filterDate, setFilterDate] = useState("");
   const [users, setUsers] = useState([]);
   const [exportado, setExportado] = useState(false);
-  const [zerando, setZerando] = useState(false);
 
   /* Mês atual para label do backup */
   const mesAtual = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   const mesKey = new Date().toISOString().slice(0, 7); // "2026-09"
-
-  /* Verifica se já existe backup deste mês no localStorage */
-  const backupKey = "ge_audit_backup_" + mesKey;
-  const jaBackup = !!loadLS(backupKey, null);
 
   useEffect(() => {
     Promise.all([
@@ -36,39 +31,7 @@ function HistoryPanel() {
     a.download = `audit-log-${mesKey}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
-    saveLS(backupKey, { exportado_em: new Date().toISOString(), total: history.length });
     setExportado(true);
-  }
-
-  /* Zera o log no Supabase — só permitido após exportar */
-  async function zerarLog() {
-    if (!exportado && !jaBackup) return;
-    if (!window.confirm(
-      `Isso vai apagar PERMANENTEMENTE os ${history.length} registros do log de auditoria.
-
-O backup JSON já foi salvo no seu computador.
-
-Digite CONFIRMAR para prosseguir:`
-    )) return;
-    const conf = window.prompt("Digite CONFIRMAR para apagar o log:");
-    if (conf !== "CONFIRMAR") return;
-    setZerando(true);
-    try {
-      /* Deleta em lotes de 50 para não estourar timeout */
-      const ids = history.map(h => h.id);
-      for (let i = 0; i < ids.length; i += 50) {
-        const lote = ids.slice(i, i + 50);
-        await fetch(`${SB_URL}/rest/v1/card_history?id=in.(${lote.join(",")})`, {
-          method: "DELETE",
-          headers: { ...H(), Prefer: "return=minimal" }
-        });
-      }
-      setHistory([]);
-      saveLS(backupKey, { ...loadLS(backupKey, {}), zerado_em: new Date().toISOString() });
-    } catch (e) {
-      alert("Erro ao zerar: " + e.message);
-    }
-    setZerando(false);
   }
 
   const actionColor = {
@@ -111,43 +74,21 @@ Digite CONFIRMAR para prosseguir:`
         }, "✕ Limpar")
       )
     ),
-    /* ── Banner de backup mensal ── */
+    /* ── Backup do log (o log é imutável: o banco não permite apagar registros por aqui) ── */
     history.length > 0 && React.createElement("div", {
-      style: { background: (exportado || jaBackup) ? "#F0FDF4" : "#FEF3C7",
-        border: `1px solid ${(exportado || jaBackup) ? "#86EFAC" : "#FDE68A"}`,
-        borderRadius: 10, padding: "12px 16px", marginBottom: 16,
+      style: { background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "12px 16px", marginBottom: 16,
         display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }
     },
       React.createElement("div", null,
-        React.createElement("div", { style: { fontWeight: 700, fontSize: 13,
-          color: (exportado || jaBackup) ? "#15803D" : "#92400E" } },
-          (exportado || jaBackup)
-            ? "✅ Backup de " + mesAtual + " já realizado"
-            : "💾 Backup mensal — " + mesAtual
-        ),
-        React.createElement("div", { style: { fontSize: 11, color: "#64748B", marginTop: 2 } },
-          (exportado || jaBackup)
-            ? "Você pode zerar o log abaixo para liberar espaço."
-            : "Exporte o log antes de zerar. O backup fica salvo no seu computador."
-        )
+        React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: exportado ? "#15803D" : "#0F172A" } },
+          exportado ? "✅ Backup de " + mesAtual + " exportado" : "💾 Backup do log — " + mesAtual),
+        React.createElement("div", { style: { fontSize: 11, color: "#64748B", marginTop: 2, maxWidth: 520, lineHeight: 1.5 } },
+          "O arquivo inclui nomes de pacientes e é salvo no seu computador. Guarde em local seguro e apague quando não precisar mais.")
       ),
-      React.createElement("div", { style: { display: "flex", gap: 8 } },
-        React.createElement("button", {
-          onClick: exportarBackup,
-          style: { padding: "7px 14px", border: "none", borderRadius: 8,
-            background: "#0F172A", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }
-        }, "📥 Exportar backup"),
-        React.createElement("button", {
-          onClick: zerarLog,
-          disabled: (!exportado && !jaBackup) || zerando,
-          title: (!exportado && !jaBackup) ? "Exporte o backup primeiro" : "Apagar todos os registros do log",
-          style: { padding: "7px 14px", border: "1px solid #FCA5A5", borderRadius: 8,
-            background: (!exportado && !jaBackup) ? "#F1F5F9" : "none",
-            color: (!exportado && !jaBackup) ? "#CBD5E1" : "#DC2626",
-            fontWeight: 700, fontSize: 12,
-            cursor: (!exportado && !jaBackup) ? "not-allowed" : "pointer" }
-        }, zerando ? "Zerando…" : "🗑 Zerar log")
-      )
+      React.createElement("button", {
+        onClick: exportarBackup,
+        style: { padding: "7px 14px", border: "none", borderRadius: 8, background: "#0F172A", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }
+      }, "📥 Exportar backup")
     ),
     loading && React.createElement("div", { style: { textAlign: "center", padding: 32, color: "#94A3B8" } }, "Carregando…"),
     !loading && filtered.length === 0 && React.createElement("div", { style: { textAlign: "center", padding: 32, color: "#CBD5E1", fontSize: 13, border: "1.5px dashed #F1F5F9", borderRadius: 10 } }, "Nenhuma ação encontrada para os filtros selecionados."),
