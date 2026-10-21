@@ -836,7 +836,7 @@ function App() {
       if (!window.XLSX) {
         await new Promise((res, rej) => {
           const s = document.createElement("script");
-          s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+          s.src = "vendor/xlsx.full.min.js";
           s.onload = res;
           s.onerror = rej;
           document.head.appendChild(s);
@@ -886,7 +886,7 @@ function App() {
       if (!window.jspdf) {
         await new Promise((res, rej) => {
           const s = document.createElement("script");
-          s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+          s.src = "vendor/jspdf.umd.min.js";
           s.onload = res;
           s.onerror = rej;
           document.head.appendChild(s);
