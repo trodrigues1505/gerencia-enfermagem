@@ -1,0 +1,12 @@
+Bibliotecas hospedadas localmente (Gerência de Enfermagem) — gerado em 21/10/2026
+Origem: pacotes oficiais do registro npm (versões fixas). Para atualizar uma biblioteca, troque o arquivo e a versão aqui.
+
+ARQUIVO                      VERSAO       LICENCA        SHA384
+react.production.min.js      18.3.1       MIT            sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z
+react-dom.production.min.js  18.3.1       MIT            sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1
+babel.min.js                 7.29.9       MIT            sha384-oLbIC13I/8DNBviftYPfOFQS5DC2WUmwk0SyIPmnzu1Ui+vYyATSSBJiJ5ETa4o/
+supabase.js                  2.117.2      MIT            sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok
+html2canvas.min.js           1.4.1        MIT            sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H
+jspdf.umd.min.js             2.5.1        MIT            sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk
+xlsx.full.min.js             0.18.5       Apache-2.0     sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw
+fonts/inter-latin-*.woff2    5.3.0        SIL-OFL-1.1    (fonte Inter via @fontsource/inter)
