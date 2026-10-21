@@ -227,7 +227,7 @@ async function sbAuthClient(){
   if(!window.supabase){
     await new Promise((res,rej)=>{
       const el=document.createElement("script");
-      el.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
+      el.src="vendor/supabase.js";
       el.onload=res; el.onerror=rej; document.head.appendChild(el);
     });
   }
