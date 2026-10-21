@@ -2,7 +2,6 @@
 const SB_URL = "https://ahcrscstdtfawoogsugi.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoY3JzY3N0ZHRmYXdvb2dzdWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjk1MDgsImV4cCI6MjEwNDIwNTUwOH0.8ivWRA99AXXyBVFT3TQd5NuSod2eiowiI490Blt2zHM";
 const FN_URL = `${SB_URL}/functions/v1`;
-const ADMIN_COREN = "299283";
 
 const EMAIL_DOM = "@scfm.local";
 const emailDeRegistro = reg => String(reg||"").trim().toLowerCase() + EMAIL_DOM;
