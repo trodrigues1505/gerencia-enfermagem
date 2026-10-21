@@ -12,7 +12,7 @@
 //
 // A fonte de verdade da versão continua sendo o version.json. Este arquivo só precisa mudar quando a LÓGICA do
 // service worker mudar (por isso o nome do cache é fixo e não acompanha a versão do app).
-const APP_VERSION = '2026.10.02-20';   // só informativo (mensagem GET_VERSION); quem avisa de versão nova é o version.json
+const APP_VERSION = '2026.10.02-21';   // só informativo (mensagem GET_VERSION); quem avisa de versão nova é o version.json
 const CACHE = 'ge-app-v4';
 
 // Caminhos relativos ao escopo do SW — funcionam em qualquer subpasta.
