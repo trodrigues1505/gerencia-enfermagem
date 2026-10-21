@@ -131,11 +131,23 @@ function LoginScreen({
   function handleFoto(e, setter) {
     const f = e.target.files[0];
     if (!f) return;
+    // Reduz a foto antes de enviar (máx. 256 px, JPEG): o servidor recusa imagens grandes
+    // e uma foto de celular tem vários MB.
     const r = new FileReader();
-    r.onload = ev => setter(p => ({
-      ...p,
-      foto: ev.target.result
-    }));
+    r.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 256;
+        const k = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(img.width * k));
+        c.height = Math.max(1, Math.round(img.height * k));
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        setter(p => ({ ...p, foto: c.toDataURL("image/jpeg", 0.8) }));
+      };
+      img.onerror = () => setErr("Não foi possível ler essa imagem. Tente outra foto.");
+      img.src = ev.target.result;
+    };
     r.readAsDataURL(f);
   }
   const inp2 = {
