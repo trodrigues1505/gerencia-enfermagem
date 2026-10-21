@@ -1,3 +1,6 @@
+/* LGPD: snapshots com dados de pacientes deixaram de ser gravados no navegador.
+   Esta linha apaga as cópias antigas que ainda existam neste aparelho. */
+try { localStorage.removeItem("ge_snapshots"); } catch (e) {}
 const {
   useState,
   useEffect,
@@ -50,7 +53,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [showInstall, setShowInstall] = useState(false);
   const [showSnapPanel, setShowSnapPanel] = useState(false);
-  const [snapshots, setSnapshots] = useState(() => loadLS("ge_snapshots", []));
+  const [snapshots, setSnapshots] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [showDuplicates, setShowDuplicates] = useState(false);
   const [importResult, setImportResult] = useState(null);
@@ -167,11 +170,10 @@ function App() {
     applySnapshot(snap.cards, snap.cols);
   }
 
-  // Remove um snapshot do estado e do localStorage
+  // Remove um snapshot da lista da sessão (não existe mais cópia no navegador)
   function deleteSnapshot(id) {
     if (!window.confirm("Remover este snapshot?")) return;
     const updated = snapshots.filter(s => s.id !== id);
-    saveLS("ge_snapshots", updated);
     setSnapshots(updated);
     showT("Snapshot removido.");
   }
@@ -1035,9 +1037,8 @@ function App() {
       cards: cardsData,
       cols: colsData
     };
-    const list = loadLS("ge_snapshots", []);
-    const updated = [snap, ...list].slice(0, 20);
-    saveLS("ge_snapshots", updated);
+    // A lista vive só na memória desta sessão; o arquivo JSON baixado abaixo é a cópia que fica com o usuário.
+    const updated = [snap, ...snapshots].slice(0, 20);
     setSnapshots(updated);
     const blob = new Blob([JSON.stringify(snap, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
