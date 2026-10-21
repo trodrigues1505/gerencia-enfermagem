@@ -1,3 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gerência de Enfermagem</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0F172A">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GE Enfermagem">
+<link rel="apple-touch-icon" href="icon-192.svg">
+<link rel="stylesheet" href="css/app.css">
+<script src="canon.js"></script>
+<script src="vendor/react.production.min.js"></script>
+<script src="vendor/react-dom.production.min.js"></script>
+<script src="vendor/html2canvas.min.js"></script>
+
+</head>
+<body>
+<div id="root"></div>
+
+<div id="ge-version" role="status" tabindex="0" title="Versão do app. Clique para procurar atualizações.">
+  <span class="ge-pip"></span><span id="ge-version-label">—</span>
+</div>
+
+<div id="ge-update" role="alertdialog" aria-live="polite" aria-hidden="true">
+  <div class="ge-txt">
+    <b>Nova versão disponível</b>
+    <span>Atualize para continuar com os dados e recursos mais recentes. A página vai recarregar.</span>
+  </div>
+  <div class="ge-acts">
+    <button class="ge-now" id="ge-update-now">Atualizar</button>
+    <button class="ge-later" id="ge-update-later">Depois</button>
+  </div>
+</div>
+
 <script>
 (function () {
   // ==========================================================================
@@ -6,16 +44,13 @@
   // Qualquer mudança (index.html, sw.js, canon.js, manifest) é anunciada pelo
   // mesmo toast e aplicada pelo mesmo botão. F5 nunca é necessário.
   // ==========================================================================
-  var APP_VERSION = '2026.10.02-21';   // deve ser IGUAL ao "version" do version.json
+  var APP_VERSION = '2026.10.02-21';   // deve bater com version.json
 
   var pill  = document.getElementById('ge-version');
   var label = document.getElementById('ge-version-label');
   var toast = document.getElementById('ge-update');
   var novaVersao = null;
   var aplicando = false;
-  // Lembra, só nesta aba, qual versão o usuário acabou de aplicar. Evita o aviso voltar em loop.
-  function lerSS(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
-  function gravarSS(k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} }
 
   label.textContent = 'v' + APP_VERSION;
   pill.dataset.state = 'idle';
@@ -51,8 +86,6 @@
         await Promise.all(keys.map(function (k) { return caches.delete(k); }));
       }
     } catch (e) { console.error('[update]', e); }
-    gravarSS('ge_versao_aplicada', novaVersao || '');
-    gravarSS('ge_aplicado_em', String(Date.now()));
     location.replace(location.pathname + '?v=' + Date.now());
   }
 
@@ -81,28 +114,11 @@
     try {
       if ('serviceWorker' in navigator) {
         var reg = await navigator.serviceWorker.getRegistration();
-        if (reg) {
-          await reg.update();
-          if (reg.waiting) {
-            // Se o usuário acabou de clicar em Atualizar (últimos 2 min), ativa o worker em espera sem perguntar de novo.
-            if (Date.now() - Number(lerSS('ge_aplicado_em') || 0) < 120000) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-            else return anunciar(servidor);
-          }
-        }
+        if (reg) { await reg.update(); if (reg.waiting) return anunciar(servidor); }
       }
     } catch (e) {}
 
-    if (servidor && servidor !== APP_VERSION) {
-      if (servidor === lerSS('ge_versao_aplicada')) {
-        // Já atualizamos para esta versão e a página continua com outro número: não é cache,
-        // é o APP_VERSION do index.html diferente do version.json. Mostra o problema em vez de repetir o aviso.
-        pill.dataset.state = 'stale';
-        label.textContent = 'v' + APP_VERSION + ' ≠ servidor v' + servidor;
-        pill.title = 'APP_VERSION do index.html e "version" do version.json estão diferentes. Deixe os dois iguais no repositório.';
-        return;
-      }
-      return anunciar(servidor);
-    }
+    if (servidor && servidor !== APP_VERSION) return anunciar(servidor);
 
     if (porClique) {
       pill.dataset.state = 'current';
@@ -149,3 +165,25 @@
   });
 })();
 </script>
+
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/constants.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/login.js"></script>
+<script src="js/modais.js"></script>
+<script src="js/card-modal.js"></script>
+<script src="js/kanban.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/history.js"></script>
+<script src="js/users.js"></script>
+<script src="js/calendar.js"></script>
+<script src="js/timeline.js"></script>
+<script src="js/livro.js"></script>
+<script src="js/acoes.js"></script>
+<script src="js/floating.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
